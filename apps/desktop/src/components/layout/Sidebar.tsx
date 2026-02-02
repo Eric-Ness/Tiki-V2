@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Panel, Separator, type PanelImperativeHandle } from "react-resizable-panels";
+import { useLayoutStore } from "../../stores";
 
 interface SidebarProps {
   children: ReactNode;
@@ -16,13 +17,21 @@ export function Sidebar({
   className = "",
 }: SidebarProps) {
   const panelRef = useRef<PanelImperativeHandle>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const isCollapsed = useLayoutStore((state) => state.collapsedPanels.sidebar);
+  const setCollapsed = useLayoutStore((state) => state.setCollapsed);
 
   const handleToggle = () => {
     if (isCollapsed) {
       panelRef.current?.expand();
     } else {
       panelRef.current?.collapse();
+    }
+  };
+
+  const handleResize = (size: { asPercentage: number }) => {
+    const collapsed = size.asPercentage === 0;
+    if (collapsed !== isCollapsed) {
+      setCollapsed("sidebar", collapsed);
     }
   };
 
@@ -35,9 +44,7 @@ export function Sidebar({
         minSize={minSize}
         collapsible
         collapsedSize={0}
-        onResize={(size) => {
-          setIsCollapsed(size.asPercentage === 0);
-        }}
+        onResize={handleResize}
         className={`panel sidebar-panel ${isCollapsed ? "collapsed" : ""} ${className}`.trim()}
       >
         <div className="sidebar-content">

@@ -3,18 +3,21 @@ import { Panel } from "react-resizable-panels";
 
 interface MainContentProps {
   children: ReactNode;
+  defaultSize?: number;
   minSize?: number;
   className?: string;
 }
 
 export function MainContent({
   children,
+  defaultSize = 55,
   minSize = 30,
   className = "",
 }: MainContentProps) {
   return (
     <Panel
       id="main-content"
+      defaultSize={defaultSize}
       minSize={minSize}
       className={`panel main-content-panel ${className}`.trim()}
     >

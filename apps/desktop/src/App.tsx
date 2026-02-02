@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AppLayout, Sidebar, MainContent, DetailPanel } from "./components/layout";
+import { useLayoutStore } from "./stores";
 import "./App.css";
 
 // Types matching Rust state structures
@@ -48,6 +49,7 @@ function App() {
   const [state, setState] = useState<TikiState | null>(null);
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const panelSizes = useLayoutStore((state) => state.panelSizes);
 
   // Load initial state
   useEffect(() => {
@@ -95,7 +97,7 @@ function App() {
       </header>
 
       <AppLayout>
-        <Sidebar defaultSize={20} minSize={15}>
+        <Sidebar defaultSize={panelSizes.sidebar} minSize={15}>
           <h3>Navigation</h3>
           <nav className="nav-list">
             <a href="#" className="nav-item active">Active Work</a>
@@ -104,7 +106,7 @@ function App() {
           </nav>
         </Sidebar>
 
-        <MainContent minSize={30}>
+        <MainContent defaultSize={panelSizes.main} minSize={30}>
           <main className="main">
             <section className="section">
               <h2>Active Work</h2>
@@ -164,7 +166,7 @@ function App() {
           </main>
         </MainContent>
 
-        <DetailPanel defaultSize={25} minSize={15}>
+        <DetailPanel defaultSize={panelSizes.detail} minSize={15}>
           <h3>Details</h3>
           <p className="hint">Select an item to view details</p>
         </DetailPanel>
@@ -172,6 +174,13 @@ function App() {
 
       <footer className="footer">
         <span className="path">{tikiPath}</span>
+        <button
+          className="reset-layout-btn"
+          onClick={() => useLayoutStore.getState().resetLayout()}
+          title="Reset layout to defaults"
+        >
+          Reset Layout
+        </button>
       </footer>
     </div>
   );

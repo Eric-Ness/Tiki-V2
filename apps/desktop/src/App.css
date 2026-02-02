@@ -293,6 +293,9 @@
 
 /* Footer */
 .footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 12px 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.2);
@@ -302,4 +305,21 @@
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.3);
   font-family: monospace;
+}
+
+.reset-layout-btn {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reset-layout-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.2);
 }
