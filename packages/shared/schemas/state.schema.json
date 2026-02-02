@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/state.schema.json",
+  "title": "Tiki State",
+  "description": "Tracks all active work and execution history for Tiki v2",
+  "type": "object",
+  "required": ["schemaVersion", "activeWork"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version for migrations"
+    },
+    "activeWork": {
+      "type": "object",
+      "description": "All currently active work items, keyed by work ID (e.g., 'issue:42' or 'release:v1.2')",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^issue:\\d+$": {
+          "$ref": "#/$defs/issueWork"
+        },
+        "^release:.+$": {
+          "$ref": "#/$defs/releaseWork"
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "description": "Record of completed work",
+      "additionalProperties": false,
+      "properties": {
+        "lastCompletedIssue": {
+          "$ref": "#/$defs/completedIssueRecord"
+        },
+        "lastCompletedRelease": {
+          "$ref": "#/$defs/completedReleaseRecord"
+        },
+        "recentIssues": {
+          "type": "array",
+          "description": "Recently completed issues (for quick reference)",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/completedIssueRecord"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "workStatus": {
+      "type": "string",
+      "enum": ["pending", "planning", "executing", "paused", "shipping", "completed", "failed"],
+      "description": "Status of a work item"
+    },
+    "phaseStatus": {
+      "type": "string",
+      "enum": ["pending", "executing", "completed", "failed", "skipped"],
+      "description": "Status of an individual phase"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp"
+    },
+    "issueWork": {
+      "type": "object",
+      "description": "State for a single issue being worked on",
+      "required": ["type", "issue", "status", "createdAt", "lastActivity"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "issue"
+        },
+        "issue": {
+          "type": "object",
+          "required": ["number"],
+          "additionalProperties": false,
+          "properties": {
+            "number": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "GitHub issue number"
+            },
+            "title": {
+              "type": "string",
+              "description": "Issue title (cached from GitHub)"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Full GitHub issue URL"
+            }
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/workStatus"
+        },
+        "phase": {
+          "type": "object",
+          "description": "Current phase execution state",
+          "additionalProperties": false,
+          "properties": {
+            "current": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Current phase number (1-indexed)"
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Total number of phases"
+            },
+            "status": {
+              "$ref": "#/$defs/phaseStatus"
+            }
+          }
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "lastActivity": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error details if status is 'failed'",
+          "additionalProperties": false,
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "integer",
+              "description": "Phase where failure occurred"
+            },
+            "timestamp": {
+              "$ref": "#/$defs/timestamp"
+            }
+          }
+        }
+      }
+    },
+    "releaseWork": {
+      "type": "object",
+      "description": "State for a release (group of issues)",
+      "required": ["type", "release", "status", "createdAt", "lastActivity"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "release"
+        },
+        "release": {
+          "type": "object",
+          "required": ["version", "issues"],
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^v?\\d+\\.\\d+(\\.\\d+)?(-[a-zA-Z0-9]+)?$",
+              "description": "Semantic version (e.g., 'v1.2.0', '1.2', 'v2.0-beta')"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "description": "Issue numbers included in this release"
+            },
+            "currentIssue": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Currently executing issue number"
+            },
+            "completedIssues": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "description": "Issue numbers that have been completed"
+            },
+            "milestone": {
+              "type": "string",
+              "description": "GitHub milestone name (if different from version)"
+            }
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/workStatus"
+        },
+        "phase": {
+          "type": "object",
+          "description": "Current phase of current issue",
+          "additionalProperties": false,
+          "properties": {
+            "current": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "status": {
+              "$ref": "#/$defs/phaseStatus"
+            }
+          }
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "lastActivity": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "issue": {
+              "type": "integer",
+              "description": "Issue where failure occurred"
+            },
+            "phase": {
+              "type": "integer",
+              "description": "Phase where failure occurred"
+            },
+            "timestamp": {
+              "$ref": "#/$defs/timestamp"
+            }
+          }
+        }
+      }
+    },
+    "completedIssueRecord": {
+      "type": "object",
+      "required": ["number", "completedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "completedReleaseRecord": {
+      "type": "object",
+      "required": ["version", "completedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "completedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

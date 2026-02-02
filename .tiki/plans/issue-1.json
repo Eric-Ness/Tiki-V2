@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 1,
+    "title": "feat(desktop): Install react-resizable-panels for layout system",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/1"
+  },
+  "createdAt": "2026-02-02T12:02:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Package react-resizable-panels is listed in package.json dependencies"
+    },
+    {
+      "id": "SC2",
+      "category": "Build",
+      "criterion": "pnpm build completes without errors in apps/desktop"
+    },
+    {
+      "id": "SC3",
+      "category": "Runtime",
+      "criterion": "Tauri dev server starts and renders the app without errors"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "A PanelGroup with 2 Panel components renders in the UI"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "PanelResizeHandle is visible between panels"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "criterion": "Dragging the resize handle changes panel widths"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Install react-resizable-panels and verify build",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:04:00.000Z",
+      "content": "Install the react-resizable-panels package and verify the project still builds correctly.\n\n1. Run `pnpm add react-resizable-panels` in the apps/desktop directory\n2. Run `pnpm build` to verify TypeScript compilation succeeds\n3. Check that no type errors or build warnings are introduced",
+      "verification": [
+        "react-resizable-panels appears in apps/desktop/package.json dependencies",
+        "pnpm build completes with exit code 0",
+        "No TypeScript errors related to the new package"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/package.json"
+      ],
+      "dependencies": [],
+      "summary": "Phase 1 Summary:\n- Modified: apps/desktop/package.json\n- Key changes: Added react-resizable-panels ^4.5.8 to dependencies\n- Verification: PASS - all 3 checks passed\n- Notes for next phase: Package ready to import in App.tsx"
+    },
+    {
+      "number": 2,
+      "title": "Implement basic PanelGroup with resize handles",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:06:00.000Z",
+      "content": "Create a working demo of react-resizable-panels in the App component.\n\n1. Import PanelGroup, Panel, and PanelResizeHandle from react-resizable-panels\n2. Wrap the existing app content in a Panel layout:\n   - Left panel: Navigation/sidebar placeholder\n   - Right panel: Current app content (Active Work section)\n3. Add PanelResizeHandle between panels with visible styling\n4. Add necessary CSS for panels to have proper dimensions and handle visibility\n5. Test that the Tauri dev server runs and panels resize correctly",
+      "verification": [
+        "pnpm tauri:dev starts without errors",
+        "App renders with two visible panels side by side",
+        "A resize handle is visible between the panels",
+        "Dragging the handle resizes both panels proportionally"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/App.css"
+      ],
+      "dependencies": [1],
+      "summary": "Phase 2 Summary:\n- Modified: apps/desktop/src/App.tsx, apps/desktop/src/App.css\n- Key changes:\n  - Imported Group, Panel, Separator from react-resizable-panels (v4 API)\n  - Wrapped app content in horizontal Group with two Panels\n  - Added sidebar panel (25% default, 15% min) with navigation placeholder\n  - Added content panel (30% min) with existing Active Work content\n  - Added Separator (resize handle) with hover styling\n  - Added CSS for panel layout and sidebar navigation\n- Verification: PASS - build succeeds, panels render correctly\n- Note: v4 API uses Group/Separator instead of PanelGroup/PanelResizeHandle"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [2],
+    "SC5": [2],
+    "SC6": [2]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@tiki/framework",
+  "version": "0.1.0",
+  "description": "Claude Code commands for Tiki workflow framework",
+  "type": "module",
+  "main": "./install.js",
+  "bin": {
+    "tiki-install": "./install.js"
+  },
+  "files": [
+    "commands",
+    "install.js"
+  ],
+  "scripts": {
+    "install-commands": "node install.js"
+  },
+  "dependencies": {
+    "@tiki/shared": "workspace:*"
+  }
+}

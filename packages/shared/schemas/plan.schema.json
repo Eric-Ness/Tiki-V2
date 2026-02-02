@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/plan.schema.json",
+  "title": "Tiki Plan",
+  "description": "Phase definitions and progress for a single GitHub issue",
+  "type": "object",
+  "required": ["schemaVersion", "issue", "createdAt", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version for migrations"
+    },
+    "issue": {
+      "type": "object",
+      "description": "GitHub issue metadata",
+      "required": ["number", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "GitHub issue number"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Issue title"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full GitHub issue URL"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Issue labels"
+        },
+        "milestone": {
+          "type": "string",
+          "description": "Associated milestone name"
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this plan was created"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this plan was last modified"
+    },
+    "successCriteria": {
+      "type": "array",
+      "description": "What needs to be true for this issue to be considered complete",
+      "items": {
+        "$ref": "#/$defs/successCriterion"
+      }
+    },
+    "phases": {
+      "type": "array",
+      "description": "Ordered list of execution phases",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/phase"
+      }
+    },
+    "coverageMatrix": {
+      "type": "object",
+      "description": "Maps success criteria IDs to the phases that address them",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "research": {
+      "type": "array",
+      "description": "Research documents referenced during planning",
+      "items": {
+        "type": "string",
+        "description": "Path to research document"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional planning notes or context"
+    }
+  },
+  "$defs": {
+    "criteriaCategory": {
+      "type": "string",
+      "enum": ["functional", "testing", "performance", "security", "documentation", "other"],
+      "description": "Category of success criterion"
+    },
+    "phaseStatus": {
+      "type": "string",
+      "enum": ["pending", "executing", "completed", "failed", "skipped"],
+      "description": "Current status of a phase"
+    },
+    "successCriterion": {
+      "type": "object",
+      "description": "A single success criterion that must be met",
+      "required": ["id", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^SC\\d+$",
+          "description": "Unique identifier (e.g., 'SC1', 'SC2')"
+        },
+        "category": {
+          "$ref": "#/$defs/criteriaCategory"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What needs to be true"
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether this criterion has been verified as met"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this criterion was verified"
+        }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "description": "A single execution phase",
+      "required": ["number", "title", "status", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Phase number (1-indexed, matches execution order)"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short title describing the phase"
+        },
+        "status": {
+          "$ref": "#/$defs/phaseStatus"
+        },
+        "content": {
+          "type": "string",
+          "description": "Detailed instructions for this phase"
+        },
+        "verification": {
+          "type": "array",
+          "description": "How to verify this phase was completed correctly",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addressesCriteria": {
+          "type": "array",
+          "description": "Success criteria IDs this phase addresses",
+          "items": {
+            "type": "string",
+            "pattern": "^SC\\d+$"
+          }
+        },
+        "files": {
+          "type": "array",
+          "description": "Files expected to be created or modified",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Phase numbers that must complete before this one (for future parallel execution)",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When execution of this phase started"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this phase completed"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Summary of what was accomplished (filled after completion)"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error details if phase failed",
+          "additionalProperties": false,
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    }
+  }
+}

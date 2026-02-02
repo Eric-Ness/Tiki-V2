@@ -1,0 +1,25 @@
+[package]
+name = "tiki-desktop"
+version = "0.1.0"
+description = "Tiki Desktop - GitHub issue workflow manager"
+authors = ["Eric Nichols"]
+license = "MIT"
+repository = "https://github.com/ericnichols/Tiki-V2"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "tiki_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "=2.9.1", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+notify = { version = "8", features = ["serde"] }
+tokio = { version = "1", features = ["sync", "rt"] }

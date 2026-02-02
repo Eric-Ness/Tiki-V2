@@ -1,0 +1,16 @@
+{
+  "name": "tiki-v2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub-issue-centric workflow framework for Claude Code",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "clean": "pnpm -r clean",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
