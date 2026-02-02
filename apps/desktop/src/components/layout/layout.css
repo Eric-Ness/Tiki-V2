@@ -47,14 +47,53 @@
 /* Resize handle */
 .resize-handle {
   width: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  transition: background 0.15s ease;
+  background: transparent;
   cursor: col-resize;
+  position: relative;
+  transition: background 0.15s ease;
 }
 
-.resize-handle:hover,
-.resize-handle:active {
-  background: rgba(96, 165, 250, 0.6);
+/* Grip indicator - vertical dots */
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 24px;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.5) 1px,
+    transparent 1px
+  );
+  background-size: 2px 8px;
+  background-repeat: repeat-y;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Hover state - show grip indicator */
+.resize-handle:hover {
+  background: rgba(96, 165, 250, 0.3);
+}
+
+.resize-handle:hover::before {
+  opacity: 1;
+}
+
+/* Active/dragging state - solid accent color */
+.resize-handle[data-resize-handle-active] {
+  background: #60a5fa;
+}
+
+.resize-handle[data-resize-handle-active]::before {
+  opacity: 1;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.8) 1px,
+    transparent 1px
+  );
 }
 
 /* Collapse toggle buttons */
