@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { AppLayout, Sidebar, MainContent, DetailPanel } from "./components/layout";
 import "./App.css";
 
 // Types matching Rust state structures
@@ -94,21 +94,17 @@ function App() {
         <span className="subtitle">GitHub Issue Workflow</span>
       </header>
 
-      <Group orientation="horizontal" className="panel-group">
-        <Panel id="sidebar" defaultSize={25} minSize={15} className="panel sidebar-panel">
-          <div className="sidebar">
-            <h3>Navigation</h3>
-            <nav className="nav-list">
-              <a href="#" className="nav-item active">Active Work</a>
-              <a href="#" className="nav-item">History</a>
-              <a href="#" className="nav-item">Settings</a>
-            </nav>
-          </div>
-        </Panel>
+      <AppLayout>
+        <Sidebar defaultSize={20} minSize={15}>
+          <h3>Navigation</h3>
+          <nav className="nav-list">
+            <a href="#" className="nav-item active">Active Work</a>
+            <a href="#" className="nav-item">History</a>
+            <a href="#" className="nav-item">Settings</a>
+          </nav>
+        </Sidebar>
 
-        <Separator className="resize-handle" />
-
-        <Panel id="content" minSize={30} className="panel content-panel">
+        <MainContent minSize={30}>
           <main className="main">
             <section className="section">
               <h2>Active Work</h2>
@@ -166,8 +162,13 @@ function App() {
               </section>
             )}
           </main>
-        </Panel>
-      </Group>
+        </MainContent>
+
+        <DetailPanel defaultSize={25} minSize={15}>
+          <h3>Details</h3>
+          <p className="hint">Select an item to view details</p>
+        </DetailPanel>
+      </AppLayout>
 
       <footer className="footer">
         <span className="path">{tikiPath}</span>

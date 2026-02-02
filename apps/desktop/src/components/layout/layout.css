@@ -1,0 +1,128 @@
+/* AppLayout - Root panel container */
+.app-layout {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+/* Panel base styles */
+.panel {
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar panel */
+.sidebar-panel {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-content {
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Main content panel */
+.main-content-panel {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.main-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Detail panel */
+.detail-panel {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.detail-content {
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Resize handle */
+.resize-handle {
+  width: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.15s ease;
+  cursor: col-resize;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(96, 165, 250, 0.6);
+}
+
+/* Collapse toggle buttons */
+.collapse-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapse-toggle:hover {
+  background: rgba(96, 165, 250, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.collapse-toggle-sidebar {
+  right: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.collapse-toggle-detail {
+  left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Expand buttons (shown when panel is collapsed) */
+.expand-toggle {
+  width: 20px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expand-toggle:hover {
+  background: rgba(96, 165, 250, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.expand-toggle-sidebar {
+  border-radius: 0 4px 4px 0;
+}
+
+.expand-toggle-detail {
+  border-radius: 4px 0 0 4px;
+}
+
+/* Collapsed panel state */
+.panel.collapsed {
+  overflow: hidden;
+}
