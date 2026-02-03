@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +11,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useIssuesStore, useKanbanStore, useTikiReleasesStore } from '../../stores';
+import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useLayoutStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard } from './KanbanCard';
@@ -46,6 +47,8 @@ export function KanbanBoard() {
   const issues = useIssuesStore((s) => s.issues);
   const releaseFilter = useKanbanStore((s) => s.releaseFilter);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
+  const { tabs, activeTabId } = useTerminalStore();
+  const setActiveView = useLayoutStore((s) => s.setActiveView);
   const [activeId, setActiveId] = useState<number | null>(null);
 
   // Configure DnD sensors
@@ -55,6 +58,52 @@ export function KanbanBoard() {
     }),
     useSensor(KeyboardSensor)
   );
+
+  // Get active terminal ID
+  const getActiveTerminalId = useCallback((): string | null => {
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    return activeTab?.activeTerminalId || null;
+  }, [tabs, activeTabId]);
+
+  // Execute a command in the terminal
+  const executeInTerminal = useCallback(async (command: string) => {
+    const terminalId = getActiveTerminalId();
+    if (!terminalId) {
+      console.error('No active terminal found');
+      return false;
+    }
+    try {
+      await invoke('write_terminal', { id: terminalId, data: command + '\n' });
+      return true;
+    } catch (error) {
+      console.error('Failed to write to terminal:', error);
+      return false;
+    }
+  }, [getActiveTerminalId]);
+
+  // Determine the appropriate command based on source column
+  const getExecuteCommand = (issueNumber: number, fromColumn: string): string => {
+    // If coming from Backlog (no plan yet), run full yolo
+    if (fromColumn === 'backlog') {
+      return `/tiki:yolo ${issueNumber}`;
+    }
+    // If coming from Planning (has plan) or resuming, just execute
+    return `/tiki:execute ${issueNumber}`;
+  };
+
+  // Trigger execution for an issue
+  const triggerExecution = useCallback(async (issueNumber: number, fromColumn: string) => {
+    const command = getExecuteCommand(issueNumber, fromColumn);
+
+    // Switch to terminal view
+    setActiveView('terminal');
+
+    // Send command to terminal
+    const success = await executeInTerminal(command);
+    if (success) {
+      console.log(`Started execution: ${command}`);
+    }
+  }, [setActiveView, executeInTerminal]);
 
   // Find which column an issue belongs to
   const getIssueColumn = (issueNumber: number): string | null => {
@@ -93,9 +142,11 @@ export function KanbanBoard() {
       return;
     }
 
-    // TODO: Trigger workflow action based on target column
-    // This will be implemented in issue #39 (auto-execute) and #40 (auto-ship)
-    console.log(`Drop: issue #${issueNumber} from ${sourceColumn} to ${targetColumn}`);
+    // Trigger workflow action based on target column
+    if (targetColumn === 'executing') {
+      triggerExecution(issueNumber, sourceColumn);
+    }
+    // TODO: Issue #40 will handle shipping
   };
 
   // Get the issue being dragged for the overlay
