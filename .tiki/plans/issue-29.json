@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 29,
+    "title": "Add Issue enhancements",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/29"
+  },
+  "createdAt": "2026-02-03T20:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Users can click 'Enhance with AI' and select an enhancement type from a dropdown"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Description is sent to Claude and updated with enhanced text"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can configure AI execution settings (model, planning type, run tests)"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Users can set issue priority (High/Medium/Low)"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Users can assign the new issue to an existing release"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "criterion": "Users can select branch strategy (current/auto/custom)"
+    },
+    {
+      "id": "SC7",
+      "category": "UI",
+      "criterion": "All new controls fit within modal following existing styling patterns"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add Priority and Branch Selection UI",
+      "status": "completed",
+      "completedAt": "2026-02-03T20:50:00.000Z",
+      "summary": "Added priority toggle (High/Medium/Low) with color-coded buttons and branch strategy dropdown with Current/Auto/Custom options. Custom branch reveals text input. Form state tracks all selections. Build and typecheck pass.",
+      "content": "Add the foundational UI elements for priority selection and branch strategy to the IssueFormModal. Priority will use a 3-button toggle (High/Medium/Low) similar to label selection. Branch selection will be a dropdown with options: 'current', 'auto', 'custom'. When 'custom' is selected, show a text input for the branch name. These don't require backend changes and establish the expanded form structure.",
+      "verification": [
+        "Modal displays priority toggle with High/Medium/Low options",
+        "Priority selection is visually indicated (styled like labels)",
+        "Branch dropdown shows three options: Current Branch, Auto, Custom",
+        "Selecting 'Custom' reveals a text input for branch name",
+        "Form state correctly tracks priority and branch selections",
+        "Build passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC4", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add AI Execution Settings Section",
+      "status": "completed",
+      "completedAt": "2026-02-03T20:55:00.000Z",
+      "summary": "Added collapsible AI Execution section with model dropdown (sonnet/opus/haiku), planning type dropdown (skip/lite/spec/full with full as default), and run tests checkbox. Section expands/collapses with chevron animation. Build and typecheck pass.",
+      "content": "Add a collapsible 'AI Execution' section to the modal containing: (1) Model selection dropdown with options like 'sonnet', 'opus', 'haiku', (2) Planning type dropdown with 'skip', 'lite', 'spec', 'full' (default: full), (3) 'Run tests' checkbox. This section configures how Tiki will process the issue after creation. Use a collapsible section pattern to keep the modal compact.",
+      "verification": [
+        "AI Execution section appears in the modal (collapsible)",
+        "Model dropdown shows available model options",
+        "Planning type dropdown shows skip/lite/spec/full with 'full' as default",
+        "Run tests checkbox is functional",
+        "Settings are tracked in form state",
+        "Section can be expanded/collapsed",
+        "Build passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC3", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add Release Assignment UI",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:00:00.000Z",
+      "summary": "Added 'Add to Release' dropdown that pulls from useTikiReleasesStore and shows active releases. Users can select a release or leave unassigned. Shows hint when no active releases available. Build and typecheck pass.",
+      "content": "Add an 'Add to Release' dropdown that lists available Tiki releases. Fetch releases from the releasesStore or .tiki/releases/ directory. The dropdown should show release versions with their status. Selected release is tracked in form state and will be used after issue creation to add the issue to that release.",
+      "verification": [
+        "Release dropdown appears in the modal",
+        "Dropdown lists available releases with version names",
+        "User can select a release or leave it unassigned",
+        "Selected release is tracked in form state",
+        "Build passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC5", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 4,
+      "title": "Add Enhance with AI Button and Dropdown",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:05:00.000Z",
+      "summary": "Added 'Enhance with AI' button next to description field with dropdown menu containing 4 enhancement options: Improve clarity, Add technical details, Simplify language, Add acceptance criteria. Button shows loading spinner when enhancing. Dropdown closes on outside click. Backend call placeholder ready for Phase 6. Build and typecheck pass.",
+      "content": "Add an 'Enhance with AI' button next to the description textarea. When clicked, show a dropdown menu with enhancement options: 'Improve clarity', 'Add technical details', 'Simplify language', 'Add acceptance criteria'. Clicking an option triggers the enhancement (backend call added in next phase). Show loading state while processing. The button should be styled as a secondary action near the description field.",
+      "verification": [
+        "Enhance with AI button appears near description field",
+        "Clicking button reveals dropdown with 4 enhancement options",
+        "Dropdown closes when clicking outside",
+        "Selected enhancement type is captured for backend call",
+        "Loading state placeholder is in place",
+        "Build passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC1", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 5,
+      "title": "Add Backend Command for AI Enhancement",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:10:00.000Z",
+      "summary": "Added enhance_issue_description Tauri command that uses Claude CLI with appropriate prompts for each enhancement type (clarity, technical, simplify, acceptance). Command registered in lib.rs. Cargo check passes.",
+      "content": "Create a new Tauri command 'enhance_issue_description' that takes the current description text and enhancement type, calls the Claude API (via the Anthropic SDK or CLI), and returns the enhanced description. The command should: (1) Accept description and enhancement_type parameters, (2) Build an appropriate prompt based on enhancement type, (3) Call Claude API using environment variable ANTHROPIC_API_KEY or claude CLI, (4) Return the enhanced text. Handle errors gracefully.",
+      "verification": [
+        "New command 'enhance_issue_description' is registered in lib.rs",
+        "Command accepts description and enhancement_type parameters",
+        "Command builds appropriate prompts for each enhancement type",
+        "Command calls Claude and returns enhanced text",
+        "Error handling returns meaningful error messages",
+        "Build passes with cargo build"
+      ],
+      "addressesCriteria": ["SC2"],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [4]
+    },
+    {
+      "number": 6,
+      "title": "Connect AI Enhancement UI to Backend",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:14:00.000Z",
+      "summary": "Wired up handleEnhanceDescription to call enhance_issue_description backend command. On success, description field updates with enhanced text. Loading state shows while processing, errors display on failure. Build and typecheck pass.",
+      "content": "Wire up the Enhance with AI dropdown to call the backend command. When user selects an enhancement type: (1) Show loading spinner on button, (2) Disable description editing, (3) Call enhance_issue_description via invoke, (4) Update description field with result, (5) Re-enable editing. Handle errors by showing an error toast or inline message.",
+      "verification": [
+        "Selecting enhancement option triggers backend call",
+        "Loading state shows while processing",
+        "Description field updates with enhanced text on success",
+        "Error message displays on failure",
+        "User can edit the enhanced description after it returns",
+        "Manual test: enhance a description and verify output"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx"
+      ],
+      "dependencies": [4, 5]
+    },
+    {
+      "number": 7,
+      "title": "Add Git Branch Listing Backend Command",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:20:00.000Z",
+      "summary": "Added get_current_branch and list_git_branches Tauri commands using git CLI. get_current_branch returns current branch name via git rev-parse. list_git_branches returns array of local branch names via git branch --format. Both accept project_path parameter and have proper error handling for non-git directories. Commands registered in lib.rs. Cargo check passes.",
+      "content": "Add a Tauri command 'list_git_branches' that returns available git branches for the active project. Also add 'get_current_branch' to get the current branch name. These will populate the branch dropdown when 'Current Branch' is selected (showing actual branch name) and enable validation for custom branch input.",
+      "verification": [
+        "Command 'list_git_branches' returns array of branch names",
+        "Command 'get_current_branch' returns current branch name",
+        "Commands work with project_path parameter",
+        "Error handling for non-git directories",
+        "Build passes with cargo build"
+      ],
+      "addressesCriteria": ["SC6"],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 8,
+      "title": "Connect Branch UI to Backend and Polish",
+      "status": "completed",
+      "completedAt": "2026-02-03T21:25:00.000Z",
+      "summary": "Wired branch dropdown to backend. Added currentBranchName state and fetchCurrentBranch function that calls get_current_branch on modal open. Current Branch option now shows actual branch name (e.g., 'Current (main)'). Loading state disables dropdown while fetching. All form fields maintain state correctly with proper resets on open. Build and typecheck pass.",
+      "content": "Wire up branch selection UI to use the git commands. Show current branch name in the dropdown option. For custom branch, optionally validate against existing branches. Final polish: ensure all new UI elements have consistent styling, proper focus management, and keyboard navigation. Test the complete flow end-to-end.",
+      "verification": [
+        "Current Branch option shows actual branch name",
+        "Branch dropdown populates correctly",
+        "Custom branch input works",
+        "All form fields maintain state correctly",
+        "Tab order is logical through new fields",
+        "End-to-end manual test: create issue with all new options",
+        "Build and typecheck pass"
+      ],
+      "addressesCriteria": ["SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [7]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [4, 6],
+    "SC2": [5, 6],
+    "SC3": [2],
+    "SC4": [1],
+    "SC5": [3],
+    "SC6": [1, 7, 8],
+    "SC7": [1, 2, 3, 4, 8]
+  }
+}

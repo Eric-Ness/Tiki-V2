@@ -1,30 +1,33 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:28": {
+    "issue:29": {
       "type": "issue",
-      "issue": {
-        "number": 28,
-        "title": "feat(framework): Add release command files for multi-issue pipeline execution"
-      },
+      "number": 29,
+      "title": "Add Issue enhancements",
       "status": "shipping",
-      "pipelineStep": "SHIP",
+      "startedAt": "2026-02-03T20:30:00.000Z",
+      "lastActivity": "2026-02-03T21:25:00.000Z",
       "phase": {
-        "current": 4,
-        "total": 4,
+        "current": 8,
+        "total": 8,
         "status": "completed"
       },
-      "createdAt": "2026-02-03T18:00:00.000Z",
-      "lastActivity": "2026-02-03T18:10:00.000Z"
+      "auditPassed": true
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 25,
-      "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
-      "completedAt": "2026-02-03T12:30:00.000Z"
+      "number": 28,
+      "title": "feat(framework): Add release command files for multi-issue pipeline execution",
+      "completedAt": "2026-02-03T18:30:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 28,
+        "title": "feat(framework): Add release command files for multi-issue pipeline execution",
+        "completedAt": "2026-02-03T18:30:00.000Z"
+      },
       {
         "number": 25,
         "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
@@ -69,11 +72,6 @@
         "number": 10,
         "title": "feat(desktop): Add Releases section showing versions",
         "completedAt": "2026-02-02T22:00:00.000Z"
-      },
-      {
-        "number": 9,
-        "title": "feat(desktop): Add GitHub Issues section using gh CLI",
-        "completedAt": "2026-02-02T21:05:00.000Z"
       }
     ]
   }
