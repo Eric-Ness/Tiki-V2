@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTerminalStore } from '../../stores';
-import { Terminal } from './Terminal';
+import { TerminalSplit } from './TerminalSplit';
 import { TerminalTabs } from './TerminalTabs';
 import './Terminal.css';
 
 export function TerminalPane() {
-  const { tabs, activeTabId, addTab, removeTab, setActiveTab, updateTabStatus } = useTerminalStore();
+  const { tabs, activeTabId, addTab, removeTab, setActiveTab, splitTerminal } = useTerminalStore();
   const hasInitialized = useRef(false);
 
   // Create initial tab if none exist
@@ -60,16 +60,32 @@ export function TerminalPane() {
       }
       return;
     }
-  }, [activeTabId, addTab, removeTab, setActiveTab, tabs]);
+
+    // Ctrl + Shift + H: Split horizontal
+    if ((e.key === 'h' || e.key === 'H') && e.shiftKey) {
+      e.preventDefault();
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab && activeTabId) {
+        splitTerminal(activeTabId, activeTab.activeTerminalId, 'horizontal');
+      }
+      return;
+    }
+
+    // Ctrl + Shift + V: Split vertical
+    if ((e.key === 'v' || e.key === 'V') && e.shiftKey) {
+      e.preventDefault();
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      if (activeTab && activeTabId) {
+        splitTerminal(activeTabId, activeTab.activeTerminalId, 'vertical');
+      }
+      return;
+    }
+  }, [activeTabId, addTab, removeTab, setActiveTab, splitTerminal, tabs]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
-
-  const handleStatusChange = (tabId: string, status: 'ready' | 'busy' | 'idle' | 'exited') => {
-    updateTabStatus(tabId, status);
-  };
 
   return (
     <div className="terminal-pane">
@@ -81,10 +97,7 @@ export function TerminalPane() {
             className="terminal-instance"
             style={{ display: tab.id === activeTabId ? 'flex' : 'none' }}
           >
-            <Terminal
-              tabId={tab.id}
-              onStatusChange={(status) => handleStatusChange(tab.id, status)}
-            />
+            <TerminalSplit tabId={tab.id} node={tab.splitRoot} />
           </div>
         ))}
       </div>

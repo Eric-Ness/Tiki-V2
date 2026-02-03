@@ -26,4 +26,8 @@ export {
   useTerminalStore,
   type TerminalTab,
   type TerminalStatus,
+  type SplitDirection,
+  type TerminalLeaf,
+  type SplitNode,
+  type SplitTreeNode,
 } from './terminalStore';

@@ -10,11 +10,11 @@ interface TerminalProps {
   className?: string;
   cwd?: string;
   shell?: string;
-  tabId?: string;
+  terminalId?: string;
   onStatusChange?: (status: 'ready' | 'busy' | 'idle' | 'exited') => void;
 }
 
-export function Terminal({ className = "", cwd, shell, tabId, onStatusChange }: TerminalProps) {
+export function Terminal({ className = "", cwd, shell, terminalId, onStatusChange }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -59,6 +59,7 @@ export function Terminal({ className = "", cwd, shell, tabId, onStatusChange }: 
     onExit: handleExit,
     cwd,
     shell,
+    externalId: terminalId,
   });
 
   // Store functions in refs to avoid stale closures

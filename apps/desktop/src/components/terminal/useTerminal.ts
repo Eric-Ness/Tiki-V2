@@ -18,6 +18,7 @@ export interface UseTerminalOptions {
   onExit?: (exitCode: number | null) => void;
   shell?: string;
   cwd?: string;
+  externalId?: string;
 }
 
 export interface UseTerminalReturn {
@@ -33,7 +34,7 @@ export interface UseTerminalReturn {
 let terminalCounter = 0;
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { onOutput, onExit, shell, cwd } = options;
+  const { onOutput, onExit, shell, cwd, externalId } = options;
 
   const [terminalId, setTerminalId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -55,8 +56,8 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
     try {
       setError(null);
 
-      // Generate unique terminal ID
-      const id = `terminal-${Date.now()}-${++terminalCounter}`;
+      // Use external ID if provided, otherwise generate one
+      const id = externalId ?? `terminal-${Date.now()}-${++terminalCounter}`;
       currentIdRef.current = id;
 
       // Set up event listeners before creating terminal
@@ -99,7 +100,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       unlistenOutputRef.current = null;
       unlistenExitRef.current = null;
     }
-  }, [shell, cwd]);
+  }, [shell, cwd, externalId]);
 
   // Write data to the terminal
   const writeTerminal = useCallback(async (data: string) => {
