@@ -240,6 +240,11 @@ export function KanbanBoard() {
     >
       <div className="kanban-board">
         <KanbanFilters />
+        {issues.length === 0 && (
+          <div className="kanban-no-issues-hint">
+            No issues loaded. Click "Issues" in the sidebar to fetch from GitHub.
+          </div>
+        )}
         <div className="kanban-columns">
           {columns.map((column) => (
             <KanbanColumn
