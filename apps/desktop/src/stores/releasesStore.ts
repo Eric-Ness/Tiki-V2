@@ -6,7 +6,7 @@ export interface GitHubRelease {
   isDraft: boolean;
   isPrerelease: boolean;
   publishedAt?: string;
-  url: string;
+  url?: string;
 }
 
 interface ReleasesState {

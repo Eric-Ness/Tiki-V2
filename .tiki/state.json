@@ -1,28 +1,18 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "issue:29": {
-      "type": "issue",
-      "number": 29,
-      "title": "Add Issue enhancements",
-      "status": "shipping",
-      "startedAt": "2026-02-03T20:30:00.000Z",
-      "lastActivity": "2026-02-03T21:25:00.000Z",
-      "phase": {
-        "current": 8,
-        "total": 8,
-        "status": "completed"
-      },
-      "auditPassed": true
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 28,
-      "title": "feat(framework): Add release command files for multi-issue pipeline execution",
-      "completedAt": "2026-02-03T18:30:00.000Z"
+      "number": 29,
+      "title": "Add Issue enhancements",
+      "completedAt": "2026-02-03T21:30:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 29,
+        "title": "Add Issue enhancements",
+        "completedAt": "2026-02-03T21:30:00.000Z"
+      },
       {
         "number": 28,
         "title": "feat(framework): Add release command files for multi-issue pipeline execution",
@@ -67,11 +57,6 @@
         "number": 11,
         "title": "feat(desktop): Install PTY plugin and xterm.js for terminal",
         "completedAt": "2026-02-02T23:30:00.000Z"
-      },
-      {
-        "number": 10,
-        "title": "feat(desktop): Add Releases section showing versions",
-        "completedAt": "2026-02-02T22:00:00.000Z"
       }
     ]
   }
