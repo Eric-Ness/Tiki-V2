@@ -92,3 +92,62 @@ pub fn fetch_github_issues(
     serde_json::from_str(&stdout)
         .map_err(|e| format!("Failed to parse issues: {}", e))
 }
+
+/// A GitHub release fetched from gh CLI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubRelease {
+    pub tag_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub is_draft: bool,
+    pub is_prerelease: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub url: String,
+}
+
+/// Fetch GitHub releases from the current repository
+/// - limit: Maximum number of releases to fetch. Defaults to 20
+#[tauri::command]
+pub fn fetch_github_releases(limit: Option<u32>) -> Result<Vec<GitHubRelease>, String> {
+    let limit_val = limit.unwrap_or(20);
+
+    let output = Command::new("gh")
+        .args([
+            "release",
+            "list",
+            "--json",
+            "tagName,name,isDraft,isPrerelease,publishedAt,url",
+            "--limit",
+            &limit_val.to_string(),
+        ])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("Failed to fetch releases: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse releases: {}", e))
+}

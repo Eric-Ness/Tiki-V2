@@ -37,6 +37,7 @@ pub fn run() {
             commands::switch_project,
             github::check_gh_auth,
             github::fetch_github_issues,
+            github::fetch_github_releases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

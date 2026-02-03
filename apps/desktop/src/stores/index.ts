@@ -16,3 +16,8 @@ export {
   type GitHubLabel,
   type IssueFilter,
 } from './issuesStore';
+
+export {
+  useReleasesStore,
+  type GitHubRelease,
+} from './releasesStore';
