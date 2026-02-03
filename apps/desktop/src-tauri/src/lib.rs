@@ -6,6 +6,7 @@ mod watcher;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Initialize logging in debug mode
             if cfg!(debug_assertions) {
@@ -30,6 +31,9 @@ pub fn run() {
             commands::get_state,
             commands::get_plan,
             commands::get_tiki_path,
+            commands::select_project_directory,
+            commands::validate_tiki_directory,
+            commands::switch_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

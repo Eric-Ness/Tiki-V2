@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 7,
+    "title": "feat(desktop): Add Projects section with add/remove/switch",
+    "url": "https://github.com/ericnichols/Tiki-V2/issues/7"
+  },
+  "createdAt": "2026-02-02T18:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Users can add projects via native folder selection dialog"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Users can remove projects with a confirmation prompt"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can switch between projects by clicking"
+    },
+    {
+      "id": "SC4",
+      "category": "Visual",
+      "criterion": "Active project is visually distinguished (highlighted)"
+    },
+    {
+      "id": "SC5",
+      "category": "Persistence",
+      "criterion": "Project list persists across app restarts"
+    },
+    {
+      "id": "SC6",
+      "category": "Validation",
+      "criterion": "Only valid Tiki directories (with .tiki folder) can be added"
+    },
+    {
+      "id": "SC7",
+      "category": "Integration",
+      "criterion": "Switching projects updates the file watcher to new directory"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add Tauri dialog plugin and Rust commands",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:50:00.000Z",
+      "summary": "Added tauri-plugin-dialog v2 to Cargo.toml. Created select_project_directory() command using blocking_pick_folder() for native folder picker. Created validate_tiki_directory(path) command to check for .tiki folder existence. Registered dialog plugin and both commands in lib.rs. Fixed pre-existing TypeScript import issue in CollapsibleSection.tsx. Cargo build and pnpm build both succeed.",
+      "content": "Install tauri-plugin-dialog for native file dialogs. Add two Rust commands:\n\n1. `select_project_directory()` - Opens native folder picker dialog and returns selected path\n2. `validate_tiki_directory(path: String)` - Checks if the given path contains a .tiki folder\n\nSteps:\n1. Add tauri-plugin-dialog to Cargo.toml dependencies\n2. Register the dialog plugin in lib.rs\n3. Add the two commands to commands.rs\n4. Register new commands in the invoke_handler",
+      "verification": [
+        "cargo build succeeds with new plugin",
+        "Commands are registered (visible in invoke_handler)",
+        "App launches without errors"
+      ],
+      "addressesCriteria": ["SC1", "SC6"],
+      "files": [
+        "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create projectsStore with Zustand",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:55:00.000Z",
+      "summary": "Created projectsStore.ts with Project interface, ProjectsState, and ProjectsActions. Store uses persist middleware with key 'tiki-projects'. Implements addProject (auto-selects new project if none active), removeProject (selects next project if removing active), setActiveProject, and getActiveProject. Exported from stores/index.ts. TypeScript compiles successfully.",
+      "content": "Create a Zustand store for managing project state with persistence.\n\nInterface:\n```typescript\ninterface Project {\n  id: string;        // unique identifier (uuid)\n  name: string;      // display name (folder name)\n  path: string;      // absolute path to project\n  addedAt: string;   // ISO timestamp\n}\n\ninterface ProjectsState {\n  projects: Project[];\n  activeProjectId: string | null;\n}\n\ninterface ProjectsActions {\n  addProject: (path: string, name: string) => void;\n  removeProject: (id: string) => void;\n  setActiveProject: (id: string) => void;\n  getActiveProject: () => Project | undefined;\n}\n```\n\nUse persist middleware with key 'tiki-projects' following layoutStore pattern.",
+      "verification": [
+        "TypeScript compiles without errors",
+        "Store exports useProjectsStore hook",
+        "Follows existing layoutStore.ts pattern"
+      ],
+      "addressesCriteria": ["SC5"],
+      "files": [
+        "apps/desktop/src/stores/projectsStore.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Create ProjectCard component",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:00:00.000Z",
+      "summary": "Created ProjectCard.tsx with Project display, active state styling (highlighted border), hover-visible remove button (X icon), keyboard navigation (Enter/Space), and path truncation. Created ProjectCard.css with dark theme styling, focus states, and smooth transitions. TypeScript compiles successfully.",
+      "content": "Create a ProjectCard component for displaying individual projects.\n\nProps:\n```typescript\ninterface ProjectCardProps {\n  project: Project;\n  isActive: boolean;\n  onSelect: () => void;\n  onRemove: () => void;\n}\n```\n\nFeatures:\n- Display project name and truncated path\n- Active state visual indicator (highlighted border/background)\n- Remove button (X icon) that appears on hover\n- Click card to select/switch\n- Keyboard accessible (Enter/Space to select)\n\nCreate matching CSS file for styling.",
+      "verification": [
+        "Component renders without errors",
+        "Active state is visually distinct",
+        "Remove button visible on hover",
+        "Keyboard navigation works"
+      ],
+      "addressesCriteria": ["SC4"],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectCard.tsx",
+        "apps/desktop/src/components/sidebar/ProjectCard.css"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Create ProjectsSection component",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:05:00.000Z",
+      "summary": "Created ProjectsSection.tsx using CollapsibleSection wrapper, ProjectCard list, folder icon, and badge count. Implements add flow: invoke select_project_directory -> validate_tiki_directory -> addProject. Shows error message for invalid directories. Remove flow uses window.confirm. Loading state during add. Created ProjectsSection.css with empty state, error styling, and dashed add button. TypeScript compiles successfully.",
+      "content": "Create the main ProjectsSection component that wraps project list.\n\nFeatures:\n- Uses CollapsibleSection for expand/collapse\n- Displays list of ProjectCard components\n- Add Project button that triggers Rust dialog command\n- Validation: calls validate_tiki_directory before adding\n- Error toast/message if selected folder is invalid\n- Confirmation dialog before removing a project\n\nFlow for adding:\n1. User clicks Add button\n2. Call invoke('select_project_directory')\n3. If path returned, call invoke('validate_tiki_directory', { path })\n4. If valid, add to store; if invalid, show error\n\nFlow for removing:\n1. User clicks remove on ProjectCard\n2. Show confirmation (can use window.confirm initially)\n3. If confirmed, remove from store",
+      "verification": [
+        "Section renders in sidebar",
+        "Add button opens folder picker",
+        "Invalid directories show error message",
+        "Remove shows confirmation before deleting",
+        "Project list updates reactively"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC6"],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx",
+        "apps/desktop/src/components/sidebar/ProjectsSection.css"
+      ],
+      "dependencies": [1, 2, 3]
+    },
+    {
+      "number": 5,
+      "title": "Integrate ProjectsSection into Sidebar",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:10:00.000Z",
+      "summary": "Added ProjectsSection import to App.tsx. Placed ProjectsSection as first element in Sidebar, above Active Work section. Build succeeds with all components integrated. CSS bundle increased from 6.32KB to 10.53KB with new component styles.",
+      "content": "Add ProjectsSection to the Sidebar component.\n\nSteps:\n1. Import ProjectsSection in Sidebar.tsx\n2. Add ProjectsSection as first section in sidebar content\n3. Ensure proper spacing and layout with other sidebar content\n\nNote: The sidebar may need a container for multiple sections.",
+      "verification": [
+        "ProjectsSection visible in sidebar",
+        "Layout is correct and doesn't break existing UI",
+        "App builds and runs successfully"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src/components/layout/Sidebar.tsx"
+      ],
+      "dependencies": [4]
+    },
+    {
+      "number": 6,
+      "title": "Implement file watcher project switching",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:20:00.000Z",
+      "summary": "Refactored watcher.rs to support dynamic project switching using global WatcherState with OnceLock<Arc<Mutex>>. Added switch_watch_path() function that stops current watcher via channel signal and spawns new watcher thread. Added switch_project command in commands.rs that validates path and calls watcher switch. Updated ProjectsSection.tsx with useEffect to call switch_project when activeProjectId changes. Both Rust and TypeScript build successfully.",
+      "content": "Enable switching the file watcher to watch a different project directory.\n\nApproach:\n1. Add a Rust command `switch_project(path: String)` that:\n   - Signals the current watcher to stop\n   - Starts a new watcher for the new path\n2. Use a channel or atomic flag to signal watcher shutdown\n3. Call this command from React when activeProjectId changes\n\nAlternative simpler approach:\n1. Store the current watch path in a Mutex<Option<PathBuf>>\n2. On project switch, update the path and emit a 'project-switched' event\n3. Watcher reads from the Mutex to determine current path\n\nChoose the simpler approach if the full restart is complex.\n\nReact side:\n- In ProjectsSection or App.tsx, use useEffect to detect activeProjectId changes\n- Call invoke('switch_project', { path }) when it changes\n- Optionally refresh state data after switch",
+      "verification": [
+        "Switching project updates watcher path",
+        "File changes in new project trigger events",
+        "No watcher errors on project switch",
+        "App state refreshes to show new project data"
+      ],
+      "addressesCriteria": ["SC7"],
+      "files": [
+        "apps/desktop/src-tauri/src/watcher.rs",
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx"
+      ],
+      "dependencies": [4, 5]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 4, 5],
+    "SC2": [4, 5],
+    "SC3": [4, 5],
+    "SC4": [3, 5],
+    "SC5": [2],
+    "SC6": [1, 4],
+    "SC7": [6]
+  }
+}

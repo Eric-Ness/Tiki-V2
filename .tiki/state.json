@@ -1,25 +1,30 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:6": {
-      "number": 6,
-      "title": "feat(desktop): Create CollapsibleSection component with animations",
+    "issue:7": {
+      "number": 7,
+      "title": "feat(desktop): Add Projects section with add/remove/switch",
       "status": "shipping",
-      "lastActivity": "2026-02-02T12:20:00.000Z",
+      "lastActivity": "2026-02-02T19:20:00.000Z",
       "phase": {
-        "total": 2,
-        "current": 2,
+        "total": 6,
+        "current": 6,
         "status": "completed"
       }
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 5,
-      "title": "feat(desktop): Integrate new layout into App.tsx",
-      "completedAt": "2026-02-03T00:05:00.000Z"
+      "number": 6,
+      "title": "feat(desktop): Create CollapsibleSection component with animations",
+      "completedAt": "2026-02-02T12:25:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 6,
+        "title": "feat(desktop): Create CollapsibleSection component with animations",
+        "completedAt": "2026-02-02T12:25:00.000Z"
+      },
       {
         "number": 5,
         "title": "feat(desktop): Integrate new layout into App.tsx",

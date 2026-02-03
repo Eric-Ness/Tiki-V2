@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import "./CollapsibleSection.css";
 
 export interface CollapsibleSectionProps {

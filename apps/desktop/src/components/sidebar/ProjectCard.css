@@ -1,0 +1,81 @@
+.project-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+  background-color: var(--bg-secondary, #1e1e1e);
+}
+
+.project-card:hover {
+  background-color: var(--bg-hover, #2a2a2a);
+}
+
+.project-card:focus {
+  outline: none;
+  border-color: var(--accent-color, #007acc);
+}
+
+.project-card.active {
+  background-color: var(--bg-active, #37373d);
+  border-color: var(--accent-color, #007acc);
+}
+
+.project-card-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.project-card-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary, #cccccc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-card-path {
+  font-size: 11px;
+  color: var(--text-secondary, #858585);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.project-card-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.project-card:hover .project-card-remove,
+.project-card:focus-within .project-card-remove {
+  opacity: 1;
+}
+
+.project-card-remove:hover {
+  background-color: var(--bg-hover, #3c3c3c);
+  color: var(--text-primary, #cccccc);
+}
+
+.project-card-remove:focus {
+  outline: none;
+  opacity: 1;
+  background-color: var(--bg-hover, #3c3c3c);
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AppLayout, Sidebar, MainContent, DetailPanel } from "./components/layout";
+import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { WorkCard, type WorkContext } from "./components/work";
 import { useLayoutStore } from "./stores";
 import "./App.css";
@@ -79,6 +80,8 @@ function App() {
 
       <AppLayout>
         <Sidebar defaultSize={panelSizes.sidebar} minSize={15}>
+          <ProjectsSection />
+
           <h3>Active Work</h3>
           {error && <div className="error">{error}</div>}
 
