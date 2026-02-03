@@ -1,31 +1,35 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:18": {
+    "issue:28": {
       "type": "issue",
       "issue": {
-        "number": 18,
-        "title": "Add/Edit Release",
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/18"
+        "number": 28,
+        "title": "feat(framework): Add release command files for multi-issue pipeline execution"
       },
       "status": "shipping",
+      "pipelineStep": "SHIP",
       "phase": {
-        "total": 5,
-        "current": 5,
+        "current": 4,
+        "total": 4,
         "status": "completed"
       },
-      "createdAt": "2026-02-02T18:00:00.000Z",
-      "lastActivity": "2026-02-02T18:40:00.000Z",
-      "auditPassed": true
+      "createdAt": "2026-02-03T18:00:00.000Z",
+      "lastActivity": "2026-02-03T18:10:00.000Z"
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 17,
-      "title": "Add/Edit New Github Issues",
-      "completedAt": "2026-02-02T13:05:00.000Z"
+      "number": 25,
+      "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
+      "completedAt": "2026-02-03T12:30:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 25,
+        "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
+        "completedAt": "2026-02-03T12:30:00.000Z"
+      },
       {
         "number": 17,
         "title": "Add/Edit New Github Issues",
@@ -70,11 +74,6 @@
         "number": 9,
         "title": "feat(desktop): Add GitHub Issues section using gh CLI",
         "completedAt": "2026-02-02T21:05:00.000Z"
-      },
-      {
-        "number": 8,
-        "title": "feat(desktop): Add State section showing execution progress",
-        "completedAt": "2026-02-02T19:55:00.000Z"
       }
     ]
   }

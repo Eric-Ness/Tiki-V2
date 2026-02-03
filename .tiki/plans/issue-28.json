@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 28,
+    "title": "feat(framework): Add release command files for multi-issue pipeline execution",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/28"
+  },
+  "createdAt": "2026-02-03T18:10:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "/tiki:release v1.2 executes all issues in dependency order"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "--dry-run flag previews execution order without executing"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "--continue flag resumes after a failed issue"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "/tiki:release status shows release progress"
+    },
+    {
+      "id": "SC5",
+      "category": "Shipping",
+      "criterion": "Git tag is created and pushed on completion"
+    },
+    {
+      "id": "SC6",
+      "category": "Shipping",
+      "criterion": "GitHub milestone is closed if linked"
+    },
+    {
+      "id": "SC7",
+      "category": "State",
+      "criterion": "state.json is updated with release:{version} work item"
+    },
+    {
+      "id": "SC8",
+      "category": "State",
+      "criterion": "Release file archived to .tiki/releases/archive/ on completion"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Core release execution command",
+      "status": "pending",
+      "content": "Create packages/framework/commands/release.md with the primary execution flow:\n\n1. YAML frontmatter with name, description, argument pattern, tools list\n2. Overview section explaining release execution\n3. <instructions> section with steps for:\n   - Loading release from .tiki/releases/{version}.json\n   - Initializing state.json with release:{version} work entry\n   - Calculating dependency order by parsing 'depends on #N' from issue bodies\n   - Executing each issue via Skill tool calling /tiki:yolo\n   - Tracking currentIssue and completedIssues in state\n4. <dependency-parsing> section explaining regex pattern for dependencies\n5. <release-flow> diagram showing execution flow\n6. <state-management> section with JSON examples for ReleaseWork\n7. <output> section with progress table format",
+      "verification": [
+        "File exists at packages/framework/commands/release.md",
+        "YAML frontmatter is valid with name: release",
+        "Instructions cover load, parse deps, execute issues, update state",
+        "State management section shows ReleaseWork JSON structure"
+      ],
+      "addressesCriteria": ["SC1", "SC7"],
+      "files": [
+        "packages/framework/commands/release.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add --dry-run and --continue flags",
+      "status": "pending",
+      "content": "Extend release.md to handle command flags:\n\n1. Add <argument-parsing> section showing flag detection:\n   - --dry-run: Preview execution order without running\n   - --continue: Resume from last failed/incomplete issue\n   - --no-tag: Skip git tag creation on ship\n2. Add <dry-run-mode> section that:\n   - Loads release and calculates dependency order\n   - Outputs ordered list of issues without executing\n   - Shows which issues are already completed (if resuming)\n3. Add <resume-logic> section that:\n   - Checks state.json for existing release:{version} entry\n   - Identifies currentIssue and completedIssues\n   - Skips already-completed issues\n   - Continues from where it left off\n4. Add appropriate <errors> for:\n   - Release not found\n   - No issues to execute (all done)\n   - Invalid flag combinations",
+      "verification": [
+        "release.md includes --dry-run documentation and logic",
+        "release.md includes --continue documentation and logic",
+        "--dry-run section shows output format without execution",
+        "Resume logic handles partial completion state"
+      ],
+      "addressesCriteria": ["SC2", "SC3"],
+      "files": [
+        "packages/framework/commands/release.md"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add status subcommand and release shipping",
+      "status": "pending",
+      "content": "Complete release.md with status and shipping functionality:\n\n1. Add <status-subcommand> section:\n   - /tiki:release status - Show all release statuses\n   - /tiki:release status v1.2 - Show specific release\n   - Output format showing issues completed/pending\n2. Add <release-shipping> section with steps:\n   - Create git tag: git tag {version} && git push origin {version}\n   - Close GitHub milestone: gh api to update milestone state\n   - Archive release file: move to .tiki/releases/archive/\n   - Update state.json history with release completion\n3. Add <next-actions> section with AskUserQuestion options:\n   - Release another version\n   - View release history\n   - Done\n4. Ensure all <errors> are comprehensive:\n   - Tag creation failures\n   - Milestone not found\n   - Push permission errors",
+      "verification": [
+        "/tiki:release status documented with output format",
+        "Shipping section includes git tag, milestone close, archive steps",
+        "Error handling covers tag/push/milestone failures",
+        "Next actions use AskUserQuestion pattern from other commands"
+      ],
+      "addressesCriteria": ["SC4", "SC5", "SC6", "SC8"],
+      "files": [
+        "packages/framework/commands/release.md"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Final polish and verification",
+      "status": "pending",
+      "content": "Review and finalize the release command:\n\n1. Read through the complete release.md file\n2. Verify consistency with other command files (yolo.md, ship.md patterns)\n3. Ensure all XML sections are properly closed\n4. Verify JSON examples are valid\n5. Check that all success criteria are addressed\n6. Test that the command can be invoked (syntax check)\n7. Ensure the command is registered/discoverable",
+      "verification": [
+        "All XML tags properly opened and closed",
+        "JSON examples are syntactically valid",
+        "Command format matches yolo.md and ship.md patterns",
+        "All 8 success criteria addressed in the command file"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7", "SC8"],
+      "files": [
+        "packages/framework/commands/release.md"
+      ],
+      "dependencies": [3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 4],
+    "SC2": [2, 4],
+    "SC3": [2, 4],
+    "SC4": [3, 4],
+    "SC5": [3, 4],
+    "SC6": [3, 4],
+    "SC7": [1, 4],
+    "SC8": [3, 4]
+  }
+}
