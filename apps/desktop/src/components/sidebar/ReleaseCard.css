@@ -28,6 +28,11 @@
   border-color: var(--accent-color, #007acc);
 }
 
+.release-card.selected {
+  background-color: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
 .release-card-header {
   display: flex;
   align-items: center;

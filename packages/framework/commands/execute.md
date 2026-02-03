@@ -39,6 +39,7 @@ This is not optional. The desktop app and other tooling rely on the `phase` obje
       "type": "issue",
       "issue": { "number": {N}, "title": "..." },
       "status": "executing",
+      "pipelineStep": "EXECUTE",
       "phase": {
         "current": {phase number, 1-indexed},
         "total": {total phases from plan},
@@ -196,6 +197,7 @@ During execution, update `.tiki/state.json`:
     "status": "executing"
   },
   "status": "executing",
+  "pipelineStep": "EXECUTE",
   "lastActivity": "{ISO timestamp}"
 }
 ```

@@ -25,16 +25,47 @@ pub enum WorkContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IssueContext {
-    pub issue_number: u32,
-    pub title: String,
+    pub issue: IssueRef,
     pub status: WorkStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_phase: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_phases: Option<u32>,
-    pub started_at: String,
+    pub phase: Option<PhaseProgress>,
+    pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_activity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audit_passed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yolo: Option<bool>,
+}
+
+/// Reference to a GitHub issue
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueRef {
+    pub number: u32,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// Phase progress tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhaseProgress {
+    pub total: u32,
+    pub current: u32,
+    pub status: PhaseProgressStatus,
+}
+
+/// Status of the current phase
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PhaseProgressStatus {
+    Pending,
+    Running,
+    Executing,
+    Completed,
+    Failed,
 }
 
 /// Context for working on a release
@@ -47,7 +78,7 @@ pub struct ReleaseContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_issue: Option<u32>,
     pub completed_issues: Vec<u32>,
-    pub started_at: String,
+    pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_activity: Option<String>,
 }
@@ -57,10 +88,12 @@ pub struct ReleaseContext {
 #[serde(rename_all = "lowercase")]
 pub enum WorkStatus {
     Pending,
+    Planning,
     Executing,
     Paused,
     Completed,
     Failed,
+    Shipping,
 }
 
 /// History tracking

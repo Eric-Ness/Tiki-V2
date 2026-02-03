@@ -113,7 +113,21 @@ Prefix each with an ID: SC1, SC2, SC3, etc.
 <state-management>
 Update `.tiki/state.json` after review:
 - Change status from `pending` to `planning`
+- Set `pipelineStep` to `"REVIEW"`
 - Update `lastActivity` timestamp
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "status": "planning",
+      "pipelineStep": "REVIEW",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
 </state-management>
 
 <errors>

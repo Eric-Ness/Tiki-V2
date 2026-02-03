@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { type GitHubIssue, type GitHubLabel } from "../../stores";
+import { type GitHubIssue } from "../../stores";
 import "./IssueFormModal.css";
 
 interface LabelInfo {

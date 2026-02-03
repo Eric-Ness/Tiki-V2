@@ -41,6 +41,7 @@ When getting an issue, update `.tiki/state.json`:
         "url": "{url}"
       },
       "status": "pending",
+      "pipelineStep": "GET",
       "createdAt": "{ISO timestamp}",
       "lastActivity": "{ISO timestamp}"
     }

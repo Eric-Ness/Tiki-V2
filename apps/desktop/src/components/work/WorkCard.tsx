@@ -1,22 +1,37 @@
+export type WorkStatus = "pending" | "planning" | "executing" | "paused" | "completed" | "failed" | "shipping";
+export type PhaseStatus = "pending" | "running" | "executing" | "completed" | "failed";
+export type PipelineStep = "GET" | "REVIEW" | "PLAN" | "AUDIT" | "EXECUTE" | "SHIP";
+
+export interface PhaseInfo {
+  total: number;
+  current: number;
+  status: PhaseStatus;
+}
+
 export interface IssueContext {
   type: "issue";
-  issueNumber: number;
-  title: string;
-  status: "pending" | "executing" | "paused" | "completed" | "failed";
-  currentPhase?: number;
-  totalPhases?: number;
-  startedAt: string;
+  issue: {
+    number: number;
+    title: string;
+    url: string;
+  };
+  status: WorkStatus;
+  pipelineStep?: PipelineStep;
+  phase?: PhaseInfo;
+  createdAt: string;
   lastActivity?: string;
+  auditPassed?: boolean;
 }
 
 export interface ReleaseContext {
   type: "release";
   version: string;
   issues: number[];
-  status: "pending" | "executing" | "paused" | "completed" | "failed";
+  status: WorkStatus;
+  pipelineStep?: PipelineStep;
   currentIssue?: number;
   completedIssues: number[];
-  startedAt: string;
+  createdAt: string;
   lastActivity?: string;
 }
 
@@ -39,24 +54,24 @@ export function WorkCard({ work }: WorkCardProps) {
       <div className="work-title">
         {isIssue ? (
           <>
-            <span className="issue-number">#{work.issueNumber}</span>
-            <span className="title">{work.title}</span>
+            <span className="issue-number">#{work.issue.number}</span>
+            <span className="title">{work.issue.title}</span>
           </>
         ) : (
           <span className="version">{work.version}</span>
         )}
       </div>
 
-      {isIssue && work.currentPhase && work.totalPhases && (
+      {isIssue && work.phase && work.phase.total > 0 && (
         <div className="progress">
           <div className="progress-bar">
             <div
               className="progress-fill"
-              style={{ width: `${(work.currentPhase / work.totalPhases) * 100}%` }}
+              style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
             />
           </div>
           <span className="progress-text">
-            Phase {work.currentPhase} of {work.totalPhases}
+            Phase {work.phase.current} of {work.phase.total}
           </span>
         </div>
       )}

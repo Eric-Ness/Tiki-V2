@@ -91,9 +91,23 @@ Validate a plan before execution to catch issues early. This step checks for com
 
 <state-management>
 After audit:
+- Set `pipelineStep` to `"AUDIT"`
 - If PASS: Update state status to `executing`, ready for execute
 - If WARN: Keep status as `planning`, note warnings in state
 - If FAIL: Keep status as `planning`, execution blocked until fixed
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "status": "executing",
+      "pipelineStep": "AUDIT",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
 </state-management>
 
 <errors>

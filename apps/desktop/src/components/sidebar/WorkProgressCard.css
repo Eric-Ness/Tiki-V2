@@ -116,33 +116,63 @@
   color: var(--text-primary, #cccccc);
 }
 
-/* Progress bar */
-.work-progress-bar-container {
+/* Segmented Phase Progress */
+.work-progress-phases {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
 }
 
-.work-progress-bar {
+.phase-segments {
   flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
+  display: flex;
+  gap: 3px;
+  height: 6px;
 }
 
-.work-progress-fill {
+.phase-segment {
+  flex: 1;
   height: 100%;
-  background: #4ade80;
   border-radius: 2px;
-  transition: width 0.3s ease;
+  transition: background-color 0.3s ease;
+}
+
+/* Segment status colors */
+.phase-segment.segment-completed {
+  background: #4ade80;
+}
+
+.phase-segment.segment-running {
+  background: #60a5fa;
+  animation: pulse-segment 1.5s ease-in-out infinite;
+}
+
+.phase-segment.segment-pending {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.phase-segment.segment-failed {
+  background: #f87171;
+}
+
+/* Pulse animation for running phase */
+@keyframes pulse-segment {
+  0%, 100% {
+    opacity: 1;
+    background: #60a5fa;
+  }
+  50% {
+    opacity: 0.5;
+    background: #3b82f6;
+  }
 }
 
 .work-progress-text {
   font-size: 11px;
   color: var(--text-secondary, #858585);
   white-space: nowrap;
+  min-width: 40px;
+  text-align: right;
 }
 
 /* Release progress */
@@ -152,17 +182,9 @@
   gap: 4px;
   font-size: 12px;
   color: var(--text-secondary, #858585);
-  margin-bottom: 8px;
 }
 
 .work-progress-current {
   font-size: 11px;
   color: var(--text-tertiary, #666666);
-}
-
-/* Timestamp */
-.work-progress-timestamp {
-  font-size: 10px;
-  color: var(--text-tertiary, #666666);
-  text-align: right;
 }
