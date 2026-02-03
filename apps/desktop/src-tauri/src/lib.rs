@@ -39,6 +39,7 @@ pub fn run() {
             commands::load_tiki_releases,
             commands::save_tiki_release,
             commands::delete_tiki_release,
+            github::check_claude_cli,
             github::check_gh_auth,
             github::fetch_github_issues,
             github::fetch_github_releases,

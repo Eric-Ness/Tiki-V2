@@ -27,6 +27,26 @@ pub struct GitHubIssue {
     pub updated_at: String,
 }
 
+/// Check if Claude CLI is installed and accessible
+/// Returns Ok(true) if installed, Ok(false) if not installed
+#[tauri::command]
+pub fn check_claude_cli() -> Result<bool, String> {
+    let output = Command::new("claude")
+        .args(["--version"])
+        .output();
+
+    match output {
+        Ok(result) => Ok(result.status.success()),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Ok(false)
+            } else {
+                Err(format!("Failed to check Claude CLI: {}", e))
+            }
+        }
+    }
+}
+
 /// Check if gh CLI is authenticated
 /// Returns Ok(true) if authenticated, Ok(false) if not authenticated,
 /// Err if gh CLI is not installed
@@ -354,14 +374,15 @@ pub fn enhance_issue_description(
     };
 
     // Use the claude CLI to enhance the description
+    // Note: -p flag runs in headless mode with the given prompt
     let output = Command::new("claude")
-        .args(["-p", &prompt, "--no-input"])
+        .args(["-p", &prompt])
         .output()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                "Claude CLI is not installed. Please install it from https://github.com/anthropics/claude-code".to_string()
+                "Claude CLI not found. Please install it from https://github.com/anthropics/claude-code and ensure it's in your PATH.".to_string()
             } else {
-                format!("Failed to run Claude CLI: {}", e)
+                format!("Failed to run Claude CLI: {}. Make sure Claude CLI is properly installed and configured.", e)
             }
         })?;
 

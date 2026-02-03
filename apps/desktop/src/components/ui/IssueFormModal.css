@@ -120,6 +120,16 @@
   cursor: not-allowed;
 }
 
+.issue-form-enhance-btn.cli-unavailable {
+  border-color: var(--warning-border, #856404);
+  color: var(--warning-text, #f0ad4e);
+  opacity: 0.7;
+}
+
+.issue-form-enhance-btn.cli-unavailable:hover {
+  background: rgba(240, 173, 78, 0.1);
+}
+
 .issue-form-spinner-small {
   width: 10px;
   height: 10px;

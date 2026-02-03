@@ -45,6 +45,7 @@ export function IssueFormModal({
   const [selectedRelease, setSelectedRelease] = useState<string>("");
   const [enhanceDropdownOpen, setEnhanceDropdownOpen] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [claudeCliAvailable, setClaudeCliAvailable] = useState<boolean | null>(null);
   const [currentBranchName, setCurrentBranchName] = useState<string | null>(null);
   const [loadingBranch, setLoadingBranch] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -60,13 +61,24 @@ export function IssueFormModal({
 
   const isEditMode = !!editingIssue;
 
-  // Fetch labels and current branch when modal opens
+  // Fetch labels, current branch, and check Claude CLI when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchLabels();
       fetchCurrentBranch();
+      checkClaudeCli();
     }
   }, [isOpen]);
+
+  const checkClaudeCli = async () => {
+    try {
+      const available = await invoke<boolean>("check_claude_cli");
+      setClaudeCliAvailable(available);
+    } catch (err) {
+      console.error("Failed to check Claude CLI:", err);
+      setClaudeCliAvailable(false);
+    }
+  };
 
   // Reset/populate form when modal opens
   useEffect(() => {
@@ -327,16 +339,36 @@ export function IssueFormModal({
               <div className="issue-form-enhance-wrapper" ref={enhanceDropdownRef}>
                 <button
                   type="button"
-                  className="issue-form-enhance-btn"
+                  className={`issue-form-enhance-btn${claudeCliAvailable === false ? " cli-unavailable" : ""}`}
                   onClick={() => setEnhanceDropdownOpen(!enhanceDropdownOpen)}
-                  disabled={loading || enhancing || !body.trim()}
+                  disabled={loading || enhancing || !body.trim() || claudeCliAvailable === false}
                   aria-expanded={enhanceDropdownOpen}
                   aria-haspopup="menu"
+                  title={claudeCliAvailable === false ? "Claude CLI not installed. Install from https://github.com/anthropics/claude-code" : undefined}
                 >
                   {enhancing ? (
                     <>
                       <span className="issue-form-spinner issue-form-spinner-small" />
                       Enhancing...
+                    </>
+                  ) : claudeCliAvailable === false ? (
+                    <>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M7 1L8.5 4.5L12 5L9.5 7.5L10 11L7 9.5L4 11L4.5 7.5L2 5L5.5 4.5L7 1Z"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      CLI not installed
                     </>
                   ) : (
                     <>

@@ -1,0 +1,55 @@
+{
+  "issueNumber": 31,
+  "title": "Create Issue - Enhance error",
+  "createdAt": "2026-02-03T22:40:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Add check_claude_cli function in Rust backend",
+      "objective": "Create a Tauri command to verify Claude CLI is installed and accessible",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "tasks": [
+        "Add check_claude_cli function similar to check_gh_auth",
+        "Use 'claude --version' or 'claude --help' to verify CLI availability",
+        "Register the new command in lib.rs invoke_handler"
+      ],
+      "verification": "TypeScript compiles and the check_claude_cli command is callable from frontend"
+    },
+    {
+      "id": 2,
+      "title": "Fix Claude CLI invocation flags",
+      "objective": "Update enhance_issue_description to use correct Claude CLI flags",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs"
+      ],
+      "tasks": [
+        "Remove the --no-input flag which may not exist",
+        "Use appropriate flags for headless/non-interactive mode",
+        "Improve error message to include troubleshooting steps"
+      ],
+      "verification": "Rust compiles without errors"
+    },
+    {
+      "id": 3,
+      "title": "Update IssueFormModal to check CLI availability",
+      "objective": "Add pre-validation of Claude CLI and disable button if unavailable",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx"
+      ],
+      "tasks": [
+        "Add state for claudeCliAvailable boolean",
+        "Call check_claude_cli on modal open",
+        "Disable Enhance with AI button when CLI not available",
+        "Add tooltip explaining CLI is required when disabled",
+        "Update button styling to indicate unavailable state"
+      ],
+      "verification": "Button is disabled with helpful message when Claude CLI is not detected"
+    }
+  ]
+}
