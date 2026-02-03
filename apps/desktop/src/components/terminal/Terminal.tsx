@@ -10,17 +10,31 @@ interface TerminalProps {
   className?: string;
   cwd?: string;
   shell?: string;
+  tabId?: string;
+  onStatusChange?: (status: 'ready' | 'busy' | 'idle' | 'exited') => void;
 }
 
-export function Terminal({ className = "", cwd, shell }: TerminalProps) {
+export function Terminal({ className = "", cwd, shell, tabId, onStatusChange }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isInitializedRef = useRef(false);
+  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
 
   // Callbacks for terminal output and exit
   const handleOutput = useCallback((data: string) => {
     xtermRef.current?.write(data);
+
+    // Signal busy status on output, debounce to idle
+    onStatusChangeRef.current?.('busy');
+    if (idleTimeoutRef.current) {
+      clearTimeout(idleTimeoutRef.current);
+    }
+    idleTimeoutRef.current = setTimeout(() => {
+      onStatusChangeRef.current?.('idle');
+    }, 500);
   }, []);
 
   const handleExit = useCallback((exitCode: number | null) => {
@@ -31,6 +45,7 @@ export function Terminal({ className = "", cwd, shell }: TerminalProps) {
         `\x1b[90m[Process exited${exitCode !== null ? ` with code ${exitCode}` : ""}]\x1b[0m`
       );
     }
+    onStatusChangeRef.current?.('exited');
   }, []);
 
   const {
@@ -108,6 +123,8 @@ export function Terminal({ className = "", cwd, shell }: TerminalProps) {
       // Send initial size after connection
       const { rows, cols } = xterm;
       resizeTerminalRef.current(rows, cols);
+      // Signal ready status
+      onStatusChangeRef.current?.('ready');
     });
 
     // Cleanup
@@ -118,6 +135,9 @@ export function Terminal({ className = "", cwd, shell }: TerminalProps) {
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current);
+      }
       destroyTerminal();
     };
   }, [createTerminal, destroyTerminal]);

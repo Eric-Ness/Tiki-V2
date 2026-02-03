@@ -21,3 +21,9 @@ export {
   useReleasesStore,
   type GitHubRelease,
 } from './releasesStore';
+
+export {
+  useTerminalStore,
+  type TerminalTab,
+  type TerminalStatus,
+} from './terminalStore';
