@@ -137,14 +137,14 @@
   border-left: 3px solid #22c55e;
 }
 
-/* Basic Card Styles (will be expanded in #37) */
+/* Card Styles */
 .kanban-card {
   background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 6px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .kanban-card:hover {
@@ -152,10 +152,43 @@
   transform: translateY(-1px);
 }
 
+.kanban-card--selected {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+.kanban-card--paused {
+  border-left: 3px solid #f59e0b;
+}
+
+.kanban-card--failed {
+  border-left: 3px solid #ef4444;
+}
+
+.kanban-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 .kanban-card-number {
   font-size: 11px;
   color: #888;
-  margin-bottom: 4px;
+}
+
+.kanban-card-badge {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.kanban-card-badge--paused {
+  color: #f59e0b;
+}
+
+.kanban-card-badge--failed {
+  color: #ef4444;
+  font-weight: bold;
 }
 
 .kanban-card-title {
@@ -178,6 +211,35 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+/* Phase Progress */
+.kanban-card-progress {
+  margin-top: 8px;
+  background: #252525;
+  border-radius: 4px;
+  height: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kanban-card-progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #f59e0b;
+  opacity: 0.3;
+  transition: width 0.3s ease;
+}
+
+.kanban-card-progress-text {
+  position: relative;
+  display: block;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 20px;
+  color: #ccc;
 }
 
 /* Empty Board State */
