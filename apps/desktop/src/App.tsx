@@ -3,7 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AppLayout, Sidebar, MainContent, DetailPanel } from "./components/layout";
 import { ProjectsSection } from "./components/sidebar/ProjectsSection";
-import { WorkCard, type WorkContext } from "./components/work";
+import { StateSection } from "./components/sidebar/StateSection";
+import type { WorkContext } from "./components/work";
 import { useLayoutStore } from "./stores";
 import "./App.css";
 
@@ -65,8 +66,6 @@ function App() {
     };
   }, []);
 
-  const activeWorkEntries = state ? Object.entries(state.activeWork) : [];
-
   const handleResetLayout = () => {
     useLayoutStore.getState().resetLayout();
   };
@@ -82,7 +81,6 @@ function App() {
         <Sidebar defaultSize={panelSizes.sidebar} minSize={15}>
           <ProjectsSection />
 
-          <h3>Active Work</h3>
           {error && <div className="error">{error}</div>}
 
           {!state && !error && (
@@ -95,21 +93,8 @@ function App() {
             </div>
           )}
 
-          {state && activeWorkEntries.length === 0 && (
-            <div className="empty-state">
-              <p>No active work.</p>
-              <p className="hint">
-                Run <code>tiki:get #issue</code> to start working on an issue.
-              </p>
-            </div>
-          )}
-
-          {activeWorkEntries.length > 0 && (
-            <div className="work-list">
-              {activeWorkEntries.map(([key, work]) => (
-                <WorkCard key={key} work={work} />
-              ))}
-            </div>
+          {state && (
+            <StateSection activeWork={state.activeWork} />
           )}
         </Sidebar>
 
