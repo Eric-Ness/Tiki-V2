@@ -1,0 +1,93 @@
+/* CollapsibleSection - Expandable sidebar section */
+.collapsible-section {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Header button - clickable toggle area */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.collapsible-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.collapsible-header:focus {
+  outline: none;
+  background: rgba(96, 165, 250, 0.2);
+}
+
+.collapsible-header:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: -2px;
+}
+
+/* Icon container */
+.collapsible-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Title text */
+.collapsible-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Badge count */
+.collapsible-badge {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(96, 165, 250, 0.3);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Chevron icon - rotates when expanded */
+.collapsible-chevron {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease-out;
+}
+
+.collapsible-section.expanded .collapsible-chevron {
+  transform: rotate(90deg);
+}
+
+/* Content area - CSS grid trick for smooth height animation */
+.collapsible-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease-out;
+}
+
+.collapsible-section.expanded .collapsible-content {
+  grid-template-rows: 1fr;
+}
+
+/* Inner wrapper - required for grid animation */
+.collapsible-content-inner {
+  overflow: hidden;
+}

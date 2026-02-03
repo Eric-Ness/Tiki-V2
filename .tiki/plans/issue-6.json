@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 6,
+    "title": "feat(desktop): Create CollapsibleSection component with animations",
+    "url": "https://github.com/ericnewton/Tiki-V2/issues/6"
+  },
+  "createdAt": "2026-02-02T12:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "description": "Sections expand and collapse on click/keyboard"
+    },
+    {
+      "id": "SC2",
+      "category": "Animation",
+      "description": "Expand/collapse transitions are smooth (no jumpiness)"
+    },
+    {
+      "id": "SC3",
+      "category": "Animation",
+      "description": "Chevron rotates 90° when section is expanded"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "description": "Badge displays count when badge prop is provided"
+    },
+    {
+      "id": "SC5",
+      "category": "Accessibility",
+      "description": "aria-expanded attribute reflects current state"
+    },
+    {
+      "id": "SC6",
+      "category": "Accessibility",
+      "description": "Component is operable with keyboard (Enter/Space)"
+    },
+    {
+      "id": "SC7",
+      "category": "Structure",
+      "description": "Barrel export in src/components/ui/index.ts"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create CollapsibleSection component with core functionality",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:15:00.000Z",
+      "summary": "Phase 1 Summary:\n- Created: apps/desktop/src/components/ui/CollapsibleSection.tsx, apps/desktop/src/components/ui/index.ts\n- Key changes:\n  - CollapsibleSection component with props: title, children, icon?, badge?, defaultCollapsed?, className?\n  - useState for collapsed state management\n  - Button header with aria-expanded attribute\n  - Keyboard support (Enter/Space)\n  - Inline SVG chevron icon\n  - Conditional rendering of icon and badge\n- Verification: PASS - TypeScript compiles without errors\n- Notes for next phase: Component has 'expanded' class applied when not collapsed, ready for CSS styling",
+      "content": "Create the CollapsibleSection component with:\n\n1. Create `src/components/ui/CollapsibleSection.tsx`:\n   - Define props interface: `children`, `title`, `icon?`, `badge?`, `defaultCollapsed?`, `className?`\n   - Use useState for collapsed state\n   - Render header button with title, optional icon, optional badge, chevron\n   - Render children in collapsible content wrapper\n   - Add aria-expanded to header button\n   - Handle click and keyboard (Enter/Space) events\n\n2. Create `src/components/ui/index.ts`:\n   - Export CollapsibleSection component\n\nComponent structure:\n```\n<div className=\"collapsible-section\">\n  <button className=\"collapsible-header\" aria-expanded={!collapsed}>\n    {icon && <span className=\"collapsible-icon\">{icon}</span>}\n    <span className=\"collapsible-title\">{title}</span>\n    {badge !== undefined && <span className=\"collapsible-badge\">{badge}</span>}\n    <svg className=\"collapsible-chevron\" ... />\n  </button>\n  <div className=\"collapsible-content\">\n    <div className=\"collapsible-content-inner\">\n      {children}\n    </div>\n  </div>\n</div>\n```\n\nUse inline SVG for chevron (pointing right, rotates down when expanded).",
+      "verification": [
+        "File apps/desktop/src/components/ui/CollapsibleSection.tsx exists",
+        "File apps/desktop/src/components/ui/index.ts exists with named export",
+        "Component renders with title and children",
+        "Click toggles collapsed state",
+        "aria-expanded attribute changes with state",
+        "TypeScript compiles without errors"
+      ],
+      "addressesCriteria": ["SC1", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/ui/CollapsibleSection.tsx",
+        "apps/desktop/src/components/ui/index.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add CSS animations for smooth expand/collapse and chevron rotation",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:20:00.000Z",
+      "summary": "Phase 2 Summary:\n- Created: apps/desktop/src/components/ui/CollapsibleSection.css\n- Modified: apps/desktop/src/components/ui/CollapsibleSection.tsx (added CSS import)\n- Key changes:\n  - CSS grid trick for smooth height animation (0fr → 1fr)\n  - Chevron rotation animation (0° → 90°) with 0.2s transition\n  - Dark theme styling matching existing components\n  - Hover states on header button\n  - Focus visible outline for accessibility\n  - Badge styling with blue accent\n- Verification: PASS - TypeScript compiles, all styles applied\n- Notes: All success criteria addressed",
+      "content": "Create the CSS file with smooth animations:\n\n1. Create `src/components/ui/CollapsibleSection.css`:\n   - Style `.collapsible-section` container\n   - Style `.collapsible-header` as a button (reset button styles, flex layout)\n   - Style `.collapsible-icon`, `.collapsible-title`, `.collapsible-badge`\n   - Style `.collapsible-chevron` with rotation transform\n   - Use CSS grid trick for smooth height animation:\n     ```css\n     .collapsible-content {\n       display: grid;\n       grid-template-rows: 0fr;\n       transition: grid-template-rows 0.2s ease-out;\n     }\n     .collapsible-section.expanded .collapsible-content {\n       grid-template-rows: 1fr;\n     }\n     .collapsible-content-inner {\n       overflow: hidden;\n     }\n     ```\n   - Add chevron rotation:\n     ```css\n     .collapsible-chevron {\n       transition: transform 0.2s ease-out;\n     }\n     .collapsible-section.expanded .collapsible-chevron {\n       transform: rotate(90deg);\n     }\n     ```\n   - Match existing dark theme (rgba backgrounds, hover states)\n\n2. Import CSS in CollapsibleSection.tsx\n\n3. Add `expanded` class to container based on state",
+      "verification": [
+        "File apps/desktop/src/components/ui/CollapsibleSection.css exists",
+        "CSS is imported in CollapsibleSection.tsx",
+        "Expand/collapse animates smoothly (no height jump)",
+        "Chevron rotates 90° when expanded",
+        "Styling matches existing dark theme",
+        "Hover states work on header"
+      ],
+      "addressesCriteria": ["SC2", "SC3"],
+      "files": [
+        "apps/desktop/src/components/ui/CollapsibleSection.css",
+        "apps/desktop/src/components/ui/CollapsibleSection.tsx"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [2],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1]
+  }
+}

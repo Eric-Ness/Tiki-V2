@@ -1,21 +1,50 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:1": {
-      "type": "issue",
-      "issue": {
+    "issue:6": {
+      "number": 6,
+      "title": "feat(desktop): Create CollapsibleSection component with animations",
+      "status": "shipping",
+      "lastActivity": "2026-02-02T12:20:00.000Z",
+      "phase": {
+        "total": 2,
+        "current": 2,
+        "status": "completed"
+      }
+    }
+  },
+  "history": {
+    "lastCompletedIssue": {
+      "number": 5,
+      "title": "feat(desktop): Integrate new layout into App.tsx",
+      "completedAt": "2026-02-03T00:05:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 5,
+        "title": "feat(desktop): Integrate new layout into App.tsx",
+        "completedAt": "2026-02-03T00:05:00.000Z"
+      },
+      {
+        "number": 4,
+        "title": "feat(desktop): Add Zustand store for layout state persistence",
+        "completedAt": "2026-02-03T00:25:00.000Z"
+      },
+      {
+        "number": 3,
+        "title": "feat(desktop): Style resize handles with visual feedback",
+        "completedAt": "2026-02-02T23:50:00.000Z"
+      },
+      {
+        "number": 2,
+        "title": "feat(desktop): Create 3-panel resizable layout structure",
+        "completedAt": "2026-02-02T23:05:00.000Z"
+      },
+      {
         "number": 1,
         "title": "feat(desktop): Install react-resizable-panels for layout system",
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/1"
-      },
-      "status": "shipping",
-      "phase": {
-        "current": 2,
-        "total": 2,
-        "status": "completed"
-      },
-      "createdAt": "2026-02-02T12:00:00.000Z",
-      "lastActivity": "2026-02-02T12:06:00.000Z"
-    }
+        "completedAt": "2026-02-02T12:10:00.000Z"
+      }
+    ]
   }
 }
