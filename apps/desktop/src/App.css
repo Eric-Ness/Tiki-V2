@@ -67,11 +67,20 @@
 .main {
   flex: 1;
   padding: 24px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .section {
   margin-bottom: 32px;
+}
+
+/* Terminal section needs full height */
+.terminal-section {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
 .section h2 {
