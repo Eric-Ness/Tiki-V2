@@ -1,13 +1,34 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "issue:36": {
+      "type": "issue",
+      "number": 36,
+      "title": "Lots of terminals pop up when background items are working",
+      "status": "executing",
+      "yolo": true,
+      "startedAt": "2026-02-03T23:30:00.000Z",
+      "currentPhase": null,
+      "phases": []
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 29,
-      "title": "Add Issue enhancements",
-      "completedAt": "2026-02-03T21:30:00.000Z"
+      "number": 31,
+      "title": "Create Issue - Enhance error",
+      "completedAt": "2026-02-03T23:00:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 31,
+        "title": "Create Issue - Enhance error",
+        "completedAt": "2026-02-03T23:00:00.000Z"
+      },
+      {
+        "number": 30,
+        "title": "Release to detail",
+        "completedAt": "2026-02-03T22:30:00.000Z"
+      },
       {
         "number": 29,
         "title": "Add Issue enhancements",
@@ -44,19 +65,17 @@
         "completedAt": "2026-02-03T01:30:00.000Z"
       },
       {
-        "number": 13,
-        "title": "feat(desktop): Create Terminal component with xterm.js",
-        "completedAt": "2026-02-03T00:10:00.000Z"
-      },
-      {
         "number": 12,
         "title": "feat(desktop): Implement PTY spawning and management in Rust",
         "completedAt": "2026-02-03T00:20:00.000Z"
-      },
+      }
+    ],
+    "recentReleases": [
       {
-        "number": 11,
-        "title": "feat(desktop): Install PTY plugin and xterm.js for terminal",
-        "completedAt": "2026-02-02T23:30:00.000Z"
+        "version": "v0.1.2",
+        "issues": [30, 31],
+        "completedAt": "2026-02-03T23:10:00.000Z",
+        "tag": "v0.1.2"
       }
     ]
   }

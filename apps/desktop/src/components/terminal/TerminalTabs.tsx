@@ -77,9 +77,9 @@ export function TerminalTabs() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`terminal-tab ${tab.id === activeTabId ? 'terminal-tab-active' : ''}`}
+            className={`terminal-tab ${tab.id === activeTabId ? 'terminal-tab-active' : ''} ${tab.backgroundMode ? 'terminal-tab-background' : ''}`}
             onClick={() => handleTabClick(tab.id)}
-            title={tab.cwd || tab.title}
+            title={tab.backgroundMode ? `${tab.cwd || tab.title} (background)` : (tab.cwd || tab.title)}
           >
             <StatusDot status={tab.status} />
             {editingTabId === tab.id ? (

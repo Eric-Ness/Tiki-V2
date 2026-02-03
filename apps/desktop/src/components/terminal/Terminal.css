@@ -50,6 +50,22 @@
   background: #1e1e1e;
 }
 
+/* Background tab (created without focus, not yet viewed) */
+.terminal-tab-background {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.terminal-tab-background:hover {
+  opacity: 0.8;
+}
+
+.terminal-tab-background .terminal-tab-title::after {
+  content: ' (bg)';
+  font-size: 10px;
+  color: #666;
+}
+
 .terminal-tab-status {
   width: 8px;
   height: 8px;

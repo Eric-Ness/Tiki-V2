@@ -28,6 +28,8 @@ export interface TerminalTab {
   cwd?: string;
   splitRoot: SplitTreeNode;
   activeTerminalId: string;
+  /** When true, tab was created in background and hasn't been viewed yet */
+  backgroundMode?: boolean;
 }
 
 interface TerminalState {
@@ -37,6 +39,8 @@ interface TerminalState {
 
 interface TerminalActions {
   addTab: () => string;
+  /** Creates a tab in the background without making it active (won't steal focus) */
+  addTabInBackground: () => string;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   setActiveTerminal: (tabId: string, terminalId: string) => void;
@@ -171,6 +175,24 @@ export const useTerminalStore = create<TerminalStore>()(
         return tabId;
       },
 
+      addTabInBackground: () => {
+        const tabId = generateId();
+        const terminalId = generateId();
+        const newTab: TerminalTab = {
+          id: tabId,
+          title: generateTitle(),
+          status: 'starting',
+          splitRoot: createLeaf(terminalId),
+          activeTerminalId: terminalId,
+          backgroundMode: true,
+        };
+        set((state) => ({
+          tabs: [...state.tabs, newTab],
+          // Don't change activeTabId - keep current tab focused
+        }));
+        return tabId;
+      },
+
       removeTab: (id) =>
         set((state) => {
           const newTabs = state.tabs.filter((t) => t.id !== id);
@@ -206,7 +228,14 @@ export const useTerminalStore = create<TerminalStore>()(
           };
         }),
 
-      setActiveTab: (id) => set({ activeTabId: id }),
+      setActiveTab: (id) =>
+        set((state) => ({
+          activeTabId: id,
+          // Clear backgroundMode when user views the tab
+          tabs: state.tabs.map((t) =>
+            t.id === id && t.backgroundMode ? { ...t, backgroundMode: false } : t
+          ),
+        })),
 
       setActiveTerminal: (tabId, terminalId) =>
         set((state) => ({

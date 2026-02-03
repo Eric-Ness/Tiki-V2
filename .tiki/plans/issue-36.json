@@ -1,0 +1,45 @@
+{
+  "issueNumber": 36,
+  "title": "Lots of terminals pop up when background items are working",
+  "createdAt": "2026-02-03T23:35:00.000Z",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Add background tab creation to terminal store",
+      "status": "pending",
+      "description": "Add addTabInBackground() method to terminalStore.ts that creates a tab without setting it as active. Also add a backgroundMode flag to the TerminalTab interface.",
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts"
+      ],
+      "verification": "TypeScript compiles without errors. The store should have both addTab() (existing, focuses) and addTabInBackground() (new, doesn't focus) methods."
+    },
+    {
+      "id": "phase-2",
+      "name": "Add visual indicator for background tabs",
+      "status": "pending",
+      "description": "Update TerminalTabs.tsx to show a visual indicator (e.g., dimmed styling or badge) for tabs created in background mode that haven't been viewed yet.",
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalTabs.tsx"
+      ],
+      "verification": "Background tabs are visually distinguishable from active tabs. CSS styling differentiates them."
+    },
+    {
+      "id": "phase-3",
+      "name": "Update tab selection to clear background flag",
+      "status": "pending",
+      "description": "When a user clicks on a background tab to view it, clear the backgroundMode flag so it's no longer styled as a background tab.",
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts"
+      ],
+      "verification": "Clicking a background tab makes it active and clears the background styling."
+    },
+    {
+      "id": "phase-4",
+      "name": "Build and verify",
+      "status": "pending",
+      "description": "Run typecheck and build to ensure no compilation errors.",
+      "files": [],
+      "verification": "pnpm typecheck and pnpm build complete without errors."
+    }
+  ]
+}
