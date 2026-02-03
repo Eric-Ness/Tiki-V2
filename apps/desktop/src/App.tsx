@@ -8,6 +8,8 @@ import { ReleasesSection } from "./components/sidebar/ReleasesSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { TerminalPane } from "./components/terminal";
 import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
+import { CenterTabs } from "./components/layout/CenterTabs";
+import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore } from "./stores";
 import "./App.css";
@@ -34,6 +36,7 @@ function App() {
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
   const panelSizes = useLayoutStore((s) => s.panelSizes);
+  const activeView = useLayoutStore((s) => s.activeView);
 
   // Detail panel state
   const selectedIssue = useDetailStore((s) => s.selectedIssue);
@@ -123,6 +126,24 @@ function App() {
     useLayoutStore.getState().resetLayout();
   };
 
+  // Keyboard shortcuts for view switching
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          useLayoutStore.getState().setActiveView('terminal');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          useLayoutStore.getState().setActiveView('kanban');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="app">
       <header className="header">
@@ -170,9 +191,10 @@ function App() {
           className="panel main-content-panel"
         >
           <div className="main-content">
+            <CenterTabs />
             <main className="main">
               <section className="section terminal-section">
-                <TerminalPane />
+                {activeView === 'terminal' ? <TerminalPane /> : <KanbanBoard />}
               </section>
             </main>
           </div>

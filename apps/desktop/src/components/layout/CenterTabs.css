@@ -1,0 +1,47 @@
+/* Center Panel Tabs - View Switcher */
+.center-tabs {
+  display: flex;
+  align-items: center;
+  background: #252525;
+  border-bottom: 1px solid #333;
+  padding: 0 8px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.center-tabs-list {
+  display: flex;
+  gap: 4px;
+}
+
+.center-tab {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.center-tab:hover {
+  background: #333;
+  color: #ccc;
+}
+
+.center-tab-active {
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+.center-tab-active:hover {
+  background: #1e1e1e;
+}
+
+.center-tab-label {
+  white-space: nowrap;
+}

@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// View types for center panel
+export type ViewType = 'terminal' | 'kanban';
+
 // Default panel sizes (percentages)
 const DEFAULT_SIZES = {
   sidebar: 20,
@@ -22,11 +25,13 @@ export interface CollapsedPanels {
 interface LayoutState {
   panelSizes: PanelSizes;
   collapsedPanels: CollapsedPanels;
+  activeView: ViewType;
 }
 
 interface LayoutActions {
   setPanelSizes: (sizes: PanelSizes) => void;
   setCollapsed: (panel: keyof CollapsedPanels, collapsed: boolean) => void;
+  setActiveView: (view: ViewType) => void;
   resetLayout: () => void;
 }
 
@@ -38,6 +43,7 @@ const initialState: LayoutState = {
     sidebar: false,
     detail: false,
   },
+  activeView: 'terminal',
 };
 
 export const useLayoutStore = create<LayoutStore>()(
@@ -54,6 +60,8 @@ export const useLayoutStore = create<LayoutStore>()(
             [panel]: collapsed,
           },
         })),
+
+      setActiveView: (view) => set({ activeView: view }),
 
       resetLayout: () => set({ ...initialState }),
     }),

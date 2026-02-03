@@ -1,0 +1,39 @@
+/* Kanban Board Styles */
+.kanban-board {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1e1e1e;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* Placeholder for initial release */
+.kanban-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  text-align: center;
+  padding: 24px;
+}
+
+.kanban-placeholder-icon {
+  color: #444;
+  margin-bottom: 16px;
+}
+
+.kanban-placeholder-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #888;
+}
+
+.kanban-placeholder-text {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
