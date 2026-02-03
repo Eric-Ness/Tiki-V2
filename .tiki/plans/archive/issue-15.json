@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 15,
+    "title": "feat(desktop): Add terminal split panes",
+    "url": "https://github.com/anthropics/tiki-v2/issues/15"
+  },
+  "createdAt": "2026-02-03T02:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Users can split a terminal pane horizontally"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Users can split a terminal pane vertically"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Split panes can be resized by dragging the separator"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Closing a split promotes the sibling to take its place"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Nested splits (split within split) work correctly"
+    },
+    {
+      "id": "SC6",
+      "category": "UX",
+      "criterion": "Keyboard shortcuts Ctrl+Shift+H/V trigger splits"
+    },
+    {
+      "id": "SC7",
+      "category": "UX",
+      "criterion": "Split buttons are accessible in terminal UI"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add split tree types and store state",
+      "status": "completed",
+      "completedAt": "2026-02-03T02:15:00.000Z",
+      "summary": "Added split tree types (SplitDirection, TerminalLeaf, SplitNode, SplitTreeNode) and store actions (splitTerminal, closeSplit, updateSplitSizes, setActiveTerminal). Each tab now has a splitRoot and activeTerminalId. Helper functions for tree manipulation included.",
+      "content": "Define the split tree data structure types and update terminalStore.ts with split layout state management.\n\nTasks:\n1. Add type definitions for SplitDirection, TerminalLeaf, SplitNode, and SplitTree\n2. Add splitLayout state to the terminal store (root node per tab)\n3. Add actions: splitTerminal(tabId, terminalId, direction), closeSplit(tabId, terminalId), updateSplitSizes(tabId, nodeId, sizes)\n4. Initialize new tabs with a single terminal leaf node\n5. Update persistence to include split layout\n\nThe split tree structure:\n- TerminalLeaf: { type: 'terminal', terminalId: string }\n- SplitNode: { type: 'split', id: string, direction: 'horizontal' | 'vertical', children: (TerminalLeaf | SplitNode)[], sizes: number[] }\n- Each tab has a root node that is either a leaf or a split",
+      "verification": [
+        "TypeScript compiles without errors",
+        "New types are exported from the store",
+        "Store actions are callable (can test in console)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4"],
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create TerminalSplit recursive component",
+      "status": "completed",
+      "completedAt": "2026-02-03T02:20:00.000Z",
+      "summary": "Created TerminalSplit.tsx with recursive rendering using react-resizable-panels (PanelGroup, Panel, PanelResizeHandle). Component renders terminal leaves or nested splits. Added CSS for split handles with hover/active states.",
+      "content": "Create the TerminalSplit.tsx component that recursively renders the split tree using react-resizable-panels.\n\nTasks:\n1. Create TerminalSplit.tsx component\n2. Implement recursive rendering: if node is leaf, render Terminal; if split, render PanelGroup with children\n3. Use react-resizable-panels Group, Panel, and Separator components\n4. Handle resize events to update split sizes in store\n5. Pass terminalId to Terminal component for proper PTY association\n6. Style the resize handles appropriately\n\nComponent structure:\n- TerminalSplit receives: tabId, node (SplitNode | TerminalLeaf)\n- For leaf: render <Terminal tabId={tabId} terminalId={node.terminalId} />\n- For split: render <Group direction={node.direction}> with recursive children",
+      "verification": [
+        "Component renders without errors",
+        "Single terminal (leaf node) displays correctly",
+        "TypeScript compiles without errors"
+      ],
+      "addressesCriteria": ["SC3", "SC5"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalSplit.tsx",
+        "apps/desktop/src/components/terminal/Terminal.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Integrate split layout into TerminalPane",
+      "status": "completed",
+      "completedAt": "2026-02-03T02:30:00.000Z",
+      "summary": "Updated TerminalPane to use TerminalSplit component. Modified Terminal.tsx and useTerminal.ts to support external terminalId for PTY session management. Each terminal in a split gets its own shell session.",
+      "content": "Update TerminalPane.tsx to use the new TerminalSplit component instead of directly rendering Terminal instances.\n\nTasks:\n1. Import and use TerminalSplit component\n2. Get split layout for active tab from store\n3. Render TerminalSplit with the root node\n4. Update Terminal component to accept terminalId prop and use it for PTY association\n5. Ensure tab switching still works correctly with split layouts\n6. Each terminal in a split should have its own PTY session\n\nThe TerminalPane now renders:\n- TerminalTabs (unchanged)\n- For each tab: TerminalSplit with that tab's split tree root",
+      "verification": [
+        "App starts and terminal displays correctly",
+        "Tab switching works with split layouts",
+        "Each terminal pane has its own working shell"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC5"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalPane.tsx",
+        "apps/desktop/src/components/terminal/Terminal.tsx"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Add split actions and UI controls",
+      "status": "completed",
+      "completedAt": "2026-02-03T02:40:00.000Z",
+      "summary": "Added SplitControls component with split horizontal/vertical buttons and close button. Added keyboard shortcuts Ctrl+Shift+H/V in TerminalPane. Added CSS for controls with hover states and active terminal highlighting.",
+      "content": "Add split buttons to the terminal UI and implement keyboard shortcuts for splitting.\n\nTasks:\n1. Add split horizontal/vertical buttons to terminal header or context area\n2. Create a small toolbar or use right-click context menu\n3. Add keyboard shortcuts: Ctrl+Shift+H (horizontal), Ctrl+Shift+V (vertical)\n4. Wire up the split actions to the store\n5. Add close button to each split pane (promotes sibling when closed)\n6. Style the split controls to be unobtrusive but accessible\n\nUI options:\n- Small toolbar in top-right of each terminal pane with split icons\n- Or floating buttons that appear on hover\n- Close button (×) in corner of each pane",
+      "verification": [
+        "Can split terminal horizontally via button",
+        "Can split terminal vertically via button",
+        "Keyboard shortcuts Ctrl+Shift+H/V work",
+        "Can close a split pane and sibling takes over",
+        "Nested splits work (split a split)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalSplit.tsx",
+        "apps/desktop/src/components/terminal/TerminalPane.tsx",
+        "apps/desktop/src/components/terminal/Terminal.css"
+      ],
+      "dependencies": [3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 3, 4],
+    "SC2": [1, 3, 4],
+    "SC3": [2, 3],
+    "SC4": [1, 4],
+    "SC5": [2, 3, 4],
+    "SC6": [4],
+    "SC7": [4]
+  }
+}

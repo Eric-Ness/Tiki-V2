@@ -1,26 +1,33 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "issue:13": {
-      "number": 13,
-      "title": "feat(desktop): Create Terminal component with xterm.js",
-      "status": "shipping",
-      "startedAt": "2026-02-02T23:55:00.000Z",
-      "lastActivity": "2026-02-03T00:08:00.000Z",
-      "phase": {
-        "current": 3,
-        "total": 3,
-        "status": "completed"
-      }
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 12,
-      "title": "feat(desktop): Implement PTY spawning and management in Rust",
-      "completedAt": "2026-02-03T00:20:00.000Z"
+      "number": 16,
+      "title": "feat(desktop): Track terminal busy/idle status",
+      "completedAt": "2026-02-03T02:15:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 16,
+        "title": "feat(desktop): Track terminal busy/idle status",
+        "completedAt": "2026-02-03T02:15:00.000Z"
+      },
+      {
+        "number": 15,
+        "title": "feat(desktop): Add terminal split panes",
+        "completedAt": "2026-02-03T02:05:00.000Z"
+      },
+      {
+        "number": 14,
+        "title": "feat(desktop): Add terminal tab management",
+        "completedAt": "2026-02-03T01:30:00.000Z"
+      },
+      {
+        "number": 13,
+        "title": "feat(desktop): Create Terminal component with xterm.js",
+        "completedAt": "2026-02-03T00:10:00.000Z"
+      },
       {
         "number": 12,
         "title": "feat(desktop): Implement PTY spawning and management in Rust",
@@ -50,31 +57,6 @@
         "number": 7,
         "title": "feat(desktop): Add Projects section with add/remove/switch",
         "completedAt": "2026-02-02T19:25:00.000Z"
-      },
-      {
-        "number": 6,
-        "title": "feat(desktop): Create CollapsibleSection component with animations",
-        "completedAt": "2026-02-02T12:25:00.000Z"
-      },
-      {
-        "number": 5,
-        "title": "feat(desktop): Integrate new layout into App.tsx",
-        "completedAt": "2026-02-03T00:05:00.000Z"
-      },
-      {
-        "number": 4,
-        "title": "feat(desktop): Add Zustand store for layout state persistence",
-        "completedAt": "2026-02-03T00:25:00.000Z"
-      },
-      {
-        "number": 3,
-        "title": "feat(desktop): Style resize handles with visual feedback",
-        "completedAt": "2026-02-02T23:50:00.000Z"
-      },
-      {
-        "number": 2,
-        "title": "feat(desktop): Create 3-panel resizable layout structure",
-        "completedAt": "2026-02-02T23:05:00.000Z"
       }
     ]
   }

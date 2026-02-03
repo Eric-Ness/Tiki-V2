@@ -192,9 +192,11 @@ Each tab/context is independent. They don't need to know about each other. They 
 ### v0.1 - Foundation
 **Goal:** Single issue, end-to-end workflow
 
-- [ ] Monorepo structure (framework + desktop + shared)
-- [ ] Shared schemas: `state.json`, `plan.json`
-- [ ] Framework commands: `get`, `plan`, `execute`, `ship`
+- [x] Monorepo structure (framework + desktop + shared)
+- [x] Shared schemas: `state.schema.json`, `plan.schema.json`
+- [x] TypeScript types matching schemas with helper functions
+- [x] Schema validation utilities (Ajv-based)
+- [x] Framework commands: `get`, `review`, `plan`, `audit`, `execute`, `ship`, `yolo`
 - [ ] Desktop: State display panel (what's executing, current phase)
 - [ ] Desktop: GitHub issues list
 - [ ] Desktop: Basic terminal integration
@@ -271,10 +273,10 @@ Each tab/context is independent. They don't need to know about each other. They 
 4. **Plan file schema** - phases, dependencies, verification items
 
 ### To Build
-1. Initialize `Tiki-V2` repo with monorepo structure
-2. Scaffold Tauri app
-3. Set up shared schemas package
-4. Create first framework command in hybrid format
+1. ~~Initialize `Tiki-V2` repo with monorepo structure~~ **DONE**
+2. ~~Set up shared schemas package~~ **DONE**
+3. Scaffold Tauri app
+4. Create first framework command in hybrid format (`get.md`)
 5. Implement state file watcher in Rust
 
 ---
@@ -290,9 +292,177 @@ Each tab/context is independent. They don't need to know about each other. They 
 ## Next Steps
 
 When starting fresh context:
-1. Read this file and `TIKI-V2-DESIGN.md`
-2. Create GitHub repo `Tiki-V2`
-3. Initialize monorepo structure
-4. Begin with shared schemas (foundation for everything else)
-5. Build framework commands
+1. Read this file and `DESIGN.md`
+2. ~~Create GitHub repo `Tiki-V2`~~ **DONE**
+3. ~~Initialize monorepo structure~~ **DONE**
+4. ~~Begin with shared schemas (foundation for everything else)~~ **DONE**
+5. Build framework commands (start with `get.md`)
 6. Build Tauri desktop app incrementally
+
+### Completed (2026-02-02)
+- Created `@tiki/shared` package with:
+  - `schemas/state.schema.json` - Work-scoped execution state
+  - `schemas/plan.schema.json` - Issue phase definitions with success criteria
+  - TypeScript types with helper functions
+  - Ajv-based validation utilities
+- Set up pnpm workspace configuration
+- Created `@tiki/framework` package with core commands:
+  - `get.md` - Fetch and display GitHub issue
+  - `review.md` - Analyze issue before planning
+  - `plan.md` - Break issue into executable phases
+  - `audit.md` - Validate plan before execution
+  - `execute.md` - Run phases with sub-agents
+  - `ship.md` - Commit, push, and close issue
+  - `yolo.md` - Full automated pipeline
+- Created install script for deploying commands to projects
+- **Scaffolded Tauri desktop app** (`apps/desktop/`):
+  - React + TypeScript + Vite frontend
+  - Rust backend with Tauri 2.x
+  - File watcher for `.tiki/` directory changes
+  - Basic state display panel UI
+  - IPC commands: `get_state`, `get_plan`, `get_tiki_path`
+  - Event system: `tiki-file-changed` events emitted on state/plan changes
+
+---
+
+## Handoff Notes (2026-02-02, Latest)
+
+### TL;DR - Start Here
+
+**Project:** Tiki v2 - GitHub-issue-centric workflow framework for Claude Code
+**Status:** v0.5 - Desktop app scaffolded and running, framework commands complete
+**Next milestone:** GitHub issues list component, real-world testing
+
+### Quick Start
+
+**Run the desktop app:**
+```cmd
+# MUST use x64 Native Tools Command Prompt for VS 2022
+cd C:\Users\ericn\Documents\Github\Tiki-V2\apps\desktop
+pnpm tauri:dev
+```
+
+**Build/verify packages:**
+```bash
+cd C:\Users\ericn\Documents\Github\Tiki-V2
+pnpm install
+pnpm build
+```
+
+**Install framework to a project:**
+```bash
+cd <target-project>
+node C:\Users\ericn\Documents\Github\Tiki-V2\packages\framework\install.js
+```
+
+---
+
+### What Exists
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `@tiki/shared` | ✅ Complete | Schemas, types, validation |
+| `@tiki/framework` | ✅ Complete | 7 commands (get→yolo pipeline) |
+| `@tiki/desktop` | ✅ Scaffolded | Tauri app compiles and runs |
+| File watcher | ✅ Built | Rust, monitors `.tiki/` |
+| React UI | ✅ Built | State display panel |
+| IPC commands | ✅ Built | get_state, get_plan, get_tiki_path |
+
+### What Doesn't Exist Yet
+
+- GitHub issues list component in desktop
+- Terminal integration
+- Release commands (`release:new`, `release:add`, etc.)
+- Real-world testing of framework commands
+- Frontend handling of file watcher events
+
+---
+
+### Project Structure
+
+```
+Tiki-V2/
+├── packages/
+│   ├── shared/              # TypeScript types + JSON schemas
+│   │   ├── schemas/         # state.schema.json, plan.schema.json
+│   │   └── src/             # Types, validation (Ajv)
+│   └── framework/           # Claude Code commands
+│       ├── commands/*.md    # get, review, plan, audit, execute, ship, yolo
+│       └── install.js       # Deploys to .claude/commands/tiki/
+├── apps/
+│   └── desktop/             # Tauri app (React + Rust)
+│       ├── src/             # React frontend
+│       └── src-tauri/       # Rust backend (watcher, IPC)
+└── docs/
+    ├── DESIGN.md            # Full architecture
+    └── PLANNING-NOTES.md    # This file
+```
+
+---
+
+### Key Design Decisions
+
+1. **Work-scoped state** - Keys like `issue:42` or `release:v1.2`, not terminal IDs
+2. **Hybrid Markdown+XML commands** - YAML frontmatter + XML tags + Markdown content
+3. **Success criteria first** - "What needs to be true?" → derive phases backward
+4. **Sub-agent execution** - Fresh context per phase, summaries passed forward
+5. **Tauri over Electron** - ~10MB vs ~150MB, ~50MB RAM vs ~300MB
+
+### Framework Commands
+
+| Command | Purpose |
+|---------|---------|
+| `tiki:get` | Fetch GitHub issue, initialize state |
+| `tiki:review` | Analyze issue, derive success criteria |
+| `tiki:plan` | Create phases with coverage matrix |
+| `tiki:audit` | Validate plan completeness |
+| `tiki:execute` | Run phases with sub-agents |
+| `tiki:ship` | Commit, push, close issue |
+| `tiki:yolo` | Full automated pipeline |
+
+---
+
+### Important Technical Notes
+
+- **Windows:** Must run Tauri from "x64 Native Tools Command Prompt for VS 2022"
+- **Tauri version:** Pinned to 2.9.1 (matches @tauri-apps/api)
+- **pnpm workspace:** Always run `pnpm install` from repo root
+- **GitHub CLI:** Framework commands require authenticated `gh`
+
+### Files to Read First
+
+1. [docs/DESIGN.md](docs/DESIGN.md) - Full architecture
+2. [docs/PLANNING-NOTES.md](docs/PLANNING-NOTES.md) - This file
+3. [packages/shared/schemas/state.schema.json](packages/shared/schemas/state.schema.json) - State model
+4. [packages/shared/schemas/plan.schema.json](packages/shared/schemas/plan.schema.json) - Plan model
+5. [packages/framework/commands/get.md](packages/framework/commands/get.md) - Command format reference
+6. [apps/desktop/src/App.tsx](apps/desktop/src/App.tsx) - Desktop UI
+
+### Key Desktop Files
+
+| File | Purpose |
+|------|---------|
+| `apps/desktop/src/App.tsx` | React UI component |
+| `apps/desktop/src-tauri/src/lib.rs` | Tauri setup |
+| `apps/desktop/src-tauri/src/commands.rs` | IPC commands |
+| `apps/desktop/src-tauri/src/watcher.rs` | File system watcher |
+| `apps/desktop/src-tauri/src/state.rs` | Rust types |
+
+---
+
+### Roadmap
+
+- **v0.1** (current): Single issue workflow, desktop state display
+- **v0.2**: Release commands, multi-issue grouping
+- **v0.3**: Parallel execution, dependency graphs
+- **v0.4**: Verification gates, requirements tracking
+- **v0.5**: Knowledge & research system
+
+---
+
+### What to Do Next
+
+1. **Test framework commands** - Use `tiki:get <issue>` on a real GitHub issue
+2. **Add GitHub issues list** - Component in desktop app using `gh` CLI
+3. **Wire up file watcher events** - Frontend should refresh on state changes
+4. **Create `.tiki/` structure** - Test desktop app with real state.json

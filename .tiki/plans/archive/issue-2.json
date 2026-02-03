@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 2,
+    "title": "feat(desktop): Create 3-panel resizable layout structure",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/2"
+  },
+  "createdAt": "2026-02-02T22:35:00.000Z",
+  "complexity": "Medium",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "3-panel layout renders with correct proportions (20/55/25)"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Panels can be resized by dragging handles"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Sidebar collapses to 0 width when toggle clicked"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "DetailPanel collapses to 0 width when toggle clicked"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Collapsed panels expand via button click"
+    },
+    {
+      "id": "SC6",
+      "category": "Constraint",
+      "criterion": "Min/max sizes enforced during resize"
+    },
+    {
+      "id": "SC7",
+      "category": "Integration",
+      "criterion": "App.tsx refactored to use new layout components"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create layout component structure and AppLayout",
+      "status": "pending",
+      "content": "Create the components/layout/ directory structure and implement AppLayout.tsx as the root layout wrapper.\n\n1. Create directory: src/components/layout/\n2. Create AppLayout.tsx with:\n   - Import PanelGroup from react-resizable-panels\n   - Accept children prop for flexible content\n   - Use horizontal orientation\n   - Apply .app-layout class\n3. Create layout.css with base styles for .app-layout\n4. Create index.ts exporting AppLayout\n\nAppLayout should be a thin wrapper that provides the PanelGroup container. It does NOT include the panels themselves - those will be composed by the consumer.",
+      "verification": [
+        "Directory src/components/layout/ exists",
+        "AppLayout.tsx exports a functional component",
+        "layout.css exists with .app-layout styles",
+        "index.ts exports AppLayout",
+        "TypeScript compiles without errors: pnpm --filter @tiki/desktop build"
+      ],
+      "addressesCriteria": [],
+      "files": [
+        "src/components/layout/AppLayout.tsx",
+        "src/components/layout/layout.css",
+        "src/components/layout/index.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Implement panel container components",
+      "status": "pending",
+      "content": "Create Sidebar, MainContent, and DetailPanel container components.\n\n1. Create Sidebar.tsx:\n   - Wrap react-resizable-panels Panel component\n   - Props: children, defaultSize (20), minSize (15), collapsible (true)\n   - Use useImperativeHandle to expose collapse/expand methods\n   - Forward ref as ImperativePanelHandle\n   - Include collapse toggle button in header area\n\n2. Create MainContent.tsx:\n   - Simple Panel wrapper for center content\n   - Props: children, minSize (30)\n   - Not collapsible\n\n3. Create DetailPanel.tsx:\n   - Similar to Sidebar but for right panel\n   - Props: children, defaultSize (25), minSize (15), collapsible (true)\n   - Forward ref as ImperativePanelHandle\n   - Include collapse toggle button in header area\n\n4. Update index.ts to export all components\n5. Update layout.css with panel-specific styles",
+      "verification": [
+        "Sidebar.tsx exports component with ref forwarding",
+        "MainContent.tsx exports component",
+        "DetailPanel.tsx exports component with ref forwarding",
+        "All components are exported from index.ts",
+        "TypeScript compiles without errors"
+      ],
+      "addressesCriteria": ["SC1", "SC6"],
+      "files": [
+        "src/components/layout/Sidebar.tsx",
+        "src/components/layout/MainContent.tsx",
+        "src/components/layout/DetailPanel.tsx",
+        "src/components/layout/index.ts",
+        "src/components/layout/layout.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add collapse/expand functionality",
+      "status": "pending",
+      "content": "Implement the collapse/expand toggle functionality for Sidebar and DetailPanel.\n\n1. In Sidebar.tsx:\n   - Add useState for collapsed state tracking\n   - Use onCollapse/onExpand callbacks from Panel to sync state\n   - Add toggle button that calls ref.collapse() or ref.expand()\n   - Style button to show collapse icon (<<) or expand icon (>>)\n   - Position button at panel edge\n\n2. In DetailPanel.tsx:\n   - Same pattern as Sidebar\n   - Button shows (>>) for collapse, (<<) for expand\n   - Position at left edge of panel\n\n3. Update layout.css:\n   - Styles for collapse toggle buttons\n   - Transition effects for smooth collapse/expand\n   - Collapsed state indicator styles\n\n4. Ensure collapsedSize={0} is set on collapsible panels",
+      "verification": [
+        "Sidebar collapse button toggles panel width to 0",
+        "Sidebar expand button restores panel to previous size",
+        "DetailPanel collapse button toggles panel width to 0",
+        "DetailPanel expand button restores panel to previous size",
+        "Collapse/expand transitions are smooth"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC5"],
+      "files": [
+        "src/components/layout/Sidebar.tsx",
+        "src/components/layout/DetailPanel.tsx",
+        "src/components/layout/layout.css"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Integrate layout into App.tsx",
+      "status": "pending",
+      "content": "Refactor App.tsx to use the new layout components and verify everything works together.\n\n1. Update App.tsx:\n   - Import AppLayout, Sidebar, MainContent, DetailPanel from components/layout\n   - Replace existing PanelGroup/Panel structure with new components\n   - Move sidebar navigation content into Sidebar component\n   - Move main content into MainContent component\n   - Add DetailPanel with placeholder content (e.g., 'Detail Panel' heading)\n   - Ensure header and footer remain outside the panel group\n\n2. Update App.css:\n   - Remove layout-specific styles that moved to layout.css\n   - Keep content-specific styles (work cards, status badges, etc.)\n\n3. Import layout.css in App.tsx or main.tsx\n\n4. Test the complete layout:\n   - Verify 3 panels render\n   - Verify resize handles work\n   - Verify collapse/expand on Sidebar and DetailPanel\n   - Verify min/max constraints are enforced",
+      "verification": [
+        "App renders with 3-panel layout",
+        "Panels have correct default sizes (20/55/25)",
+        "Resize handles allow dragging between panels",
+        "Sidebar collapse/expand works",
+        "DetailPanel collapse/expand works",
+        "Min sizes are enforced during resize",
+        "pnpm --filter @tiki/desktop build succeeds",
+        "pnpm --filter @tiki/desktop dev shows working layout"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "src/App.tsx",
+        "src/App.css",
+        "src/main.tsx"
+      ],
+      "dependencies": [3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2, 4],
+    "SC2": [4],
+    "SC3": [3, 4],
+    "SC4": [3, 4],
+    "SC5": [3, 4],
+    "SC6": [2, 4],
+    "SC7": [4]
+  }
+}

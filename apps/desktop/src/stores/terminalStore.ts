@@ -325,6 +325,7 @@ export const useTerminalStore = create<TerminalStore>()(
     }),
     {
       name: 'tiki-terminals',
+      version: 1,
       // Only persist tab metadata, not connection state
       partialize: (state) => ({
         tabs: state.tabs.map((t) => ({
@@ -333,6 +334,21 @@ export const useTerminalStore = create<TerminalStore>()(
         })),
         activeTabId: state.activeTabId,
       }),
+      // Migrate old persisted state that may be missing splitRoot
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 0) {
+          const state = persistedState as TerminalState;
+          return {
+            ...state,
+            tabs: state.tabs.map((tab) => ({
+              ...tab,
+              splitRoot: tab.splitRoot ?? createLeaf(tab.activeTerminalId || generateId()),
+              activeTerminalId: tab.activeTerminalId || (tab.splitRoot?.type === 'terminal' ? tab.splitRoot.terminalId : generateId()),
+            })),
+          };
+        }
+        return persistedState as TerminalState;
+      },
     }
   )
 );

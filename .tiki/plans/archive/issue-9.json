@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 9,
+    "title": "feat(desktop): Add GitHub Issues section using gh CLI",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/9"
+  },
+  "createdAt": "2026-02-02T20:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Issues load from gh CLI via Tauri IPC"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Issues display with labels as colored badges"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can filter by open/closed/all states"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Refresh button fetches latest issues"
+    },
+    {
+      "id": "SC5",
+      "category": "Error Handling",
+      "criterion": "gh not installed error shows helpful message"
+    },
+    {
+      "id": "SC6",
+      "category": "Error Handling",
+      "criterion": "Not authenticated error shows helpful message"
+    },
+    {
+      "id": "SC7",
+      "category": "UX",
+      "criterion": "Loading state displays during fetch operations"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create Rust github module with data types",
+      "status": "pending",
+      "content": "Create the github.rs Rust module with GitHubIssue and GitHubLabel data structures. Add the module declaration to lib.rs. Define the structs with Serialize/Deserialize derives for JSON serialization.\n\nStructures needed:\n- GitHubLabel: id, name, color, description\n- GitHubIssue: number, title, body, state, labels, url, created_at, updated_at\n\nThis phase establishes the data contract between Rust and TypeScript.",
+      "verification": [
+        "cargo check passes in src-tauri directory",
+        "GitHubIssue and GitHubLabel structs are defined with serde derives",
+        "Module is declared in lib.rs"
+      ],
+      "addressesCriteria": [],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Implement gh CLI Tauri commands",
+      "status": "pending",
+      "content": "Implement the two Tauri commands in github.rs:\n\n1. check_gh_auth() -> Result<bool, String>\n   - Run `gh auth status` and check exit code\n   - Return true if authenticated, false if not\n   - Return error if gh CLI not installed\n\n2. fetch_github_issues(state: Option<String>, limit: Option<u32>) -> Result<Vec<GitHubIssue>, String>\n   - Run `gh issue list --json number,title,body,state,labels,url,createdAt,updatedAt`\n   - Add --state flag if state parameter provided (open/closed/all)\n   - Add --limit flag if limit provided (default 30)\n   - Parse JSON output into Vec<GitHubIssue>\n   - Handle errors: gh not installed, not authenticated, not in repo\n\nRegister both commands in lib.rs generate_handler![] macro.",
+      "verification": [
+        "cargo check passes",
+        "Commands are registered in lib.rs",
+        "Running `cargo tauri dev` doesn't crash on startup"
+      ],
+      "addressesCriteria": ["SC1", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Create issuesStore with Zustand",
+      "status": "pending",
+      "content": "Create the issues Zustand store following the existing patterns in projectsStore.ts.\n\nState:\n- issues: GitHubIssue[]\n- filter: 'open' | 'closed' | 'all' (default: 'open')\n- isLoading: boolean\n- error: string | null\n- lastFetched: Date | null\n\nActions:\n- setIssues(issues: GitHubIssue[])\n- setFilter(filter: 'open' | 'closed' | 'all')\n- setLoading(loading: boolean)\n- setError(error: string | null)\n- clearError()\n\nDefine TypeScript interfaces for GitHubIssue and GitHubLabel matching the Rust structs.\n\nExport from stores/index.ts.",
+      "verification": [
+        "TypeScript compiles without errors",
+        "Store is exported from stores/index.ts",
+        "Interfaces match Rust struct fields"
+      ],
+      "addressesCriteria": ["SC3", "SC7"],
+      "files": [
+        "apps/desktop/src/stores/issuesStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 4,
+      "title": "Create IssueCard component",
+      "status": "pending",
+      "content": "Create the IssueCard component following ProjectCard patterns.\n\nProps:\n- issue: GitHubIssue\n- onClick?: () => void\n\nDisplay:\n- Issue number (#N) and title\n- Labels as colored badges (background from label.color)\n- State indicator (open/closed)\n- Relative time since updated\n\nStyling:\n- Follow ProjectCard.css patterns\n- Use CSS variables for theming\n- Hover effect with background change\n- Labels should have rounded corners and use the hex color from GitHub",
+      "verification": [
+        "Component renders without errors",
+        "CSS file uses project CSS variable conventions",
+        "Labels display with correct colors from GitHub"
+      ],
+      "addressesCriteria": ["SC2"],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssueCard.tsx",
+        "apps/desktop/src/components/sidebar/IssueCard.css"
+      ],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Create IssuesSection and integrate",
+      "status": "pending",
+      "content": "Create the IssuesSection component using CollapsibleSection wrapper.\n\nFeatures:\n- CollapsibleSection with bug icon and issue count badge\n- Filter dropdown (open/closed/all) in header area\n- Refresh button that fetches latest issues\n- Loading spinner during fetch\n- Error display with dismiss button\n- Empty state when no issues\n- List of IssueCard components\n\nOn mount:\n1. Check gh auth status via check_gh_auth command\n2. If authenticated, fetch issues with current filter\n3. Display appropriate error if not installed or not authenticated\n\nIntegrate into App.tsx sidebar after ProjectsSection.",
+      "verification": [
+        "IssuesSection renders in sidebar",
+        "Filter dropdown changes displayed issues",
+        "Refresh button fetches new issues",
+        "Error states display helpful messages",
+        "Loading state shows during fetch",
+        "App builds and runs without errors"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.css",
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [2, 3, 4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2, 5],
+    "SC2": [4],
+    "SC3": [3, 5],
+    "SC4": [5],
+    "SC5": [2, 5],
+    "SC6": [2, 5],
+    "SC7": [3, 5]
+  }
+}

@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(gh issue view:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(gh repo view:*)",
+      "Bash(wc:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm tauri:dev:*)",
+      "Bash(timeout:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)"
     ]
   }
 }

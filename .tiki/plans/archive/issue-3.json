@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 3,
+    "title": "feat(desktop): Style resize handles with visual feedback",
+    "url": "https://github.com/ericnewton/Tiki-V2/issues/3"
+  },
+  "createdAt": "2026-02-02T23:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Visual",
+      "criterion": "Handles are nearly invisible/subtle by default"
+    },
+    {
+      "id": "SC2",
+      "category": "Interaction",
+      "criterion": "Handles show grip indicator on hover"
+    },
+    {
+      "id": "SC3",
+      "category": "Interaction",
+      "criterion": "Active dragging uses accent color #60a5fa"
+    },
+    {
+      "id": "SC4",
+      "category": "Animation",
+      "criterion": "Smooth CSS transitions between all states"
+    },
+    {
+      "id": "SC5",
+      "category": "UX",
+      "criterion": "Cursor changes to col-resize on handle"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Implement resize handle visual states",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:40:00.000Z",
+      "summary": "Updated layout.css with complete resize handle styling: (1) Base state now transparent instead of semi-visible, (2) Hover state shows grip indicator using ::before pseudo-element with radial-gradient dots and subtle blue background, (3) Active/dragging state uses solid #60a5fa via [data-resize-handle-active] selector, (4) Smooth 0.15s transitions on background and opacity. Build verified successful.",
+      "content": "Update the `.resize-handle` CSS in layout.css to implement:\n\n1. **Base state**: Make handles more subtle/transparent (currently rgba 0.1, should be near-transparent)\n\n2. **Hover state**: Add a grip indicator using CSS pseudo-elements (::before) to show vertical dots or lines that indicate draggability. Keep the subtle blue background.\n\n3. **Active/dragging state**: Use the `[data-resize-handle-active]` attribute selector that react-resizable-panels provides to style the active dragging state with the full accent color #60a5fa.\n\n4. **Transitions**: Ensure smooth transitions for background, opacity, and any transform properties.\n\nThe grip indicator pattern should use 3 small dots or lines vertically centered in the handle.",
+      "verification": [
+        "Resize handles are barely visible when not interacting",
+        "Hovering over a handle shows a grip indicator (dots or lines)",
+        "While actively dragging, handle shows solid accent color #60a5fa",
+        "Transitions are smooth between all states (no jarring changes)",
+        "Cursor shows col-resize when over handle"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/components/layout/layout.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Visual verification and refinement",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:45:00.000Z",
+      "summary": "Visual verification passed. User confirmed all resize handle states work correctly: transparent base state, grip indicator on hover, solid accent color when dragging, smooth transitions.",
+      "content": "Build the app and visually verify all resize handle states work correctly:\n\n1. Run `npm run dev` or build the desktop app\n2. Test hover state on both resize handles (sidebar-main and main-detail)\n3. Test active dragging state\n4. Verify transitions are smooth\n5. Make any minor CSS adjustments needed for visual polish\n\nThis phase may be skipped if Phase 1 verification passes on first attempt.",
+      "verification": [
+        "App builds without errors",
+        "Both resize handles show consistent behavior",
+        "Visual appearance matches design intent"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src/components/layout/layout.css"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [1, 2],
+    "SC3": [1, 2],
+    "SC4": [1, 2],
+    "SC5": [1]
+  }
+}
