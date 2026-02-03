@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -22,6 +22,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onStatusChangeRef = useRef(onStatusChange);
   onStatusChangeRef.current = onStatusChange;
+
+  // Track when container becomes visible (has dimensions)
+  const [isVisible, setIsVisible] = useState(false);
 
   // Callbacks for terminal output and exit
   const handleOutput = useCallback((data: string) => {
@@ -71,8 +74,33 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   // Initialize xterm.js and connect to PTY
   useEffect(() => {
     if (!terminalRef.current || isInitializedRef.current) return;
-    isInitializedRef.current = true;
 
+    // Don't initialize if container has no dimensions (hidden tab)
+    if (!isVisible && (terminalRef.current.offsetWidth === 0 || terminalRef.current.offsetHeight === 0)) {
+      return;
+    }
+
+    isInitializedRef.current = true;
+    const container = terminalRef.current;
+
+    // Use requestAnimationFrame to ensure DOM is fully laid out before xterm init
+    const rafId = requestAnimationFrame(() => {
+      // Double-check dimensions after RAF
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        isInitializedRef.current = false;
+        return;
+      }
+
+      initializeTerminal(container);
+    });
+
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, [isVisible]);
+
+  // Separate function for terminal initialization
+  const initializeTerminal = useCallback((container: HTMLDivElement) => {
     // Create terminal instance
     const xterm = new XTerm({
       theme: {
@@ -97,7 +125,11 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
 
     // Open terminal in container
     xterm.open(terminalRef.current);
-    fitAddon.fit();
+
+    // Only fit if container has dimensions (not hidden)
+    if (terminalRef.current.offsetWidth > 0 && terminalRef.current.offsetHeight > 0) {
+      fitAddon.fit();
+    }
 
     // Store refs
     xtermRef.current = xterm;
@@ -115,7 +147,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
 
     // Handle window resize
     const handleWindowResize = () => {
-      fitAddon.fit();
+      if (terminalRef.current && terminalRef.current.offsetWidth > 0 && terminalRef.current.offsetHeight > 0) {
+        fitAddon.fit();
+      }
     };
     window.addEventListener("resize", handleWindowResize);
 
@@ -141,21 +175,29 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
       }
       destroyTerminal();
     };
-  }, [createTerminal, destroyTerminal]);
+  }, [createTerminal, destroyTerminal, isVisible]);
 
-  // Re-fit on container resize
+  // Watch for container visibility and re-fit on resize
   useEffect(() => {
     const container = terminalRef.current;
     if (!container) return;
 
     const observer = new ResizeObserver(() => {
-      fitAddonRef.current?.fit();
+      const hasSize = container.offsetWidth > 0 && container.offsetHeight > 0;
+      if (hasSize) {
+        // Trigger initialization if not yet done
+        if (!isVisible) {
+          setIsVisible(true);
+        }
+        // Fit existing terminal
+        fitAddonRef.current?.fit();
+      }
     });
 
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, []);
+  }, [isVisible]);
 
   return (
     <div className={`terminal-container ${className}`.trim()}>
