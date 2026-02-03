@@ -1,50 +1,15 @@
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { WorkProgressCard } from "./WorkProgressCard";
-import type { WorkContext, WorkStatus } from "../work/WorkCard";
+import type { WorkContext } from "../work/WorkCard";
 import "./StateSection.css";
 
 interface StateSectionProps {
   activeWork: Record<string, WorkContext>;
 }
 
-/**
- * Determines if a work status indicates active/busy state
- */
-function isActiveStatus(status: WorkStatus): boolean {
-  return status === "executing" || status === "planning" || status === "shipping";
-}
-
-/**
- * Gets the overall system status based on all active work
- */
-function getGlobalStatus(workEntries: [string, WorkContext][]): {
-  label: string;
-  status: "idle" | "busy" | "paused" | "failed";
-} {
-  if (workEntries.length === 0) {
-    return { label: "Idle", status: "idle" };
-  }
-
-  const hasExecuting = workEntries.some(([, work]) => isActiveStatus(work.status));
-  const hasFailed = workEntries.some(([, work]) => work.status === "failed");
-  const hasPaused = workEntries.some(([, work]) => work.status === "paused");
-
-  if (hasFailed) {
-    return { label: "Failed", status: "failed" };
-  }
-  if (hasExecuting) {
-    return { label: "Busy", status: "busy" };
-  }
-  if (hasPaused) {
-    return { label: "Paused", status: "paused" };
-  }
-  return { label: "Idle", status: "idle" };
-}
-
 export function StateSection({ activeWork }: StateSectionProps) {
   const workEntries = Object.entries(activeWork);
   const activeCount = workEntries.length;
-  const globalStatus = getGlobalStatus(workEntries);
 
   const stateIcon = (
     <svg
@@ -72,13 +37,14 @@ export function StateSection({ activeWork }: StateSectionProps) {
       className="state-section"
     >
       <div className="state-section-content">
-        {/* Global Status Indicator */}
-        <div className="global-status-indicator">
-          <span className={`status-dot status-${globalStatus.status}`} />
-          <span className="status-label">{globalStatus.label}</span>
-        </div>
-
-        {workEntries.length > 0 && (
+        {workEntries.length === 0 ? (
+          <div className="state-section-empty">
+            <p>No active work</p>
+            <p className="state-section-hint">
+              Run <code>tiki:get #issue</code> to start working on an issue.
+            </p>
+          </div>
+        ) : (
           <div className="state-section-list">
             {workEntries.map(([key, work]) => (
               <WorkProgressCard key={key} work={work} />
