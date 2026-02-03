@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useIssuesStore, useKanbanStore, useTikiReleasesStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
+import { KanbanColumn } from './KanbanColumn';
 import './kanban.css';
 
 // Column configuration mapping to Tiki work statuses
@@ -84,36 +85,12 @@ export function KanbanBoard() {
     <div className="kanban-board">
       <div className="kanban-columns">
         {columns.map((column) => (
-          <div key={column.id} className={`kanban-column kanban-column--${column.id}`}>
-            <div className="kanban-column-header">
-              <span className="kanban-column-title">{column.title}</span>
-              <span className="kanban-column-count">({column.issues.length})</span>
-            </div>
-            <div className="kanban-column-body">
-              {column.issues.length === 0 ? (
-                <div className="kanban-column-empty">No issues</div>
-              ) : (
-                column.issues.map((issue) => (
-                  <div key={issue.number} className="kanban-card">
-                    <div className="kanban-card-number">#{issue.number}</div>
-                    <div className="kanban-card-title">{issue.title}</div>
-                    {issue.labels.length > 0 && (
-                      <div className="kanban-card-labels">
-                        {issue.labels.slice(0, 3).map((label) => (
-                          <span
-                            key={label.id}
-                            className="kanban-card-label"
-                            style={{ backgroundColor: `#${label.color}` }}
-                            title={label.name}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <KanbanColumn
+            key={column.id}
+            id={column.id}
+            title={column.title}
+            issues={column.issues}
+          />
         ))}
       </div>
     </div>
