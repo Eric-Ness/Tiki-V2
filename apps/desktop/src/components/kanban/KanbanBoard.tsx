@@ -50,6 +50,7 @@ export function KanbanBoard() {
   const { tabs, activeTabId } = useTerminalStore();
   const setActiveView = useLayoutStore((s) => s.setActiveView);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [shipConfirmation, setShipConfirmation] = useState<{ issueNumber: number; title: string } | null>(null);
 
   // Configure DnD sensors
   const sensors = useSensors(
@@ -105,6 +106,38 @@ export function KanbanBoard() {
     }
   }, [setActiveView, executeInTerminal]);
 
+  // Show ship confirmation dialog
+  const requestShipConfirmation = useCallback((issueNumber: number) => {
+    const issue = issues.find((i) => i.number === issueNumber);
+    if (issue) {
+      setShipConfirmation({ issueNumber, title: issue.title });
+    }
+  }, [issues]);
+
+  // Actually trigger the ship command
+  const confirmShip = useCallback(async () => {
+    if (!shipConfirmation) return;
+
+    const command = `/tiki:ship ${shipConfirmation.issueNumber}`;
+
+    // Switch to terminal view
+    setActiveView('terminal');
+
+    // Send command to terminal
+    const success = await executeInTerminal(command);
+    if (success) {
+      console.log(`Started shipping: ${command}`);
+    }
+
+    // Close the confirmation dialog
+    setShipConfirmation(null);
+  }, [shipConfirmation, setActiveView, executeInTerminal]);
+
+  // Cancel ship operation
+  const cancelShip = useCallback(() => {
+    setShipConfirmation(null);
+  }, []);
+
   // Find which column an issue belongs to
   const getIssueColumn = (issueNumber: number): string | null => {
     const issue = issues.find((i) => i.number === issueNumber);
@@ -145,8 +178,9 @@ export function KanbanBoard() {
     // Trigger workflow action based on target column
     if (targetColumn === 'executing') {
       triggerExecution(issueNumber, sourceColumn);
+    } else if (targetColumn === 'shipping' && sourceColumn === 'executing') {
+      requestShipConfirmation(issueNumber);
     }
-    // TODO: Issue #40 will handle shipping
   };
 
   // Get the issue being dragged for the overlay
@@ -248,6 +282,27 @@ export function KanbanBoard() {
       <DragOverlay>
         {activeIssue ? <KanbanCard issue={activeIssue} isDragging /> : null}
       </DragOverlay>
+
+      {/* Ship Confirmation Dialog */}
+      {shipConfirmation && (
+        <div className="kanban-dialog-overlay" onClick={cancelShip}>
+          <div className="kanban-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3 className="kanban-dialog-title">Ship Issue #{shipConfirmation.issueNumber}?</h3>
+            <p className="kanban-dialog-message">
+              This will commit changes, push to remote, and close the issue:
+            </p>
+            <p className="kanban-dialog-issue-title">{shipConfirmation.title}</p>
+            <div className="kanban-dialog-actions">
+              <button className="kanban-dialog-btn kanban-dialog-btn--cancel" onClick={cancelShip}>
+                Cancel
+              </button>
+              <button className="kanban-dialog-btn kanban-dialog-btn--confirm" onClick={confirmShip}>
+                Ship
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DndContext>
   );
 }

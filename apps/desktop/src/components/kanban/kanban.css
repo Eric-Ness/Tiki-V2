@@ -320,6 +320,84 @@
   background: #4a4a4a;
 }
 
+/* Ship Confirmation Dialog */
+.kanban-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.kanban-dialog {
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.kanban-dialog-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.kanban-dialog-message {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #888;
+}
+
+.kanban-dialog-issue-title {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #e0e0e0;
+  padding: 10px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  border-left: 3px solid #8b5cf6;
+}
+
+.kanban-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.kanban-dialog-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s;
+}
+
+.kanban-dialog-btn--cancel {
+  background: #333;
+  color: #e0e0e0;
+}
+
+.kanban-dialog-btn--cancel:hover {
+  background: #444;
+}
+
+.kanban-dialog-btn--confirm {
+  background: #8b5cf6;
+  color: white;
+}
+
+.kanban-dialog-btn--confirm:hover {
+  background: #7c3aed;
+}
+
 /* Reduced motion accessibility */
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
