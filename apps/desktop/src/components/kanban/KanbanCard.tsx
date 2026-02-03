@@ -1,4 +1,5 @@
 import { useDraggable } from '@dnd-kit/core';
+import { motion } from 'framer-motion';
 import { useDetailStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 
@@ -73,9 +74,11 @@ export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDra
 
       {isExecuting && workItem && workItem.currentPhase && workItem.totalPhases && (
         <div className="kanban-card-progress" title={workItem.phaseName || ''}>
-          <div
+          <motion.div
             className="kanban-card-progress-bar"
-            style={{ width: `${(workItem.currentPhase / workItem.totalPhases) * 100}%` }}
+            initial={false}
+            animate={{ width: `${(workItem.currentPhase / workItem.totalPhases) * 100}%` }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
           />
           <span className="kanban-card-progress-text">
             Phase {workItem.currentPhase}/{workItem.totalPhases}

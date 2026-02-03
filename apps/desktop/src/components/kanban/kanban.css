@@ -319,3 +319,13 @@
 .kanban-column-body::-webkit-scrollbar-thumb:hover {
   background: #4a4a4a;
 }
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .kanban-card,
+  .kanban-card-progress-bar,
+  .kanban-column-count {
+    transition: none !important;
+    animation: none !important;
+  }
+}
