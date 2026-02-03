@@ -30,7 +30,9 @@ export function ReleasesSection() {
   const updateTikiRelease = useTikiReleasesStore((state) => state.updateRelease);
 
   // Projects store
-  const activeProject = useProjectsStore((state) => state.activeProject);
+  const activeProject = useProjectsStore((state) =>
+    state.projects.find((p) => p.id === state.activeProjectId)
+  );
 
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);

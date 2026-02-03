@@ -48,13 +48,6 @@ pub fn switch_watch_path(app_handle: AppHandle, new_path: PathBuf) -> Result<(),
     Ok(())
 }
 
-/// Get the current watched path
-pub fn get_current_watch_path() -> Option<PathBuf> {
-    let state = get_watcher_state();
-    let guard = state.lock().ok()?;
-    guard.current_path.clone()
-}
-
 /// Events emitted to the frontend when files change
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]

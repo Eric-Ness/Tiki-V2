@@ -32,7 +32,9 @@ export function IssueFormModal({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const originalLabels = useRef<string[]>([]);
 
-  const activeProject = useProjectsStore((state) => state.activeProject);
+  const activeProject = useProjectsStore((state) =>
+    state.projects.find((p) => p.id === state.activeProjectId)
+  );
 
   const isEditMode = !!editingIssue;
 

@@ -192,11 +192,6 @@ impl TerminalManager {
         }
         session
     }
-
-    /// Check if a session exists
-    pub fn has_session(&self, id: &str) -> bool {
-        self.sessions.contains_key(id)
-    }
 }
 
 /// Get the global terminal manager instance

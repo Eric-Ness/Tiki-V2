@@ -21,7 +21,9 @@ export function IssuesSection() {
   const clearError = useIssuesStore((state) => state.clearError);
   const setLastFetched = useIssuesStore((state) => state.setLastFetched);
 
-  const activeProject = useProjectsStore((state) => state.activeProject);
+  const activeProject = useProjectsStore((state) =>
+    state.projects.find((p) => p.id === state.activeProjectId)
+  );
 
   const fetchIssues = useCallback(async () => {
     // Don't fetch if no project is selected
