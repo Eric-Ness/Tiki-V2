@@ -225,10 +225,6 @@ pub fn create_github_issue(
         args.push(label);
     }
 
-    // Add --json to get the created issue back
-    args.push("--json".to_string());
-    args.push("number,title,body,state,labels,url,createdAt,updatedAt".to_string());
-
     let output = Command::new("gh")
         .args(&args)
         .output()
@@ -257,8 +253,49 @@ pub fn create_github_issue(
         return Err(format!("Failed to create issue: {}", stderr));
     }
 
+    // gh issue create outputs the issue URL on success
+    // Parse the issue number from the URL and fetch full issue data
     let stdout = String::from_utf8_lossy(&output.stdout);
-    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse created issue: {}", e))
+    let issue_url = stdout.trim();
+
+    // Extract issue number from URL (e.g., "https://github.com/owner/repo/issues/123")
+    let issue_number: u32 = issue_url
+        .rsplit('/')
+        .next()
+        .and_then(|n| n.parse().ok())
+        .ok_or_else(|| format!("Failed to parse issue number from URL: {}", issue_url))?;
+
+    // Fetch the created issue using gh issue view
+    fetch_github_issue_by_number(issue_number)
+}
+
+/// Fetch a single GitHub issue by number
+fn fetch_github_issue_by_number(number: u32) -> Result<GitHubIssue, String> {
+    let output = Command::new("gh")
+        .args([
+            "issue",
+            "view",
+            &number.to_string(),
+            "--json",
+            "number,title,body,state,labels,url,createdAt,updatedAt",
+        ])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to fetch issue: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse issue: {}", e))
 }
 
 /// Edit an existing GitHub issue
