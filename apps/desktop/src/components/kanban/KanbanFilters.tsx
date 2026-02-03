@@ -21,7 +21,7 @@ export function KanbanFilters() {
             {activeReleases.map((release) => (
               <option key={release.version} value={release.version}>
                 {release.version}
-                {release.title ? ` - ${release.title}` : ''}
+                {release.name ? ` - ${release.name}` : ''}
               </option>
             ))}
           </optgroup>

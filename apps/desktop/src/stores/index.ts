@@ -3,6 +3,7 @@ export {
   DEFAULT_SIZES,
   type PanelSizes,
   type CollapsedPanels,
+  type ViewType,
 } from './layoutStore';
 
 export {
