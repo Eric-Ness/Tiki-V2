@@ -1,4 +1,5 @@
 mod commands;
+mod github;
 mod state;
 mod watcher;
 
@@ -34,6 +35,8 @@ pub fn run() {
             commands::select_project_directory,
             commands::validate_tiki_directory,
             commands::switch_project,
+            github::check_gh_auth,
+            github::fetch_github_issues,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

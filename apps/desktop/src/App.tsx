@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AppLayout, Sidebar, MainContent, DetailPanel } from "./components/layout";
 import { ProjectsSection } from "./components/sidebar/ProjectsSection";
+import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore } from "./stores";
@@ -80,6 +81,7 @@ function App() {
       <AppLayout>
         <Sidebar defaultSize={panelSizes.sidebar} minSize={15}>
           <ProjectsSection />
+          <IssuesSection />
 
           {error && <div className="error">{error}</div>}
 
