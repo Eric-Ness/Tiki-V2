@@ -1,21 +1,61 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { useTerminal } from "./useTerminal";
 import "xterm/css/xterm.css";
 import "./Terminal.css";
 
 interface TerminalProps {
   className?: string;
+  cwd?: string;
+  shell?: string;
 }
 
-export function Terminal({ className = "" }: TerminalProps) {
+export function Terminal({ className = "", cwd, shell }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const isInitializedRef = useRef(false);
 
+  // Callbacks for terminal output and exit
+  const handleOutput = useCallback((data: string) => {
+    xtermRef.current?.write(data);
+  }, []);
+
+  const handleExit = useCallback((exitCode: number | null) => {
+    const xterm = xtermRef.current;
+    if (xterm) {
+      xterm.writeln("");
+      xterm.writeln(
+        `\x1b[90m[Process exited${exitCode !== null ? ` with code ${exitCode}` : ""}]\x1b[0m`
+      );
+    }
+  }, []);
+
+  const {
+    isConnected,
+    createTerminal,
+    writeTerminal,
+    resizeTerminal,
+    destroyTerminal,
+  } = useTerminal({
+    onOutput: handleOutput,
+    onExit: handleExit,
+    cwd,
+    shell,
+  });
+
+  // Store functions in refs to avoid stale closures
+  const writeTerminalRef = useRef(writeTerminal);
+  const resizeTerminalRef = useRef(resizeTerminal);
+  writeTerminalRef.current = writeTerminal;
+  resizeTerminalRef.current = resizeTerminal;
+
+  // Initialize xterm.js and connect to PTY
   useEffect(() => {
-    if (!terminalRef.current || xtermRef.current) return;
+    if (!terminalRef.current || isInitializedRef.current) return;
+    isInitializedRef.current = true;
 
     // Create terminal instance
     const xterm = new XTerm({
@@ -47,40 +87,51 @@ export function Terminal({ className = "" }: TerminalProps) {
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
 
-    // Write welcome message
-    xterm.writeln("\x1b[1;36m╔════════════════════════════════════════╗\x1b[0m");
-    xterm.writeln("\x1b[1;36m║\x1b[0m  \x1b[1;33mTiki Terminal\x1b[0m - Ready for PTY        \x1b[1;36m║\x1b[0m");
-    xterm.writeln("\x1b[1;36m╚════════════════════════════════════════╝\x1b[0m");
-    xterm.writeln("");
-    xterm.writeln("\x1b[90mxterm.js initialized successfully.\x1b[0m");
-    xterm.writeln("\x1b[90mPTY integration coming in future issues.\x1b[0m");
-    xterm.writeln("");
+    // Connect user input to PTY
+    const onDataDisposable = xterm.onData((data) => {
+      writeTerminalRef.current(data);
+    });
 
-    // Handle resize
-    const handleResize = () => {
+    // Send resize events when terminal dimensions change
+    const onResizeDisposable = xterm.onResize(({ rows, cols }) => {
+      resizeTerminalRef.current(rows, cols);
+    });
+
+    // Handle window resize
+    const handleWindowResize = () => {
       fitAddon.fit();
     };
+    window.addEventListener("resize", handleWindowResize);
 
-    window.addEventListener("resize", handleResize);
+    // Create the PTY session
+    createTerminal().then(() => {
+      // Send initial size after connection
+      const { rows, cols } = xterm;
+      resizeTerminalRef.current(rows, cols);
+    });
 
     // Cleanup
     return () => {
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", handleWindowResize);
+      onDataDisposable.dispose();
+      onResizeDisposable.dispose();
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      destroyTerminal();
     };
-  }, []);
+  }, [createTerminal, destroyTerminal]);
 
   // Re-fit on container resize
   useEffect(() => {
+    const container = terminalRef.current;
+    if (!container) return;
+
     const observer = new ResizeObserver(() => {
       fitAddonRef.current?.fit();
     });
 
-    if (terminalRef.current) {
-      observer.observe(terminalRef.current);
-    }
+    observer.observe(container);
 
     return () => observer.disconnect();
   }, []);
@@ -88,6 +139,9 @@ export function Terminal({ className = "" }: TerminalProps) {
   return (
     <div className={`terminal-container ${className}`.trim()}>
       <div ref={terminalRef} className="terminal-content" />
+      {!isConnected && (
+        <div className="terminal-status">Connecting...</div>
+      )}
     </div>
   );
 }

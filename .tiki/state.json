@@ -1,25 +1,56 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:7": {
-      "number": 7,
-      "title": "feat(desktop): Add Projects section with add/remove/switch",
+    "issue:13": {
+      "number": 13,
+      "title": "feat(desktop): Create Terminal component with xterm.js",
       "status": "shipping",
-      "lastActivity": "2026-02-02T19:20:00.000Z",
+      "startedAt": "2026-02-02T23:55:00.000Z",
+      "lastActivity": "2026-02-03T00:08:00.000Z",
       "phase": {
-        "total": 6,
-        "current": 6,
+        "current": 3,
+        "total": 3,
         "status": "completed"
       }
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 6,
-      "title": "feat(desktop): Create CollapsibleSection component with animations",
-      "completedAt": "2026-02-02T12:25:00.000Z"
+      "number": 12,
+      "title": "feat(desktop): Implement PTY spawning and management in Rust",
+      "completedAt": "2026-02-03T00:20:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 12,
+        "title": "feat(desktop): Implement PTY spawning and management in Rust",
+        "completedAt": "2026-02-03T00:20:00.000Z"
+      },
+      {
+        "number": 11,
+        "title": "feat(desktop): Install PTY plugin and xterm.js for terminal",
+        "completedAt": "2026-02-02T23:30:00.000Z"
+      },
+      {
+        "number": 10,
+        "title": "feat(desktop): Add Releases section showing versions",
+        "completedAt": "2026-02-02T22:00:00.000Z"
+      },
+      {
+        "number": 9,
+        "title": "feat(desktop): Add GitHub Issues section using gh CLI",
+        "completedAt": "2026-02-02T21:05:00.000Z"
+      },
+      {
+        "number": 8,
+        "title": "feat(desktop): Add State section showing execution progress",
+        "completedAt": "2026-02-02T19:55:00.000Z"
+      },
+      {
+        "number": 7,
+        "title": "feat(desktop): Add Projects section with add/remove/switch",
+        "completedAt": "2026-02-02T19:25:00.000Z"
+      },
       {
         "number": 6,
         "title": "feat(desktop): Create CollapsibleSection component with animations",
@@ -44,11 +75,6 @@
         "number": 2,
         "title": "feat(desktop): Create 3-panel resizable layout structure",
         "completedAt": "2026-02-02T23:05:00.000Z"
-      },
-      {
-        "number": 1,
-        "title": "feat(desktop): Install react-resizable-panels for layout system",
-        "completedAt": "2026-02-02T12:10:00.000Z"
       }
     ]
   }

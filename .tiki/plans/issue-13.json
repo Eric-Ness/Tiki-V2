@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 13,
+    "title": "feat(desktop): Create Terminal component with xterm.js",
+    "url": "https://github.com/anthropics/tiki-v2/issues/13"
+  },
+  "createdAt": "2026-02-02T23:57:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Terminal creates PTY session on mount via create_terminal"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Users can type commands and see shell output"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Terminal auto-resizes with container via resize_terminal"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Links in output are clickable (WebLinksAddon)"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Terminal destroys cleanly on unmount via destroy_terminal"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "criterion": "Terminal handles terminal-exit events gracefully"
+    },
+    {
+      "id": "SC7",
+      "category": "Code",
+      "criterion": "useTerminal.ts hook encapsulates IPC state"
+    },
+    {
+      "id": "SC8",
+      "category": "Code",
+      "criterion": "index.ts exports Terminal and hook"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create useTerminal hook with IPC lifecycle",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:00:00.000Z",
+      "summary": "Created useTerminal.ts hook with full Tauri IPC integration. Exports: TerminalOutputEvent, TerminalExitEvent types, UseTerminalOptions, UseTerminalReturn interfaces, and useTerminal hook with createTerminal, writeTerminal, resizeTerminal, destroyTerminal functions. Includes event listeners for terminal-output and terminal-exit events with proper cleanup on unmount.",
+      "content": "Create the useTerminal.ts hook that manages the terminal lifecycle via Tauri IPC:\n\n1. Define TypeScript types for terminal events (TerminalOutputEvent, TerminalExitEvent)\n2. Create useTerminal hook with:\n   - State: terminalId, isConnected, error\n   - createTerminal() - calls create_terminal IPC\n   - writeTerminal(data) - calls write_terminal IPC\n   - resizeTerminal(rows, cols) - calls resize_terminal IPC\n   - destroyTerminal() - calls destroy_terminal IPC\n3. Set up event listeners for terminal-output and terminal-exit\n4. Return hook interface for Terminal component to use\n\nUse Tauri's invoke() for commands and listen() for events.",
+      "verification": [
+        "File apps/desktop/src/components/terminal/useTerminal.ts exists",
+        "TypeScript types compile without errors",
+        "Hook exports createTerminal, writeTerminal, resizeTerminal, destroyTerminal functions"
+      ],
+      "addressesCriteria": ["SC1", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/terminal/useTerminal.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Integrate Terminal.tsx with useTerminal hook",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:05:00.000Z",
+      "summary": "Updated Terminal.tsx to use useTerminal hook. Connected xterm.onData to writeTerminal for input, terminal-output events to xterm.write for output, xterm.onResize to resizeTerminal for dimension updates. Added handleExit callback displaying exit message. Removed placeholder welcome message. Added 'Connecting...' status indicator. Updated Terminal.css with position relative and status styles.",
+      "content": "Update Terminal.tsx to use the useTerminal hook and connect xterm.js to the PTY:\n\n1. Import and use the useTerminal hook\n2. On mount: call createTerminal() to spawn shell\n3. Connect xterm.onData to writeTerminal() for user input\n4. Connect terminal-output events to xterm.write() for output display\n5. On resize: call resizeTerminal(rows, cols) when FitAddon triggers\n6. On unmount: call destroyTerminal() for cleanup\n7. Handle terminal-exit event to show exit message\n8. Remove the placeholder welcome message\n\nThe terminal should now be fully functional with real shell I/O.",
+      "verification": [
+        "Terminal spawns PowerShell (Windows) or default shell on load",
+        "Typing in terminal sends input to shell",
+        "Shell output appears in terminal",
+        "Resizing the container resizes the PTY",
+        "Unmounting destroys the terminal session cleanly"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.tsx"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add barrel export and final polish",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:08:00.000Z",
+      "summary": "Created index.ts barrel export exporting Terminal component, useTerminal hook, and all relevant types (TerminalOutputEvent, TerminalExitEvent, UseTerminalOptions, UseTerminalReturn). App builds successfully without errors.",
+      "content": "Create the index.ts barrel export and ensure everything is properly exported:\n\n1. Create index.ts that exports:\n   - Terminal component (default and named)\n   - useTerminal hook\n   - Any relevant types\n2. Verify the component integrates properly with the app\n3. Test the full terminal flow end-to-end\n\nThis completes the Terminal component integration.",
+      "verification": [
+        "File apps/desktop/src/components/terminal/index.ts exists",
+        "Can import { Terminal, useTerminal } from './components/terminal'",
+        "App builds without errors",
+        "Terminal works end-to-end: spawn, type, output, resize, close"
+      ],
+      "addressesCriteria": ["SC8"],
+      "files": [
+        "apps/desktop/src/components/terminal/index.ts"
+      ],
+      "dependencies": [1, 2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [2],
+    "SC3": [2],
+    "SC4": [2],
+    "SC5": [1, 2],
+    "SC6": [1, 2],
+    "SC7": [1],
+    "SC8": [3]
+  }
+}
