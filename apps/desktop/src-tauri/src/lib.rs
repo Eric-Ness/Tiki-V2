@@ -1,6 +1,7 @@
 mod commands;
 mod github;
 mod state;
+mod terminal;
 mod watcher;
 
 
@@ -38,6 +39,10 @@ pub fn run() {
             github::check_gh_auth,
             github::fetch_github_issues,
             github::fetch_github_releases,
+            terminal::commands::create_terminal,
+            terminal::commands::write_terminal,
+            terminal::commands::resize_terminal,
+            terminal::commands::destroy_terminal,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
