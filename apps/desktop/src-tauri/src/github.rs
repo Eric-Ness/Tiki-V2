@@ -46,36 +46,43 @@ pub fn check_gh_auth() -> Result<bool, String> {
     Ok(output.status.success())
 }
 
-/// Fetch GitHub issues from the current repository
+/// Fetch GitHub issues from a repository
 /// - state: Filter by issue state ("open", "closed", "all"). Defaults to "open"
 /// - limit: Maximum number of issues to fetch. Defaults to 30
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn fetch_github_issues(
     state: Option<String>,
     limit: Option<u32>,
+    project_path: Option<String>,
 ) -> Result<Vec<GitHubIssue>, String> {
     let state_filter = state.unwrap_or_else(|| "open".to_string());
     let limit_val = limit.unwrap_or(30);
 
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "list",
-            "--json",
-            "number,title,body,state,labels,url,createdAt,updatedAt",
-            "--state",
-            &state_filter,
-            "--limit",
-            &limit_val.to_string(),
-        ])
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/".to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "issue",
+        "list",
+        "--json",
+        "number,title,body,state,labels,url,createdAt,updatedAt",
+        "--state",
+        &state_filter,
+        "--limit",
+        &limit_val.to_string(),
+    ]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -107,30 +114,38 @@ pub struct GitHubRelease {
     pub url: String,
 }
 
-/// Fetch GitHub releases from the current repository
+/// Fetch GitHub releases from a repository
 /// - limit: Maximum number of releases to fetch. Defaults to 20
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
-pub fn fetch_github_releases(limit: Option<u32>) -> Result<Vec<GitHubRelease>, String> {
+pub fn fetch_github_releases(
+    limit: Option<u32>,
+    project_path: Option<String>,
+) -> Result<Vec<GitHubRelease>, String> {
     let limit_val = limit.unwrap_or(20);
 
-    let output = Command::new("gh")
-        .args([
-            "release",
-            "list",
-            "--json",
-            "tagName,name,isDraft,isPrerelease,publishedAt,url",
-            "--limit",
-            &limit_val.to_string(),
-        ])
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                    .to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "release",
+        "list",
+        "--json",
+        "tagName,name,isDraft,isPrerelease,publishedAt,url",
+        "--limit",
+        &limit_val.to_string(),
+    ]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -159,27 +174,25 @@ pub struct LabelInfo {
     pub color: String,
 }
 
-/// Fetch available labels from the current repository
+/// Fetch available labels from a repository
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
-pub fn fetch_github_labels() -> Result<Vec<LabelInfo>, String> {
-    let output = Command::new("gh")
-        .args([
-            "label",
-            "list",
-            "--json",
-            "name,color",
-            "--limit",
-            "100",
-        ])
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                    .to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+pub fn fetch_github_labels(project_path: Option<String>) -> Result<Vec<LabelInfo>, String> {
+    let mut cmd = Command::new("gh");
+    cmd.args(["label", "list", "--json", "name,color", "--limit", "100"]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -202,11 +215,13 @@ pub fn fetch_github_labels() -> Result<Vec<LabelInfo>, String> {
 }
 
 /// Create a new GitHub issue
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn create_github_issue(
     title: String,
     body: Option<String>,
     labels: Vec<String>,
+    project_path: Option<String>,
 ) -> Result<GitHubIssue, String> {
     let mut args = vec![
         "issue".to_string(),
@@ -225,17 +240,21 @@ pub fn create_github_issue(
         args.push(label);
     }
 
-    let output = Command::new("gh")
-        .args(&args)
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                    .to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+    let mut cmd = Command::new("gh");
+    cmd.args(&args);
+
+    if let Some(ref path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -266,28 +285,35 @@ pub fn create_github_issue(
         .ok_or_else(|| format!("Failed to parse issue number from URL: {}", issue_url))?;
 
     // Fetch the created issue using gh issue view
-    fetch_github_issue_by_number(issue_number)
+    fetch_github_issue_by_number(issue_number, project_path)
 }
 
 /// Fetch a single GitHub issue by number
-fn fetch_github_issue_by_number(number: u32) -> Result<GitHubIssue, String> {
-    let output = Command::new("gh")
-        .args([
-            "issue",
-            "view",
-            &number.to_string(),
-            "--json",
-            "number,title,body,state,labels,url,createdAt,updatedAt",
-        ])
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                    .to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+fn fetch_github_issue_by_number(
+    number: u32,
+    project_path: Option<String>,
+) -> Result<GitHubIssue, String> {
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "issue",
+        "view",
+        &number.to_string(),
+        "--json",
+        "number,title,body,state,labels,url,createdAt,updatedAt",
+    ]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -299,6 +325,7 @@ fn fetch_github_issue_by_number(number: u32) -> Result<GitHubIssue, String> {
 }
 
 /// Edit an existing GitHub issue
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn edit_github_issue(
     number: u32,
@@ -306,6 +333,7 @@ pub fn edit_github_issue(
     body: Option<String>,
     add_labels: Vec<String>,
     remove_labels: Vec<String>,
+    project_path: Option<String>,
 ) -> Result<(), String> {
     let mut args = vec![
         "issue".to_string(),
@@ -333,17 +361,21 @@ pub fn edit_github_issue(
         args.push(label);
     }
 
-    let output = Command::new("gh")
-        .args(&args)
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                    .to_string()
-            } else {
-                format!("Failed to run gh CLI: {}", e)
-            }
-        })?;
+    let mut cmd = Command::new("gh");
+    cmd.args(&args);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

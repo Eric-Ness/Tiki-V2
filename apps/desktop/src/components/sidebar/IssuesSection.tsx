@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, useDetailStore, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, useProjectsStore, type GitHubIssue, type IssueFilter } from "../../stores";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
@@ -21,7 +21,17 @@ export function IssuesSection() {
   const clearError = useIssuesStore((state) => state.clearError);
   const setLastFetched = useIssuesStore((state) => state.setLastFetched);
 
+  const activeProject = useProjectsStore((state) => state.activeProject);
+
   const fetchIssues = useCallback(async () => {
+    // Don't fetch if no project is selected
+    if (!activeProject) {
+      setIssues([]);
+      clearError();
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     clearError();
 
@@ -35,10 +45,11 @@ export function IssuesSection() {
         return;
       }
 
-      // Fetch issues with current filter
+      // Fetch issues with current filter and project path
       const fetchedIssues = await invoke<GitHubIssue[]>("fetch_github_issues", {
         state: filter,
         limit: 30,
+        projectPath: activeProject.path,
       });
 
       setIssues(fetchedIssues);
@@ -50,7 +61,7 @@ export function IssuesSection() {
     } finally {
       setLoading(false);
     }
-  }, [filter, setIssues, setLoading, setError, clearError, setLastFetched]);
+  }, [filter, activeProject, setIssues, setLoading, setError, clearError, setLastFetched]);
 
   // Fetch issues on mount and when filter changes
   useEffect(() => {
@@ -97,13 +108,15 @@ export function IssuesSection() {
     </svg>
   );
 
+  const hasProject = !!activeProject;
+
   const headerActions = (
     <div className="issues-section-actions" onClick={(e) => e.stopPropagation()}>
       <select
         className="issues-section-filter"
         value={filter}
         onChange={(e) => handleFilterChange(e.target.value as IssueFilter)}
-        disabled={isLoading}
+        disabled={isLoading || !hasProject}
       >
         <option value="open">Open</option>
         <option value="closed">Closed</option>
@@ -114,7 +127,8 @@ export function IssuesSection() {
         onClick={() => setShowCreateModal(true)}
         type="button"
         aria-label="Create new issue"
-        title="Create new issue"
+        title={hasProject ? "Create new issue" : "Select a project first"}
+        disabled={!hasProject}
       >
         <svg
           width="14"
@@ -134,10 +148,10 @@ export function IssuesSection() {
       <button
         className="issues-section-refresh"
         onClick={fetchIssues}
-        disabled={isLoading}
+        disabled={isLoading || !hasProject}
         type="button"
         aria-label="Refresh issues"
-        title="Refresh issues"
+        title={hasProject ? "Refresh issues" : "Select a project first"}
       >
         <svg
           className={isLoading ? "spinning" : ""}
@@ -204,7 +218,13 @@ export function IssuesSection() {
             </div>
           )}
 
-          {!isLoading && !error && issues.length === 0 && (
+          {!hasProject && (
+            <div className="issues-section-empty">
+              Select a project to view issues
+            </div>
+          )}
+
+          {hasProject && !isLoading && !error && issues.length === 0 && (
             <div className="issues-section-empty">
               No {filter === "all" ? "" : filter} issues found
             </div>

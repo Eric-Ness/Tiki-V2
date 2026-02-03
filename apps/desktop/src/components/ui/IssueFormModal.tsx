@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { type GitHubIssue } from "../../stores";
+import { useProjectsStore, type GitHubIssue } from "../../stores";
 import "./IssueFormModal.css";
 
 interface LabelInfo {
@@ -31,6 +31,8 @@ export function IssueFormModal({
   const [titleTouched, setTitleTouched] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const originalLabels = useRef<string[]>([]);
+
+  const activeProject = useProjectsStore((state) => state.activeProject);
 
   const isEditMode = !!editingIssue;
 
@@ -70,9 +72,16 @@ export function IssueFormModal({
   }, [isOpen]);
 
   const fetchLabels = async () => {
+    if (!activeProject) {
+      setAvailableLabels([]);
+      return;
+    }
+
     setLoadingLabels(true);
     try {
-      const labels = await invoke<LabelInfo[]>("fetch_github_labels");
+      const labels = await invoke<LabelInfo[]>("fetch_github_labels", {
+        projectPath: activeProject.path,
+      });
       setAvailableLabels(labels);
     } catch (err) {
       console.error("Failed to fetch labels:", err);
@@ -117,12 +126,14 @@ export function IssueFormModal({
           body: body.trim() || null,
           addLabels,
           removeLabels,
+          projectPath: activeProject?.path,
         });
       } else {
         await invoke("create_github_issue", {
           title: title.trim(),
           body: body.trim() || null,
           labels: selectedLabels,
+          projectPath: activeProject?.path,
         });
       }
 

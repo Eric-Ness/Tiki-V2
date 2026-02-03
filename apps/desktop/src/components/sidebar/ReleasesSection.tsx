@@ -7,6 +7,7 @@ import {
   useReleasesStore,
   useDetailStore,
   useTikiReleasesStore,
+  useProjectsStore,
   type GitHubRelease,
   type TikiRelease,
 } from "../../stores";
@@ -27,6 +28,9 @@ export function ReleasesSection() {
   const setTikiReleases = useTikiReleasesStore((state) => state.setReleases);
   const addTikiRelease = useTikiReleasesStore((state) => state.addRelease);
   const updateTikiRelease = useTikiReleasesStore((state) => state.updateRelease);
+
+  // Projects store
+  const activeProject = useProjectsStore((state) => state.activeProject);
 
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -52,6 +56,14 @@ export function ReleasesSection() {
   }, []);
 
   const fetchReleases = useCallback(async () => {
+    // Don't fetch GitHub releases if no project is selected
+    if (!activeProject) {
+      setReleases([]);
+      clearError();
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     clearError();
 
@@ -65,9 +77,10 @@ export function ReleasesSection() {
         return;
       }
 
-      // Fetch releases
+      // Fetch releases with project path
       const fetchedReleases = await invoke<GitHubRelease[]>("fetch_github_releases", {
         limit: 20,
+        projectPath: activeProject.path,
       });
 
       setReleases(fetchedReleases);
@@ -79,7 +92,7 @@ export function ReleasesSection() {
     } finally {
       setLoading(false);
     }
-  }, [setReleases, setLoading, setError, clearError, setLastFetched]);
+  }, [activeProject, setReleases, setLoading, setError, clearError, setLastFetched]);
 
   const setSelectedRelease = useDetailStore((state) => state.setSelectedRelease);
   const selectedRelease = useDetailStore((state) => state.selectedRelease);
@@ -159,6 +172,8 @@ export function ReleasesSection() {
     </svg>
   );
 
+  const hasProject = !!activeProject;
+
   const headerActions = (
     <div className="releases-section-actions" onClick={(e) => e.stopPropagation()}>
       <button
@@ -186,10 +201,10 @@ export function ReleasesSection() {
       <button
         className="releases-section-refresh"
         onClick={fetchReleases}
-        disabled={isLoading}
+        disabled={isLoading || !hasProject}
         type="button"
         aria-label="Refresh releases"
-        title="Refresh releases"
+        title={hasProject ? "Refresh releases" : "Select a project first"}
       >
         <svg
           className={isLoading ? "spinning" : ""}
@@ -312,7 +327,13 @@ export function ReleasesSection() {
             </div>
           )}
 
-          {!isLoading && !error && releases.length === 0 && tikiReleases.length === 0 && (
+          {!hasProject && tikiReleases.length === 0 && (
+            <div className="releases-section-empty">
+              Select a project to view GitHub releases
+            </div>
+          )}
+
+          {hasProject && !isLoading && !error && releases.length === 0 && tikiReleases.length === 0 && (
             <div className="releases-section-empty">
               No releases found. Click + to create one.
             </div>
