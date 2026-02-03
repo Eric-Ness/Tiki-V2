@@ -6,6 +6,7 @@ import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
 import { StateSection } from "./components/sidebar/StateSection";
+import { Terminal } from "./components/terminal/Terminal";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore } from "./stores";
 import "./App.css";
@@ -104,14 +105,9 @@ function App() {
 
         <MainContent defaultSize={panelSizes.main} minSize={30}>
           <main className="main">
-            <section className="section">
+            <section className="section terminal-section">
               <h2>Terminal</h2>
-              <div className="empty-state">
-                <p>Terminal output will appear here.</p>
-                <p className="hint">
-                  This panel is prepared for Phase 3: Terminal integration.
-                </p>
-              </div>
+              <Terminal />
             </section>
           </main>
         </MainContent>
