@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 5,
+    "title": "feat(desktop): Integrate new layout into App.tsx",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/5"
+  },
+  "createdAt": "2026-02-02T23:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "App displays with 3-panel layout correctly"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Header component spans full width at top"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Active work items display in sidebar panel"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Recent activity displays in detail panel"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "File watcher events still trigger state updates"
+    },
+    {
+      "id": "SC6",
+      "category": "Code Quality",
+      "criterion": "Components are properly extracted and organized"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Extract Header and WorkCard components",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:50:00.000Z",
+      "content": "Create new component files by extracting existing code from App.tsx:\n\n1. Create `components/Header.tsx`:\n   - Extract the header JSX from App.tsx\n   - Accept `tikiPath` as a prop for the footer path display\n   - Accept `onResetLayout` callback for the reset button\n\n2. Create `components/work/WorkCard.tsx`:\n   - Move the WorkCard function component from App.tsx\n   - Move the related TypeScript interfaces (IssueContext, ReleaseContext, WorkContext)\n   - Export the WorkContext type for use in other components\n\n3. Create `components/work/index.ts`:\n   - Barrel export for WorkCard and types\n\nKeep App.tsx unchanged for now - just create the new files.",
+      "verification": [
+        "Header.tsx exports a Header component",
+        "WorkCard.tsx exports WorkCard component and WorkContext type",
+        "components/work/index.ts has proper exports",
+        "TypeScript compiles without errors: `npm run build`"
+      ],
+      "addressesCriteria": ["SC2", "SC6"],
+      "files": [
+        "apps/desktop/src/components/Header.tsx",
+        "apps/desktop/src/components/work/WorkCard.tsx",
+        "apps/desktop/src/components/work/index.ts"
+      ],
+      "dependencies": [],
+      "summary": "Phase 1 Summary:\n- Created: components/Header.tsx, components/work/WorkCard.tsx, components/work/index.ts\n- Modified: components/layout/AppLayout.tsx (fixed onLayoutChange type)\n- Key changes:\n  - Header component accepts tikiPath and onResetLayout props\n  - WorkCard component with exported IssueContext, ReleaseContext, WorkContext types\n  - Barrel export in work/index.ts\n  - Fixed AppLayout onLayoutChange to use Layout type instead of number[]\n- Verification: PASS - npm run build succeeds\n- Notes for next phase: App.tsx still has inline definitions that need to be replaced with imports"
+    },
+    {
+      "number": 2,
+      "title": "Refactor App.tsx to use new components and reorganize panels",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:00:00.000Z",
+      "content": "Update App.tsx to use the extracted components and reorganize content into proper panels:\n\n1. Import the new components:\n   - Import Header from './components/Header'\n   - Import WorkCard from './components/work'\n\n2. Replace inline header with Header component\n\n3. Move content to appropriate panels:\n   - Sidebar: Move 'Active Work' section (work list, empty states, errors)\n   - MainContent: Leave prepared for terminal (placeholder content)\n   - DetailPanel: Move 'Recent Activity' section (history)\n\n4. Remove the inline WorkCard function (now imported)\n\n5. Remove duplicate type definitions (now in WorkCard.tsx)\n\n6. Keep TikiState and FileEvent interfaces in App.tsx (used for state management)\n\n7. Ensure all props are passed correctly:\n   - Header receives tikiPath and onResetLayout\n   - WorkCard receives work prop",
+      "verification": [
+        "App compiles without errors: `npm run build`",
+        "App displays header at top spanning full width",
+        "Active work displays in sidebar (left panel)",
+        "Recent activity displays in detail panel (right panel)",
+        "Main content shows placeholder for terminal",
+        "File watcher events still update the UI when .tiki/state.json changes",
+        "Reset Layout button still works"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [1],
+      "summary": "Phase 2 Summary:\n- Modified: apps/desktop/src/App.tsx\n- Key changes:\n  - Imported WorkCard and WorkContext from components/work\n  - Moved Active Work section to Sidebar panel\n  - Moved Recent Activity section to DetailPanel\n  - MainContent now shows terminal placeholder for Phase 3\n  - Removed inline WorkCard component definition\n  - Removed duplicate type definitions (IssueContext, ReleaseContext, WorkContext)\n  - TikiState now uses imported WorkContext type\n- Verification: PASS - npm run build succeeds\n- All success criteria addressed"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2],
+    "SC2": [1, 2],
+    "SC3": [2],
+    "SC4": [2],
+    "SC5": [2],
+    "SC6": [1, 2]
+  }
+}

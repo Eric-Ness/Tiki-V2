@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 11,
+  "title": "feat(desktop): Install PTY plugin and xterm.js for terminal",
+  "createdAt": "2026-02-02T23:05:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Install Dependencies",
+      "description": "Add portable-pty to Rust and xterm.js to frontend",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:15:00.000Z",
+      "tasks": [
+        {
+          "id": "1.1",
+          "description": "Add portable-pty = \"0.8\" to Cargo.toml dependencies",
+          "file": "apps/desktop/src-tauri/Cargo.toml",
+          "status": "completed"
+        },
+        {
+          "id": "1.2",
+          "description": "Install xterm.js and addons via pnpm",
+          "command": "pnpm add xterm @xterm/addon-fit @xterm/addon-web-links",
+          "cwd": "apps/desktop",
+          "status": "completed"
+        }
+      ],
+      "verification": [
+        "Cargo.toml contains portable-pty dependency",
+        "package.json contains xterm dependencies"
+      ],
+      "summary": "Added portable-pty = \"0.8\" to Cargo.toml. Installed xterm ^5.3.0, @xterm/addon-fit ^0.11.0, @xterm/addon-web-links ^0.12.0 via pnpm. Note: xterm v5 is deprecated, future migration to @xterm/xterm recommended."
+    },
+    {
+      "id": 2,
+      "name": "Verify Builds and Test Terminal",
+      "description": "Ensure both Rust and frontend compile, then create basic terminal test",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:25:00.000Z",
+      "tasks": [
+        {
+          "id": "2.1",
+          "description": "Run cargo build to verify Rust compiles with PTY crate",
+          "command": "cargo build",
+          "cwd": "apps/desktop/src-tauri",
+          "status": "completed"
+        },
+        {
+          "id": "2.2",
+          "description": "Create basic Terminal.tsx component to test xterm.js rendering",
+          "file": "apps/desktop/src/components/terminal/Terminal.tsx",
+          "status": "completed"
+        },
+        {
+          "id": "2.3",
+          "description": "Create Terminal.css with basic terminal styles",
+          "file": "apps/desktop/src/components/terminal/Terminal.css",
+          "status": "completed"
+        },
+        {
+          "id": "2.4",
+          "description": "Add terminal to MainContent for testing",
+          "file": "apps/desktop/src/App.tsx",
+          "status": "completed"
+        },
+        {
+          "id": "2.5",
+          "description": "Run pnpm build to verify frontend builds",
+          "command": "pnpm build",
+          "cwd": "apps/desktop",
+          "status": "completed"
+        }
+      ],
+      "verification": [
+        "cargo build succeeds without errors",
+        "pnpm build succeeds without errors",
+        "Terminal component renders in the app"
+      ],
+      "summary": "Rust compiles successfully with portable-pty (1 minor warning about unused function). Created Terminal component with xterm.js, FitAddon, and WebLinksAddon. Added to App.tsx main content. Frontend builds successfully (536KB bundle, could benefit from code splitting)."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Dependency",
+      "criterion": "portable-pty crate is added to Cargo.toml",
+      "met": true
+    },
+    {
+      "id": "SC2",
+      "category": "Dependency",
+      "criterion": "xterm.js and addons are in package.json",
+      "met": true
+    },
+    {
+      "id": "SC3",
+      "category": "Build",
+      "criterion": "cargo build succeeds in src-tauri directory",
+      "met": true
+    },
+    {
+      "id": "SC4",
+      "category": "Build",
+      "criterion": "pnpm build succeeds in desktop app",
+      "met": true
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Basic xterm.js terminal renders in the UI",
+      "met": true
+    }
+  ]
+}

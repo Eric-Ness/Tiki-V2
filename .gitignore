@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Accidental Windows NUL files
+nul
+
+# Tauri build
+apps/desktop/src-tauri/target/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

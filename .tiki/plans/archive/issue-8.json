@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 8,
+    "title": "feat(desktop): Add State section showing execution progress",
+    "url": "https://github.com/user/Tiki-V2/issues/8"
+  },
+  "createdAt": "2026-02-02T19:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "State displays in a collapsible section within the sidebar"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Badge shows count of active work items"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Empty state shows helpful message when no active work"
+    },
+    {
+      "id": "SC4",
+      "category": "UX",
+      "criterion": "Progress bars animate smoothly with CSS transitions"
+    },
+    {
+      "id": "SC5",
+      "category": "UX",
+      "criterion": "Timestamps display in relative format (e.g., '5m ago')"
+    },
+    {
+      "id": "SC6",
+      "category": "UX",
+      "criterion": "Timestamps update in real-time without manual refresh"
+    },
+    {
+      "id": "SC7",
+      "category": "Integration",
+      "criterion": "Section responds to Tauri tiki-file-changed events"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create WorkProgressCard component",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:40:00.000Z",
+      "summary": "Created WorkProgressCard.tsx with progress bar and relative timestamp display. Created WorkProgressCard.css with all status colors and animations. TypeScript compiles without errors.",
+      "content": "Create the WorkProgressCard component that displays a single work item (issue or release) with progress bar and timestamp. This is a refactored version of the existing WorkCard with enhanced features.\n\n1. Create WorkProgressCard.tsx in src/components/sidebar/\n2. Import and use WorkContext types from existing work/WorkCard.tsx\n3. Add progress bar with CSS transition animation\n4. Add relative timestamp display using a simple utility function\n5. Create WorkProgressCard.css with styles (migrate from App.css work-card styles)\n6. Export from a new index.ts or update imports\n\nThe relative timestamp should show: 'just now', 'Xm ago', 'Xh ago', 'Xd ago'",
+      "verification": [
+        "WorkProgressCard.tsx compiles without TypeScript errors",
+        "WorkProgressCard.css contains all necessary styles",
+        "Progress bar shows correct percentage based on currentPhase/totalPhases",
+        "Relative timestamp formats correctly for various time ranges"
+      ],
+      "addressesCriteria": ["SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/components/sidebar/WorkProgressCard.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create StateSection component",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:42:00.000Z",
+      "summary": "Created StateSection.tsx wrapping CollapsibleSection with activity icon, badge for active count, and empty state. Created StateSection.css with styling. TypeScript compiles without errors.",
+      "content": "Create the StateSection component that wraps CollapsibleSection and displays a list of WorkProgressCard items.\n\n1. Create StateSection.tsx using CollapsibleSection pattern from ProjectsSection\n2. Add icon (activity/pulse icon for state)\n3. Accept activeWork as a prop (Record<string, WorkContext>)\n4. Display badge with count of active work items\n5. Show empty state when no active work\n6. Map work entries to WorkProgressCard components\n7. Create StateSection.css for section-specific styles",
+      "verification": [
+        "StateSection.tsx compiles without TypeScript errors",
+        "Section displays with icon and 'Active Work' title",
+        "Badge shows correct count when work items exist",
+        "Empty state displays when activeWork is empty"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "apps/desktop/src/components/sidebar/StateSection.tsx",
+        "apps/desktop/src/components/sidebar/StateSection.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Integrate StateSection into App.tsx",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:45:00.000Z",
+      "summary": "Replaced inline work display with StateSection component. Removed WorkCard import (now using StateSection). State data flows through props. TypeScript compiles without errors.",
+      "content": "Replace the inline work display in App.tsx with the new StateSection component.\n\n1. Import StateSection from components/sidebar/StateSection\n2. Replace the 'Active Work' heading and work-list section with <StateSection />\n3. Pass activeWork data as props to StateSection\n4. Remove redundant work display code from sidebar\n5. Keep Tauri state events connected (they already work)\n6. Verify state updates flow through to StateSection",
+      "verification": [
+        "App.tsx compiles without TypeScript errors",
+        "StateSection appears in sidebar below ProjectsSection",
+        "Active work displays correctly in the new section",
+        "Empty state shows when no work is active"
+      ],
+      "addressesCriteria": ["SC1", "SC7"],
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Add real-time timestamp updates",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:47:00.000Z",
+      "summary": "Added useEffect with 30-second interval to force re-renders and update relative timestamps. Interval is cleaned up on unmount to prevent memory leaks. TypeScript compiles without errors.",
+      "content": "Add interval-based updates so relative timestamps refresh automatically.\n\n1. Add useEffect with setInterval in WorkProgressCard or StateSection\n2. Update timestamps every 30-60 seconds\n3. Use a state variable to trigger re-renders\n4. Clean up interval on unmount\n5. Consider using a shared timer context if performance is a concern (optional optimization)\n\nKeep it simple: a local interval in WorkProgressCard that increments a counter to force re-render.",
+      "verification": [
+        "Timestamps update automatically without user interaction",
+        "No memory leaks (interval cleaned up on unmount)",
+        "Updates occur at reasonable frequency (30-60s)",
+        "Console shows no warnings about state updates on unmounted components"
+      ],
+      "addressesCriteria": ["SC6"],
+      "files": [
+        "apps/desktop/src/components/sidebar/WorkProgressCard.tsx"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 5,
+      "title": "Clean up and polish",
+      "status": "completed",
+      "completedAt": "2026-02-02T19:50:00.000Z",
+      "summary": "Removed all old work-card, status-badge, progress, and release-progress styles from App.css (115 lines removed). Build succeeds without errors.",
+      "content": "Remove old styles from App.css and ensure everything works together.\n\n1. Remove .work-card, .work-header, .work-title, .work-list, .progress-* styles from App.css\n2. Ensure WorkProgressCard.css has all necessary styles\n3. Test all status colors (executing, pending, paused, completed, failed)\n4. Verify progress bar animation is smooth\n5. Test the full flow: add work item → see it appear → see progress update → see timestamps update\n6. Run build to ensure no errors",
+      "verification": [
+        "No duplicate styles between App.css and WorkProgressCard.css",
+        "All status colors display correctly",
+        "Progress bar animates smoothly on changes",
+        "npm run build succeeds without errors",
+        "App functions correctly with state changes"
+      ],
+      "addressesCriteria": ["SC4"],
+      "files": [
+        "apps/desktop/src/App.css",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.css"
+      ],
+      "dependencies": [3, 4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2, 3],
+    "SC2": [2],
+    "SC3": [2],
+    "SC4": [1, 5],
+    "SC5": [1],
+    "SC6": [4],
+    "SC7": [3]
+  }
+}

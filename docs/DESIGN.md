@@ -606,9 +606,12 @@ After migration:
 ## Implementation Phases
 
 ### Phase 1: Core State & Commands
-- [ ] New state.json schema with multi-context
+- [x] New state.json schema with multi-context (work-scoped)
+- [x] Plan.json schema with phases, success criteria, coverage matrix
+- [x] TypeScript types matching schemas
+- [x] Schema validation utilities (Ajv-based)
 - [ ] Core commands: get, plan, execute, ship
-- [ ] State validation on write
+- [ ] State file read/write operations
 
 ### Phase 2: Workflow Integration
 - [ ] review command
@@ -670,13 +673,100 @@ After migration:
 |---------|------|---------|
 | 0.1 | 2026-02-02 | Initial design draft |
 | 0.2 | 2026-02-02 | Added: hybrid Markdown+XML format (research-backed), extensibility system (hooks + custom commands), resolved open questions on hooks/update/custom commands |
+| 0.3 | 2026-02-02 | Implementation started: shared schemas package created with state.schema.json, plan.schema.json, TypeScript types, and Ajv validation utilities |
+| 0.4 | 2026-02-02 | Framework commands complete: get, review, plan, audit, execute, ship, yolo - all in hybrid Markdown+XML format |
+| 0.5 | 2026-02-02 | Desktop app scaffolded and running: Tauri 2.x + React + Vite, file watcher, state display UI |
 
 ## Next Steps
 
-When continuing this design work:
+**Immediate (v0.1 remaining):**
+1. ~~Scaffold Tauri desktop app (`apps/desktop/`)~~ ✅ DONE
+2. ~~Implement state file watcher in Rust~~ ✅ DONE
+3. ~~Create basic state display panel UI~~ ✅ DONE
+4. ~~VS C++ tools installed, app compiles and runs~~ ✅ DONE
+5. GitHub issues list component
+6. Terminal integration (optional)
+7. Test framework commands with real GitHub issues
+8. Wire up frontend to receive file watcher events and refresh state
 
-1. **Context persistence** - Decide how terminals track their context ID
-2. **Detailed schemas** - Write JSON Schema for state.json and plan files
-3. **Sub-agent protocol** - Define what passes between phases
-4. **Write a sample command** - Create one v2 command as a reference template
-5. **Migration plan** - How to convert v1 installations
+**Future versions:**
+- v0.2: Release commands (`release:new`, `release:add`, etc.)
+- v0.3: Parallel execution with dependency graphs
+- v0.4: Verification & quality gates
+- v0.5: Knowledge & research system
+
+---
+
+## Handoff Notes (2026-02-02)
+
+### Project Status: v0.5 - Desktop App Running
+
+Tiki v2 is a complete rewrite of the GitHub-issue-centric workflow framework. The core architecture is defined, shared schemas are built, all Phase 1 framework commands exist, and the Tauri desktop app compiles and runs.
+
+### Quick Start Commands
+
+**Run the desktop app:**
+```cmd
+# Must use x64 Native Tools Command Prompt for VS 2022
+cd C:\Users\ericn\Documents\Github\Tiki-V2\apps\desktop
+pnpm tauri:dev
+```
+
+**Build shared package:**
+```bash
+cd C:\Users\ericn\Documents\Github\Tiki-V2
+pnpm install
+pnpm build
+```
+
+**Install framework commands to a project:**
+```bash
+cd <your-project>
+node C:\Users\ericn\Documents\Github\Tiki-V2\packages\framework\install.js
+# Creates .claude/commands/tiki/*.md files
+```
+
+### What's Built
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Shared schemas | ✅ Complete | `packages/shared/schemas/` |
+| TypeScript types | ✅ Complete | `packages/shared/src/types/` |
+| Schema validation (Ajv) | ✅ Complete | `packages/shared/src/validation/` |
+| Framework commands (7) | ✅ Complete | `packages/framework/commands/` |
+| Install script | ✅ Complete | `packages/framework/install.js` |
+| Tauri app scaffold | ✅ Complete | `apps/desktop/` |
+| Rust file watcher | ✅ Complete | `apps/desktop/src-tauri/src/watcher.rs` |
+| IPC commands | ✅ Complete | `apps/desktop/src-tauri/src/commands.rs` |
+| React state display UI | ✅ Complete | `apps/desktop/src/App.tsx` |
+
+### What's NOT Built Yet
+
+- GitHub issues list component in desktop app
+- Terminal integration
+- Release commands (`release:new`, `release:add`, etc.)
+- Actual testing of framework commands with GitHub issues
+- Frontend event handling for file watcher updates
+
+### Key Technical Decisions
+
+1. **Tauri 2.x** - Using v2.9.1 (pinned to match @tauri-apps/api npm package)
+2. **Work-scoped state** - Keys like `issue:42` or `release:v1.2`, not terminal IDs
+3. **Hybrid Markdown+XML** - Commands use YAML frontmatter + XML tags + Markdown content
+4. **Sub-agent execution** - Each phase runs with fresh context, passes summaries forward
+5. **Success criteria first** - Backward planning from "what needs to be true"
+
+### Files to Read First (Priority Order)
+
+1. This file (`docs/DESIGN.md`) - Full architecture
+2. `docs/PLANNING-NOTES.md` - Planning context and decisions
+3. `packages/shared/schemas/state.schema.json` - State data model
+4. `packages/shared/schemas/plan.schema.json` - Plan data model
+5. `packages/framework/commands/get.md` - Reference command format
+6. `apps/desktop/src/App.tsx` - Desktop UI component
+
+### Important Notes
+
+- **Windows-specific:** Must run Tauri from "x64 Native Tools Command Prompt for VS 2022"
+- **pnpm workspace:** Run `pnpm install` from repo root, not individual packages
+- **GitHub CLI required:** Framework commands depend on `gh` being authenticated

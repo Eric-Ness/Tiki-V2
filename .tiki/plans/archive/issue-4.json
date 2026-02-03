@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 4,
+    "title": "feat(desktop): Add Zustand store for layout state persistence",
+    "url": "https://github.com/ericnewton/Tiki-V2/issues/4"
+  },
+  "createdAt": "2026-02-02T23:58:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Panel sizes persist to localStorage when resized"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Collapsed states persist across page refresh/restart"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Resizing any panel updates the store immediately"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Reset layout action restores default sizes (20%, 55%, 25%)"
+    },
+    {
+      "id": "SC5",
+      "category": "Integration",
+      "criterion": "Sidebar, MainContent, and DetailPanel read initial sizes from store"
+    },
+    {
+      "id": "SC6",
+      "category": "Integration",
+      "criterion": "Panel collapse/expand actions update store state"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Install Zustand and create layout store",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:05:00.000Z",
+      "content": "Install zustand package and create the foundational layout store with TypeScript types, persist middleware, and all necessary state/actions.\n\n1. Run `pnpm add zustand` in apps/desktop\n2. Create `src/stores/layoutStore.ts` with:\n   - Interface for LayoutState (panelSizes, collapsedPanels)\n   - Interface for LayoutActions (setPanelSizes, setCollapsed, resetLayout)\n   - Default sizes: sidebar=20, main=55, detail=25\n   - Use `persist` middleware with localStorage\n   - Storage key: 'tiki-layout'\n3. Create `src/stores/index.ts` barrel export\n4. Verify the store compiles correctly",
+      "verification": [
+        "pnpm add zustand completes without error",
+        "TypeScript compiles with no errors (pnpm build or tsc --noEmit)",
+        "Store exports useLayoutStore hook"
+      ],
+      "addressesCriteria": ["SC1", "SC4"],
+      "files": [
+        "apps/desktop/package.json",
+        "apps/desktop/src/stores/layoutStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ],
+      "dependencies": [],
+      "summary": "Installed Zustand 5.0.11. Created layoutStore.ts with useLayoutStore hook, persist middleware, PanelSizes/CollapsedPanels interfaces, and setPanelSizes/setCollapsed/resetLayout actions. Default sizes: sidebar=20%, main=55%, detail=25%. Storage key: tiki-layout."
+    },
+    {
+      "number": 2,
+      "title": "Connect AppLayout to store for panel sizes",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:10:00.000Z",
+      "content": "Integrate the layout store with the AppLayout component to sync panel sizes.\n\n1. Import useLayoutStore in AppLayout.tsx\n2. Add `onLayout` callback to the Group component that updates store with all panel sizes\n3. Pass stored sizes as `defaultSize` to child panels via context or props\n4. Consider: The Group component's onLayout provides all sizes at once - more efficient than per-panel onResize\n5. Test that resizing panels updates the store\n6. Test that refreshing the page restores the sizes",
+      "verification": [
+        "Resize a panel, check localStorage for 'tiki-layout' key",
+        "Refresh page, panel sizes are restored",
+        "React DevTools shows store state updating on resize"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC5"],
+      "files": [
+        "apps/desktop/src/components/layout/AppLayout.tsx",
+        "apps/desktop/src/components/layout/Sidebar.tsx",
+        "apps/desktop/src/components/layout/MainContent.tsx",
+        "apps/desktop/src/components/layout/DetailPanel.tsx"
+      ],
+      "dependencies": [1],
+      "summary": "AppLayout now uses useLayoutStore with onLayout callback to sync all panel sizes. App.tsx imports store and passes panelSizes to all panels. MainContent now accepts defaultSize prop. TypeScript compiles cleanly."
+    },
+    {
+      "number": 3,
+      "title": "Migrate collapse state to store",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:15:00.000Z",
+      "content": "Move the local collapse state from Sidebar and DetailPanel into the Zustand store for persistence.\n\n1. Remove local useState for isCollapsed from Sidebar.tsx and DetailPanel.tsx\n2. Read collapsed state from useLayoutStore\n3. Update collapse/expand button handlers to call store actions\n4. The onResize callback can also detect collapse (size === 0) and update store\n5. Ensure both sidebar and detail panel collapse states persist independently",
+      "verification": [
+        "Collapse sidebar, refresh page - sidebar remains collapsed",
+        "Collapse detail panel, refresh page - detail panel remains collapsed",
+        "Collapse both, refresh - both remain collapsed",
+        "localStorage 'tiki-layout' shows collapsedPanels state"
+      ],
+      "addressesCriteria": ["SC2", "SC6"],
+      "files": [
+        "apps/desktop/src/components/layout/Sidebar.tsx",
+        "apps/desktop/src/components/layout/DetailPanel.tsx"
+      ],
+      "dependencies": [2],
+      "summary": "Removed local useState for isCollapsed from Sidebar and DetailPanel. Both now read collapse state from useLayoutStore. handleResize updates store only when state changes. Toggle handlers use panel refs for expand/collapse animation."
+    },
+    {
+      "number": 4,
+      "title": "Add reset layout functionality",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:20:00.000Z",
+      "content": "Implement the reset layout action and expose it in the UI.\n\n1. Ensure resetLayout action in store resets to defaults (20, 55, 25) and clears collapsed states\n2. Add a reset button somewhere accessible (could be in a header, context menu, or keyboard shortcut)\n3. For now, a simple button in one of the panels or as a dev tool is sufficient\n4. Test the full persistence flow end-to-end",
+      "verification": [
+        "Resize panels to custom sizes, collapse a panel",
+        "Click reset button",
+        "Panels return to default sizes (20%, 55%, 25%)",
+        "No panels are collapsed after reset",
+        "localStorage reflects the reset state"
+      ],
+      "addressesCriteria": ["SC4"],
+      "files": [
+        "apps/desktop/src/components/layout/AppLayout.tsx"
+      ],
+      "dependencies": [3],
+      "summary": "Added Reset Layout button to footer using useLayoutStore.getState().resetLayout(). Footer styled with flexbox. Button has subtle styling with hover effect."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [3],
+    "SC3": [2],
+    "SC4": [1, 4],
+    "SC5": [2],
+    "SC6": [3]
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 12,
+    "title": "feat(desktop): Implement PTY spawning and management in Rust",
+    "url": "https://github.com/ericnichols/Tiki-V2/issues/12"
+  },
+  "createdAt": "2026-02-02T23:35:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "description": "Can spawn shell processes (PowerShell on Windows, default shell on Unix)"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "description": "Can write input data to a terminal session"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "description": "Terminal output is received and emitted to frontend"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "description": "Can resize terminal (rows/cols)"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "description": "Can destroy terminal session cleanly"
+    },
+    {
+      "id": "SC6",
+      "category": "Platform",
+      "description": "Works correctly on Windows with PowerShell"
+    },
+    {
+      "id": "SC7",
+      "category": "Integration",
+      "description": "Commands are registered in lib.rs and callable from frontend"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create terminal module structure and TerminalSession",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:45:00.000Z",
+      "summary": "Created terminal/mod.rs and terminal/pty.rs with TerminalSession struct. Implements new(), write(), resize(), take_reader(), set_stop_signal(), stop_reader() methods. Uses PowerShell on Windows, $SHELL on Unix. Added mod terminal to lib.rs.",
+      "content": "Create the terminal module structure with mod.rs and pty.rs. Implement the TerminalSession struct that wraps a portable-pty PtyPair. This phase focuses on the core PTY spawning logic.\n\n1. Create `src-tauri/src/terminal/mod.rs` that exports the module contents\n2. Create `src-tauri/src/terminal/pty.rs` with:\n   - TerminalSession struct holding the PTY master/slave pair\n   - Constructor that spawns a shell (PowerShell on Windows, default shell on Unix)\n   - Basic write method to send data to PTY\n   - Resize method to change terminal dimensions\n   - Drop implementation for cleanup\n3. Add `mod terminal;` to lib.rs (but don't register commands yet)\n4. Ensure it compiles with `cargo check`",
+      "verification": [
+        "cargo check passes in src-tauri directory",
+        "terminal/mod.rs and terminal/pty.rs exist",
+        "TerminalSession struct is defined with new(), write(), resize() methods"
+      ],
+      "addressesCriteria": ["SC1", "SC6"],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/mod.rs",
+        "apps/desktop/src-tauri/src/terminal/pty.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Implement TerminalManager for multi-session handling",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:50:00.000Z",
+      "summary": "Added TerminalManager with HashMap<String, TerminalSession>. Global singleton using OnceLock pattern. Methods: create_session, get_session, get_session_mut, remove_session, has_session. Exported get_terminal_manager() accessor.",
+      "content": "Create a TerminalManager that maintains multiple terminal sessions indexed by ID. This allows the frontend to create and manage multiple terminals.\n\n1. Add to terminal/pty.rs or create terminal/manager.rs:\n   - TerminalManager struct with HashMap<String, TerminalSession>\n   - Global singleton using OnceLock<Arc<Mutex<TerminalManager>>> pattern (like watcher.rs)\n   - Methods: create_session(id, shell, cwd), get_session(id), remove_session(id)\n   - Handle thread-safe access with proper locking\n2. Export manager from mod.rs\n3. Ensure it compiles with `cargo check`",
+      "verification": [
+        "cargo check passes",
+        "TerminalManager struct exists with create/get/remove methods",
+        "Global manager accessor function exists"
+      ],
+      "addressesCriteria": ["SC1", "SC5"],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/pty.rs",
+        "apps/desktop/src-tauri/src/terminal/mod.rs"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Create IPC commands for terminal control",
+      "status": "completed",
+      "completedAt": "2026-02-02T23:55:00.000Z",
+      "summary": "Created terminal/commands.rs with 4 IPC commands: create_terminal, write_terminal, resize_terminal, destroy_terminal. All use #[tauri::command] attribute and registered in lib.rs generate_handler! macro.",
+      "content": "Implement the Tauri IPC commands that the frontend will call to control terminals.\n\n1. Create `src-tauri/src/terminal/commands.rs` with:\n   - `create_terminal(id: String, shell: Option<String>, cwd: Option<String>)` - spawn new PTY\n   - `write_terminal(id: String, data: String)` - write input to PTY\n   - `resize_terminal(id: String, rows: u16, cols: u16)` - resize PTY\n   - `destroy_terminal(id: String)` - kill PTY and clean up\n2. Each command should return Result<(), String> for error handling\n3. Export commands from mod.rs\n4. Register commands in lib.rs with tauri::generate_handler!\n5. Test with cargo check",
+      "verification": [
+        "cargo check passes",
+        "All 4 commands are defined with #[tauri::command] attribute",
+        "Commands are registered in lib.rs generate_handler! macro"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4", "SC5", "SC7"],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/commands.rs",
+        "apps/desktop/src-tauri/src/terminal/mod.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Implement PTY output streaming via events",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:05:00.000Z",
+      "summary": "Added TerminalOutputEvent struct with id/data fields. Created start_output_reader() function that spawns reader thread. Reader emits terminal-output events in a loop. Uses stop signal channel for cleanup. create_terminal now accepts AppHandle.",
+      "content": "Set up async output reading from PTY and emit to frontend via Tauri events. This is the most complex phase as it requires spawning a reader thread for each terminal.\n\n1. Modify create_terminal command to accept AppHandle parameter\n2. When creating a terminal, spawn a dedicated thread that:\n   - Reads from PTY reader in a loop\n   - Emits 'terminal-output' events with { id, data } payload\n   - Handles EOF/errors gracefully\n   - Stops when terminal is destroyed (use channel for stop signal)\n3. Define TerminalOutputEvent struct for the event payload\n4. Store the stop signal sender in TerminalSession for cleanup\n5. Test the full build with cargo build",
+      "verification": [
+        "cargo build passes",
+        "terminal-output event is emitted with id and data fields",
+        "Reader thread starts when terminal is created",
+        "Reader thread stops when terminal is destroyed"
+      ],
+      "addressesCriteria": ["SC3", "SC5"],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/pty.rs",
+        "apps/desktop/src-tauri/src/terminal/commands.rs"
+      ],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Handle terminal exit and error conditions",
+      "status": "completed",
+      "completedAt": "2026-02-03T00:15:00.000Z",
+      "summary": "Added TerminalExitEvent with id/exitCode. Reader thread emits terminal-exit on EOF and auto-cleans session. Added input validation (empty ID, zero dimensions). Added comprehensive logging. Improved error messages with context.",
+      "content": "Add proper handling for terminal exit events and error conditions to ensure robust operation.\n\n1. Detect when the shell process exits:\n   - Reader thread should detect EOF and emit 'terminal-exit' event\n   - Include exit code if available\n   - Auto-cleanup the session from TerminalManager\n2. Add 'terminal-exit' event type with { id, exitCode } payload\n3. Handle edge cases:\n   - Write to destroyed terminal (return error)\n   - Create terminal with invalid shell (return error)\n   - Resize with invalid dimensions (return error)\n4. Add logging for debugging\n5. Full build and verify no warnings",
+      "verification": [
+        "cargo build passes with no warnings",
+        "terminal-exit event is defined and emitted on shell exit",
+        "Error cases return descriptive error messages",
+        "Logging statements added for key operations"
+      ],
+      "addressesCriteria": ["SC3", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/pty.rs",
+        "apps/desktop/src-tauri/src/terminal/commands.rs"
+      ],
+      "dependencies": [4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2, 3],
+    "SC2": [3],
+    "SC3": [4, 5],
+    "SC4": [3],
+    "SC5": [2, 3, 4, 5],
+    "SC6": [1, 5],
+    "SC7": [3]
+  }
+}

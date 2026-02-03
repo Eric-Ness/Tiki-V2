@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 14,
+    "title": "feat(desktop): Add terminal tab management",
+    "url": "https://github.com/anthropics/tiki-v2/issues/14"
+  },
+  "createdAt": "2026-02-03T01:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Users can create multiple terminal tabs via button or Ctrl+T"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Users can switch between tabs by clicking them"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can close individual tabs via close button or Ctrl+W"
+    },
+    {
+      "id": "SC4",
+      "category": "Visual",
+      "criterion": "Active tab is visually highlighted/distinguished"
+    },
+    {
+      "id": "SC5",
+      "category": "Visual",
+      "criterion": "Status indicator (dot) shows busy/idle/exited state"
+    },
+    {
+      "id": "SC6",
+      "category": "UX",
+      "criterion": "New terminals auto-focus when created"
+    },
+    {
+      "id": "SC7",
+      "category": "UX",
+      "criterion": "Closing last tab either creates new tab or shows empty state"
+    },
+    {
+      "id": "SC8",
+      "category": "Keyboard",
+      "criterion": "Ctrl+T creates new terminal, Ctrl+W closes current"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create terminalStore with Zustand",
+      "status": "pending",
+      "content": "Create the Zustand store for managing terminal tabs state.\n\n## Tasks\n1. Create `src/stores/terminalStore.ts`\n2. Define the TerminalTab interface with: id, title, status, cwd\n3. Define state: tabs array, activeTabId\n4. Define actions: addTab, removeTab, setActiveTab, updateTabStatus, updateTabTitle\n5. Use persist middleware to save tab state to localStorage\n6. On addTab: generate unique ID, set status to 'starting', auto-set as active\n7. On removeTab: handle last-tab behavior (create new tab if closing last one)\n8. Export the store hook\n\n## Store Interface\n```typescript\ninterface TerminalTab {\n  id: string;\n  title: string;\n  status: 'starting' | 'ready' | 'busy' | 'idle' | 'exited';\n  cwd?: string;\n}\n\ninterface TerminalState {\n  tabs: TerminalTab[];\n  activeTabId: string | null;\n}\n\ninterface TerminalActions {\n  addTab: () => string; // returns new tab ID\n  removeTab: (id: string) => void;\n  setActiveTab: (id: string) => void;\n  updateTabStatus: (id: string, status: TerminalTab['status']) => void;\n  updateTabTitle: (id: string, title: string) => void;\n}\n```\n\nFollow the pattern from layoutStore.ts and projectsStore.ts.",
+      "verification": [
+        "File src/stores/terminalStore.ts exists",
+        "TypeScript compiles without errors",
+        "Store exports useTerminalStore hook",
+        "Can call addTab() and get a new tab ID",
+        "Can call removeTab() and tab is removed",
+        "Last tab removal creates a new tab automatically"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC7"],
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create TerminalTabs component with styling",
+      "status": "pending",
+      "content": "Create the tab bar UI component with visual styling.\n\n## Tasks\n1. Create `src/components/terminal/TerminalTabs.tsx`\n2. Import and use useTerminalStore\n3. Render tab bar with:\n   - List of tabs (mapped from store)\n   - Each tab shows: title, status dot, close button (×)\n   - \"New Terminal\" button (+) at the end\n4. Handle click events:\n   - Tab click → setActiveTab\n   - Close button click → removeTab (with stopPropagation)\n   - New button click → addTab\n5. Add styling to Terminal.css:\n   - Tab bar container (flex, horizontal)\n   - Individual tabs (padding, hover states)\n   - Active tab highlight (background, border-bottom)\n   - Status dot colors: starting=yellow, ready/idle=green, busy=blue, exited=red\n   - Close button (× icon, hover red)\n   - New terminal button (+)\n\n## Status Dot Colors\n- starting: #fbbf24 (yellow)\n- ready: #22c55e (green)\n- busy: #3b82f6 (blue)\n- idle: #22c55e (green)\n- exited: #ef4444 (red)",
+      "verification": [
+        "File src/components/terminal/TerminalTabs.tsx exists",
+        "TypeScript compiles without errors",
+        "Tab bar renders with tabs from store",
+        "Clicking tab changes active tab",
+        "Close button removes tab",
+        "New button adds tab",
+        "Active tab has distinct visual style",
+        "Status dots show correct colors"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalTabs.tsx",
+        "apps/desktop/src/components/terminal/Terminal.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Create TerminalPane container with multi-instance support",
+      "status": "pending",
+      "content": "Create the container component that manages multiple terminal instances.\n\n## Tasks\n1. Create `src/components/terminal/TerminalPane.tsx`\n2. Import TerminalTabs, Terminal, and useTerminalStore\n3. Render structure:\n   - TerminalTabs at top\n   - Terminal instances below (one per tab)\n4. Manage terminal instances:\n   - Keep all terminal instances mounted (for persistence)\n   - Show/hide based on activeTabId (display: none vs block)\n   - Each Terminal gets a unique key based on tab ID\n5. Connect terminal status to store:\n   - When terminal connects → updateTabStatus('ready')\n   - When terminal receives output → updateTabStatus('busy'), then debounce to 'idle'\n   - When terminal exits → updateTabStatus('exited')\n6. Auto-focus: when activeTabId changes, focus the active terminal\n7. Update MainContent.tsx to use TerminalPane instead of Terminal\n8. Export TerminalPane from terminal/index.ts\n\n## Key Implementation Details\n- Use a Map or object to track xterm instances by tab ID\n- Pass terminalId prop to Terminal component (modify Terminal.tsx if needed)\n- Use CSS to hide inactive terminals while keeping them mounted",
+      "verification": [
+        "File src/components/terminal/TerminalPane.tsx exists",
+        "TypeScript compiles without errors",
+        "MainContent.tsx uses TerminalPane",
+        "Creating new tab spawns new terminal",
+        "Switching tabs shows correct terminal content",
+        "Terminal state persists when switching tabs",
+        "Status updates propagate to tab UI"
+      ],
+      "addressesCriteria": ["SC2", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalPane.tsx",
+        "apps/desktop/src/components/terminal/Terminal.tsx",
+        "apps/desktop/src/components/terminal/index.ts",
+        "apps/desktop/src/components/layout/MainContent.tsx"
+      ],
+      "dependencies": [1, 2]
+    },
+    {
+      "number": 4,
+      "title": "Add keyboard shortcuts",
+      "status": "pending",
+      "content": "Implement global keyboard shortcuts for terminal management.\n\n## Tasks\n1. Add keyboard event listener in TerminalPane:\n   - Listen on window for keydown events\n   - Ctrl+T (or Cmd+T on Mac) → addTab + focus new terminal\n   - Ctrl+W (or Cmd+W on Mac) → removeTab(activeTabId)\n2. Use useEffect for listener setup/cleanup\n3. Check for platform (navigator.platform) to use Cmd vs Ctrl\n4. Prevent default browser behavior for these shortcuts:\n   - event.preventDefault() to stop new tab/close tab in browser\n5. Add keyboard navigation between tabs (optional enhancement):\n   - Ctrl+Tab → next tab\n   - Ctrl+Shift+Tab → previous tab\n6. Ensure shortcuts only fire when app is focused\n\n## Implementation Notes\n- Register listeners on component mount\n- Clean up listeners on unmount\n- Use event.metaKey for Mac, event.ctrlKey for Windows/Linux\n- Test that shortcuts don't interfere with terminal input (xterm handles its own input)",
+      "verification": [
+        "Ctrl+T creates a new terminal tab",
+        "Ctrl+W closes the current terminal tab",
+        "Shortcuts work on both Windows (Ctrl) and Mac (Cmd)",
+        "Browser default actions are prevented",
+        "Shortcuts don't interfere with terminal typing",
+        "New terminals created via shortcut are auto-focused"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC6", "SC8"],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalPane.tsx"
+      ],
+      "dependencies": [3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2, 4],
+    "SC2": [2, 3],
+    "SC3": [1, 2, 4],
+    "SC4": [2],
+    "SC5": [2, 3],
+    "SC6": [3, 4],
+    "SC7": [1],
+    "SC8": [4]
+  }
+}
