@@ -143,8 +143,9 @@ export function KanbanBoard() {
     const issue = issues.find((i) => i.number === issueNumber);
     if (!issue) return null;
     // For now: closed = completed, open = backlog
-    // This will be enhanced when we integrate with tikiState
-    return issue.state === 'closed' ? 'completed' : 'backlog';
+    // GitHub CLI returns state as "OPEN"/"CLOSED" (uppercase)
+    const state = issue.state.toLowerCase();
+    return state === 'closed' ? 'completed' : 'backlog';
   };
 
   // Check if a transition is valid
@@ -219,12 +220,14 @@ export function KanbanBoard() {
     return COLUMN_CONFIG.map((col) => ({
       ...col,
       // For now, put open issues in Backlog, closed in Completed
+      // GitHub CLI returns state as "OPEN"/"CLOSED" (uppercase)
       issues: filteredIssues.filter((issue) => {
+        const state = issue.state.toLowerCase();
         if (col.id === 'completed') {
-          return issue.state === 'closed';
+          return state === 'closed';
         }
         if (col.id === 'backlog') {
-          return issue.state === 'open';
+          return state === 'open';
         }
         return false;
       }),
