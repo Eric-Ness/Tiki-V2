@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useIssuesStore, useKanbanStore, useTikiReleasesStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
+import { KanbanFilters } from './KanbanFilters';
 import './kanban.css';
 
 // Column configuration mapping to Tiki work statuses
@@ -25,9 +26,23 @@ export function KanbanBoard() {
   const releaseFilter = useKanbanStore((s) => s.releaseFilter);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
 
+  // Get all issue numbers that are assigned to any release
+  const assignedIssueNumbers = useMemo(() => {
+    const assigned = new Set<number>();
+    tikiReleases.forEach((release) => {
+      release.issues.forEach((i) => assigned.add(i.number));
+    });
+    return assigned;
+  }, [tikiReleases]);
+
   // Filter issues by release if filter is set
   const filteredIssues = useMemo(() => {
     if (!releaseFilter) return issues;
+
+    // Handle "unassigned" filter
+    if (releaseFilter === 'unassigned') {
+      return issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
+    }
 
     // Find the release and get its issues
     const release = tikiReleases.find((r) => r.version === releaseFilter);
@@ -35,7 +50,7 @@ export function KanbanBoard() {
 
     const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));
     return issues.filter((issue) => releaseIssueNumbers.has(issue.number));
-  }, [issues, releaseFilter, tikiReleases]);
+  }, [issues, releaseFilter, tikiReleases, assignedIssueNumbers]);
 
   // Organize issues into columns
   // For now, all issues go to Backlog since we don't have tikiState integration yet
@@ -62,6 +77,7 @@ export function KanbanBoard() {
   if (totalIssues === 0) {
     return (
       <div className="kanban-board">
+        <KanbanFilters />
         <div className="kanban-empty">
           <div className="kanban-empty-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -83,6 +99,7 @@ export function KanbanBoard() {
 
   return (
     <div className="kanban-board">
+      <KanbanFilters />
       <div className="kanban-columns">
         {columns.map((column) => (
           <KanbanColumn

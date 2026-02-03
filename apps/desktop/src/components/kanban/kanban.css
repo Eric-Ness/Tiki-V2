@@ -8,6 +8,53 @@
   overflow: hidden;
 }
 
+/* Filter Bar */
+.kanban-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #252525;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.kanban-filters-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.kanban-filters-select {
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e0e0e0;
+  min-width: 180px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.kanban-filters-select:hover {
+  border-color: #555;
+}
+
+.kanban-filters-select:focus {
+  border-color: #0ea5e9;
+}
+
+.kanban-filters-select option {
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+.kanban-filters-select optgroup {
+  color: #888;
+  font-style: normal;
+}
+
 /* Column Container */
 .kanban-columns {
   display: flex;
