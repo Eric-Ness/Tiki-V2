@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { ReleaseCard } from "./ReleaseCard";
@@ -8,6 +8,7 @@ import {
   useDetailStore,
   useTikiReleasesStore,
   useProjectsStore,
+  useReleaseDialogStore,
   type GitHubRelease,
   type TikiRelease,
 } from "../../stores";
@@ -34,9 +35,11 @@ export function ReleasesSection() {
     state.projects.find((p) => p.id === state.activeProjectId)
   );
 
-  // Dialog state
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRelease, setEditingRelease] = useState<TikiRelease | undefined>(undefined);
+  // Dialog state (from store for global access)
+  const isDialogOpen = useReleaseDialogStore((state) => state.isOpen);
+  const editingRelease = useReleaseDialogStore((state) => state.editingRelease);
+  const openDialog = useReleaseDialogStore((state) => state.openDialog);
+  const closeDialog = useReleaseDialogStore((state) => state.closeDialog);
 
   // Load Tiki releases from disk on mount
   const loadTikiReleases = useCallback(async () => {
@@ -98,6 +101,8 @@ export function ReleasesSection() {
 
   const setSelectedRelease = useDetailStore((state) => state.setSelectedRelease);
   const selectedRelease = useDetailStore((state) => state.selectedRelease);
+  const setSelectedTikiRelease = useDetailStore((state) => state.setSelectedTikiRelease);
+  const selectedTikiRelease = useDetailStore((state) => state.selectedTikiRelease);
 
   // Fetch releases on mount
   useEffect(() => {
@@ -111,13 +116,11 @@ export function ReleasesSection() {
   };
 
   const handleAddClick = () => {
-    setEditingRelease(undefined);
-    setIsDialogOpen(true);
+    openDialog(undefined);
   };
 
   const handleDialogClose = () => {
-    setIsDialogOpen(false);
-    setEditingRelease(undefined);
+    closeDialog();
   };
 
   const handleDialogSave = async (release: Omit<TikiRelease, "createdAt" | "updatedAt">) => {
@@ -143,10 +146,11 @@ export function ReleasesSection() {
   };
 
   const handleTikiReleaseClick = (release: TikiRelease) => {
-    setEditingRelease(release);
-    setIsDialogOpen(true);
+    // Set the selected Tiki release to show in detail panel
+    setSelectedTikiRelease(release.version);
   };
 
+  
   const releaseIcon = (
     <svg
       width="16"
@@ -284,7 +288,7 @@ export function ReleasesSection() {
                 {tikiReleases.map((release) => (
                   <div
                     key={release.version}
-                    className="releases-section-tiki-card"
+                    className={`releases-section-tiki-card${selectedTikiRelease === release.version ? " selected" : ""}`}
                     onClick={() => handleTikiReleaseClick(release)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {

@@ -7,9 +7,9 @@ import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { TerminalPane } from "./components/terminal";
-import { IssueDetail, ReleaseDetail } from "./components/detail";
+import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore } from "./stores";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -38,8 +38,10 @@ function App() {
   // Detail panel state
   const selectedIssue = useDetailStore((s) => s.selectedIssue);
   const selectedRelease = useDetailStore((s) => s.selectedRelease);
+  const selectedTikiRelease = useDetailStore((s) => s.selectedTikiRelease);
   const issues = useIssuesStore((s) => s.issues);
   const releases = useReleasesStore((s) => s.releases);
+  const tikiReleases = useTikiReleasesStore((s) => s.releases);
 
   // Active project
   const activeProject = useProjectsStore((s) => s.getActiveProject());
@@ -50,6 +52,9 @@ function App() {
     : null;
   const selectedReleaseData = selectedRelease
     ? releases.find((r) => r.tagName === selectedRelease)
+    : null;
+  const selectedTikiReleaseData = selectedTikiRelease
+    ? tikiReleases.find((r) => r.version === selectedTikiRelease)
     : null;
 
   // Load initial state when active project changes
@@ -186,6 +191,8 @@ function App() {
               <IssueDetail issue={selectedIssueData} />
             ) : selectedReleaseData ? (
               <ReleaseDetail release={selectedReleaseData} />
+            ) : selectedTikiReleaseData ? (
+              <TikiReleaseDetail release={selectedTikiReleaseData} />
             ) : (
               <>
                 <h3>Detail</h3>

@@ -1,0 +1,97 @@
+{
+  "issueNumber": 30,
+  "title": "Release to detail",
+  "createdAt": "2026-02-03T22:05:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Extend detailStore for Tiki releases",
+      "objective": "Add state management for Tiki release selection with mutual exclusivity across issue/GitHub release/Tiki release selections",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/stores/detailStore.ts"
+      ],
+      "tasks": [
+        "Add selectedTikiRelease: string | null to DetailState interface",
+        "Add setSelectedTikiRelease action to DetailActions interface",
+        "Implement setSelectedTikiRelease to set Tiki release and clear issue + GitHub release",
+        "Update clearSelection to also clear selectedTikiRelease"
+      ],
+      "verification": "TypeScript compiles without errors. Store exports selectedTikiRelease and setSelectedTikiRelease. Selecting Tiki release clears other selections."
+    },
+    {
+      "id": 2,
+      "title": "Create TikiReleaseDetail component",
+      "objective": "Build detail panel component for Tiki releases with action buttons (Edit, Run Release, Review Release) and issue list display",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx",
+        "apps/desktop/src/components/detail/index.ts"
+      ],
+      "tasks": [
+        "Create TikiReleaseDetail component accepting TikiRelease and onEdit callback props",
+        "Implement header section with version, name, and status badge",
+        "Create status badge mapping for active, completed, shipped, not_planned statuses",
+        "Add actions section with Edit, Run Release, and Review Release buttons",
+        "Implement Run Release button to invoke write_terminal with /tiki:release {version}",
+        "Implement Review Release button for dry-run preview",
+        "Add issues section listing all issues with numbers and titles",
+        "Add metadata section showing createdAt and updatedAt with formatRelativeTime",
+        "Export TikiReleaseDetail from index.ts"
+      ],
+      "verification": "Component renders without errors. Action buttons are visible and properly styled. Edit button triggers callback."
+    },
+    {
+      "id": 3,
+      "title": "Update ReleasesSection click handler",
+      "objective": "Change Tiki release click behavior from opening modal to selecting in detail panel",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "tasks": [
+        "Import setSelectedTikiRelease from useDetailStore",
+        "Modify handleTikiReleaseClick to call setSelectedTikiRelease(release.version) instead of opening modal",
+        "Keep handleAddClick unchanged for creating new releases"
+      ],
+      "verification": "Clicking Tiki release updates detailStore.selectedTikiRelease instead of opening modal. Add button still opens modal."
+    },
+    {
+      "id": 4,
+      "title": "Integrate TikiReleaseDetail into App.tsx",
+      "objective": "Wire TikiReleaseDetail into detail panel with proper data flow",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "tasks": [
+        "Import TikiReleaseDetail from ./components/detail",
+        "Import useTikiReleasesStore from ./stores",
+        "Add selectedTikiRelease from useDetailStore",
+        "Add tikiReleases from useTikiReleasesStore",
+        "Compute selectedTikiReleaseData by finding release matching selectedTikiRelease",
+        "Update detail panel JSX to render TikiReleaseDetail when selectedTikiReleaseData exists",
+        "Ensure rendering priority: selectedIssueData > selectedReleaseData > selectedTikiReleaseData > empty state"
+      ],
+      "verification": "Selecting Tiki release in sidebar displays TikiReleaseDetail in detail panel."
+    },
+    {
+      "id": 5,
+      "title": "Implement Edit modal integration",
+      "objective": "Enable Edit button in TikiReleaseDetail to open ReleaseDialog with selected release for editing",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx",
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx"
+      ],
+      "tasks": [
+        "Lift ReleaseDialog state management from ReleasesSection to App.tsx for global access",
+        "Create handleEditTikiRelease in App.tsx to open modal with selected release",
+        "Pass onEdit callback to TikiReleaseDetail from App.tsx",
+        "Wire onEdit to open ReleaseDialog with editingRelease set to current Tiki release"
+      ],
+      "verification": "Edit button in TikiReleaseDetail opens modal with correct release data. Saving updates the release and closes modal."
+    }
+  ]
+}

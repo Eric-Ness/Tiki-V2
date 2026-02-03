@@ -40,3 +40,5 @@ export {
   type TikiReleaseIssue,
   type TikiReleaseStatus,
 } from './tikiReleasesStore';
+
+export { useReleaseDialogStore } from './releaseDialogStore';
