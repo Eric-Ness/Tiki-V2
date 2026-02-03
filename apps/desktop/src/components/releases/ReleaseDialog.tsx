@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useIssuesStore, type TikiRelease } from "../../stores";
+import { invoke } from "@tauri-apps/api/core";
+import { type TikiRelease, type GitHubIssue } from "../../stores";
 import "./ReleaseDialog.css";
 
 export interface ReleaseDialogProps {
@@ -23,14 +24,31 @@ export function ReleaseDialog({
 
   const isEditing = !!editingRelease;
 
-  // Get issues from store
-  const allIssues = useIssuesStore((state) => state.issues);
-  const issuesLoading = useIssuesStore((state) => state.isLoading);
+  // Local state for open issues (fetched directly, independent of IssuesSection filter)
+  const [openIssues, setOpenIssues] = useState<GitHubIssue[]>([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
 
-  // Filter to only show open issues in available list
-  const openIssues = useMemo(() => {
-    return allIssues.filter((issue) => issue.state === "open");
-  }, [allIssues]);
+  // Fetch open issues directly from GitHub
+  const fetchOpenIssues = useCallback(async () => {
+    setIssuesLoading(true);
+    try {
+      const isAuthenticated = await invoke<boolean>("check_gh_auth");
+      if (!isAuthenticated) {
+        setOpenIssues([]);
+        return;
+      }
+      const fetchedIssues = await invoke<GitHubIssue[]>("fetch_github_issues", {
+        state: "open",
+        limit: 50,
+      });
+      setOpenIssues(fetchedIssues);
+    } catch (err) {
+      console.error("Failed to fetch open issues:", err);
+      setOpenIssues([]);
+    } finally {
+      setIssuesLoading(false);
+    }
+  }, []);
 
   // Get available issues (open issues not already selected)
   const availableIssues = useMemo(() => {
@@ -54,6 +72,13 @@ export function ReleaseDialog({
       setError(null);
     }
   }, [isOpen, editingRelease]);
+
+  // Fetch open issues when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchOpenIssues();
+    }
+  }, [isOpen, fetchOpenIssues]);
 
   // Handle escape key
   const handleKeyDown = useCallback(
