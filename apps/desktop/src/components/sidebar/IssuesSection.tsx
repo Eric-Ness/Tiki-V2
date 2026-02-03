@@ -1,11 +1,15 @@
-import { useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
+import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, type GitHubIssue, type IssueFilter } from "../../stores";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingIssue, setEditingIssue] = useState<GitHubIssue | null>(null);
+
   const issues = useIssuesStore((state) => state.issues);
   const filter = useIssuesStore((state) => state.filter);
   const isLoading = useIssuesStore((state) => state.isLoading);
@@ -53,13 +57,25 @@ export function IssuesSection() {
     fetchIssues();
   }, [fetchIssues]);
 
+  const setSelectedIssue = useDetailStore((state) => state.setSelectedIssue);
+  const selectedIssue = useDetailStore((state) => state.selectedIssue);
+
   const handleFilterChange = (newFilter: IssueFilter) => {
     setFilter(newFilter);
   };
 
   const handleIssueClick = (issue: GitHubIssue) => {
-    // Open issue in browser
-    window.open(issue.url, "_blank");
+    // Set the selected issue to show in detail panel
+    setSelectedIssue(issue.number);
+  };
+
+  const handleEditIssue = (issue: GitHubIssue) => {
+    setEditingIssue(issue);
+  };
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setEditingIssue(null);
   };
 
   const issueIcon = (
@@ -93,6 +109,28 @@ export function IssuesSection() {
         <option value="closed">Closed</option>
         <option value="all">All</option>
       </select>
+      <button
+        className="issues-section-add"
+        onClick={() => setShowCreateModal(true)}
+        type="button"
+        aria-label="Create new issue"
+        title="Create new issue"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M7 2V12M2 7H12"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
       <button
         className="issues-section-refresh"
         onClick={fetchIssues}
@@ -135,54 +173,65 @@ export function IssuesSection() {
   );
 
   return (
-    <CollapsibleSection
-      title="Issues"
-      icon={issueIcon}
-      badge={issues.length > 0 ? issues.length : undefined}
-      className="issues-section"
-    >
-      <div className="issues-section-content">
-        {headerActions}
+    <>
+      <CollapsibleSection
+        title="Issues"
+        icon={issueIcon}
+        badge={issues.length > 0 ? issues.length : undefined}
+        className="issues-section"
+      >
+        <div className="issues-section-content">
+          {headerActions}
 
-        {error && (
-          <div className="issues-section-error">
-            <span>{error}</span>
-            <button
-              className="issues-section-error-dismiss"
-              onClick={clearError}
-              type="button"
-              aria-label="Dismiss error"
-            >
-              &times;
-            </button>
-          </div>
-        )}
+          {error && (
+            <div className="issues-section-error">
+              <span>{error}</span>
+              <button
+                className="issues-section-error-dismiss"
+                onClick={clearError}
+                type="button"
+                aria-label="Dismiss error"
+              >
+                &times;
+              </button>
+            </div>
+          )}
 
-        {isLoading && issues.length === 0 && (
-          <div className="issues-section-loading">
-            <span className="issues-section-spinner" />
-            Loading issues...
-          </div>
-        )}
+          {isLoading && issues.length === 0 && (
+            <div className="issues-section-loading">
+              <span className="issues-section-spinner" />
+              Loading issues...
+            </div>
+          )}
 
-        {!isLoading && !error && issues.length === 0 && (
-          <div className="issues-section-empty">
-            No {filter === "all" ? "" : filter} issues found
-          </div>
-        )}
+          {!isLoading && !error && issues.length === 0 && (
+            <div className="issues-section-empty">
+              No {filter === "all" ? "" : filter} issues found
+            </div>
+          )}
 
-        {issues.length > 0 && (
-          <div className="issues-section-list">
-            {issues.map((issue) => (
-              <IssueCard
-                key={issue.number}
-                issue={issue}
-                onClick={() => handleIssueClick(issue)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </CollapsibleSection>
+          {issues.length > 0 && (
+            <div className="issues-section-list">
+              {issues.map((issue) => (
+                <IssueCard
+                  key={issue.number}
+                  issue={issue}
+                  isSelected={selectedIssue === issue.number}
+                  onClick={() => handleIssueClick(issue)}
+                  onEdit={handleEditIssue}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      <IssueFormModal
+        isOpen={showCreateModal || editingIssue !== null}
+        onClose={handleCloseModal}
+        onSuccess={fetchIssues}
+        editingIssue={editingIssue}
+      />
+    </>
   );
 }

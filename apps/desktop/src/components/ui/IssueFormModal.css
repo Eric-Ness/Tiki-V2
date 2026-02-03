@@ -1,0 +1,246 @@
+/* Modal overlay - fixed full-screen backdrop */
+.issue-form-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+}
+
+/* Modal card */
+.issue-form-modal {
+  width: 100%;
+  max-width: 500px;
+  max-height: calc(100vh - 48px);
+  margin: 24px;
+  background: var(--bg-secondary, #252526);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal header */
+.issue-form-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+}
+
+.issue-form-modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+}
+
+.issue-form-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.issue-form-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #cccccc);
+}
+
+/* Form */
+.issue-form-modal-form {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* Form fields */
+.issue-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.issue-form-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #858585);
+}
+
+.issue-form-field input,
+.issue-form-field textarea {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-primary, #1e1e1e);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 6px;
+  color: var(--text-primary, #cccccc);
+  transition: border-color 0.15s ease;
+  resize: vertical;
+}
+
+.issue-form-field input:focus,
+.issue-form-field textarea:focus {
+  outline: none;
+  border-color: var(--accent-color, #007acc);
+}
+
+.issue-form-field input:disabled,
+.issue-form-field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.issue-form-field input::placeholder,
+.issue-form-field textarea::placeholder {
+  color: var(--text-secondary, #858585);
+  opacity: 0.7;
+}
+
+.issue-form-field input.invalid,
+.issue-form-field textarea.invalid {
+  border-color: var(--error-border, #be1100);
+}
+
+.issue-form-field input.invalid:focus,
+.issue-form-field textarea.invalid:focus {
+  border-color: var(--error-border, #be1100);
+}
+
+.issue-form-field-error {
+  font-size: 11px;
+  color: var(--error-text, #f48771);
+}
+
+/* Labels section */
+.issue-form-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.issue-form-labels-loading,
+.issue-form-labels-empty {
+  font-size: 12px;
+  color: var(--text-secondary, #858585);
+  font-style: italic;
+}
+
+/* Label toggle buttons */
+.issue-form-label {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--label-color) 25%, transparent);
+  color: var(--label-color);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.issue-form-label:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--label-color) 35%, transparent);
+}
+
+.issue-form-label.selected {
+  background: color-mix(in srgb, var(--label-color) 45%, transparent);
+  border-color: var(--label-color);
+  box-shadow: 0 0 0 1px var(--label-color);
+}
+
+.issue-form-label:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Error display */
+.issue-form-error {
+  padding: 10px 12px;
+  background: var(--error-bg, #5a1d1d);
+  border: 1px solid var(--error-border, #be1100);
+  border-radius: 6px;
+  color: var(--error-text, #f48771);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Modal footer */
+.issue-form-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Buttons */
+.issue-form-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.issue-form-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.issue-form-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color, #3c3c3c);
+  color: var(--text-secondary, #858585);
+}
+
+.issue-form-btn-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--text-secondary, #858585);
+}
+
+.issue-form-btn-submit {
+  background: var(--accent-color, #007acc);
+  border: 1px solid var(--accent-color, #007acc);
+  color: white;
+}
+
+.issue-form-btn-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-color, #007acc) 80%, white);
+}
+
+/* Loading spinner */
+.issue-form-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: issue-form-spin 0.8s linear infinite;
+}
+
+@keyframes issue-form-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

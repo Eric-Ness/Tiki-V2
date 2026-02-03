@@ -38,6 +38,7 @@
   cursor: not-allowed;
 }
 
+.issues-section-add,
 .issues-section-refresh {
   display: flex;
   align-items: center;
@@ -52,16 +53,19 @@
   transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
+.issues-section-add:hover:not(:disabled),
 .issues-section-refresh:hover:not(:disabled) {
   border-color: var(--accent-color, #007acc);
   color: var(--text-primary, #cccccc);
 }
 
+.issues-section-add:focus,
 .issues-section-refresh:focus {
   outline: none;
   border-color: var(--accent-color, #007acc);
 }
 
+.issues-section-add:disabled,
 .issues-section-refresh:disabled {
   opacity: 0.6;
   cursor: not-allowed;

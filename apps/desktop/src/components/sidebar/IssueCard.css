@@ -24,11 +24,52 @@
   border-color: var(--accent-color, #007acc);
 }
 
+.issue-card.selected {
+  background-color: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
 .issue-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.issue-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.issue-card-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary, #6b6b6b);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.issue-card:hover .issue-card-edit {
+  opacity: 1;
+}
+
+.issue-card-edit:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #cccccc);
+}
+
+.issue-card-edit:focus {
+  outline: none;
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .issue-card-number {

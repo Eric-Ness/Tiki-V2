@@ -151,3 +151,178 @@ pub fn fetch_github_releases(limit: Option<u32>) -> Result<Vec<GitHubRelease>, S
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse releases: {}", e))
 }
+
+/// A simple label structure for fetching available labels
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LabelInfo {
+    pub name: String,
+    pub color: String,
+}
+
+/// Fetch available labels from the current repository
+#[tauri::command]
+pub fn fetch_github_labels() -> Result<Vec<LabelInfo>, String> {
+    let output = Command::new("gh")
+        .args([
+            "label",
+            "list",
+            "--json",
+            "name,color",
+            "--limit",
+            "100",
+        ])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("Failed to fetch labels: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse labels: {}", e))
+}
+
+/// Create a new GitHub issue
+#[tauri::command]
+pub fn create_github_issue(
+    title: String,
+    body: Option<String>,
+    labels: Vec<String>,
+) -> Result<GitHubIssue, String> {
+    let mut args = vec![
+        "issue".to_string(),
+        "create".to_string(),
+        "--title".to_string(),
+        title,
+    ];
+
+    if let Some(body_text) = body {
+        args.push("--body".to_string());
+        args.push(body_text);
+    }
+
+    for label in labels {
+        args.push("--label".to_string());
+        args.push(label);
+    }
+
+    // Add --json to get the created issue back
+    args.push("--json".to_string());
+    args.push("number,title,body,state,labels,url,createdAt,updatedAt".to_string());
+
+    let output = Command::new("gh")
+        .args(&args)
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("Failed to create issue: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse created issue: {}", e))
+}
+
+/// Edit an existing GitHub issue
+#[tauri::command]
+pub fn edit_github_issue(
+    number: u32,
+    title: Option<String>,
+    body: Option<String>,
+    add_labels: Vec<String>,
+    remove_labels: Vec<String>,
+) -> Result<(), String> {
+    let mut args = vec![
+        "issue".to_string(),
+        "edit".to_string(),
+        number.to_string(),
+    ];
+
+    if let Some(t) = title {
+        args.push("--title".to_string());
+        args.push(t);
+    }
+
+    if let Some(b) = body {
+        args.push("--body".to_string());
+        args.push(b);
+    }
+
+    for label in add_labels {
+        args.push("--add-label".to_string());
+        args.push(label);
+    }
+
+    for label in remove_labels {
+        args.push("--remove-label".to_string());
+        args.push(label);
+    }
+
+    let output = Command::new("gh")
+        .args(&args)
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("Failed to edit issue: {}", stderr));
+    }
+
+    Ok(())
+}
