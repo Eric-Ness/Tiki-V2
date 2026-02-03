@@ -13,6 +13,7 @@
   padding: 0 2px;
 }
 
+.releases-section-add,
 .releases-section-refresh {
   display: flex;
   align-items: center;
@@ -25,6 +26,11 @@
   color: var(--text-secondary, #858585);
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.releases-section-add:hover {
+  border-color: #3fb950;
+  color: #3fb950;
 }
 
 .releases-section-refresh:hover:not(:disabled) {
@@ -126,4 +132,86 @@
 
 .releases-section-error-dismiss:hover {
   opacity: 1;
+}
+
+/* Group labels for separating local and GitHub releases */
+.releases-section-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.releases-section-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #858585);
+  padding: 4px 2px 0;
+}
+
+/* Tiki release cards (local releases) */
+.releases-section-tiki-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--bg-secondary, #1e1e1e);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.releases-section-tiki-card:hover {
+  border-color: var(--accent-color, #007acc);
+  background-color: var(--bg-hover, #2a2a2a);
+}
+
+.releases-section-tiki-card:focus {
+  outline: none;
+  border-color: var(--accent-color, #007acc);
+}
+
+.releases-section-tiki-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.releases-section-tiki-version {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #cccccc);
+}
+
+.releases-section-tiki-status {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: capitalize;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background-color: rgba(128, 128, 128, 0.2);
+  color: var(--text-secondary, #858585);
+}
+
+.releases-section-tiki-status.active {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.releases-section-tiki-status.completed {
+  background-color: rgba(136, 87, 229, 0.15);
+  color: #a371f7;
+}
+
+.releases-section-tiki-status.shipped {
+  background-color: rgba(0, 122, 204, 0.15);
+  color: #58a6ff;
+}
+
+.releases-section-tiki-issues {
+  font-size: 11px;
+  color: var(--text-secondary, #858585);
 }

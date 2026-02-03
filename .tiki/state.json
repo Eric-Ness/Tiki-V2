@@ -1,13 +1,36 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "issue:18": {
+      "type": "issue",
+      "issue": {
+        "number": 18,
+        "title": "Add/Edit Release",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/18"
+      },
+      "status": "shipping",
+      "phase": {
+        "total": 5,
+        "current": 5,
+        "status": "completed"
+      },
+      "createdAt": "2026-02-02T18:00:00.000Z",
+      "lastActivity": "2026-02-02T18:40:00.000Z",
+      "auditPassed": true
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 16,
-      "title": "feat(desktop): Track terminal busy/idle status",
-      "completedAt": "2026-02-03T02:15:00.000Z"
+      "number": 17,
+      "title": "Add/Edit New Github Issues",
+      "completedAt": "2026-02-02T13:05:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 17,
+        "title": "Add/Edit New Github Issues",
+        "completedAt": "2026-02-02T13:05:00.000Z"
+      },
       {
         "number": 16,
         "title": "feat(desktop): Track terminal busy/idle status",
@@ -52,11 +75,6 @@
         "number": 8,
         "title": "feat(desktop): Add State section showing execution progress",
         "completedAt": "2026-02-02T19:55:00.000Z"
-      },
-      {
-        "number": 7,
-        "title": "feat(desktop): Add Projects section with add/remove/switch",
-        "completedAt": "2026-02-02T19:25:00.000Z"
       }
     ]
   }

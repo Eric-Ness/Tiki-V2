@@ -145,3 +145,33 @@ pub enum PhaseStatus {
     Failed,
     Skipped,
 }
+
+/// Tiki Release - local release with associated issues
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TikiRelease {
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub status: TikiReleaseStatus,
+    pub issues: Vec<TikiReleaseIssue>,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TikiReleaseIssue {
+    pub number: u32,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TikiReleaseStatus {
+    Active,
+    Completed,
+    Shipped,
+    NotPlanned,
+}

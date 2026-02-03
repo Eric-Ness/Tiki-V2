@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 18,
+    "title": "Add/Edit Release",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/18"
+  },
+  "createdAt": "2026-02-02T18:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "UI",
+      "criterion": "Plus button visible next to 'Releases' section header"
+    },
+    {
+      "id": "SC2",
+      "category": "UI",
+      "criterion": "Modal opens when plus button is clicked"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can enter a release name/version in the modal"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Users can see open GitHub issues in the bottom list"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Users can add issues to the release via plus button"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "criterion": "Added issues appear in the top list"
+    },
+    {
+      "id": "SC7",
+      "category": "Functional",
+      "criterion": "Users can remove issues from the top list"
+    },
+    {
+      "id": "SC8",
+      "category": "Data",
+      "criterion": "Release data (name + issues) is persisted"
+    },
+    {
+      "id": "SC9",
+      "category": "UI",
+      "criterion": "Existing releases can be clicked to edit them"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create Tiki releases store and types",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:15:00.000Z",
+      "summary": "Phase 1 Summary:\n- Created: apps/desktop/src/stores/tikiReleasesStore.ts\n- Modified: apps/desktop/src/stores/index.ts\n- Key changes:\n  - TikiRelease interface with version, name, status, issues, createdAt, updatedAt\n  - TikiReleaseIssue interface with number, title\n  - TikiReleaseStatus type (active, completed, shipped, not_planned)\n  - Zustand store with addRelease, updateRelease, deleteRelease, setReleases actions\n- Verification: PASS (TypeScript compiles without errors)\n- Notes for next phase: Store ready for use in ReleaseDialog component",
+      "content": "Create a new Zustand store for Tiki-style releases (separate from GitHub releases). This store will manage local release definitions that group issues together.\n\nTasks:\n1. Create `tikiReleasesStore.ts` with:\n   - TikiRelease interface (version, name, issues array, createdAt, status)\n   - TikiReleaseIssue interface (number, title)\n   - Store state (releases array, isLoading, error)\n   - Actions (addRelease, updateRelease, deleteRelease, setReleases)\n2. Export the store from `stores/index.ts`\n\nReference the previous implementation at `C:\\Users\\ericn\\Documents\\Github\\Tiki.Desktop\\src\\renderer\\src\\stores\\tiki-store.ts` for the Release type structure.",
+      "verification": [
+        "TypeScript compiles without errors",
+        "Store exports are accessible from index.ts",
+        "TikiRelease and TikiReleaseIssue types are properly defined"
+      ],
+      "addressesCriteria": ["SC8"],
+      "files": [
+        "apps/desktop/src/stores/tikiReleasesStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create ReleaseDialog modal component",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:20:00.000Z",
+      "summary": "Phase 2 Summary:\n- Created: apps/desktop/src/components/releases/ReleaseDialog.tsx\n- Created: apps/desktop/src/components/releases/ReleaseDialog.css\n- Created: apps/desktop/src/components/releases/index.ts\n- Key changes:\n  - Modal overlay with backdrop click to close\n  - Header with title and close button\n  - Version input field with semver validation\n  - Footer with Cancel and Save buttons\n  - Support for edit mode via editingRelease prop\n  - Issues section placeholder for Phase 3\n- Verification: PASS (TypeScript compiles without errors)\n- Notes for next phase: Modal ready for issue selection UI",
+      "content": "Create the modal dialog component for adding/editing releases. This phase focuses on the modal structure and release name input.\n\nTasks:\n1. Create `components/releases/ReleaseDialog.tsx` with:\n   - Modal overlay with backdrop\n   - Header with title and close button\n   - Version/name input field with validation\n   - Footer with Cancel and Save buttons\n   - Props: isOpen, onClose, onSave, editingRelease (optional for edit mode)\n2. Create `components/releases/ReleaseDialog.css` with modal styling\n3. Create `components/releases/index.ts` for exports\n\nFollow the modal pattern from the previous CreateReleaseDialog.tsx implementation.",
+      "verification": [
+        "Modal renders when isOpen is true",
+        "Modal closes when backdrop or close button clicked",
+        "Version input accepts and validates text",
+        "Styling matches existing app theme"
+      ],
+      "addressesCriteria": ["SC2", "SC3"],
+      "files": [
+        "apps/desktop/src/components/releases/ReleaseDialog.tsx",
+        "apps/desktop/src/components/releases/ReleaseDialog.css",
+        "apps/desktop/src/components/releases/index.ts"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add two-list issue selection UI",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:25:00.000Z",
+      "summary": "Phase 3 Summary:\n- Modified: apps/desktop/src/components/releases/ReleaseDialog.tsx\n- Modified: apps/desktop/src/components/releases/ReleaseDialog.css\n- Key changes:\n  - Wired up useIssuesStore to get open GitHub issues\n  - Top list (Issues in Release) with remove button on each issue\n  - Bottom list (Available Issues) with add button on each issue\n  - Add/remove handlers to move issues between lists\n  - Loading state and empty state messages\n  - Selected issues count displayed in labels\n  - Styled issue items with hover effects\n- Verification: PASS (TypeScript compiles without errors)\n- Notes for next phase: Dialog ready to be integrated into ReleasesSection",
+      "content": "Extend the ReleaseDialog with the two-list interface for managing issues in a release.\n\nTasks:\n1. Add 'Issues in Release' section (top list) showing selected issues with remove button\n2. Add 'Available Issues' section (bottom list) showing open GitHub issues with add button\n3. Wire up useIssuesStore to get available open issues\n4. Implement add/remove handlers to move issues between lists\n5. Update styling for the two-list layout\n\nReference the EditReleaseDialog.tsx Issues tab for the UI pattern.",
+      "verification": [
+        "Bottom list shows open issues from GitHub",
+        "Clicking '+' on an issue moves it to top list",
+        "Clicking remove on top list issue moves it back to bottom",
+        "Selected issues count is displayed"
+      ],
+      "addressesCriteria": ["SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/releases/ReleaseDialog.tsx",
+        "apps/desktop/src/components/releases/ReleaseDialog.css"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Add plus button to ReleasesSection header",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:30:00.000Z",
+      "summary": "Phase 4 Summary:\n- Modified: apps/desktop/src/components/sidebar/ReleasesSection.tsx\n- Modified: apps/desktop/src/components/sidebar/ReleasesSection.css\n- Key changes:\n  - Added + button next to refresh button in header\n  - Added dialog state (isDialogOpen, editingRelease)\n  - Integrated ReleaseDialog component\n  - Handle add/edit flow with Tiki releases store\n  - Display local (Tiki) releases separately from GitHub releases\n  - Styled Tiki release cards with status badges\n  - Click on Tiki release opens edit dialog\n- Verification: PASS (TypeScript compiles without errors)\n- Notes for next phase: Need to add Rust commands for persistence",
+      "content": "Add the '+' button to the Releases section header and wire up modal opening.\n\nTasks:\n1. Update ReleasesSection.tsx to add a '+' button in headerActions (similar to refresh button)\n2. Add state for modal visibility (isDialogOpen)\n3. Import and render ReleaseDialog component\n4. Handle onSave callback to add release to store\n5. Update ReleasesSection.css for button styling\n\nFollow the existing headerActions pattern used for the refresh button.",
+      "verification": [
+        "Plus button visible next to Releases header",
+        "Clicking plus button opens the ReleaseDialog modal",
+        "Modal can be closed and reopened"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.css"
+      ],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Add persistence and edit mode",
+      "status": "completed",
+      "completedAt": "2026-02-02T18:40:00.000Z",
+      "summary": "Phase 5 Summary:\n- Modified: apps/desktop/src-tauri/src/state.rs (added TikiRelease types)\n- Modified: apps/desktop/src-tauri/src/commands.rs (added 3 new commands)\n- Modified: apps/desktop/src-tauri/src/lib.rs (registered new commands)\n- Modified: apps/desktop/src/components/sidebar/ReleasesSection.tsx (persistence wiring)\n- Key changes:\n  - TikiRelease, TikiReleaseIssue, TikiReleaseStatus Rust types\n  - load_tiki_releases: Loads all releases from .tiki/releases/\n  - save_tiki_release: Saves release to .tiki/releases/{version}.json\n  - delete_tiki_release: Deletes a release file\n  - ReleasesSection loads releases on mount and saves on create/edit\n  - Click on Tiki release opens edit dialog (already working from Phase 4)\n- Verification: PASS (TypeScript and Rust compile without errors)\n- All success criteria met",
+      "content": "Add Rust commands for persisting releases and enable edit mode when clicking existing releases.\n\nTasks:\n1. Create Rust commands in src-tauri for:\n   - save_tiki_release: Save a release to .tiki/releases/{version}.json\n   - load_tiki_releases: Load all releases from .tiki/releases/\n   - delete_tiki_release: Delete a release file\n2. Wire up ReleaseDialog save to call Rust command\n3. Add edit mode: clicking a ReleaseCard opens dialog in edit mode\n4. Load releases on app startup\n5. Update ReleasesSection to show both GitHub releases and Tiki releases (or replace with Tiki releases based on preference)\n\nNote: May need clarification on whether to show GitHub releases, Tiki releases, or both.",
+      "verification": [
+        "Creating a release persists to .tiki/releases/",
+        "Releases load on app startup",
+        "Clicking an existing release opens edit dialog",
+        "Editing a release updates the persisted file",
+        "App builds and runs without errors"
+      ],
+      "addressesCriteria": ["SC8", "SC9"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands/mod.rs",
+        "apps/desktop/src-tauri/src/commands/tiki.rs",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx",
+        "apps/desktop/src/components/releases/ReleaseDialog.tsx"
+      ],
+      "dependencies": [4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [4],
+    "SC2": [2, 4],
+    "SC3": [2],
+    "SC4": [3],
+    "SC5": [3],
+    "SC6": [3],
+    "SC7": [3],
+    "SC8": [1, 5],
+    "SC9": [5]
+  }
+}
