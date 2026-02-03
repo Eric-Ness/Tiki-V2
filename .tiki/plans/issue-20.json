@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 20,
+    "title": "Claude Code Commands - Update Current Phase",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/20"
+  },
+  "createdAt": "2026-02-03T15:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "execute.md has explicit CRITICAL instructions for updating phase state before each phase starts"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "State updates use the correct structure: phase: { current, total, status }"
+    },
+    {
+      "id": "SC3",
+      "category": "documentation",
+      "description": "Instructions are clear and unambiguous about WHEN to update state (before starting each phase)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Update execute.md with explicit phase state instructions",
+      "status": "completed",
+      "startedAt": "2026-02-03T15:06:00.000Z",
+      "completedAt": "2026-02-03T15:08:00.000Z",
+      "summary": "Added CRITICAL instruction in instructions section and comprehensive state-update-requirement section with JSON examples showing correct phase: { current, total, status } structure",
+      "content": "Modify the execute.md command to add a CRITICAL instruction block that explicitly requires updating state.json with the phase object BEFORE starting any phase execution. The instruction should:\n1. Use strong language (CRITICAL, MUST) to ensure compliance\n2. Show the exact JSON structure with the phase object\n3. Be placed early in the instructions section so it's seen first\n4. Include an example showing the correct state update",
+      "verification": [
+        "execute.md contains CRITICAL instruction about phase state updates",
+        "The instruction appears before the phase-execution section",
+        "The JSON example shows the correct phase: { current, total, status } structure"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "packages/framework/commands/execute.md"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Verify the changes work correctly",
+      "status": "completed",
+      "startedAt": "2026-02-03T15:08:00.000Z",
+      "completedAt": "2026-02-03T15:10:00.000Z",
+      "summary": "Verified instructions match PhaseProgress type and no conflicting instructions exist",
+      "content": "Review the modified execute.md to ensure:\n1. The CRITICAL instruction is prominent and clear\n2. The JSON structure matches the TypeScript types in @tiki/shared\n3. The instruction timing is explicit (BEFORE starting each phase)",
+      "verification": [
+        "Instructions match the PhaseProgress type from state.ts",
+        "No conflicting or ambiguous instructions remain in the file"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "packages/framework/commands/execute.md"
+      ]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [1, 2],
+    "SC3": [1, 2]
+  }
+}

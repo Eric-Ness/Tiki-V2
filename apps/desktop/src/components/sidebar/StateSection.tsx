@@ -38,12 +38,7 @@ export function StateSection({ activeWork }: StateSectionProps) {
     >
       <div className="state-section-content">
         {workEntries.length === 0 ? (
-          <div className="state-section-empty">
-            <p>No active work</p>
-            <p className="state-section-hint">
-              Run <code>tiki:get #issue</code> to start working on an issue.
-            </p>
-          </div>
+          <div className="state-section-empty" />
         ) : (
           <div className="state-section-list">
             {workEntries.map(([key, work]) => (

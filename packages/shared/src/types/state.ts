@@ -21,6 +21,15 @@ export type PhaseStatus =
   | 'failed'
   | 'skipped';
 
+/** Pipeline step in the Tiki workflow */
+export type PipelineStep =
+  | 'GET'
+  | 'REVIEW'
+  | 'PLAN'
+  | 'AUDIT'
+  | 'EXECUTE'
+  | 'SHIP';
+
 /** ISO 8601 timestamp string */
 export type Timestamp = string;
 
@@ -59,6 +68,8 @@ export interface IssueWork {
   type: 'issue';
   issue: IssueInfo;
   status: WorkStatus;
+  /** Current pipeline step (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP) */
+  pipelineStep?: PipelineStep;
   phase?: PhaseProgress;
   createdAt: Timestamp;
   lastActivity: Timestamp;
@@ -84,6 +95,8 @@ export interface ReleaseWork {
   type: 'release';
   release: ReleaseInfo;
   status: WorkStatus;
+  /** Current pipeline step (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP) */
+  pipelineStep?: PipelineStep;
   /** Current phase of current issue */
   phase?: PhaseProgress;
   createdAt: Timestamp;

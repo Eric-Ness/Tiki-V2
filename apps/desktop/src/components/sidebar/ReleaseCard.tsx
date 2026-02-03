@@ -3,10 +3,11 @@ import "./ReleaseCard.css";
 
 export interface ReleaseCardProps {
   release: GitHubRelease;
+  isSelected?: boolean;
   onClick?: () => void;
 }
 
-export function ReleaseCard({ release, onClick }: ReleaseCardProps) {
+export function ReleaseCard({ release, isSelected, onClick }: ReleaseCardProps) {
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -31,7 +32,7 @@ export function ReleaseCard({ release, onClick }: ReleaseCardProps) {
 
   return (
     <div
-      className={`release-card ${release.isDraft ? "draft" : ""} ${release.isPrerelease ? "prerelease" : ""}`}
+      className={`release-card ${release.isDraft ? "draft" : ""} ${release.isPrerelease ? "prerelease" : ""}${isSelected ? " selected" : ""}`}
       onClick={onClick}
       onKeyDown={handleKeyDown}
       tabIndex={0}

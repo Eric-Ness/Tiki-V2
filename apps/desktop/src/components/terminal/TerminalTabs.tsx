@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { useTerminalStore, type TerminalTab } from '../../stores';
 
 interface StatusDotProps {
@@ -23,8 +24,18 @@ function StatusDot({ status }: StatusDotProps) {
 }
 
 export function TerminalTabs() {
-  const { tabs, activeTabId, addTab, removeTab, setActiveTab } =
+  const { tabs, activeTabId, addTab, removeTab, setActiveTab, updateTabTitle } =
     useTerminalStore();
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingTabId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingTabId]);
 
   const handleTabClick = (id: string) => {
     setActiveTab(id);
@@ -39,6 +50,27 @@ export function TerminalTabs() {
     addTab();
   };
 
+  const handleDoubleClick = (e: React.MouseEvent, tab: TerminalTab) => {
+    e.stopPropagation();
+    setEditingTabId(tab.id);
+    setEditValue(tab.title);
+  };
+
+  const handleRenameSubmit = () => {
+    if (editingTabId && editValue.trim()) {
+      updateTabTitle(editingTabId, editValue.trim());
+    }
+    setEditingTabId(null);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+      setEditingTabId(null);
+    }
+  };
+
   return (
     <div className="terminal-tabs">
       <div className="terminal-tabs-list">
@@ -50,7 +82,25 @@ export function TerminalTabs() {
             title={tab.cwd || tab.title}
           >
             <StatusDot status={tab.status} />
-            <span className="terminal-tab-title">{tab.title}</span>
+            {editingTabId === tab.id ? (
+              <input
+                ref={inputRef}
+                type="text"
+                className="terminal-tab-rename-input"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleRenameSubmit}
+                onKeyDown={handleRenameKeyDown}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span
+                className="terminal-tab-title"
+                onDoubleClick={(e) => handleDoubleClick(e, tab)}
+              >
+                {tab.title}
+              </span>
+            )}
             <span
               className="terminal-tab-close"
               onClick={(e) => handleCloseClick(e, tab.id)}

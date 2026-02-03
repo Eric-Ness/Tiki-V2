@@ -30,7 +30,9 @@
 
 .main-content {
   height: 100%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Detail panel */
@@ -46,122 +48,30 @@
 
 /* Resize handle */
 .resize-handle {
-  width: 4px;
-  background: transparent;
-  cursor: col-resize;
-  position: relative;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
   transition: background 0.15s ease;
 }
 
-/* Grip indicator - vertical dots */
-.resize-handle::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 2px;
-  height: 24px;
-  background-image: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.5) 1px,
-    transparent 1px
-  );
-  background-size: 2px 8px;
-  background-repeat: repeat-y;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+/* Horizontal layout - vertical separator */
+[data-panel-group-direction="horizontal"] > .resize-handle {
+  width: 6px;
+  cursor: col-resize;
 }
 
-/* Hover state - show grip indicator */
+/* Vertical layout - horizontal separator */
+[data-panel-group-direction="vertical"] > .resize-handle {
+  height: 6px;
+  cursor: row-resize;
+}
+
+/* Hover state */
 .resize-handle:hover {
-  background: rgba(96, 165, 250, 0.3);
+  background: rgba(96, 165, 250, 0.4);
 }
 
-.resize-handle:hover::before {
-  opacity: 1;
-}
-
-/* Active/dragging state - solid accent color */
+/* Active/dragging state */
 .resize-handle[data-resize-handle-active] {
   background: #60a5fa;
 }
 
-.resize-handle[data-resize-handle-active]::before {
-  opacity: 1;
-  background-image: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.8) 1px,
-    transparent 1px
-  );
-}
-
-/* Collapse toggle buttons */
-.collapse-toggle {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 40px;
-  padding: 0;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-  cursor: pointer;
-  z-index: 10;
-  transition: background 0.15s ease, color 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.collapse-toggle:hover {
-  background: rgba(96, 165, 250, 0.3);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.collapse-toggle-sidebar {
-  right: 0;
-  border-radius: 4px 0 0 4px;
-}
-
-.collapse-toggle-detail {
-  left: 0;
-  border-radius: 0 4px 4px 0;
-}
-
-/* Expand buttons (shown when panel is collapsed) */
-.expand-toggle {
-  width: 20px;
-  height: 40px;
-  padding: 0;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.expand-toggle:hover {
-  background: rgba(96, 165, 250, 0.3);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.expand-toggle-sidebar {
-  border-radius: 0 4px 4px 0;
-}
-
-.expand-toggle-detail {
-  border-radius: 4px 0 0 4px;
-}
-
-/* Collapsed panel state */
-.panel.collapsed {
-  overflow: hidden;
-}

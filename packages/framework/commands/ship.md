@@ -144,7 +144,24 @@ All success criteria verified:
 </output>
 
 <state-management>
-After shipping:
+When starting shipping, update `.tiki/state.json`:
+- Set `pipelineStep` to `"SHIP"`
+- Set `status` to `"shipping"`
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+After shipping completes:
 
 1. Update `.tiki/state.json`:
    - Remove issue from `activeWork`

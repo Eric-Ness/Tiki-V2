@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 17,
+    "title": "Add/Edit New Github Issues",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/17"
+  },
+  "createdAt": "2026-02-02T12:10:00.000Z",
+  "completedAt": "2026-02-02T13:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "Users can click a '+' button in the Issues section to open a create modal"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Users can enter a title and description for a new issue"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Users can select one or more labels from available repository labels"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "criterion": "Submitting the form creates a new GitHub issue via gh CLI"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "criterion": "Users can edit an existing issue (title, body, labels)"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "criterion": "The issues list refreshes after creating or editing an issue"
+    },
+    {
+      "id": "SC7",
+      "category": "UX",
+      "criterion": "Modal can be closed with Escape key or clicking outside"
+    },
+    {
+      "id": "SC8",
+      "category": "UX",
+      "criterion": "Form shows loading state while submitting"
+    },
+    {
+      "id": "SC9",
+      "category": "Error",
+      "criterion": "Error messages display when creation/edit fails"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add Rust backend commands for labels, create, and edit",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:20:00.000Z",
+      "content": "Add three new Tauri commands to github.rs:\n\n1. `fetch_github_labels()` - Fetch available labels using `gh label list --json name,color --limit 100`\n2. `create_github_issue(title, body, labels)` - Create issue using `gh issue create --title \"...\" --body \"...\" --label \"...\"`\n3. `edit_github_issue(number, title, body, labels)` - Edit issue using `gh issue edit {number} --title \"...\" --body \"...\" --add-label \"...\" --remove-label \"...\"`\n\nFollow the existing pattern in github.rs for error handling and gh CLI invocation. Register all commands in lib.rs.\n\nReference: Tiki.Desktop/src/main/services/github-bridge.ts lines 232-304",
+      "verification": [
+        "cargo check passes with no errors",
+        "Commands are registered in lib.rs generate_handler! macro",
+        "Can test commands via Tauri dev tools"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [],
+      "summary": "Added LabelInfo struct and three Tauri commands: fetch_github_labels, create_github_issue, edit_github_issue. All registered in lib.rs. cargo check passes."
+    },
+    {
+      "number": 2,
+      "title": "Create IssueFormModal component",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:30:00.000Z",
+      "content": "Create the modal component for creating/editing issues:\n\n1. Create IssueFormModal.tsx with:\n   - Props: isOpen, onClose, onSuccess, editingIssue (optional for edit mode)\n   - State: title, body, selectedLabels, availableLabels, loading, loadingLabels, error\n   - useEffect to fetch labels when modal opens\n   - useEffect to reset/populate form when modal opens (blank for create, populated for edit)\n   - Form with title input (required), body textarea, label toggle buttons\n   - Submit handler that calls create or edit command based on mode\n   - Loading states for labels and submission\n\n2. Create IssueFormModal.css with styling matching app theme:\n   - Fixed overlay with semi-transparent background\n   - Centered modal card with header/form/footer sections\n   - Label buttons with colored backgrounds and selection ring\n   - Error display styling\n\nReference: Tiki.Desktop/src/renderer/src/components/sidebar/CreateIssueDialog.tsx",
+      "verification": [
+        "Component renders without errors",
+        "TypeScript compiles with no errors",
+        "Modal displays when isOpen=true"
+      ],
+      "addressesCriteria": ["SC2", "SC3", "SC7", "SC8", "SC9"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [1],
+      "summary": "Created IssueFormModal component with create/edit modes, label fetching, form state management, loading states, and styled modal overlay."
+    },
+    {
+      "number": 3,
+      "title": "Add create button to IssuesSection",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:40:00.000Z",
+      "content": "Integrate the create functionality into IssuesSection:\n\n1. Add state for showCreateModal\n2. Add '+' button next to the refresh button in headerActions\n3. Import and render IssueFormModal with isOpen={showCreateModal}\n4. Handle onSuccess to refresh the issues list\n5. Style the add button to match the refresh button\n\nThe '+' button should be a simple SVG icon (two crossed lines) in a button element.",
+      "verification": [
+        "'+' button appears in Issues section header",
+        "Clicking '+' opens the create modal",
+        "Creating an issue refreshes the list",
+        "Modal closes after successful creation"
+      ],
+      "addressesCriteria": ["SC1", "SC4", "SC6"],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.css"
+      ],
+      "dependencies": [2],
+      "summary": "Added showCreateModal state, '+' button with plus icon SVG, imported IssueFormModal, onSuccess triggers fetchIssues."
+    },
+    {
+      "number": 4,
+      "title": "Add edit action to IssueCard",
+      "status": "completed",
+      "completedAt": "2026-02-02T12:50:00.000Z",
+      "content": "Add the ability to edit issues from the issue card:\n\n1. Add onEdit prop to IssueCard component\n2. Add edit button (pencil icon) that appears on hover\n3. Clicking edit calls onEdit with the issue data\n4. In IssuesSection, add state for editingIssue\n5. Pass editingIssue to IssueFormModal to open in edit mode\n6. Handle edit success to refresh the list\n\nThe edit button should appear on the right side of the card on hover, styled subtly.",
+      "verification": [
+        "Edit button appears on IssueCard hover",
+        "Clicking edit opens modal with issue data populated",
+        "Editing an issue updates it via gh CLI",
+        "Issues list refreshes after edit"
+      ],
+      "addressesCriteria": ["SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssueCard.tsx",
+        "apps/desktop/src/components/sidebar/IssueCard.css",
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx"
+      ],
+      "dependencies": [3],
+      "summary": "Added onEdit prop to IssueCard, pencil icon edit button on hover, editingIssue state in IssuesSection, modal opens in edit mode with issue data."
+    },
+    {
+      "number": 5,
+      "title": "Polish and keyboard accessibility",
+      "status": "completed",
+      "completedAt": "2026-02-02T13:00:00.000Z",
+      "content": "Final polish and accessibility improvements:\n\n1. Add Escape key handler to close modal\n2. Add click-outside-to-close behavior on overlay\n3. Auto-focus title input when modal opens\n4. Ensure tab order is logical through form\n5. Add aria-labels to buttons\n6. Test full create/edit flow end-to-end\n7. Handle edge cases:\n   - Empty title validation\n   - Network errors\n   - Very long titles/descriptions",
+      "verification": [
+        "Escape key closes modal",
+        "Clicking overlay closes modal",
+        "Title input is focused on open",
+        "Full create flow works end-to-end",
+        "Full edit flow works end-to-end",
+        "Error states display correctly"
+      ],
+      "addressesCriteria": ["SC7", "SC8", "SC9"],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.css"
+      ],
+      "dependencies": [4],
+      "summary": "Added Escape/click-outside blocked during loading, title validation with visual feedback, aria-pressed/aria-label on labels, maxLength on title, inline field error message."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [3],
+    "SC2": [2],
+    "SC3": [1, 2],
+    "SC4": [1, 3],
+    "SC5": [1, 4],
+    "SC6": [3, 4],
+    "SC7": [2, 5],
+    "SC8": [2, 5],
+    "SC9": [2, 5]
+  }
+}

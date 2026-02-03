@@ -1,4 +1,4 @@
-use crate::state::{TikiPlan, TikiState};
+use crate::state::{TikiPlan, TikiRelease, TikiState};
 use crate::watcher;
 use std::path::PathBuf;
 use tauri_plugin_dialog::DialogExt;
@@ -97,5 +97,99 @@ pub fn switch_project(app: tauri::AppHandle, path: String) -> Result<(), String>
     watcher::switch_watch_path(app, project_path)?;
 
     log::info!("Switched to project: {}", path);
+    Ok(())
+}
+
+/// Load all Tiki releases from .tiki/releases/
+#[tauri::command]
+pub fn load_tiki_releases(tiki_path: Option<String>) -> Result<Vec<TikiRelease>, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let releases_dir = path.join("releases");
+
+    if !releases_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut releases = Vec::new();
+
+    let entries = std::fs::read_dir(&releases_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let file_path = entry.path();
+
+        if file_path.extension().map_or(false, |ext| ext == "json") {
+            let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+            match serde_json::from_str::<TikiRelease>(&content) {
+                Ok(release) => releases.push(release),
+                Err(e) => {
+                    log::warn!("Failed to parse release file {:?}: {}", file_path, e);
+                }
+            }
+        }
+    }
+
+    // Sort by version (descending)
+    releases.sort_by(|a, b| b.version.cmp(&a.version));
+
+    Ok(releases)
+}
+
+/// Save a Tiki release to .tiki/releases/{version}.json
+#[tauri::command]
+pub fn save_tiki_release(release: TikiRelease, tiki_path: Option<String>) -> Result<(), String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let releases_dir = path.join("releases");
+
+    // Create releases directory if it doesn't exist
+    if !releases_dir.exists() {
+        std::fs::create_dir_all(&releases_dir).map_err(|e| e.to_string())?;
+    }
+
+    // Sanitize version for filename (replace special chars)
+    let safe_version = release.version.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let file_path = releases_dir.join(format!("{}.json", safe_version));
+
+    let content = serde_json::to_string_pretty(&release).map_err(|e| e.to_string())?;
+    std::fs::write(&file_path, content).map_err(|e| e.to_string())?;
+
+    log::info!("Saved release {} to {:?}", release.version, file_path);
+    Ok(())
+}
+
+/// Delete a Tiki release file
+#[tauri::command]
+pub fn delete_tiki_release(version: String, tiki_path: Option<String>) -> Result<(), String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let releases_dir = path.join("releases");
+    let safe_version = version.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let file_path = releases_dir.join(format!("{}.json", safe_version));
+
+    if file_path.exists() {
+        std::fs::remove_file(&file_path).map_err(|e| e.to_string())?;
+        log::info!("Deleted release {} from {:?}", version, file_path);
+    }
+
     Ok(())
 }

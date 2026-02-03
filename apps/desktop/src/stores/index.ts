@@ -31,3 +31,12 @@ export {
   type SplitNode,
   type SplitTreeNode,
 } from './terminalStore';
+
+export { useDetailStore } from './detailStore';
+
+export {
+  useTikiReleasesStore,
+  type TikiRelease,
+  type TikiReleaseIssue,
+  type TikiReleaseStatus,
+} from './tikiReleasesStore';

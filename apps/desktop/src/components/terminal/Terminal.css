@@ -42,12 +42,12 @@
 }
 
 .terminal-tab-active {
-  background: #1a1a1a;
+  background: #1e1e1e;
   color: #e0e0e0;
 }
 
 .terminal-tab-active:hover {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .terminal-tab-status {
@@ -61,6 +61,23 @@
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.terminal-tab-rename-input {
+  width: 100px;
+  max-width: 120px;
+  padding: 2px 4px;
+  background: #1e1e1e;
+  border: 1px solid #0ea5e9;
+  border-radius: 2px;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.terminal-tab-rename-input:focus {
+  border-color: #38bdf8;
 }
 
 .terminal-tab-close {
@@ -112,7 +129,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -136,7 +153,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border-radius: 6px;
   overflow: hidden;
 }
@@ -154,7 +171,7 @@
 
 .terminal-content .xterm-viewport {
   scrollbar-width: thin;
-  scrollbar-color: #3a3a3a #1a1a1a;
+  scrollbar-color: #3a3a3a #1e1e1e;
 }
 
 .terminal-content .xterm-viewport::-webkit-scrollbar {
@@ -162,7 +179,7 @@
 }
 
 .terminal-content .xterm-viewport::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .terminal-content .xterm-viewport::-webkit-scrollbar-thumb {

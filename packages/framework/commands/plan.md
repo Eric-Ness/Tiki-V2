@@ -132,10 +132,29 @@ After creating a plan:
 ```
 
 2. Update `.tiki/state.json`:
+- Set `pipelineStep` to `"PLAN"`
 - Set `phase.total` to the number of phases
 - Set `phase.current` to 1
 - Set `phase.status` to `pending`
 - Keep `status` as `planning` until audit passes
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "phase": {
+        "current": 1,
+        "total": {total phases},
+        "status": "pending"
+      },
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
 </state-management>
 
 <errors>

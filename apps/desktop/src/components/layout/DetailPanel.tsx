@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import { useRef } from "react";
-import { Panel, Separator, type PanelImperativeHandle } from "react-resizable-panels";
-import { useLayoutStore } from "../../stores";
+import { Panel } from "react-resizable-panels";
 
 interface DetailPanelProps {
   children: ReactNode;
@@ -16,60 +14,16 @@ export function DetailPanel({
   minSize = 15,
   className = "",
 }: DetailPanelProps) {
-  const panelRef = useRef<PanelImperativeHandle>(null);
-  const isCollapsed = useLayoutStore((state) => state.collapsedPanels.detail);
-  const setCollapsed = useLayoutStore((state) => state.setCollapsed);
-
-  const handleToggle = () => {
-    if (isCollapsed) {
-      panelRef.current?.expand();
-    } else {
-      panelRef.current?.collapse();
-    }
-  };
-
-  const handleResize = (size: { asPercentage: number }) => {
-    const collapsed = size.asPercentage === 0;
-    if (collapsed !== isCollapsed) {
-      setCollapsed("detail", collapsed);
-    }
-  };
-
   return (
-    <>
-      <Separator className="resize-handle" />
-      {isCollapsed && (
-        <button
-          className="expand-toggle expand-toggle-detail"
-          onClick={handleToggle}
-          title="Expand detail panel"
-        >
-          «
-        </button>
-      )}
-      <Panel
-        id="detail-panel"
-        panelRef={panelRef}
-        defaultSize={defaultSize}
-        minSize={minSize}
-        collapsible
-        collapsedSize={0}
-        onResize={handleResize}
-        className={`panel detail-panel ${isCollapsed ? "collapsed" : ""} ${className}`.trim()}
-      >
-        {!isCollapsed && (
-          <button
-            className="collapse-toggle collapse-toggle-detail"
-            onClick={handleToggle}
-            title="Collapse detail panel"
-          >
-            »
-          </button>
-        )}
-        <div className="detail-content">
-          {children}
-        </div>
-      </Panel>
-    </>
+    <Panel
+      id="detail-panel"
+      defaultSize={defaultSize}
+      minSize={minSize}
+      className={`panel detail-panel ${className}`.trim()}
+    >
+      <div className="detail-content">
+        {children}
+      </div>
+    </Panel>
   );
 }

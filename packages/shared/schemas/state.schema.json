@@ -58,6 +58,11 @@
       "enum": ["pending", "executing", "completed", "failed", "skipped"],
       "description": "Status of an individual phase"
     },
+    "pipelineStep": {
+      "type": "string",
+      "enum": ["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"],
+      "description": "Pipeline step in the Tiki workflow"
+    },
     "timestamp": {
       "type": "string",
       "format": "date-time",
@@ -96,6 +101,10 @@
         },
         "status": {
           "$ref": "#/$defs/workStatus"
+        },
+        "pipelineStep": {
+          "$ref": "#/$defs/pipelineStep",
+          "description": "Current pipeline step (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP)"
         },
         "phase": {
           "type": "object",
@@ -191,6 +200,10 @@
         },
         "status": {
           "$ref": "#/$defs/workStatus"
+        },
+        "pipelineStep": {
+          "$ref": "#/$defs/pipelineStep",
+          "description": "Current pipeline step (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP)"
         },
         "phase": {
           "type": "object",

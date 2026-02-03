@@ -122,14 +122,32 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           return;
         }
 
-        // Create terminal instance
+        // Create terminal instance with VS Code dark theme colors
         const xterm = new XTerm({
           theme: {
-            background: "#1a1a1a",
-            foreground: "#e0e0e0",
-            cursor: "#e0e0e0",
-            cursorAccent: "#1a1a1a",
-            selectionBackground: "#3a3a3a",
+            background: "#1e1e1e",
+            foreground: "#cccccc",
+            cursor: "#aeafad",
+            cursorAccent: "#1e1e1e",
+            selectionBackground: "#264f78",
+            selectionForeground: "#ffffff",
+            // ANSI colors matching VS Code dark theme
+            black: "#000000",
+            red: "#cd3131",
+            green: "#0dbc79",
+            yellow: "#e5e510",
+            blue: "#2472c8",
+            magenta: "#bc3fbc",
+            cyan: "#11a8cd",
+            white: "#e5e5e5",
+            brightBlack: "#666666",
+            brightRed: "#f14c4c",
+            brightGreen: "#23d18b",
+            brightYellow: "#f5f543",
+            brightBlue: "#3b8eea",
+            brightMagenta: "#d670d6",
+            brightCyan: "#29b8db",
+            brightWhite: "#e5e5e5",
           },
           fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
           fontSize: 13,

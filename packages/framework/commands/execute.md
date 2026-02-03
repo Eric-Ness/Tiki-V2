@@ -12,6 +12,7 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
 <instructions>
   <step>Load the plan from `.tiki/plans/issue-{number}.json`</step>
   <step>Load current state from `.tiki/state.json` to find current phase</step>
+  <step>**CRITICAL: Update state.json with phase info BEFORE starting work** (see state-update-requirement below)</step>
   <step>For the current phase:
     1. Display phase details (title, files, verification criteria)
     2. Execute the phase content (the actual work)
@@ -22,6 +23,57 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
   <step>If verification passes, advance to next phase or complete</step>
   <step>If verification fails, offer recovery options</step>
 </instructions>
+
+<state-update-requirement>
+## CRITICAL: Phase State Updates
+
+**You MUST update `.tiki/state.json` BEFORE starting work on each phase.**
+
+This is not optional. The desktop app and other tooling rely on the `phase` object being kept current.
+
+**BEFORE starting each phase, update state.json with:**
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "issue": { "number": {N}, "title": "..." },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "phase": {
+        "current": {phase number, 1-indexed},
+        "total": {total phases from plan},
+        "status": "executing"
+      },
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+**AFTER completing each phase, update:**
+- Set `phase.status` to `"completed"` or `"failed"`
+- If advancing to next phase, increment `phase.current` and set `phase.status` to `"pending"`
+- If all phases complete, set work `status` to `"shipping"`
+
+**Example - Starting Phase 2 of 3:**
+```json
+"phase": {
+  "current": 2,
+  "total": 3,
+  "status": "executing"
+}
+```
+
+**Example - After completing Phase 2, ready for Phase 3:**
+```json
+"phase": {
+  "current": 3,
+  "total": 3,
+  "status": "pending"
+}
+```
+</state-update-requirement>
 
 <phase-execution>
 **Before starting a phase:**
@@ -145,6 +197,7 @@ During execution, update `.tiki/state.json`:
     "status": "executing"
   },
   "status": "executing",
+  "pipelineStep": "EXECUTE",
   "lastActivity": "{ISO timestamp}"
 }
 ```
