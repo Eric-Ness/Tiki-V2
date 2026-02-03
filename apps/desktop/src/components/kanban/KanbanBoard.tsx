@@ -1,9 +1,30 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { useIssuesStore, useKanbanStore, useTikiReleasesStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
+import { KanbanCard } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
 import './kanban.css';
+
+// Valid state transitions for drag-and-drop
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  backlog: ['planning', 'executing'],
+  planning: ['backlog', 'executing'],
+  executing: ['shipping', 'backlog'],
+  shipping: ['completed', 'executing'],
+  completed: [], // Cannot move completed items
+};
 
 // Column configuration mapping to Tiki work statuses
 const COLUMN_CONFIG = [
@@ -25,6 +46,60 @@ export function KanbanBoard() {
   const issues = useIssuesStore((s) => s.issues);
   const releaseFilter = useKanbanStore((s) => s.releaseFilter);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
+  const [activeId, setActiveId] = useState<number | null>(null);
+
+  // Configure DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  // Find which column an issue belongs to
+  const getIssueColumn = (issueNumber: number): string | null => {
+    const issue = issues.find((i) => i.number === issueNumber);
+    if (!issue) return null;
+    // For now: closed = completed, open = backlog
+    // This will be enhanced when we integrate with tikiState
+    return issue.state === 'closed' ? 'completed' : 'backlog';
+  };
+
+  // Check if a transition is valid
+  const isValidTransition = (fromColumn: string, toColumn: string): boolean => {
+    return VALID_TRANSITIONS[fromColumn]?.includes(toColumn) ?? false;
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = event.active.id as number;
+    setActiveId(id);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const issueNumber = active.id as number;
+    const targetColumn = over.id as string;
+    const sourceColumn = getIssueColumn(issueNumber);
+
+    if (!sourceColumn || sourceColumn === targetColumn) return;
+
+    if (!isValidTransition(sourceColumn, targetColumn)) {
+      // Invalid transition - card will snap back automatically
+      console.log(`Invalid transition: ${sourceColumn} → ${targetColumn}`);
+      return;
+    }
+
+    // TODO: Trigger workflow action based on target column
+    // This will be implemented in issue #39 (auto-execute) and #40 (auto-ship)
+    console.log(`Drop: issue #${issueNumber} from ${sourceColumn} to ${targetColumn}`);
+  };
+
+  // Get the issue being dragged for the overlay
+  const activeIssue = activeId ? issues.find((i) => i.number === activeId) : null;
 
   // Get all issue numbers that are assigned to any release
   const assignedIssueNumbers = useMemo(() => {
@@ -98,18 +173,30 @@ export function KanbanBoard() {
   }
 
   return (
-    <div className="kanban-board">
-      <KanbanFilters />
-      <div className="kanban-columns">
-        {columns.map((column) => (
-          <KanbanColumn
-            key={column.id}
-            id={column.id}
-            title={column.title}
-            issues={column.issues}
-          />
-        ))}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="kanban-board">
+        <KanbanFilters />
+        <div className="kanban-columns">
+          {columns.map((column) => (
+            <KanbanColumn
+              key={column.id}
+              id={column.id}
+              title={column.title}
+              issues={column.issues}
+              activeId={activeId}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+
+      <DragOverlay>
+        {activeIssue ? <KanbanCard issue={activeIssue} isDragging /> : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
