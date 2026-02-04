@@ -1,21 +1,6 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "release:v0.2.1": {
-      "type": "release",
-      "release": {
-        "version": "v0.2.1",
-        "issues": [47, 48],
-        "currentIssue": null,
-        "completedIssues": [47, 48],
-        "milestone": null
-      },
-      "status": "shipping",
-      "pipelineStep": "SHIP",
-      "createdAt": "2026-02-04T05:10:00.000Z",
-      "lastActivity": "2026-02-04T05:30:00.000Z"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
       "number": 48,
@@ -110,6 +95,12 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.2.1",
+        "issues": [47, 48],
+        "completedAt": "2026-02-04T05:35:00.000Z",
+        "tag": "v0.2.1"
+      },
       {
         "version": "v0.2.0",
         "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
