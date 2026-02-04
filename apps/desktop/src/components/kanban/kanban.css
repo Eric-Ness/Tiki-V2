@@ -207,6 +207,37 @@
   margin-bottom: 4px;
 }
 
+.kanban-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kanban-card-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  opacity: 0;
+}
+
+.kanban-card:hover .kanban-card-play {
+  opacity: 1;
+}
+
+.kanban-card-play:hover {
+  background: #22c55e;
+  color: white;
+}
+
 .kanban-card-number {
   font-size: 11px;
   color: #888;

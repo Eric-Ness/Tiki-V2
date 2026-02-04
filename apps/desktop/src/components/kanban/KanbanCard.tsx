@@ -16,15 +16,17 @@ export interface KanbanCardProps {
   isSelected?: boolean;
   isDragging?: boolean;
   isBeingDragged?: boolean;
+  onExecute?: (issueNumber: number) => void;
 }
 
-export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged }: KanbanCardProps) {
+export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, onExecute }: KanbanCardProps) {
   const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
 
   const isPaused = workItem?.status === 'paused';
   const isFailed = workItem?.status === 'failed';
   const isExecuting = workItem?.status === 'executing';
-  const isCompleted = issue.state === 'closed';
+  const isCompleted = issue.state.toLowerCase() === 'closed';
+  const canExecute = !isCompleted && !isExecuting && onExecute;
 
   // Only make non-completed cards draggable
   const { attributes, listeners, setNodeRef, isDragging: isDraggingFromHook } = useDraggable({
@@ -53,8 +55,24 @@ export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDra
     >
       <div className="kanban-card-header">
         <span className="kanban-card-number">#{issue.number}</span>
-        {isPaused && <span className="kanban-card-badge kanban-card-badge--paused">⏸</span>}
-        {isFailed && <span className="kanban-card-badge kanban-card-badge--failed">!</span>}
+        <div className="kanban-card-actions">
+          {isPaused && <span className="kanban-card-badge kanban-card-badge--paused">⏸</span>}
+          {isFailed && <span className="kanban-card-badge kanban-card-badge--failed">!</span>}
+          {canExecute && (
+            <button
+              className="kanban-card-play"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExecute(issue.number);
+              }}
+              title="Start execution"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="kanban-card-title">{issue.title}</div>

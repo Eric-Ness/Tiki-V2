@@ -10,6 +10,7 @@ export interface KanbanColumnProps {
   issues: GitHubIssue[];
   workItems?: Map<number, WorkItem>;
   activeId?: number | null;
+  onExecute?: (issueNumber: number) => void;
 }
 
 const cardVariants = {
@@ -18,7 +19,7 @@ const cardVariants = {
   exit: { opacity: 0, y: -20 },
 };
 
-export function KanbanColumn({ id, title, issues, workItems, activeId }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, issues, workItems, activeId, onExecute }: KanbanColumnProps) {
   const selectedIssue = useDetailStore((s) => s.selectedIssue);
   const { isOver, setNodeRef } = useDroppable({ id });
 
@@ -69,6 +70,7 @@ export function KanbanColumn({ id, title, issues, workItems, activeId }: KanbanC
                   workItem={workItems?.get(issue.number)}
                   isSelected={selectedIssue === issue.number}
                   isBeingDragged={activeId === issue.number}
+                  onExecute={onExecute}
                 />
               </motion.div>
             ))}

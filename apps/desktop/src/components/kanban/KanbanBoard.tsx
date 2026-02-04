@@ -256,6 +256,7 @@ export function KanbanBoard() {
               title={column.title}
               issues={column.issues}
               activeId={activeId}
+              onExecute={(issueNumber) => triggerExecution(issueNumber, column.id)}
             />
           ))}
         </div>
