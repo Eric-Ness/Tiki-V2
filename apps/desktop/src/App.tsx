@@ -193,8 +193,11 @@ function App() {
           <div className="main-content">
             <CenterTabs />
             <main className="main">
-              <section className="section terminal-section">
-                {activeView === 'terminal' ? <TerminalPane /> : <KanbanBoard />}
+              <section className={`section terminal-section ${activeView !== 'terminal' ? 'hidden' : ''}`}>
+                <TerminalPane />
+              </section>
+              <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
+                <KanbanBoard />
               </section>
             </main>
           </div>
