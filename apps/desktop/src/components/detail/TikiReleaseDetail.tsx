@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TikiRelease } from "../../stores/tikiReleasesStore";
-import { useTerminalStore, useReleaseDialogStore } from "../../stores";
+import { useTerminalStore, useReleaseDialogStore, useTikiReleasesStore, useDetailStore } from "../../stores";
 import "./DetailPanel.css";
 
 interface TikiReleaseDetailProps {
@@ -39,6 +39,8 @@ function formatRelativeTime(dateString: string): string {
 export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
   const { tabs, activeTabId } = useTerminalStore();
   const openDialog = useReleaseDialogStore((state) => state.openDialog);
+  const deleteRelease = useTikiReleasesStore((state) => state.deleteRelease);
+  const clearSelection = useDetailStore((state) => state.clearSelection);
   const badgeClass = statusBadgeStyles[release.status] || statusBadgeStyles.active;
 
   const getActiveTerminalId = (): string | null => {
@@ -69,6 +71,19 @@ export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
 
   const handleEdit = () => {
     openDialog(release);
+  };
+
+  const handleDelete = async () => {
+    const confirmed = window.confirm(`Delete release ${release.version}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await invoke("delete_tiki_release", { version: release.version });
+      deleteRelease(release.version);
+      clearSelection();
+    } catch (error) {
+      console.error("Failed to delete release:", error);
+    }
   };
 
   return (
@@ -117,6 +132,12 @@ export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
             <path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 010 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14s-3.671-.992-4.933-2.078c-1.27-1.091-2.187-2.345-2.637-3.023a1.62 1.62 0 010-1.798c.45-.678 1.367-1.932 2.637-3.023C4.33 2.992 6.019 2 8 2zm0 2c-1.416 0-2.7.72-3.733 1.608-1.006.865-1.79 1.904-2.188 2.492a.12.12 0 000 .134c.398.588 1.182 1.627 2.188 2.492C5.3 11.28 6.584 12 8 12c1.416 0 2.7-.72 3.733-1.608 1.006-.865 1.79-1.904 2.188-2.492a.12.12 0 000-.134c-.398-.588-1.182-1.627-2.188-2.492C10.7 4.72 9.416 4 8 4zm0 2a2 2 0 110 4 2 2 0 010-4z" />
           </svg>
           Review
+        </button>
+        <button className="detail-action-btn detail-action-btn-danger" onClick={handleDelete}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zm4.5 0V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75zM4.496 6.675a.75.75 0 10-1.492.15l.66 6.6A1.75 1.75 0 005.405 15h5.19a1.75 1.75 0 001.741-1.575l.66-6.6a.75.75 0 00-1.492-.15l-.66 6.6a.25.25 0 01-.249.225h-5.19a.25.25 0 01-.249-.225l-.66-6.6z" />
+          </svg>
+          Delete
         </button>
       </div>
 

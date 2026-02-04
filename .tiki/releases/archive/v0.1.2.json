@@ -1,0 +1,13 @@
+{
+  "version": "v0.1.2",
+  "status": "shipped",
+  "issues": [
+    { "number": 30, "title": "Release to detail" },
+    { "number": 31, "title": "Create Issue - Enhance error" }
+  ],
+  "milestone": null,
+  "createdAt": "2026-02-03T22:00:00.000Z",
+  "completedAt": "2026-02-03T23:10:00.000Z",
+  "shipped": true,
+  "tag": "v0.1.2"
+}

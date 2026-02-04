@@ -1,0 +1,83 @@
+{
+  "issueNumber": 32,
+  "title": "Add tab system to center panel (Terminal | Kanban)",
+  "createdAt": "2026-02-04T00:02:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Update layoutStore with activeView state",
+      "description": "Add activeView: 'terminal' | 'kanban' state to layoutStore with persistence",
+      "status": "pending",
+      "files": ["apps/desktop/src/stores/layoutStore.ts"],
+      "tasks": [
+        "Add ViewType type definition",
+        "Add activeView field to LayoutState",
+        "Add setActiveView action to LayoutActions",
+        "Update initialState with default 'terminal' view"
+      ],
+      "verification": "TypeScript compiles without errors"
+    },
+    {
+      "id": 2,
+      "title": "Create CenterTabs component",
+      "description": "Create tab bar component for switching between Terminal and Kanban views",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/layout/CenterTabs.tsx",
+        "apps/desktop/src/components/layout/CenterTabs.css"
+      ],
+      "tasks": [
+        "Create CenterTabs.tsx with Terminal and Kanban tabs",
+        "Style to match existing dark theme (use Terminal.css patterns)",
+        "Connect to layoutStore for activeView state",
+        "Add click handlers to switch views"
+      ],
+      "verification": "Component exports correctly"
+    },
+    {
+      "id": 3,
+      "title": "Create KanbanBoard placeholder",
+      "description": "Create placeholder component for Kanban view",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/kanban/kanban.css",
+        "apps/desktop/src/components/kanban/index.ts"
+      ],
+      "tasks": [
+        "Create kanban directory",
+        "Create KanbanBoard.tsx with placeholder content",
+        "Create basic styling",
+        "Create index.ts exports"
+      ],
+      "verification": "Component renders placeholder text"
+    },
+    {
+      "id": 4,
+      "title": "Integrate tab system in App.tsx",
+      "description": "Update App.tsx to use CenterTabs and conditionally render views",
+      "status": "pending",
+      "files": ["apps/desktop/src/App.tsx"],
+      "tasks": [
+        "Import CenterTabs and KanbanBoard components",
+        "Get activeView from layoutStore",
+        "Add CenterTabs above main content",
+        "Conditionally render TerminalPane or KanbanBoard based on activeView"
+      ],
+      "verification": "Tab switching works in the UI"
+    },
+    {
+      "id": 5,
+      "title": "Add keyboard shortcuts (optional)",
+      "description": "Add Ctrl+1 and Ctrl+2 keyboard shortcuts for view switching",
+      "status": "pending",
+      "files": ["apps/desktop/src/App.tsx"],
+      "tasks": [
+        "Add useEffect for keyboard event listener",
+        "Handle Ctrl+1 to switch to terminal",
+        "Handle Ctrl+2 to switch to kanban"
+      ],
+      "verification": "Keyboard shortcuts work"
+    }
+  ]
+}

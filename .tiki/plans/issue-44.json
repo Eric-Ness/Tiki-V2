@@ -1,0 +1,83 @@
+{
+  "issueNumber": 44,
+  "title": "GitHub Integration Status Indicator",
+  "createdAt": "2026-02-04T02:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Add backend command for repository info",
+      "description": "Create a new Tauri command get_github_repo_info() that retrieves the current repository's owner and repo name using gh CLI. This builds on the existing check_gh_auth() pattern in github.rs.",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "tasks": [
+        "Create GitHubRepoInfo struct with owner and repo fields",
+        "Implement get_github_repo_info() command using 'gh repo view --json owner,name'",
+        "Handle error cases: gh not installed, not authenticated, not a git repo",
+        "Register the new command in lib.rs invoke_handler"
+      ],
+      "verification": "Run 'pnpm tauri:dev' and test invoke('get_github_repo_info') from browser console returns owner/repo or appropriate error"
+    },
+    {
+      "id": 2,
+      "title": "Create GitHub status store",
+      "description": "Create a new Zustand store (githubStatusStore.ts) to manage GitHub connection state. The store will track authentication status, repository info, and connection state with loading/error handling.",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/stores/githubStatusStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ],
+      "tasks": [
+        "Define GitHubStatus interface with connectionStatus, isAuthenticated, repoInfo, error fields",
+        "Define ConnectionStatus type: 'connected' | 'disconnected' | 'checking' | 'error'",
+        "Create useGithubStatusStore with state and actions",
+        "Add checkStatus action that calls check_gh_auth() and get_github_repo_info()",
+        "Export from stores/index.ts"
+      ],
+      "verification": "TypeScript compiles without errors, store can be imported"
+    },
+    {
+      "id": 3,
+      "title": "Create GitHubStatus UI component",
+      "description": "Create a new component GitHubStatus.tsx that displays the connection status indicator. Shows colored dot (green/red/spinner), repo info, and authentication state.",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/components/status/GitHubStatus.tsx",
+        "apps/desktop/src/components/status/GitHubStatus.css",
+        "apps/desktop/src/components/status/index.ts"
+      ],
+      "tasks": [
+        "Create status directory and component files",
+        "Build GitHubStatus component showing: status dot, owner/repo text, auth state",
+        "Style with dark theme (match existing footer/header patterns)",
+        "Handle all states: checking (spinner), connected (green), disconnected (red), error (red + message)",
+        "Handle 'no project selected' state gracefully",
+        "Handle 'gh CLI not installed' state with helpful message",
+        "Export from index.ts"
+      ],
+      "verification": "Component renders correctly in isolation with mock data"
+    },
+    {
+      "id": 4,
+      "title": "Integrate status component and add polling",
+      "description": "Integrate GitHubStatus component into App.tsx footer area. Add startup check and periodic polling (every 5 minutes) to keep status current.",
+      "status": "pending",
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/App.css"
+      ],
+      "tasks": [
+        "Import GitHubStatus component and useGithubStatusStore",
+        "Add GitHubStatus to footer section (left of tikiPath)",
+        "Call checkStatus() on component mount (startup check)",
+        "Set up 5-minute interval for periodic status checks",
+        "Clean up interval on unmount",
+        "Re-check status when activeProject changes",
+        "Style footer to accommodate new status indicator"
+      ],
+      "verification": "Status indicator appears in footer, updates on startup and every 5 minutes, responds to project changes"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "version": "v0.2.0",
+  "title": "Kanban Board for Visual Workflow Management",
+  "description": "Adds a visual Kanban board to manage GitHub issues through the Tiki workflow pipeline with drag-and-drop, automation triggers, and state synchronization.",
+  "createdAt": "2026-02-03T23:50:00.000Z",
+  "status": "pending",
+  "issues": [
+    {
+      "number": 32,
+      "title": "Add tab system to center panel (Terminal | Kanban)",
+      "status": "pending",
+      "order": 1
+    },
+    {
+      "number": 33,
+      "title": "Create Kanban store for board state management",
+      "status": "pending",
+      "order": 2
+    },
+    {
+      "number": 34,
+      "title": "Create KanbanBoard container component",
+      "status": "pending",
+      "order": 3
+    },
+    {
+      "number": 35,
+      "title": "Create KanbanColumn component",
+      "status": "pending",
+      "order": 4
+    },
+    {
+      "number": 37,
+      "title": "Create KanbanCard component with phase progress",
+      "status": "pending",
+      "order": 5
+    },
+    {
+      "number": 38,
+      "title": "Implement drag-and-drop for Kanban cards",
+      "status": "pending",
+      "order": 6
+    },
+    {
+      "number": 39,
+      "title": "Auto-trigger execution when card dropped in Executing column",
+      "status": "pending",
+      "order": 7
+    },
+    {
+      "number": 40,
+      "title": "Auto-trigger ship when card dropped in Shipping column",
+      "status": "pending",
+      "order": 8
+    },
+    {
+      "number": 41,
+      "title": "Add release filter dropdown to Kanban board",
+      "status": "pending",
+      "order": 9
+    },
+    {
+      "number": 42,
+      "title": "Auto-animate cards between columns when Tiki state changes",
+      "status": "pending",
+      "order": 10
+    },
+    {
+      "number": 43,
+      "title": "Epic: Kanban Board for Visual Workflow Management",
+      "status": "pending",
+      "order": 11
+    }
+  ]
+}

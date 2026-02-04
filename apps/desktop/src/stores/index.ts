@@ -45,3 +45,5 @@ export {
 export { useReleaseDialogStore } from './releaseDialogStore';
 
 export { useKanbanStore } from './kanbanStore';
+
+export { useTikiStateStore } from './tikiStateStore';

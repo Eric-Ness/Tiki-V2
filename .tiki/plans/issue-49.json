@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 49,
+  "issueTitle": "Phase Current/Total + Data Consolidation",
+  "createdAt": "2026-02-04T03:30:00.000Z",
+  "review": {
+    "summary": "Enhance phase progress display across UI and consolidate GitHub issue data into state.json as single source of truth",
+    "requirements": [
+      "Wire phase data through KanbanBoard to KanbanCard",
+      "Add phase progress indicator to IssueCard in sidebar",
+      "Add phase progress section to IssueDetail panel",
+      "Store full GitHub metadata (labels with color, timestamps) in state.json",
+      "Simplify component data flow to read from single source"
+    ],
+    "successCriteria": [
+      "SC1: KanbanCard displays 'Phase X/Y' progress during execution",
+      "SC2: IssueCard shows compact phase indicator for active issues",
+      "SC3: IssueDetail shows full phase progress with individual phase status",
+      "SC4: Labels stored with full objects (id, name, color) in state.json",
+      "SC5: Components can read issue data from tikiStateStore alone",
+      "SC6: GitHub timestamps (createdAt, updatedAt) available in state"
+    ]
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Wire phase data to KanbanCard",
+      "status": "completed",
+      "tasks": [
+        "Create workItemsMap in KanbanBoard from activeWork state",
+        "Map WorkContext.phase to WorkItem shape expected by KanbanCard",
+        "Pass workItemsMap to KanbanColumn component",
+        "Update KanbanColumn to pass workItem to KanbanCard",
+        "Verify phase progress displays on executing cards"
+      ],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/kanban/KanbanColumn.tsx"
+      ],
+      "verification": "Run pnpm tauri:dev and verify KanbanCard shows 'Phase X/Y' for issues in executing state"
+    },
+    {
+      "id": "phase-2",
+      "name": "Add phase indicator to IssueCard",
+      "status": "completed",
+      "tasks": [
+        "Pass activeWork from IssuesSection or via store to IssueCard",
+        "Add optional workContext prop to IssueCard component",
+        "Display compact phase badge (e.g., '2/3') when issue has active work",
+        "Style phase indicator to match existing card design"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/sidebar/IssueCard.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.css"
+      ],
+      "verification": "Verify IssueCard shows phase progress for issues in activeWork"
+    },
+    {
+      "id": "phase-3",
+      "name": "Add phase progress to IssueDetail",
+      "status": "completed",
+      "tasks": [
+        "Pass work context to IssueDetail from App.tsx",
+        "Add phase progress section similar to WorkProgressCard",
+        "Display individual phase status (pending, executing, completed, failed)",
+        "Show phase names if available from plan data"
+      ],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/detail/DetailPanel.css"
+      ],
+      "verification": "Verify IssueDetail shows full phase progress when issue has active work"
+    },
+    {
+      "id": "phase-4",
+      "name": "Consolidate GitHub data in state.json",
+      "status": "completed",
+      "tasks": [
+        "Extend IssueRef type to include full label objects (id, name, color, description)",
+        "Add createdAt and updatedAt fields to IssueRef",
+        "Update Rust state.rs to match new IssueRef structure",
+        "Update framework get.md to store full GitHub metadata when fetching",
+        "Add schema version migration logic for backward compatibility",
+        "Update components to prefer reading from tikiStateStore"
+      ],
+      "files": [
+        "packages/shared/src/types/state.ts",
+        "packages/shared/schemas/state.schema.json",
+        "apps/desktop/src-tauri/src/state.rs",
+        "packages/framework/commands/get.md"
+      ],
+      "verification": "Verify state.json contains full label objects and timestamps after /tiki:get"
+    }
+  ]
+}

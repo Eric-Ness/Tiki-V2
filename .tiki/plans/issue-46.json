@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 46,
+  "issueTitle": "Delete Issues",
+  "createdAt": "2026-02-04T03:00:00.000Z",
+  "review": {
+    "summary": "Add ability to close GitHub issues directly from the Tiki desktop app detail panel",
+    "requirements": [
+      "Backend Rust command to close issues via gh CLI",
+      "Close Issue button in detail panel UI",
+      "Confirmation before closing",
+      "UI refresh after closing",
+      "Disabled state for already-closed issues"
+    ],
+    "successCriteria": [
+      "close_github_issue Tauri command exists and works",
+      "Close Issue button appears in IssueDetail panel",
+      "Button is disabled for closed issues",
+      "Confirmation dialog appears before closing",
+      "Issue list refreshes after closing to reflect new state"
+    ]
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Add Rust backend command for closing issues",
+      "status": "completed",
+      "tasks": [
+        "Add close_github_issue command in github.rs",
+        "Use gh issue close CLI command",
+        "Handle auth and repo validation errors",
+        "Register command in main.rs"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/main.rs"
+      ],
+      "verification": "Build the Rust backend with cargo build to verify no compilation errors"
+    },
+    {
+      "id": "phase-2",
+      "name": "Add Close Issue button to detail panel",
+      "status": "completed",
+      "tasks": [
+        "Add close button with danger styling to IssueDetail component",
+        "Add state for loading and confirmation",
+        "Implement handleCloseIssue function calling Tauri command",
+        "Disable button for already-closed issues",
+        "Show inline confirmation before closing"
+      ],
+      "files": [
+        "apps/desktop/src/components/detail/IssueDetail.tsx"
+      ],
+      "verification": "Run pnpm lint and pnpm typecheck to verify TypeScript compiles correctly"
+    },
+    {
+      "id": "phase-3",
+      "name": "Add issue refresh callback integration",
+      "status": "completed",
+      "tasks": [
+        "Pass refreshIssues callback from IssuesSection to IssueDetail via props/context",
+        "Call refresh after successful close to update sidebar and kanban",
+        "Ensure closed issue shows correct state in all views"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/App.tsx"
+      ],
+      "verification": "Run pnpm tauri:dev and manually test closing an issue"
+    }
+  ]
+}
