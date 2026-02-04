@@ -26,6 +26,7 @@ interface IssuesState {
   isLoading: boolean;
   error: string | null;
   lastFetched: string | null;
+  refetchCounter: number;
 }
 
 interface IssuesActions {
@@ -35,6 +36,7 @@ interface IssuesActions {
   setError: (error: string | null) => void;
   clearError: () => void;
   setLastFetched: (timestamp: string) => void;
+  triggerRefetch: () => void;
 }
 
 type IssuesStore = IssuesState & IssuesActions;
@@ -45,6 +47,7 @@ const initialState: IssuesState = {
   isLoading: false,
   error: null,
   lastFetched: null,
+  refetchCounter: 0,
 };
 
 export const useIssuesStore = create<IssuesStore>()((set) => ({
@@ -61,4 +64,6 @@ export const useIssuesStore = create<IssuesStore>()((set) => ({
   clearError: () => set({ error: null }),
 
   setLastFetched: (lastFetched) => set({ lastFetched }),
+
+  triggerRefetch: () => set((state) => ({ refetchCounter: state.refetchCounter + 1 })),
 }));

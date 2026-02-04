@@ -31,6 +31,13 @@ pub struct GitHubIssue {
 /// Returns Ok(true) if installed, Ok(false) if not installed
 #[tauri::command]
 pub fn check_claude_cli() -> Result<bool, String> {
+    // On Windows, we need to run through cmd.exe to find .cmd files in PATH
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd")
+        .args(["/C", "claude", "--version"])
+        .output();
+
+    #[cfg(not(target_os = "windows"))]
     let output = Command::new("claude")
         .args(["--version"])
         .output();
@@ -375,6 +382,20 @@ pub fn enhance_issue_description(
 
     // Use the claude CLI to enhance the description
     // Note: -p flag runs in headless mode with the given prompt
+    // On Windows, we need to run through cmd.exe to find .cmd files in PATH
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd")
+        .args(["/C", "claude", "-p", &prompt])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "Claude CLI not found. Please install it from https://github.com/anthropics/claude-code and ensure it's in your PATH.".to_string()
+            } else {
+                format!("Failed to run Claude CLI: {}. Make sure Claude CLI is properly installed and configured.", e)
+            }
+        })?;
+
+    #[cfg(not(target_os = "windows"))]
     let output = Command::new("claude")
         .args(["-p", &prompt])
         .output()
@@ -461,6 +482,46 @@ pub fn list_git_branches(project_path: Option<String>) -> Result<Vec<String>, St
         .collect();
 
     Ok(branches)
+}
+
+/// Close a GitHub issue
+/// - number: The issue number to close
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
+#[tauri::command]
+pub fn close_github_issue(number: u32, project_path: Option<String>) -> Result<(), String> {
+    let mut cmd = Command::new("gh");
+    cmd.args(["issue", "close", &number.to_string()]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("Failed to close issue: {}", stderr));
+    }
+
+    Ok(())
 }
 
 /// Edit an existing GitHub issue

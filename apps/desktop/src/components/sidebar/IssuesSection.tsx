@@ -20,14 +20,22 @@ export function IssuesSection() {
   const setError = useIssuesStore((state) => state.setError);
   const clearError = useIssuesStore((state) => state.clearError);
   const setLastFetched = useIssuesStore((state) => state.setLastFetched);
+  const refetchCounter = useIssuesStore((state) => state.refetchCounter);
 
   const activeProject = useProjectsStore((state) =>
     state.projects.find((p) => p.id === state.activeProjectId)
   );
 
+  // Debug: track activeProject changes
+  useEffect(() => {
+    console.log('[IssuesSection] activeProject changed:', activeProject?.name ?? 'NONE', activeProject?.id ?? 'no-id');
+  }, [activeProject]);
+
   const fetchIssues = useCallback(async () => {
+    console.log('[IssuesSection] fetchIssues called, activeProject:', activeProject?.name ?? 'NONE');
     // Don't fetch if no project is selected
     if (!activeProject) {
+      console.log('[IssuesSection] No active project - clearing issues');
       setIssues([]);
       clearError();
       setLoading(false);
@@ -48,12 +56,14 @@ export function IssuesSection() {
       }
 
       // Fetch issues with current filter and project path
+      console.log('[IssuesSection] Fetching issues for project:', activeProject.path);
       const fetchedIssues = await invoke<GitHubIssue[]>("fetch_github_issues", {
         state: filter,
         limit: 30,
         projectPath: activeProject.path,
       });
 
+      console.log('[IssuesSection] Fetched', fetchedIssues.length, 'issues:', fetchedIssues.map(i => i.number));
       setIssues(fetchedIssues);
       setLastFetched(new Date().toISOString());
     } catch (err) {
@@ -63,7 +73,7 @@ export function IssuesSection() {
     } finally {
       setLoading(false);
     }
-  }, [filter, activeProject, setIssues, setLoading, setError, clearError, setLastFetched]);
+  }, [filter, activeProject, refetchCounter, setIssues, setLoading, setError, clearError, setLastFetched]);
 
   // Fetch issues on mount and when filter changes
   useEffect(() => {

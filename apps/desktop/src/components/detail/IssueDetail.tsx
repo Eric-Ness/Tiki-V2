@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
+import { useProjectsStore, useIssuesStore } from "../../stores";
 import "./DetailPanel.css";
 
 interface IssueDetailProps {
@@ -35,11 +38,46 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export function IssueDetail({ issue }: IssueDetailProps) {
+  const [isClosing, setIsClosing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const activeProject = useProjectsStore((state) => state.activeProject);
+  const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
+
   const normalizedState = issue.state.toLowerCase();
   const badgeClass = stateBadgeStyles[normalizedState] || stateBadgeStyles.open;
+  const isClosed = normalizedState === "closed";
 
   const handleOpenInGitHub = () => {
     window.open(issue.url, "_blank");
+  };
+
+  const handleCloseIssue = async () => {
+    if (!showConfirm) {
+      setShowConfirm(true);
+      setError(null);
+      return;
+    }
+
+    setIsClosing(true);
+    setError(null);
+    try {
+      await invoke("close_github_issue", {
+        number: issue.number,
+        projectPath: activeProject?.path,
+      });
+      setShowConfirm(false);
+      triggerRefetch();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
+  const handleCancelClose = () => {
+    setShowConfirm(false);
+    setError(null);
   };
 
   return (
@@ -61,7 +99,45 @@ export function IssueDetail({ issue }: IssueDetailProps) {
           </svg>
           Open in GitHub
         </button>
+        {!isClosed && (
+          <>
+            {showConfirm ? (
+              <>
+                <button
+                  className="detail-action-btn detail-action-btn-danger"
+                  onClick={handleCloseIssue}
+                  disabled={isClosing}
+                >
+                  {isClosing ? "Closing..." : "Confirm Close"}
+                </button>
+                <button
+                  className="detail-action-btn"
+                  onClick={handleCancelClose}
+                  disabled={isClosing}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                className="detail-action-btn detail-action-btn-danger"
+                onClick={handleCloseIssue}
+                title="Close this issue on GitHub"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z" />
+                </svg>
+                Close Issue
+              </button>
+            )}
+          </>
+        )}
       </div>
+      {error && (
+        <div className="detail-error" style={{ color: "#ef4444", fontSize: "12px", padding: "8px 0" }}>
+          {error}
+        </div>
+      )}
 
       {issue.labels.length > 0 && (
         <div className="detail-section">
