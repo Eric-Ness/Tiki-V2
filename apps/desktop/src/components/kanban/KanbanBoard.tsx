@@ -21,7 +21,8 @@ import './kanban.css';
 // Valid state transitions for drag-and-drop
 const VALID_TRANSITIONS: Record<string, string[]> = {
   backlog: ['planning', 'executing'],
-  planning: ['backlog', 'executing'],
+  planning: ['backlog', 'review', 'executing'],
+  review: ['planning', 'executing'],
   executing: ['shipping', 'backlog'],
   shipping: ['completed', 'executing'],
   completed: [], // Cannot move completed items
@@ -31,6 +32,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 const COLUMN_CONFIG = [
   { id: 'backlog', title: 'Backlog', statuses: ['pending'] },
   { id: 'planning', title: 'Planning', statuses: ['planning'] },
+  { id: 'review', title: 'Review', statuses: [] },
   { id: 'executing', title: 'Executing', statuses: ['executing'] },
   { id: 'shipping', title: 'Shipping', statuses: ['shipping'] },
   { id: 'completed', title: 'Completed', statuses: ['completed'] },
@@ -148,8 +150,12 @@ export function KanbanBoard() {
     setShipConfirmation(null);
   }, []);
 
-  // Map Tiki work status to column ID
-  const statusToColumn = (status: string): string => {
+  // Map Tiki work status to column ID, using pipelineStep to distinguish review
+  const statusToColumn = (status: string, pipelineStep?: string): string => {
+    // Issues in planning status with REVIEW pipeline step go to review column
+    if (status === 'planning' && pipelineStep === 'REVIEW') {
+      return 'review';
+    }
     switch (status) {
       case 'planning':
         return 'planning';
@@ -176,7 +182,7 @@ export function KanbanBoard() {
     const workKey = `issue:${issueNumber}`;
     const work = activeWork[workKey];
     if (work && work.type === 'issue') {
-      return statusToColumn(work.status);
+      return statusToColumn(work.status, (work as { pipelineStep?: string }).pipelineStep);
     }
 
     // Fall back to GitHub state
@@ -289,7 +295,7 @@ export function KanbanBoard() {
         const workKey = `issue:${issue.number}`;
         const work = activeWork[workKey];
         if (work && work.type === 'issue') {
-          const issueColumn = statusToColumn(work.status);
+          const issueColumn = statusToColumn(work.status, (work as { pipelineStep?: string }).pipelineStep);
           return issueColumn === col.id;
         }
 

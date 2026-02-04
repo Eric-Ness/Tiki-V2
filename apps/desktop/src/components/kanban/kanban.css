@@ -145,6 +145,10 @@
   border-left: 3px solid #3b82f6;
 }
 
+.kanban-column--review .kanban-column-header {
+  border-left: 3px solid #06b6d4;
+}
+
 .kanban-column--executing .kanban-column-header {
   border-left: 3px solid #f59e0b;
 }
