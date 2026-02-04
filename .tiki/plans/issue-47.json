@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 47,
+  "issueTitle": "Card Info - Remove timestamps from cards",
+  "createdAt": "2026-02-04T05:12:00.000Z",
+  "review": {
+    "summary": "Remove time-related text (created X ago, updated X ago, published X ago) from sidebar cards and detail panels to make them more compact",
+    "requirements": [
+      "Remove 'Updated X ago' from IssueCard",
+      "Remove 'Published X ago' from ReleaseCard",
+      "Remove Timeline section from IssueDetail",
+      "Remove Published section from ReleaseDetail",
+      "Remove Details (Created/Updated) section from TikiReleaseDetail",
+      "Remove unused formatRelativeTime functions",
+      "Remove orphaned CSS classes"
+    ],
+    "successCriteria": [
+      "SC1: IssueCard no longer shows 'Updated X ago'",
+      "SC2: ReleaseCard no longer shows 'Published X ago'",
+      "SC3: IssueDetail no longer shows Timeline section",
+      "SC4: ReleaseDetail no longer shows Published section",
+      "SC5: TikiReleaseDetail no longer shows Details section with timestamps",
+      "SC6: No unused formatRelativeTime functions remain",
+      "SC7: Build and typecheck pass"
+    ]
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Remove timestamps from all components",
+      "status": "pending",
+      "tasks": [
+        "Remove formatRelativeTime and meta section from IssueCard.tsx",
+        "Remove .issue-card-meta and .issue-card-updated from IssueCard.css",
+        "Remove formatRelativeTime and meta section from ReleaseCard.tsx",
+        "Remove .release-card-meta and .release-card-date from ReleaseCard.css",
+        "Remove formatRelativeTime and Timeline section from IssueDetail.tsx",
+        "Remove formatRelativeTime and Published section from ReleaseDetail.tsx",
+        "Remove formatRelativeTime and Details section from TikiReleaseDetail.tsx",
+        "Remove .detail-meta CSS classes from DetailPanel.css if no longer used",
+        "Verify typecheck passes"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssueCard.tsx",
+        "apps/desktop/src/components/sidebar/IssueCard.css",
+        "apps/desktop/src/components/sidebar/ReleaseCard.tsx",
+        "apps/desktop/src/components/sidebar/ReleaseCard.css",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/detail/ReleaseDetail.tsx",
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx",
+        "apps/desktop/src/components/detail/DetailPanel.css"
+      ],
+      "verification": "pnpm typecheck passes and no formatRelativeTime references remain"
+    }
+  ]
+}

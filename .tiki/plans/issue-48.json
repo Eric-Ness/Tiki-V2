@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "issueNumber": 48,
+  "issueTitle": "Add Review Column To Kanban",
+  "createdAt": "2026-02-04T05:25:00.000Z",
+  "review": {
+    "summary": "Add a Review column to the Kanban board so issues in the REVIEW pipeline step are displayed in their own column",
+    "requirements": [
+      "Add a 'Review' column between 'Planning' and 'Executing'",
+      "Use pipelineStep field to place issues with pipelineStep=REVIEW into the review column",
+      "Update statusToColumn to check pipelineStep",
+      "Add valid drag-and-drop transitions for the review column",
+      "Add CSS styling for the review column"
+    ],
+    "successCriteria": [
+      "SC1: Review column appears in Kanban between Planning and Executing",
+      "SC2: Issues with pipelineStep=REVIEW appear in the Review column",
+      "SC3: Drag-and-drop transitions work to/from Review column",
+      "SC4: Review column has distinct styling",
+      "SC5: Build and typecheck pass"
+    ]
+  },
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Add Review column to Kanban board",
+      "status": "pending",
+      "tasks": [
+        "Add 'review' column to COLUMN_CONFIG in KanbanBoard.tsx",
+        "Update statusToColumn to handle pipelineStep-based review placement",
+        "Update VALID_TRANSITIONS for review column",
+        "Update issue assignment logic to pass pipelineStep to statusToColumn",
+        "Add CSS styling for .kanban-column--review",
+        "Verify typecheck passes"
+      ],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/kanban/kanban.css"
+      ],
+      "verification": "pnpm typecheck passes, review column visible in Kanban"
+    }
+  ]
+}

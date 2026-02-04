@@ -1,93 +1,58 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:49": {
-      "type": "issue",
-      "issue": {
-        "number": 49,
-        "title": "Phase Current/Total",
-        "body": "Consolidate all issue data into .tiki/state.json and enhance phase progress display",
-        "state": "OPEN",
-        "labels": ["bug", "enhancement"]
-      },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "phase": {
-        "current": 4,
-        "total": 4,
-        "status": "completed"
-      },
-      "createdAt": "2026-02-04T03:30:00.000Z",
-      "lastActivity": "2026-02-04T04:00:00.000Z"
-    },
-    "issue:46": {
-      "type": "issue",
-      "issue": {
-        "number": 46,
-        "title": "Delete Issues",
-        "body": "I would also like the ability to delete a GitHub issue, or at least auto-close it. That's probably better than that. What should happen is the ability to close out the ticket immediately.",
-        "state": "CLOSED",
-        "labels": ["enhancement"]
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "yolo": true,
-      "createdAt": "2026-02-04T03:00:00.000Z",
-      "lastActivity": "2026-02-04T03:15:00.000Z",
-      "commit": "735fed7"
-    },
-    "issue:44": {
-      "type": "issue",
-      "issue": {
-        "number": 44,
-        "title": "Test 3",
-        "body": "The desktop app needs a GitHub integration status indicator showing whether the app is properly connected to GitHub and can access the configured repository.\n\n**Current behavior:** Users have no visibility into whether GitHub authentication is working or if the repository is accessible. Issues only appear (or fail to appear) when explicitly fetched.\n\n**Desired behavior:** Display a status indicator in the UI that shows:\n- Connection status (connected/disconnected/error)\n- Currently configured repository (owner/repo)\n- Authentication state (authenticated/unauthenticated)\n\n**Implementation notes:**\n- Add a status component to the sidebar or header area\n- Use the existing `gh` CLI integration to check authentication status\n- Poll or check status on app startup and periodically thereafter\n- Show actionable error messages when connection fails (e.g., \"Run `gh auth login` to authenticate\")",
-        "state": "OPEN",
-        "labels": ["bug"]
-      },
-      "status": "planning",
-      "pipelineStep": "GET",
-      "yolo": true,
-      "createdAt": "2026-02-04T02:00:00.000Z",
-      "lastActivity": "2026-02-04T02:00:00.000Z"
-    },
-    "issue:26": {
-      "type": "issue",
-      "issue": {
-        "number": 26,
-        "title": "test issue",
-        "body": "test issue can you just do it with two phases - this is just for testing.",
-        "state": "OPEN",
-        "labels": ["bug"]
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "yolo": true,
-      "createdAt": "2026-02-04T01:00:00.000Z",
-      "lastActivity": "2026-02-04T01:00:00.000Z"
-    },
-    "release:v0.2.0": {
+    "release:v0.2.1": {
       "type": "release",
       "release": {
-        "version": "v0.2.0",
-        "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
+        "version": "v0.2.1",
+        "issues": [47, 48],
         "currentIssue": null,
-        "completedIssues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
+        "completedIssues": [47, 48],
         "milestone": null
       },
-      "status": "completed",
+      "status": "shipping",
       "pipelineStep": "SHIP",
-      "createdAt": "2026-02-03T23:55:00.000Z",
-      "lastActivity": "2026-02-04T00:10:00.000Z"
+      "createdAt": "2026-02-04T05:10:00.000Z",
+      "lastActivity": "2026-02-04T05:30:00.000Z"
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 41,
-      "title": "Add release filter dropdown to Kanban board",
-      "completedAt": "2026-02-04T00:30:00.000Z"
+      "number": 48,
+      "title": "Add Review Column To Kanban",
+      "completedAt": "2026-02-04T05:30:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 48,
+        "title": "Add Review Column To Kanban",
+        "completedAt": "2026-02-04T05:30:00.000Z"
+      },
+      {
+        "number": 47,
+        "title": "Card Info",
+        "completedAt": "2026-02-04T05:20:00.000Z"
+      },
+      {
+        "number": 44,
+        "title": "Test 3",
+        "completedAt": "2026-02-04T05:00:00.000Z"
+      },
+      {
+        "number": 49,
+        "title": "Phase Current/Total",
+        "completedAt": "2026-02-04T04:30:00.000Z"
+      },
+      {
+        "number": 46,
+        "title": "Delete Issues",
+        "completedAt": "2026-02-04T03:15:00.000Z"
+      },
+      {
+        "number": 26,
+        "title": "test issue",
+        "completedAt": "2026-02-04T01:00:00.000Z"
+      },
       {
         "number": 41,
         "title": "Add release filter dropdown to Kanban board",
@@ -142,24 +107,14 @@
         "number": 25,
         "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
         "completedAt": "2026-02-03T12:30:00.000Z"
-      },
-      {
-        "number": 17,
-        "title": "Add/Edit New Github Issues",
-        "completedAt": "2026-02-02T13:05:00.000Z"
-      },
-      {
-        "number": 16,
-        "title": "feat(desktop): Track terminal busy/idle status",
-        "completedAt": "2026-02-03T02:15:00.000Z"
-      },
-      {
-        "number": 15,
-        "title": "feat(desktop): Add terminal split panes",
-        "completedAt": "2026-02-03T02:05:00.000Z"
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.2.0",
+        "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
+        "completedAt": "2026-02-04T00:10:00.000Z"
+      },
       {
         "version": "v0.1.2",
         "issues": [30, 31],

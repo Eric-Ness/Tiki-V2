@@ -1,0 +1,9 @@
+{
+  "version": "v0.2.1",
+  "status": "active",
+  "issues": [
+    { "number": 47, "title": "Card Info" },
+    { "number": 48, "title": "Add Review Column To Kanban" }
+  ],
+  "createdAt": "2026-02-04T05:10:00.000Z"
+}
