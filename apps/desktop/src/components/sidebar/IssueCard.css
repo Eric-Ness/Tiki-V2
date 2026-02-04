@@ -131,15 +131,3 @@
   border-radius: 10px;
   white-space: nowrap;
 }
-
-.issue-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.issue-card-updated {
-  font-size: 11px;
-  color: var(--text-tertiary, #6b6b6b);
-}

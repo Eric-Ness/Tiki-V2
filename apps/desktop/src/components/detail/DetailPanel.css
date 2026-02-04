@@ -173,29 +173,6 @@
   font-weight: 500;
 }
 
-/* Meta info */
-.detail-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.detail-meta-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.detail-meta-label {
-  color: rgba(255, 255, 255, 0.5);
-  min-width: 60px;
-}
-
-.detail-meta-value {
-  color: rgba(255, 255, 255, 0.8);
-}
-
 /* Body/Description */
 .detail-body-section {
   flex: 1;

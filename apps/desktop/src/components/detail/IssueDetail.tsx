@@ -33,21 +33,6 @@ function getContrastColor(hexColor: string): string {
   return luminance > 0.5 ? "#000000" : "#ffffff";
 }
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 30) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
-
 export function IssueDetail({ issue, work }: IssueDetailProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -206,24 +191,6 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           </div>
         </div>
       )}
-
-      <div className="detail-section">
-        <h3 className="detail-section-title">Timeline</h3>
-        <div className="detail-meta">
-          <div className="detail-meta-item">
-            <span className="detail-meta-label">Created</span>
-            <span className="detail-meta-value">
-              {formatRelativeTime(issue.createdAt)}
-            </span>
-          </div>
-          <div className="detail-meta-item">
-            <span className="detail-meta-label">Updated</span>
-            <span className="detail-meta-value">
-              {formatRelativeTime(issue.updatedAt)}
-            </span>
-          </div>
-        </div>
-      </div>
 
       {issue.body && (
         <div className="detail-section detail-body-section">

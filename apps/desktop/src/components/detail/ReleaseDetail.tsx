@@ -11,21 +11,6 @@ const statusBadgeStyles: Record<string, string> = {
   prerelease: "release-status-prerelease",
 };
 
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 30) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
-
 function getReleaseStatus(release: GitHubRelease): string {
   if (release.isDraft) return "draft";
   if (release.isPrerelease) return "prerelease";
@@ -85,18 +70,6 @@ export function ReleaseDetail({ release }: ReleaseDetailProps) {
         </div>
       )}
 
-      {release.publishedAt && (
-        <div className="detail-section">
-          <h3 className="detail-section-title">Published</h3>
-          <div className="detail-meta">
-            <div className="detail-meta-item">
-              <span className="detail-meta-value">
-                {formatRelativeTime(release.publishedAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
