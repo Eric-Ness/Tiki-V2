@@ -4,8 +4,19 @@ import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore } from "../../stores";
 import "./DetailPanel.css";
 
+interface WorkContext {
+  status: string;
+  pipelineStep?: string;
+  phase?: {
+    current?: number;
+    total?: number;
+    status?: string;
+  };
+}
+
 interface IssueDetailProps {
   issue: GitHubIssue;
+  work?: WorkContext | null;
 }
 
 const stateBadgeStyles: Record<string, string> = {
@@ -37,7 +48,7 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-export function IssueDetail({ issue }: IssueDetailProps) {
+export function IssueDetail({ issue, work }: IssueDetailProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +167,42 @@ export function IssueDetail({ issue }: IssueDetailProps) {
                 {label.name}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {work && (
+        <div className="detail-section">
+          <h3 className="detail-section-title">Workflow Progress</h3>
+          <div className="detail-workflow">
+            <div className="detail-workflow-status">
+              <span className="detail-workflow-label">Status</span>
+              <span className={`detail-workflow-badge detail-workflow-badge--${work.status}`}>
+                {work.status}
+              </span>
+            </div>
+            {work.pipelineStep && (
+              <div className="detail-workflow-status">
+                <span className="detail-workflow-label">Step</span>
+                <span className="detail-workflow-value">{work.pipelineStep}</span>
+              </div>
+            )}
+            {work.phase && work.phase.current && work.phase.total && (
+              <div className="detail-workflow-phase">
+                <div className="detail-workflow-phase-header">
+                  <span className="detail-workflow-label">Phase Progress</span>
+                  <span className="detail-workflow-phase-count">
+                    {work.phase.current} / {work.phase.total}
+                  </span>
+                </div>
+                <div className="detail-workflow-phase-bar">
+                  <div
+                    className="detail-workflow-phase-fill"
+                    style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

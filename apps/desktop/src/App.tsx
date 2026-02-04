@@ -11,7 +11,7 @@ import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/deta
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore } from "./stores";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -60,6 +60,11 @@ function App() {
     ? tikiReleases.find((r) => r.version === selectedTikiRelease)
     : null;
 
+  // Get work context for selected issue
+  const selectedIssueWork = selectedIssue && state?.activeWork
+    ? state.activeWork[`issue:${selectedIssue}`]
+    : null;
+
   // Load initial state when active project changes
   useEffect(() => {
     async function loadState() {
@@ -73,6 +78,10 @@ function App() {
           const currentState = await invoke<TikiState | null>("get_state", {});
           console.log("State loaded:", currentState);
           setState(currentState);
+          // Sync to tikiStateStore for Kanban
+          if (currentState?.activeWork) {
+            useTikiStateStore.getState().setActiveWork(currentState.activeWork);
+          }
         } catch (e) {
           console.error("Error loading state:", e);
           setError(String(e));
@@ -91,6 +100,10 @@ function App() {
         });
         console.log("State loaded:", currentState);
         setState(currentState);
+        // Sync to tikiStateStore for Kanban
+        if (currentState?.activeWork) {
+          useTikiStateStore.getState().setActiveWork(currentState.activeWork);
+        }
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
@@ -110,7 +123,13 @@ function App() {
           const currentState = await invoke<TikiState | null>("get_state", {
             tikiPath: projectTikiPath,
           });
+          console.log("State reloaded, activeWork keys:", currentState?.activeWork ? Object.keys(currentState.activeWork) : 'none');
           setState(currentState);
+          // Sync to tikiStateStore for Kanban
+          if (currentState?.activeWork) {
+            console.log("Syncing to tikiStateStore:", Object.entries(currentState.activeWork).map(([k, v]) => `${k}: ${v.status}`));
+            useTikiStateStore.getState().setActiveWork(currentState.activeWork);
+          }
         } catch (e) {
           console.error("Failed to reload state:", e);
         }
@@ -213,7 +232,7 @@ function App() {
         >
           <div className="detail-content">
             {selectedIssueData ? (
-              <IssueDetail issue={selectedIssueData} />
+              <IssueDetail issue={selectedIssueData} work={selectedIssueWork} />
             ) : selectedReleaseData ? (
               <ReleaseDetail release={selectedReleaseData} />
             ) : selectedTikiReleaseData ? (

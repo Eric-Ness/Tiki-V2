@@ -33,14 +33,38 @@ export type PipelineStep =
 /** ISO 8601 timestamp string */
 export type Timestamp = string;
 
+/** GitHub label with full metadata */
+export interface GitHubLabelInfo {
+  /** Unique identifier */
+  id: string;
+  /** Label name */
+  name: string;
+  /** Hex color (without #) */
+  color: string;
+  /** Optional description */
+  description?: string;
+}
+
 /** Issue metadata cached from GitHub */
 export interface IssueInfo {
   /** GitHub issue number */
   number: number;
   /** Issue title (cached from GitHub) */
   title?: string;
+  /** Issue body/description */
+  body?: string;
+  /** Issue state (OPEN or CLOSED) */
+  state?: 'OPEN' | 'CLOSED' | string;
   /** Full GitHub issue URL */
   url?: string;
+  /** Labels as string array (backward compatible) */
+  labels?: string[];
+  /** Labels with full metadata (preferred over labels) */
+  labelDetails?: GitHubLabelInfo[];
+  /** GitHub created timestamp */
+  createdAt?: Timestamp;
+  /** GitHub updated timestamp */
+  updatedAt?: Timestamp;
 }
 
 /** Current phase execution state */

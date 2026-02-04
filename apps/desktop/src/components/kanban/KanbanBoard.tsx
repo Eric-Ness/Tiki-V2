@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   DndContext,
@@ -11,10 +11,10 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useLayoutStore } from '../../stores';
+import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useLayoutStore, useTikiStateStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
-import { KanbanCard } from './KanbanCard';
+import { KanbanCard, type WorkItem } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
 import './kanban.css';
 
@@ -49,8 +49,18 @@ export function KanbanBoard() {
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
   const { tabs, activeTabId } = useTerminalStore();
   const setActiveView = useLayoutStore((s) => s.setActiveView);
+  const activeWork = useTikiStateStore((s) => s.activeWork);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [shipConfirmation, setShipConfirmation] = useState<{ issueNumber: number; title: string } | null>(null);
+
+  // Debug logging for Kanban state
+  useEffect(() => {
+    console.log('[Kanban] === STATE UPDATE ===');
+    console.log('[Kanban] issues count:', issues.length, 'numbers:', issues.map(i => i.number));
+    console.log('[Kanban] activeWork:', Object.entries(activeWork).map(([k, v]) => `${k}: ${v.status}`));
+    console.log('[Kanban] releaseFilter:', releaseFilter);
+    console.log('[Kanban] tikiReleases count:', tikiReleases.length);
+  }, [activeWork, issues, releaseFilter, tikiReleases]);
 
   // Configure DnD sensors
   const sensors = useSensors(
@@ -138,12 +148,38 @@ export function KanbanBoard() {
     setShipConfirmation(null);
   }, []);
 
-  // Find which column an issue belongs to
+  // Map Tiki work status to column ID
+  const statusToColumn = (status: string): string => {
+    switch (status) {
+      case 'planning':
+        return 'planning';
+      case 'executing':
+        return 'executing';
+      case 'shipping':
+        return 'shipping';
+      case 'completed':
+        return 'completed';
+      case 'pending':
+      case 'paused':
+      case 'failed':
+      default:
+        return 'backlog';
+    }
+  };
+
+  // Find which column an issue belongs to based on Tiki work state
   const getIssueColumn = (issueNumber: number): string | null => {
     const issue = issues.find((i) => i.number === issueNumber);
     if (!issue) return null;
-    // For now: closed = completed, open = backlog
-    // GitHub CLI returns state as "OPEN"/"CLOSED" (uppercase)
+
+    // Check Tiki work state first
+    const workKey = `issue:${issueNumber}`;
+    const work = activeWork[workKey];
+    if (work && work.type === 'issue') {
+      return statusToColumn(work.status);
+    }
+
+    // Fall back to GitHub state
     const state = issue.state.toLowerCase();
     return state === 'closed' ? 'completed' : 'backlog';
   };
@@ -198,30 +234,66 @@ export function KanbanBoard() {
 
   // Filter issues by release if filter is set
   const filteredIssues = useMemo(() => {
-    if (!releaseFilter) return issues;
+    console.log('[Kanban] Computing filteredIssues...');
+    console.log('[Kanban] - releaseFilter:', releaseFilter);
+    console.log('[Kanban] - issues count:', issues.length);
+
+    if (!releaseFilter) {
+      console.log('[Kanban] - No filter, returning all issues');
+      return issues;
+    }
 
     // Handle "unassigned" filter
     if (releaseFilter === 'unassigned') {
-      return issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
+      const result = issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
+      console.log('[Kanban] - Unassigned filter, returning:', result.length);
+      return result;
     }
 
     // Find the release and get its issues
     const release = tikiReleases.find((r) => r.version === releaseFilter);
-    if (!release) return issues;
+    if (!release) {
+      console.log('[Kanban] - Release not found, returning all issues');
+      return issues;
+    }
 
     const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));
-    return issues.filter((issue) => releaseIssueNumbers.has(issue.number));
+    const result = issues.filter((issue) => releaseIssueNumbers.has(issue.number));
+    console.log('[Kanban] - Filtered by release, returning:', result.length, result.map(i => i.number));
+    return result;
   }, [issues, releaseFilter, tikiReleases, assignedIssueNumbers]);
 
-  // Organize issues into columns
-  // For now, all issues go to Backlog since we don't have tikiState integration yet
-  // This will be enhanced when we connect to the actual work state
+  // Create workItems map from activeWork for phase progress display
+  const workItemsMap: Map<number, WorkItem> = useMemo(() => {
+    const map = new Map<number, WorkItem>();
+    Object.entries(activeWork).forEach(([key, work]) => {
+      if (key.startsWith('issue:') && work.type === 'issue') {
+        const issueNumber = parseInt(key.replace('issue:', ''), 10);
+        const phase = (work as { phase?: { current?: number; total?: number } }).phase;
+        map.set(issueNumber, {
+          status: work.status as WorkItem['status'],
+          currentPhase: phase?.current,
+          totalPhases: phase?.total,
+        });
+      }
+    });
+    return map;
+  }, [activeWork]);
+
+  // Organize issues into columns based on Tiki work status
   const columns: ColumnData[] = useMemo(() => {
-    return COLUMN_CONFIG.map((col) => ({
-      ...col,
-      // For now, put open issues in Backlog, closed in Completed
-      // GitHub CLI returns state as "OPEN"/"CLOSED" (uppercase)
-      issues: filteredIssues.filter((issue) => {
+    console.log('[Kanban] Computing columns from', filteredIssues.length, 'filtered issues');
+    const result = COLUMN_CONFIG.map((col) => {
+      const colIssues = filteredIssues.filter((issue) => {
+        // Check Tiki work state first
+        const workKey = `issue:${issue.number}`;
+        const work = activeWork[workKey];
+        if (work && work.type === 'issue') {
+          const issueColumn = statusToColumn(work.status);
+          return issueColumn === col.id;
+        }
+
+        // Fall back to GitHub state for issues not in Tiki work
         const state = issue.state.toLowerCase();
         if (col.id === 'completed') {
           return state === 'closed';
@@ -230,9 +302,12 @@ export function KanbanBoard() {
           return state === 'open';
         }
         return false;
-      }),
-    }));
-  }, [filteredIssues]);
+      });
+      return { ...col, issues: colIssues };
+    });
+    console.log('[Kanban] Columns:', result.map(c => `${c.id}: ${c.issues.length}`).join(', '));
+    return result;
+  }, [filteredIssues, activeWork]);
 
   return (
     <DndContext
@@ -255,6 +330,7 @@ export function KanbanBoard() {
               id={column.id}
               title={column.title}
               issues={column.issues}
+              workItems={workItemsMap}
               activeId={activeId}
               onExecute={(issueNumber) => triggerExecution(issueNumber, column.id)}
             />

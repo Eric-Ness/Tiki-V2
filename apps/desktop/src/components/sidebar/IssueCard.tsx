@@ -1,14 +1,21 @@
 import type { GitHubIssue } from "../../stores";
 import "./IssueCard.css";
 
+export interface WorkProgress {
+  status: string;
+  currentPhase?: number;
+  totalPhases?: number;
+}
+
 export interface IssueCardProps {
   issue: GitHubIssue;
+  work?: WorkProgress;
   isSelected?: boolean;
   onClick?: () => void;
   onEdit?: (issue: GitHubIssue) => void;
 }
 
-export function IssueCard({ issue, isSelected, onClick, onEdit }: IssueCardProps) {
+export function IssueCard({ issue, work, isSelected, onClick, onEdit }: IssueCardProps) {
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -84,6 +91,11 @@ export function IssueCard({ issue, isSelected, onClick, onEdit }: IssueCardProps
           <span className={`issue-card-state ${issue.state}`}>
             {issue.state === "OPEN" ? "Open" : "Closed"}
           </span>
+          {work && work.currentPhase && work.totalPhases && (
+            <span className="issue-card-phase" title={`Phase ${work.currentPhase} of ${work.totalPhases}`}>
+              {work.currentPhase}/{work.totalPhases}
+            </span>
+          )}
         </div>
       </div>
       <div className="issue-card-title">{issue.title}</div>

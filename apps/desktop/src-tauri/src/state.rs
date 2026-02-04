@@ -28,6 +28,8 @@ pub struct IssueContext {
     pub issue: IssueRef,
     pub status: WorkStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline_step: Option<PipelineStep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<PhaseProgress>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,6 +40,17 @@ pub struct IssueContext {
     pub yolo: Option<bool>,
 }
 
+/// GitHub label with full metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubLabelInfo {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
 /// Reference to a GitHub issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,7 +58,19 @@ pub struct IssueRef {
     pub number: u32,
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub labels: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_details: Option<Vec<GitHubLabelInfo>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
 }
 
 /// Phase progress tracking
@@ -72,15 +97,26 @@ pub enum PhaseProgressStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseContext {
-    pub version: String,
-    pub issues: Vec<u32>,
+    pub release: ReleaseRef,
     pub status: WorkStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_issue: Option<u32>,
-    pub completed_issues: Vec<u32>,
+    pub pipeline_step: Option<PipelineStep>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_activity: Option<String>,
+}
+
+/// Reference to a release
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseRef {
+    pub version: String,
+    pub issues: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_issue: Option<u32>,
+    pub completed_issues: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub milestone: Option<String>,
 }
 
 /// Status of a work context
@@ -94,6 +130,18 @@ pub enum WorkStatus {
     Completed,
     Failed,
     Shipping,
+}
+
+/// Pipeline step in the Tiki workflow
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PipelineStep {
+    Get,
+    Review,
+    Plan,
+    Audit,
+    Execute,
+    Ship,
 }
 
 /// History tracking

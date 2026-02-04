@@ -14,7 +14,7 @@ Fetch a GitHub issue and display it in a readable format. This is typically the 
   <step>Verify the GitHub CLI is authenticated by running `gh auth status`</step>
   <step>Fetch the issue using the GitHub CLI:
     ```bash
-    gh issue view {number} --json number,title,body,state,labels,milestone,assignees,url
+    gh issue view {number} --json number,title,body,state,labels,milestone,assignees,url,createdAt,updatedAt
     ```
   </step>
   <step>Display the issue in the formatted output template below</step>
@@ -28,6 +28,7 @@ When getting an issue, update `.tiki/state.json`:
 1. If the file doesn't exist, create it with the initial schema
 2. Add or update the work entry with key `issue:{number}`
 3. Set status to `pending` (issue fetched but not yet being worked on)
+4. **Store full GitHub metadata** for offline access and consolidated data flow
 
 ```json
 {
@@ -38,7 +39,15 @@ When getting an issue, update `.tiki/state.json`:
       "issue": {
         "number": {number},
         "title": "{title}",
-        "url": "{url}"
+        "body": "{body}",
+        "state": "{state}",
+        "url": "{url}",
+        "labels": ["{label1}", "{label2}"],
+        "labelDetails": [
+          {"id": "{id}", "name": "{name}", "color": "{hex}", "description": "{desc}"}
+        ],
+        "createdAt": "{GitHub created timestamp}",
+        "updatedAt": "{GitHub updated timestamp}"
       },
       "status": "pending",
       "pipelineStep": "GET",
@@ -48,6 +57,8 @@ When getting an issue, update `.tiki/state.json`:
   }
 }
 ```
+
+**Note:** Store both `labels` (string array for backward compatibility) and `labelDetails` (full objects with color/description for rich display).
 </state-management>
 
 <output>

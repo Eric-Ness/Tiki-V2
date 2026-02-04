@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, useDetailStore, useProjectsStore, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, type GitHubIssue, type IssueFilter } from "../../stores";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
@@ -25,6 +25,7 @@ export function IssuesSection() {
   const activeProject = useProjectsStore((state) =>
     state.projects.find((p) => p.id === state.activeProjectId)
   );
+  const activeWork = useTikiStateStore((state) => state.activeWork);
 
   // Debug: track activeProject changes
   useEffect(() => {
@@ -244,15 +245,25 @@ export function IssuesSection() {
 
           {issues.length > 0 && (
             <div className="issues-section-list">
-              {issues.map((issue) => (
-                <IssueCard
-                  key={issue.number}
-                  issue={issue}
-                  isSelected={selectedIssue === issue.number}
-                  onClick={() => handleIssueClick(issue)}
-                  onEdit={handleEditIssue}
-                />
-              ))}
+              {issues.map((issue) => {
+                const workKey = `issue:${issue.number}`;
+                const work = activeWork[workKey];
+                const workProgress = work && work.type === 'issue' ? {
+                  status: work.status,
+                  currentPhase: (work as { phase?: { current?: number } }).phase?.current,
+                  totalPhases: (work as { phase?: { total?: number } }).phase?.total,
+                } : undefined;
+                return (
+                  <IssueCard
+                    key={issue.number}
+                    issue={issue}
+                    work={workProgress}
+                    isSelected={selectedIssue === issue.number}
+                    onClick={() => handleIssueClick(issue)}
+                    onEdit={handleEditIssue}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
