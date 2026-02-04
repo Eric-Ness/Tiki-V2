@@ -1,24 +1,74 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:36": {
+    "issue:26": {
       "type": "issue",
-      "number": 36,
-      "title": "Lots of terminals pop up when background items are working",
+      "issue": {
+        "number": 26,
+        "title": "test issue",
+        "body": "test issue can you just do it with two phases - this is just for testing.",
+        "state": "OPEN",
+        "labels": ["bug"]
+      },
       "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "currentPhase": 2,
       "yolo": true,
-      "startedAt": "2026-02-03T23:30:00.000Z",
-      "currentPhase": null,
-      "phases": []
+      "createdAt": "2026-02-04T01:00:00.000Z",
+      "lastActivity": "2026-02-04T01:00:00.000Z"
+    },
+    "release:v0.2.0": {
+      "type": "release",
+      "release": {
+        "version": "v0.2.0",
+        "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
+        "currentIssue": null,
+        "completedIssues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
+        "milestone": null
+      },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-02-03T23:55:00.000Z",
+      "lastActivity": "2026-02-04T00:10:00.000Z"
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 31,
-      "title": "Create Issue - Enhance error",
-      "completedAt": "2026-02-03T23:00:00.000Z"
+      "number": 41,
+      "title": "Add release filter dropdown to Kanban board",
+      "completedAt": "2026-02-04T00:30:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 41,
+        "title": "Add release filter dropdown to Kanban board",
+        "completedAt": "2026-02-04T00:30:00.000Z"
+      },
+      {
+        "number": 35,
+        "title": "Create KanbanColumn component",
+        "completedAt": "2026-02-04T00:25:00.000Z"
+      },
+      {
+        "number": 34,
+        "title": "Create KanbanBoard container component",
+        "completedAt": "2026-02-04T00:20:00.000Z"
+      },
+      {
+        "number": 33,
+        "title": "Create Kanban store for board state management",
+        "completedAt": "2026-02-04T00:15:00.000Z"
+      },
+      {
+        "number": 32,
+        "title": "Add tab system to center panel (Terminal | Kanban)",
+        "completedAt": "2026-02-04T00:10:00.000Z"
+      },
+      {
+        "number": 36,
+        "title": "Lots of terminals pop up when background items are working",
+        "completedAt": "2026-02-03T23:45:00.000Z"
+      },
       {
         "number": 31,
         "title": "Create Issue - Enhance error",
@@ -58,16 +108,6 @@
         "number": 15,
         "title": "feat(desktop): Add terminal split panes",
         "completedAt": "2026-02-03T02:05:00.000Z"
-      },
-      {
-        "number": 14,
-        "title": "feat(desktop): Add terminal tab management",
-        "completedAt": "2026-02-03T01:30:00.000Z"
-      },
-      {
-        "number": 12,
-        "title": "feat(desktop): Implement PTY spawning and management in Rust",
-        "completedAt": "2026-02-03T00:20:00.000Z"
       }
     ],
     "recentReleases": [
