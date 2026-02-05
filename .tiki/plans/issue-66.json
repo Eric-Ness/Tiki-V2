@@ -1,0 +1,40 @@
+{
+  "issueNumber": 66,
+  "title": "Test 8",
+  "description": "Test issue with 4 no-op phases to validate Kanban board visualization and card transitions",
+  "createdAt": "2026-02-06T01:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Environment Check",
+      "description": "Verify the project root and .tiki/ directory exist. Confirm state.json is present and valid JSON.",
+      "status": "completed",
+      "verification": "Project root contains package.json and .tiki/state.json exists as valid JSON",
+      "files": []
+    },
+    {
+      "id": 2,
+      "title": "Dependency Audit",
+      "description": "List installed dependencies without modifying anything. Check that pnpm-workspace.yaml exists and node_modules are present.",
+      "status": "completed",
+      "verification": "pnpm-workspace.yaml exists and node_modules directory is present",
+      "files": []
+    },
+    {
+      "id": 3,
+      "title": "Structure Validation",
+      "description": "Confirm expected directories (packages/shared, packages/framework, apps/desktop) are present with their package.json files.",
+      "status": "completed",
+      "verification": "All three package directories exist with package.json files",
+      "files": []
+    },
+    {
+      "id": 4,
+      "title": "Summary Report",
+      "description": "Echo a completion summary to stdout listing all checks that passed.",
+      "status": "completed",
+      "verification": "Summary report echoed successfully",
+      "files": []
+    }
+  ]
+}
