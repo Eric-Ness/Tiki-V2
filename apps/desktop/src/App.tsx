@@ -232,6 +232,11 @@ function App() {
                       id: activeTab.activeTerminalId,
                       data: "claude --dangerously-skip-permissions\n",
                     });
+                    // Focus the terminal so Enter doesn't re-trigger the button
+                    const textarea = document.querySelector<HTMLTextAreaElement>(
+                      '.terminal-split-active .xterm-helper-textarea'
+                    );
+                    textarea?.focus();
                   } catch (err) {
                     console.error("Failed to write to terminal:", err);
                   }
