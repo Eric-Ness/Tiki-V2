@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 50,
+    "title": "Issues Not moving through Kanban columns",
+    "url": "https://github.com/ericnewton/Tiki-V2/issues/50"
+  },
+  "createdAt": "2026-02-04T06:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "description": "Issues with status 'pending' appear in the Review column"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "description": "Issues with status 'planning' appear in the Plan column"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "description": "Issues with status 'executing' appear in the Execute column"
+    },
+    {
+      "id": "SC4",
+      "category": "Functional",
+      "description": "Issues with status 'shipping' appear in the Shipping column"
+    },
+    {
+      "id": "SC5",
+      "category": "Functional",
+      "description": "Issues with status 'completed' appear in the Completed column"
+    },
+    {
+      "id": "SC6",
+      "category": "Functional",
+      "description": "Drag-and-drop transitions work with the updated column IDs"
+    },
+    {
+      "id": "SC7",
+      "category": "Functional",
+      "description": "Issues without active work entries fall back correctly (open → Review, closed → Completed)"
+    },
+    {
+      "id": "SC8",
+      "category": "Build",
+      "description": "TypeScript type-checks pass (pnpm typecheck)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Fix Kanban column config and status-to-column mapping",
+      "status": "completed",
+      "completedAt": "2026-02-04T06:15:00.000Z",
+      "summary": "Replaced COLUMN_CONFIG with 5 pipeline-aligned columns (Review/Plan/Execute/Shipping/Completed), simplified statusToColumn to use direct status mapping without pipelineStep, updated VALID_TRANSITIONS and all column ID references in drag handlers, and renamed CSS accent color classes. TypeScript typecheck passes.",
+      "content": "Fix the Kanban board so issues move through columns matching the pipeline stages.\n\n## Changes to make in `apps/desktop/src/components/kanban/KanbanBoard.tsx`:\n\n### 1. Update COLUMN_CONFIG (lines 32-39)\nReplace the current column configuration with pipeline-aligned columns:\n- Remove 'backlog' column entirely\n- Rename 'review' to map to 'pending' status (column id: 'review', title: 'Review', statuses: ['pending'])\n- Rename 'planning' to 'plan' (column id: 'plan', title: 'Plan', statuses: ['planning'])\n- Rename 'executing' to 'execute' (column id: 'execute', title: 'Execute', statuses: ['executing'])\n- Keep 'shipping' as-is (column id: 'shipping', title: 'Shipping', statuses: ['shipping'])\n- Keep 'completed' as-is (column id: 'completed', title: 'Completed', statuses: ['completed'])\n\nNew config:\n```\nconst COLUMN_CONFIG = [\n  { id: 'review', title: 'Review', statuses: ['pending'] },\n  { id: 'plan', title: 'Plan', statuses: ['planning'] },\n  { id: 'execute', title: 'Execute', statuses: ['executing'] },\n  { id: 'shipping', title: 'Shipping', statuses: ['shipping'] },\n  { id: 'completed', title: 'Completed', statuses: ['completed'] },\n] as const;\n```\n\n### 2. Update VALID_TRANSITIONS (lines 22-29)\nUpdate to use the new column IDs:\n```\nconst VALID_TRANSITIONS: Record<string, string[]> = {\n  review: ['plan', 'execute'],\n  plan: ['review', 'execute'],\n  execute: ['shipping', 'review'],\n  shipping: ['completed', 'execute'],\n  completed: [],\n};\n```\n\n### 3. Simplify statusToColumn function (lines 153-174)\nRemove the pipelineStep composite check and use direct status mapping:\n```\nconst statusToColumn = (status: string): string => {\n  switch (status) {\n    case 'pending':\n    case 'paused':\n    case 'failed':\n      return 'review';\n    case 'planning':\n      return 'plan';\n    case 'executing':\n      return 'execute';\n    case 'shipping':\n      return 'shipping';\n    case 'completed':\n      return 'completed';\n    default:\n      return 'review';\n  }\n};\n```\n\n### 4. Update statusToColumn call sites\n- In `getIssueColumn` (~line 185): Remove the second argument (pipelineStep) from the statusToColumn call. Change from `statusToColumn(work.status, (work as { pipelineStep?: string }).pipelineStep)` to `statusToColumn(work.status)`\n- In the columns useMemo (~line 298): Same change - remove pipelineStep argument\n\n### 5. Update GitHub state fallback (lines 302-310)\nChange the fallback from 'backlog' to 'review':\n```\nif (col.id === 'review') {\n  return state === 'open';\n}\n```\n\n### 6. Update getExecuteCommand (line 100)\nChange `fromColumn === 'backlog'` to `fromColumn === 'review'` — dragging from Review should run yolo (full pipeline).\n\n### 7. Update handleDragEnd column ID references (lines 222-224)\n- Change `targetColumn === 'executing'` to `targetColumn === 'execute'`\n- Change `sourceColumn === 'executing'` to `sourceColumn === 'execute'`\n\n### 8. Update CSS column accent colors in `apps/desktop/src/components/kanban/kanban.css`\n- Remove `.kanban-column--backlog` rule (line 140-142)\n- Rename `.kanban-column--planning` to `.kanban-column--plan` (line 144-146)\n- Rename `.kanban-column--executing` to `.kanban-column--execute` (line 152-154)\n- Keep `.kanban-column--review`, `.kanban-column--shipping`, `.kanban-column--completed` as-is",
+      "verification": [
+        "Run `pnpm typecheck` from the project root - should pass with no errors",
+        "Verify COLUMN_CONFIG has 5 columns: review, plan, execute, shipping, completed",
+        "Verify statusToColumn maps: pending→review, planning→plan, executing→execute, shipping→shipping, completed→completed",
+        "Verify VALID_TRANSITIONS uses new column IDs with no references to 'backlog' or 'planning'",
+        "Verify no remaining references to old column IDs ('backlog', 'planning', 'executing') in the file"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/kanban/kanban.css"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1],
+    "SC8": [1]
+  }
+}

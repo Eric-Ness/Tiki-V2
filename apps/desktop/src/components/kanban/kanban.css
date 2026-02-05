@@ -137,19 +137,15 @@
 }
 
 /* Column accent colors */
-.kanban-column--backlog .kanban-column-header {
-  border-left: 3px solid #666;
-}
-
-.kanban-column--planning .kanban-column-header {
-  border-left: 3px solid #3b82f6;
-}
-
 .kanban-column--review .kanban-column-header {
   border-left: 3px solid #06b6d4;
 }
 
-.kanban-column--executing .kanban-column-header {
+.kanban-column--plan .kanban-column-header {
+  border-left: 3px solid #3b82f6;
+}
+
+.kanban-column--execute .kanban-column-header {
   border-left: 3px solid #f59e0b;
 }
 

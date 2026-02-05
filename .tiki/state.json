@@ -1,6 +1,25 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "issue:50": {
+      "type": "issue",
+      "issue": {
+        "number": 50,
+        "title": "Issues Not moving through Kanban columns",
+        "url": "https://github.com/ericnewton/Tiki-V2/issues/50"
+      },
+      "status": "shipping",
+      "pipelineStep": "EXECUTE",
+      "auditPassed": true,
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "completed"
+      },
+      "createdAt": "2026-02-04T06:00:00.000Z",
+      "lastActivity": "2026-02-04T06:15:00.000Z"
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 48,

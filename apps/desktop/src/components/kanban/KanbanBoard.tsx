@@ -20,20 +20,18 @@ import './kanban.css';
 
 // Valid state transitions for drag-and-drop
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  backlog: ['planning', 'executing'],
-  planning: ['backlog', 'review', 'executing'],
-  review: ['planning', 'executing'],
-  executing: ['shipping', 'backlog'],
-  shipping: ['completed', 'executing'],
+  review: ['plan', 'execute'],
+  plan: ['review', 'execute'],
+  execute: ['shipping', 'review'],
+  shipping: ['completed', 'execute'],
   completed: [], // Cannot move completed items
 };
 
 // Column configuration mapping to Tiki work statuses
 const COLUMN_CONFIG = [
-  { id: 'backlog', title: 'Backlog', statuses: ['pending'] },
-  { id: 'planning', title: 'Planning', statuses: ['planning'] },
-  { id: 'review', title: 'Review', statuses: [] },
-  { id: 'executing', title: 'Executing', statuses: ['executing'] },
+  { id: 'review', title: 'Review', statuses: ['pending'] },
+  { id: 'plan', title: 'Plan', statuses: ['planning'] },
+  { id: 'execute', title: 'Execute', statuses: ['executing'] },
   { id: 'shipping', title: 'Shipping', statuses: ['shipping'] },
   { id: 'completed', title: 'Completed', statuses: ['completed'] },
 ] as const;
@@ -96,11 +94,11 @@ export function KanbanBoard() {
 
   // Determine the appropriate command based on source column
   const getExecuteCommand = (issueNumber: number, fromColumn: string): string => {
-    // If coming from Backlog (no plan yet), run full yolo
-    if (fromColumn === 'backlog') {
+    // If coming from Review (no plan yet), run full yolo
+    if (fromColumn === 'review') {
       return `/tiki:yolo ${issueNumber}`;
     }
-    // If coming from Planning (has plan) or resuming, just execute
+    // If coming from Plan (has plan) or resuming, just execute
     return `/tiki:execute ${issueNumber}`;
   };
 
@@ -150,26 +148,23 @@ export function KanbanBoard() {
     setShipConfirmation(null);
   }, []);
 
-  // Map Tiki work status to column ID, using pipelineStep to distinguish review
-  const statusToColumn = (status: string, pipelineStep?: string): string => {
-    // Issues in planning status with REVIEW pipeline step go to review column
-    if (status === 'planning' && pipelineStep === 'REVIEW') {
-      return 'review';
-    }
+  // Map Tiki work status to column ID
+  const statusToColumn = (status: string): string => {
     switch (status) {
+      case 'pending':
+      case 'paused':
+      case 'failed':
+        return 'review';
       case 'planning':
-        return 'planning';
+        return 'plan';
       case 'executing':
-        return 'executing';
+        return 'execute';
       case 'shipping':
         return 'shipping';
       case 'completed':
         return 'completed';
-      case 'pending':
-      case 'paused':
-      case 'failed':
       default:
-        return 'backlog';
+        return 'review';
     }
   };
 
@@ -182,12 +177,12 @@ export function KanbanBoard() {
     const workKey = `issue:${issueNumber}`;
     const work = activeWork[workKey];
     if (work && work.type === 'issue') {
-      return statusToColumn(work.status, (work as { pipelineStep?: string }).pipelineStep);
+      return statusToColumn(work.status);
     }
 
     // Fall back to GitHub state
     const state = issue.state.toLowerCase();
-    return state === 'closed' ? 'completed' : 'backlog';
+    return state === 'closed' ? 'completed' : 'review';
   };
 
   // Check if a transition is valid
@@ -219,9 +214,9 @@ export function KanbanBoard() {
     }
 
     // Trigger workflow action based on target column
-    if (targetColumn === 'executing') {
+    if (targetColumn === 'execute') {
       triggerExecution(issueNumber, sourceColumn);
-    } else if (targetColumn === 'shipping' && sourceColumn === 'executing') {
+    } else if (targetColumn === 'shipping' && sourceColumn === 'execute') {
       requestShipConfirmation(issueNumber);
     }
   };
@@ -295,7 +290,7 @@ export function KanbanBoard() {
         const workKey = `issue:${issue.number}`;
         const work = activeWork[workKey];
         if (work && work.type === 'issue') {
-          const issueColumn = statusToColumn(work.status, (work as { pipelineStep?: string }).pipelineStep);
+          const issueColumn = statusToColumn(work.status);
           return issueColumn === col.id;
         }
 
@@ -304,7 +299,7 @@ export function KanbanBoard() {
         if (col.id === 'completed') {
           return state === 'closed';
         }
-        if (col.id === 'backlog') {
+        if (col.id === 'review') {
           return state === 'open';
         }
         return false;
