@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 52,
+    "title": "YOLO pipeline doesn't write correct state.json format for desktop app",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/52"
+  },
+  "createdAt": "2026-02-05T07:12:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Data Format",
+      "description": "`issue` field is an object with `number` and `title` (not top-level fields)"
+    },
+    {
+      "id": "SC2",
+      "category": "Data Format",
+      "description": "No undefined/invalid fields like `github` or top-level `number`/`title`"
+    },
+    {
+      "id": "SC3",
+      "category": "Status Transitions",
+      "description": "Status progresses: `pending` → `planning` → `executing` → `shipping`"
+    },
+    {
+      "id": "SC4",
+      "category": "Pipeline Steps",
+      "description": "`pipelineStep` is set at each stage: GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP"
+    },
+    {
+      "id": "SC5",
+      "category": "Phase Progress",
+      "description": "During EXECUTE, `phase: { current, total, status }` is updated before/after each phase"
+    },
+    {
+      "id": "SC6",
+      "category": "Timestamps",
+      "description": "`lastActivity` is updated on every state change"
+    },
+    {
+      "id": "SC7",
+      "category": "Consistency",
+      "description": "Format matches `get.md` and `execute.md` state-management sections"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Replace yolo.md state-management section with explicit JSON specifications",
+      "status": "pending",
+      "content": "Replace the vague `<state-management>` section (lines 115-133) in `packages/framework/commands/yolo.md` with comprehensive state update instructions.\n\n## Changes to make:\n\n### Replace lines 115-133 with explicit state-management section\n\nThe new section must include:\n\n1. **GET step state** — Initial state when issue is fetched:\n```json\n\"issue:{number}\": {\n  \"type\": \"issue\",\n  \"issue\": { \"number\": {number}, \"title\": \"{title}\" },\n  \"status\": \"pending\",\n  \"pipelineStep\": \"GET\",\n  \"createdAt\": \"{ISO timestamp}\",\n  \"lastActivity\": \"{ISO timestamp}\"\n}\n```\n\n2. **REVIEW/PLAN/AUDIT step state** — Planning phase:\n```json\n\"issue:{number}\": {\n  \"type\": \"issue\",\n  \"issue\": { \"number\": {number}, \"title\": \"{title}\" },\n  \"status\": \"planning\",\n  \"pipelineStep\": \"REVIEW\" | \"PLAN\" | \"AUDIT\",\n  \"createdAt\": \"{ISO timestamp}\",\n  \"lastActivity\": \"{ISO timestamp}\"\n}\n```\n\n3. **EXECUTE step state** — With phase progress:\n```json\n\"issue:{number}\": {\n  \"type\": \"issue\",\n  \"issue\": { \"number\": {number}, \"title\": \"{title}\" },\n  \"status\": \"executing\",\n  \"pipelineStep\": \"EXECUTE\",\n  \"phase\": {\n    \"current\": {N},\n    \"total\": {T},\n    \"status\": \"executing\" | \"completed\" | \"pending\"\n  },\n  \"createdAt\": \"{ISO timestamp}\",\n  \"lastActivity\": \"{ISO timestamp}\"\n}\n```\n\n4. **SHIP step state**:\n```json\n\"issue:{number}\": {\n  \"type\": \"issue\",\n  \"issue\": { \"number\": {number}, \"title\": \"{title}\" },\n  \"status\": \"shipping\",\n  \"pipelineStep\": \"SHIP\",\n  \"createdAt\": \"{ISO timestamp}\",\n  \"lastActivity\": \"{ISO timestamp}\"\n}\n```\n\n5. **Completion** — Remove from activeWork, add to history\n\n6. **State update table** showing exactly when to update state:\n| Pipeline Step | `status` | `pipelineStep` | `phase` |\n|---------------|----------|----------------|---------|\n| GET | `pending` | `GET` | — |\n| REVIEW | `planning` | `REVIEW` | — |\n| PLAN | `planning` | `PLAN` | — |\n| AUDIT | `planning` | `AUDIT` | — |\n| EXECUTE (per phase) | `executing` | `EXECUTE` | `{ current: N, total: T, status: ... }` |\n| SHIP | `shipping` | `SHIP` | — |\n| Complete | (remove from activeWork) | — | — |\n\n7. **Critical requirements section** emphasizing:\n   - `issue` must be an object, not top-level fields\n   - `lastActivity` must be updated on EVERY state change\n   - Phase progress must be updated BEFORE starting each phase\n   - No extra fields like `github`, `yolo`, etc.",
+      "verification": [
+        "The new state-management section includes all 6 pipeline steps with exact JSON",
+        "JSON examples show `issue` as nested object with `number` and `title`",
+        "Table shows status and pipelineStep for each step",
+        "Phase progress format matches execute.md (current/total/status)",
+        "lastActivity timestamp requirement is documented",
+        "No references to invalid fields like `github` or top-level `number`/`title`"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "packages/framework/commands/yolo.md"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1]
+  }
+}
