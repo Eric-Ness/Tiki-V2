@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:62": {
+    "issue:63": {
       "type": "issue",
-      "issueNumber": 62,
-      "title": "Start Claude button",
-      "status": "shipping",
+      "issueNumber": 63,
+      "title": "Refresh Side Panel",
+      "status": "completed",
       "yolo": true,
-      "startedAt": "2026-02-05T23:50:00.000Z",
+      "startedAt": "2026-02-06T00:05:00.000Z",
       "phases": {
         "total": 1,
         "completed": 1,
@@ -17,11 +17,12 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 61,
-      "title": "Project-scoped isolation for terminals, sidebar panels, and kanban board",
-      "completedAt": "2026-02-05T23:40:00.000Z"
+      "number": 62,
+      "title": "Start Claude button",
+      "completedAt": "2026-02-06T00:00:00.000Z"
     },
     "recentIssues": [
+      { "number": 62, "title": "Start Claude button", "completedAt": "2026-02-06T00:00:00.000Z" },
       { "number": 61, "title": "Project-scoped isolation for terminals, sidebar panels, and kanban board", "completedAt": "2026-02-05T23:40:00.000Z" },
       { "number": 60, "title": "A 'Start Claude' button", "completedAt": "2026-02-05T22:10:00.000Z" },
       { "number": 59, "title": "Test 7", "completedAt": "2026-02-05T21:05:00.000Z" },

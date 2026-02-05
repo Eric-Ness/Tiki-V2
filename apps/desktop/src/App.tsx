@@ -139,6 +139,8 @@ function App() {
           }
           // Sync recentIssues for Completed column
           useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
+          // Refresh issues sidebar so completed/changed issues update
+          useIssuesStore.getState().triggerRefetch();
         } catch (e) {
           console.error("Failed to reload state:", e);
         }
