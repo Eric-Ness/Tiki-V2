@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 /// A GitHub label attached to an issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -381,12 +382,15 @@ pub fn enhance_issue_description(
     };
 
     // Use the claude CLI to enhance the description
-    // Note: -p flag runs in headless mode with the given prompt
-    // On Windows, we need to run through cmd.exe to find .cmd files in PATH
+    // Pipe the prompt via stdin to avoid shell metacharacter issues
+
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd")
-        .args(["/C", "claude", "-p", &prompt])
-        .output()
+    let mut child = Command::new("cmd")
+        .args(["/C", "claude", "-p"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 "Claude CLI not found. Please install it from https://github.com/anthropics/claude-code and ensure it's in your PATH.".to_string()
@@ -396,9 +400,12 @@ pub fn enhance_issue_description(
         })?;
 
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new("claude")
-        .args(["-p", &prompt])
-        .output()
+    let mut child = Command::new("claude")
+        .args(["-p"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 "Claude CLI not found. Please install it from https://github.com/anthropics/claude-code and ensure it's in your PATH.".to_string()
@@ -406,6 +413,13 @@ pub fn enhance_issue_description(
                 format!("Failed to run Claude CLI: {}. Make sure Claude CLI is properly installed and configured.", e)
             }
         })?;
+
+    // Write prompt to stdin and close it
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(prompt.as_bytes()).map_err(|e| format!("Failed to write to Claude CLI stdin: {}", e))?;
+    }
+
+    let output = child.wait_with_output().map_err(|e| format!("Failed to wait for Claude CLI: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
