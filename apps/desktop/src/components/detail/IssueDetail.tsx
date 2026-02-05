@@ -37,7 +37,7 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const activeProject = useProjectsStore((state) => state.activeProject);
+  const activeProject = useProjectsStore((state) => state.getActiveProject());
   const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
 
   const normalizedState = issue.state.toLowerCase();

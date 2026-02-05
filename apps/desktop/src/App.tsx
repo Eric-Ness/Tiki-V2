@@ -20,8 +20,9 @@ interface TikiState {
   schemaVersion: number;
   activeWork: Record<string, WorkContext>;
   history?: {
-    lastCompletedIssue?: { number: number; completedAt: string };
+    lastCompletedIssue?: { number: number; title: string; completedAt: string };
     lastCompletedRelease?: { version: string; completedAt: string };
+    recentIssues?: Array<{ number: number; title: string; completedAt: string }>;
   };
 }
 
@@ -82,6 +83,8 @@ function App() {
           if (currentState?.activeWork) {
             useTikiStateStore.getState().setActiveWork(currentState.activeWork);
           }
+          // Sync recentIssues for Completed column
+          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
         } catch (e) {
           console.error("Error loading state:", e);
           setError(String(e));
@@ -104,6 +107,8 @@ function App() {
         if (currentState?.activeWork) {
           useTikiStateStore.getState().setActiveWork(currentState.activeWork);
         }
+        // Sync recentIssues for Completed column
+        useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
@@ -130,6 +135,8 @@ function App() {
             console.log("Syncing to tikiStateStore:", Object.entries(currentState.activeWork).map(([k, v]) => `${k}: ${v.status}`));
             useTikiStateStore.getState().setActiveWork(currentState.activeWork);
           }
+          // Sync recentIssues for Completed column
+          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
         } catch (e) {
           console.error("Failed to reload state:", e);
         }

@@ -68,7 +68,7 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
             <span className="work-progress-name">{work.issue.title}</span>
           </>
         ) : (
-          <span className="work-progress-version">{work.release?.version ?? work.version}</span>
+          <span className="work-progress-version">{work.version}</span>
         )}
       </div>
 
@@ -97,11 +97,11 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
       {!isIssue && (
         <div className="work-progress-release">
           <span>
-            {(work.release?.completedIssues ?? work.completedIssues ?? []).length} / {(work.release?.issues ?? work.issues ?? []).length} issues
+            {work.completedIssues.length} / {work.issues.length} issues
           </span>
-          {(work.release?.currentIssue ?? work.currentIssue) && (
+          {work.currentIssue && (
             <span className="work-progress-current">
-              Working on #{work.release?.currentIssue ?? work.currentIssue}
+              Working on #{work.currentIssue}
             </span>
           )}
         </div>

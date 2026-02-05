@@ -52,6 +52,7 @@ export function KanbanBoard() {
   const { tabs, activeTabId } = useTerminalStore();
   const setActiveView = useLayoutStore((s) => s.setActiveView);
   const activeWork = useTikiStateStore((s) => s.activeWork);
+  const recentIssues = useTikiStateStore((s) => s.recentIssues);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [shipConfirmation, setShipConfirmation] = useState<{ issueNumber: number; title: string } | null>(null);
 
@@ -284,11 +285,37 @@ export function KanbanBoard() {
     return map;
   }, [activeWork]);
 
+  // Get set of completed issue numbers from history (for exclusion from other columns)
+  const completedIssueNumbers = useMemo(() => {
+    return new Set(recentIssues.slice(0, 8).map((i) => i.number));
+  }, [recentIssues]);
+
   // Organize issues into columns based on Tiki work status
   const columns: ColumnData[] = useMemo(() => {
     console.log('[Kanban] Computing columns from', filteredIssues.length, 'filtered issues');
+    console.log('[Kanban] recentIssues count:', recentIssues.length);
     const result = COLUMN_CONFIG.map((col) => {
+      // For the completed column, use recentIssues from history (limited to 8)
+      if (col.id === 'completed') {
+        const completedIssues: GitHubIssue[] = recentIssues.slice(0, 8).map((recent) => ({
+          number: recent.number,
+          title: recent.title,
+          state: 'CLOSED',
+          body: '',
+          labels: [],
+          url: `#${recent.number}`,
+          createdAt: recent.completedAt,
+          updatedAt: recent.completedAt,
+        }));
+        return { ...col, issues: completedIssues };
+      }
+
       const colIssues = filteredIssues.filter((issue) => {
+        // Exclude issues that are in the completed history
+        if (completedIssueNumbers.has(issue.number)) {
+          return false;
+        }
+
         // Check Tiki work state first
         const workKey = `issue:${issue.number}`;
         const work = activeWork[workKey];
@@ -299,9 +326,6 @@ export function KanbanBoard() {
 
         // Fall back to GitHub state for issues not in Tiki work
         const state = issue.state.toLowerCase();
-        if (col.id === 'completed') {
-          return state === 'closed';
-        }
         if (col.id === 'open') {
           return state === 'open';
         }
@@ -311,7 +335,7 @@ export function KanbanBoard() {
     });
     console.log('[Kanban] Columns:', result.map(c => `${c.id}: ${c.issues.length}`).join(', '));
     return result;
-  }, [filteredIssues, activeWork]);
+  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers]);
 
   return (
     <DndContext
