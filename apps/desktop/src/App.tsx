@@ -12,6 +12,7 @@ import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
+import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -235,10 +236,7 @@ function App() {
                       data: "claude --dangerously-skip-permissions\n",
                     });
                     // Focus the terminal so Enter doesn't re-trigger the button
-                    const textarea = document.querySelector<HTMLTextAreaElement>(
-                      '.terminal-split-active .xterm-helper-textarea'
-                    );
-                    textarea?.focus();
+                    terminalFocusRegistry.focus(activeTab.activeTerminalId);
                   } catch (err) {
                     console.error("Failed to write to terminal:", err);
                   }

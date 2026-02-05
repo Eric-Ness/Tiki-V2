@@ -3,6 +3,7 @@ import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { useTerminal } from "./useTerminal";
+import { terminalFocusRegistry } from "../../stores/terminalStore";
 import "xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -176,6 +177,11 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         xtermRef.current = xterm;
         fitAddonRef.current = fitAddon;
 
+        // Register focus function so other components can focus this terminal
+        if (terminalId) {
+          terminalFocusRegistry.register(terminalId, () => xterm.focus());
+        }
+
         // Connect user input to PTY
         xterm.onData((data) => {
           writeTerminalRef.current(data);
@@ -209,6 +215,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
     // Cleanup
     return () => {
       cancelled = true;
+      if (terminalId) {
+        terminalFocusRegistry.unregister(terminalId);
+      }
       if (xtermRef.current) {
         xtermRef.current.dispose();
         xtermRef.current = null;

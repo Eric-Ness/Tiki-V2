@@ -154,6 +154,21 @@ const getTerminalIds = (node: SplitTreeNode): string[] => {
   return node.children.flatMap(getTerminalIds);
 };
 
+// Terminal focus function registry (not persisted, not reactive)
+const terminalFocusFns = new Map<string, () => void>();
+
+export const terminalFocusRegistry = {
+  register: (terminalId: string, focusFn: () => void) => {
+    terminalFocusFns.set(terminalId, focusFn);
+  },
+  unregister: (terminalId: string) => {
+    terminalFocusFns.delete(terminalId);
+  },
+  focus: (terminalId: string) => {
+    terminalFocusFns.get(terminalId)?.();
+  },
+};
+
 const initialState: TerminalState = {
   tabsByProject: {},
   activeTabByProject: {},
