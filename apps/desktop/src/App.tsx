@@ -141,6 +141,13 @@ function App() {
         } catch (e) {
           console.error("Failed to reload state:", e);
         }
+      } else if (event.payload.type === "releaseChanged") {
+        try {
+          const loadedReleases = await invoke<Array<{ version: string; status: string; issues: Array<{ number: number; title: string }>; createdAt: string }>>("load_tiki_releases");
+          useTikiReleasesStore.getState().setReleases(loadedReleases);
+        } catch (e) {
+          console.error("Failed to reload releases:", e);
+        }
       }
     });
 

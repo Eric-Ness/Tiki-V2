@@ -156,10 +156,10 @@ fn start_watcher_internal(
 
 /// Process a file system event and determine what Tiki event to emit
 fn process_event(event: &Event) -> Option<TikiFileEvent> {
-    // Only care about modify/create events
+    // Only care about modify/create/remove events
     if !matches!(
         event.kind,
-        notify::EventKind::Modify(_) | notify::EventKind::Create(_)
+        notify::EventKind::Modify(_) | notify::EventKind::Create(_) | notify::EventKind::Remove(_)
     ) {
         return None;
     }
