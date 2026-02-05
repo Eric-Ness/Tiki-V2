@@ -1,7 +1,6 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
-import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseDialog } from "../releases";
 import {
   useReleasesStore,
@@ -11,8 +10,22 @@ import {
   useReleaseDialogStore,
   type GitHubRelease,
   type TikiRelease,
+  type TikiReleaseStatus,
 } from "../../stores";
 import "./ReleasesSection.css";
+
+/** Merged release combining GitHub + local tiki data */
+interface MergedRelease {
+  version: string;
+  name?: string;
+  status?: TikiReleaseStatus;
+  issueCount?: number;
+  isDraft?: boolean;
+  isPrerelease?: boolean;
+  publishedAt?: string;
+  hasGitHub: boolean;
+  hasTiki: boolean;
+}
 
 export function ReleasesSection() {
   const releases = useReleasesStore((state) => state.releases);
@@ -44,12 +57,13 @@ export function ReleasesSection() {
   // Load Tiki releases from disk on mount
   const loadTikiReleases = useCallback(async () => {
     try {
-      const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases");
+      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath });
       setTikiReleases(loadedReleases);
     } catch (err) {
       console.error("Failed to load Tiki releases:", err);
     }
-  }, [setTikiReleases]);
+  }, [setTikiReleases, activeProject]);
 
   // Save release to disk
   const saveTikiRelease = useCallback(async (release: TikiRelease) => {
@@ -100,9 +114,10 @@ export function ReleasesSection() {
   }, [activeProject, setReleases, setLoading, setError, clearError, setLastFetched]);
 
   const setSelectedRelease = useDetailStore((state) => state.setSelectedRelease);
-  const selectedRelease = useDetailStore((state) => state.selectedRelease);
+  const projectId = useProjectsStore((state) => state.activeProjectId) ?? 'default';
+  const selectedRelease = useDetailStore((state) => state.selectionByProject[projectId]?.selectedRelease ?? null);
   const setSelectedTikiRelease = useDetailStore((state) => state.setSelectedTikiRelease);
-  const selectedTikiRelease = useDetailStore((state) => state.selectedTikiRelease);
+  const selectedTikiRelease = useDetailStore((state) => state.selectionByProject[projectId]?.selectedTikiRelease ?? null);
 
   // Fetch releases on mount
   useEffect(() => {
@@ -110,9 +125,53 @@ export function ReleasesSection() {
     loadTikiReleases();
   }, [fetchReleases, loadTikiReleases]);
 
-  const handleReleaseClick = (release: GitHubRelease) => {
-    // Set the selected release to show in detail panel
-    setSelectedRelease(release.tagName);
+  // Merge GitHub + Tiki releases into a single deduplicated list
+  const mergedReleases = useMemo(() => {
+    const map = new Map<string, MergedRelease>();
+
+    // Add GitHub releases first
+    for (const gh of releases) {
+      map.set(gh.tagName, {
+        version: gh.tagName,
+        name: gh.name,
+        isDraft: gh.isDraft,
+        isPrerelease: gh.isPrerelease,
+        publishedAt: gh.publishedAt,
+        hasGitHub: true,
+        hasTiki: false,
+      });
+    }
+
+    // Overlay tiki data (or add tiki-only releases)
+    for (const tiki of tikiReleases) {
+      const existing = map.get(tiki.version);
+      if (existing) {
+        existing.status = tiki.status;
+        existing.issueCount = tiki.issues.length;
+        existing.hasTiki = true;
+      } else {
+        map.set(tiki.version, {
+          version: tiki.version,
+          name: tiki.name,
+          status: tiki.status,
+          issueCount: tiki.issues.length,
+          hasGitHub: false,
+          hasTiki: true,
+        });
+      }
+    }
+
+    // Sort by version descending
+    return Array.from(map.values()).sort((a, b) => b.version.localeCompare(a.version));
+  }, [releases, tikiReleases]);
+
+  const handleReleaseClick = (merged: MergedRelease) => {
+    // Prefer tiki detail if local data exists, otherwise GitHub detail
+    if (merged.hasTiki) {
+      setSelectedTikiRelease(merged.version);
+    } else {
+      setSelectedRelease(merged.version);
+    }
   };
 
   const handleAddClick = () => {
@@ -145,12 +204,6 @@ export function ReleasesSection() {
     handleDialogClose();
   };
 
-  const handleTikiReleaseClick = (release: TikiRelease) => {
-    // Set the selected Tiki release to show in detail panel
-    setSelectedTikiRelease(release.version);
-  };
-
-  
   const releaseIcon = (
     <svg
       width="16"
@@ -245,8 +298,7 @@ export function ReleasesSection() {
     </div>
   );
 
-  // Calculate total count for badge
-  const totalCount = releases.length + tikiReleases.length;
+  const totalCount = mergedReleases.length;
 
   return (
     <>
@@ -273,27 +325,28 @@ export function ReleasesSection() {
             </div>
           )}
 
-          {isLoading && releases.length === 0 && tikiReleases.length === 0 && (
+          {isLoading && mergedReleases.length === 0 && (
             <div className="releases-section-loading">
               <span className="releases-section-spinner" />
               Loading releases...
             </div>
           )}
 
-          {/* Tiki Releases (local releases with issues) */}
-          {tikiReleases.length > 0 && (
-            <div className="releases-section-group">
-              <div className="releases-section-group-label">Local Releases</div>
-              <div className="releases-section-list">
-                {tikiReleases.map((release) => (
+          {mergedReleases.length > 0 && (
+            <div className="releases-section-list">
+              {mergedReleases.map((release) => {
+                const isSelected = release.hasTiki
+                  ? selectedTikiRelease === release.version
+                  : selectedRelease === release.version;
+                return (
                   <div
                     key={release.version}
-                    className={`releases-section-tiki-card${selectedTikiRelease === release.version ? " selected" : ""}`}
-                    onClick={() => handleTikiReleaseClick(release)}
+                    className={`releases-section-tiki-card${isSelected ? " selected" : ""}`}
+                    onClick={() => handleReleaseClick(release)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        handleTikiReleaseClick(release);
+                        handleReleaseClick(release);
                       }
                     }}
                     tabIndex={0}
@@ -301,45 +354,38 @@ export function ReleasesSection() {
                   >
                     <div className="releases-section-tiki-header">
                       <span className="releases-section-tiki-version">{release.version}</span>
-                      <span className={`releases-section-tiki-status ${release.status}`}>
-                        {release.status}
-                      </span>
+                      <div className="releases-section-badges">
+                        {release.status && (
+                          <span className={`releases-section-tiki-status ${release.status}`}>
+                            {release.status}
+                          </span>
+                        )}
+                        {release.isDraft && (
+                          <span className="releases-section-tiki-status">draft</span>
+                        )}
+                        {release.isPrerelease && (
+                          <span className="releases-section-tiki-status">pre-release</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="releases-section-tiki-issues">
-                      {release.issues.length} issue{release.issues.length !== 1 ? "s" : ""}
-                    </div>
+                    {release.issueCount !== undefined && (
+                      <div className="releases-section-tiki-issues">
+                        {release.issueCount} issue{release.issueCount !== 1 ? "s" : ""}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
 
-          {/* GitHub Releases */}
-          {releases.length > 0 && (
-            <div className="releases-section-group">
-              {tikiReleases.length > 0 && (
-                <div className="releases-section-group-label">GitHub Releases</div>
-              )}
-              <div className="releases-section-list">
-                {releases.map((release) => (
-                  <ReleaseCard
-                    key={release.tagName}
-                    release={release}
-                    isSelected={selectedRelease === release.tagName}
-                    onClick={() => handleReleaseClick(release)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!hasProject && tikiReleases.length === 0 && (
+          {!hasProject && mergedReleases.length === 0 && (
             <div className="releases-section-empty">
               Select a project to view GitHub releases
             </div>
           )}
 
-          {hasProject && !isLoading && !error && releases.length === 0 && tikiReleases.length === 0 && (
+          {hasProject && !isLoading && !error && mergedReleases.length === 0 && (
             <div className="releases-section-empty">
               No releases found. Click + to create one.
             </div>

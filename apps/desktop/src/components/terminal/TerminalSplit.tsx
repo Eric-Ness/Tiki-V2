@@ -63,7 +63,9 @@ const countTerminals = (node: SplitTreeNode): number => {
 };
 
 export function TerminalSplit({ tabId, node }: TerminalSplitProps) {
-  const { tabs, updateSplitSizes, updateTabStatus, setActiveTerminal } = useTerminalStore();
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const { updateSplitSizes, updateTabStatus, setActiveTerminal } = useTerminalStore();
   const activeProject = useProjectsStore((state) => state.getActiveProject());
   const tab = tabs.find((t) => t.id === tabId);
   const totalTerminals = tab ? countTerminals(tab.splitRoot) : 1;

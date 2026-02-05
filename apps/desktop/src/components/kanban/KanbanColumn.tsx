@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useDetailStore } from '../../stores';
+import { useDetailStore, useProjectsStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanCard, type WorkItem } from './KanbanCard';
 
@@ -20,7 +20,8 @@ const cardVariants = {
 };
 
 export function KanbanColumn({ id, title, issues, workItems, activeId, onExecute }: KanbanColumnProps) {
-  const selectedIssue = useDetailStore((s) => s.selectedIssue);
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const selectedIssue = useDetailStore((s) => s.selectionByProject[projectId]?.selectedIssue ?? null);
   const { isOver, setNodeRef } = useDroppable({ id });
 
   const classNames = [

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 61,
+    "title": "Project-scoped isolation for terminals, sidebar panels, and kanban board",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/61"
+  },
+  "createdAt": "2026-02-05T23:05:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "description": "Switching projects shows only that project's terminal tabs" },
+    { "id": "SC2", "description": "Terminals from the previous project are preserved and restored when switching back" },
+    { "id": "SC3", "description": "New terminals default cwd to the active project's root directory" },
+    { "id": "SC4", "description": "Selected issue/release is tracked per-project and restored on switch" },
+    { "id": "SC5", "description": "Kanban release filter is tracked per-project and restored on switch" },
+    { "id": "SC6", "description": "Switching to a project with no prior state starts clean (empty terminals, no selection, no filter)" },
+    { "id": "SC7", "description": "All per-project state survives app restart via localStorage" },
+    { "id": "SC8", "description": "No state bleed between projects in any affected store" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Project-scope the terminalStore",
+      "status": "pending",
+      "content": "Restructure `terminalStore.ts` to key all terminal state by project ID.\n\n**What to change in `apps/desktop/src/stores/terminalStore.ts`:**\n\n1. Add a new import for `useProjectsStore` to read `activeProjectId`.\n\n2. Change `TerminalState` from:\n   ```\n   tabs: TerminalTab[]\n   activeTabId: string | null\n   ```\n   to:\n   ```\n   tabsByProject: Record<string, TerminalTab[]>\n   activeTabByProject: Record<string, string | null>\n   ```\n\n3. Add a private helper `getProjectId()` that reads `useProjectsStore.getState().activeProjectId` and returns it (or a fallback like `'default'` if null).\n\n4. Update every action (`addTab`, `addTabInBackground`, `removeTab`, `setActiveTab`, `setActiveTerminal`, `updateTabStatus`, `updateTabTitle`, `updateTabCwd`, `splitTerminal`, `closeSplit`, `updateSplitSizes`) to:\n   - Read the current project ID via the helper\n   - Operate on `state.tabsByProject[projectId]` instead of `state.tabs`\n   - Write back to `state.tabsByProject[projectId]` and `state.activeTabByProject[projectId]`\n\n5. Add convenience getters that components can use:\n   - `getTabs()`: returns `tabsByProject[getProjectId()] ?? []`\n   - `getActiveTabId()`: returns `activeTabByProject[getProjectId()] ?? null`\n\n6. Update the `persist` config:\n   - `partialize`: serialize `tabsByProject` and `activeTabByProject` (resetting all tab statuses to 'starting')\n   - `migrate`: version bump to 2. Migration function should take old flat `{ tabs, activeTabId }` state and wrap it into `{ tabsByProject: { [currentActiveProjectId]: tabs }, activeTabByProject: { [currentActiveProjectId]: activeTabId } }`. Read the current active project ID from `useProjectsStore.getState().activeProjectId ?? 'default'`.\n\n7. Keep the `tabCounter` global (this is fine — it's just for display names).\n\n**What to change in consuming components:**\n\nUpdate all components that read `tabs` and `activeTabId` from the store to use the new getter pattern instead:\n\n- `apps/desktop/src/components/terminal/TerminalPane.tsx` (line 8): Change destructuring from `{ tabs, activeTabId, ... }` to use the getter methods or subscribe to the project-scoped values.\n- `apps/desktop/src/components/terminal/TerminalTabs.tsx` (line 28): Same pattern.\n- `apps/desktop/src/components/terminal/TerminalSplit.tsx` (line 66): `tabs` usage → project-scoped.\n- `apps/desktop/src/components/kanban/KanbanBoard.tsx` (line 52): `{ tabs, activeTabId }` → project-scoped.\n- `apps/desktop/src/components/detail/TikiReleaseDetail.tsx` (line 25): `{ tabs, activeTabId }` → project-scoped.\n- `apps/desktop/src/App.tsx` (line 223): `useTerminalStore.getState()` call → use project-scoped getters.\n\n**New terminal default cwd:**\nIn `addTab` and `addTabInBackground`, set `cwd` to `useProjectsStore.getState().getActiveProject()?.path` so new terminals default to the project root.",
+      "verification": [
+        "Run `pnpm typecheck` from root — no TypeScript errors",
+        "Run `pnpm build` from root — builds successfully",
+        "Manual: Open app with one project, create 2 terminals. Add a second project, switch to it — terminal list should be empty (fresh project). Create a terminal there. Switch back to first project — original 2 terminals are still there. Switch to second project — the 1 terminal is there.",
+        "Manual: Create a new terminal — verify its cwd is the active project's root path"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC6", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts",
+        "apps/desktop/src/components/terminal/TerminalPane.tsx",
+        "apps/desktop/src/components/terminal/TerminalTabs.tsx",
+        "apps/desktop/src/components/terminal/TerminalSplit.tsx",
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx",
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Project-scope the detailStore",
+      "status": "pending",
+      "content": "Restructure `detailStore.ts` to key selection state by project ID.\n\n**What to change in `apps/desktop/src/stores/detailStore.ts`:**\n\n1. Add import for `useProjectsStore`.\n\n2. Change `DetailState` from flat fields to project-keyed maps:\n   ```\n   selectionByProject: Record<string, {\n     selectedIssue: number | null;\n     selectedRelease: string | null;\n     selectedTikiRelease: string | null;\n   }>\n   ```\n\n3. Add a `getProjectId()` helper (same pattern as terminalStore).\n\n4. Update all actions (`setSelectedIssue`, `setSelectedRelease`, `setSelectedTikiRelease`, `clearSelection`) to operate on `selectionByProject[projectId]` instead of flat state.\n\n5. Add convenience getters:\n   - `getSelectedIssue()`: returns `selectionByProject[getProjectId()]?.selectedIssue ?? null`\n   - `getSelectedRelease()`: returns `selectionByProject[getProjectId()]?.selectedRelease ?? null`\n   - `getSelectedTikiRelease()`: returns `selectionByProject[getProjectId()]?.selectedTikiRelease ?? null`\n\n6. Add `persist` middleware (the store currently has NO persistence — add it with key `'tiki-detail'`). This ensures selections survive restart.\n\n**What to change in consuming components:**\n\n- `apps/desktop/src/App.tsx` (lines 44-46): Change `useDetailStore((s) => s.selectedIssue)` etc. to use project-scoped getters. Since Zustand selectors need to return stable values, consider subscribing to the whole selectionByProject map and deriving per-project values, OR expose the getters as selectable state fields.\n- `apps/desktop/src/components/sidebar/IssuesSection.tsx` (lines 84-85): `selectedIssue` and `setSelectedIssue` → project-scoped.\n- `apps/desktop/src/components/sidebar/ReleasesSection.tsx` (lines 116-119): All 4 selectors → project-scoped.\n- `apps/desktop/src/components/kanban/KanbanColumn.tsx` (line 23): `selectedIssue` → project-scoped.\n- `apps/desktop/src/components/kanban/KanbanCard.tsx` (line 23): `setSelectedIssue` → project-scoped.\n- `apps/desktop/src/components/detail/TikiReleaseDetail.tsx` (line 28): `clearSelection` → project-scoped (action already works correctly since it writes to the current project's slot).\n\n**Important pattern note:** The setters (setSelectedIssue, etc.) already scope by reading the current project ID at call time, so components don't need to pass projectId — they just call the same API as before. Only the **readers** need to change to read from the project-scoped map.",
+      "verification": [
+        "Run `pnpm typecheck` from root — no TypeScript errors",
+        "Run `pnpm build` from root — builds successfully",
+        "Manual: Select issue #5 in Project A. Switch to Project B — no issue should be selected. Select issue #10 in Project B. Switch back to Project A — issue #5 should be selected again. Same test for release selection."
+      ],
+      "addressesCriteria": ["SC4", "SC6", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/stores/detailStore.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx",
+        "apps/desktop/src/components/kanban/KanbanColumn.tsx",
+        "apps/desktop/src/components/kanban/KanbanCard.tsx",
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Project-scope the kanbanStore",
+      "status": "pending",
+      "content": "Restructure `kanbanStore.ts` to key the release filter by project ID.\n\n**What to change in `apps/desktop/src/stores/kanbanStore.ts`:**\n\n1. Add import for `useProjectsStore`.\n\n2. Change `KanbanState` from:\n   ```\n   releaseFilter: string | null\n   draggedCardId: number | null\n   ```\n   to:\n   ```\n   releaseFilterByProject: Record<string, string | null>\n   draggedCardId: number | null  // keep global — dragging is transient\n   ```\n\n3. Add `getProjectId()` helper.\n\n4. Update `setReleaseFilter` to write to `releaseFilterByProject[projectId]`.\n\n5. Add getter `getReleaseFilter()`: returns `releaseFilterByProject[getProjectId()] ?? null`.\n\n6. Update `persist.partialize` to serialize `releaseFilterByProject` instead of `releaseFilter`.\n\n7. Add migration (version 1 → 2): take old `{ releaseFilter }` and wrap into `{ releaseFilterByProject: { [currentProjectId]: releaseFilter } }`.\n\n**What to change in consuming components:**\n\n- `apps/desktop/src/components/kanban/KanbanFilters.tsx` (lines 4-5): `releaseFilter` → use project-scoped getter. `setReleaseFilter` still works as-is (scopes by current project internally).\n- `apps/desktop/src/components/kanban/KanbanBoard.tsx` (line 50): `releaseFilter` → project-scoped getter.\n\nThis is the smallest of the three store changes.",
+      "verification": [
+        "Run `pnpm typecheck` from root — no TypeScript errors",
+        "Run `pnpm build` from root — builds successfully",
+        "Manual: Set release filter to 'v1.0' in Project A. Switch to Project B — filter should be 'all' (no prior state). Set filter to 'v2.0' in Project B. Switch back to Project A — filter should be 'v1.0' again."
+      ],
+      "addressesCriteria": ["SC5", "SC6", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/stores/kanbanStore.ts",
+        "apps/desktop/src/components/kanban/KanbanFilters.tsx",
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 4,
+      "title": "Integration testing and edge case handling",
+      "status": "pending",
+      "content": "Verify the full project-switch lifecycle works end-to-end and handle edge cases.\n\n**Edge cases to address:**\n\n1. **Project removal cleanup**: When a project is removed via `projectsStore.removeProject()`, clean up its entries from all three stores (`tabsByProject`, `selectionByProject`, `releaseFilterByProject`). Add a cleanup function or subscribe to project removal.\n   - Option A: Add a `cleanupProject(projectId)` method to each store and call it from `ProjectsSection.tsx` when removing a project.\n   - Option B: Add a `useEffect` in `App.tsx` that watches the project list and cleans up orphaned project keys.\n\n2. **No active project fallback**: Ensure all three stores gracefully handle `activeProjectId === null` by using a `'default'` fallback key.\n\n3. **App.tsx startup logic** (line 223): The 'Start Claude' button reads `useTerminalStore.getState()` — verify it correctly gets the active project's terminal. If no terminal exists for the current project, it should auto-create one first.\n\n4. **Auto-create first terminal on project switch**: Currently when you switch to a brand new project, the terminal list is empty. The app should auto-create one terminal tab (matching the existing behavior where there's always at least one tab). Check if this is handled by the `removeTab` logic (which creates a new tab when removing the last one) or if we need explicit initialization.\n\n**Files to review/modify:**\n- `apps/desktop/src/App.tsx` — startup terminal auto-creation logic, Start Claude button\n- `apps/desktop/src/components/sidebar/ProjectsSection.tsx` — cleanup on project removal\n- All three stores if cleanup methods are needed\n\n**Full integration test script (manual):**\n1. Start app with no projects → should work with default fallback\n2. Add Project A → terminals, selection, filter scoped to A\n3. Create 2 terminals, select an issue, set kanban filter in A\n4. Add Project B, switch to it → clean slate (1 auto-created terminal, no selection, no filter)\n5. Create terminal, select issue, set filter in B\n6. Switch back to A → 2 terminals restored, issue selected, filter restored\n7. Switch to B → 1 terminal, its selection and filter restored\n8. Remove Project A → its state cleaned up from localStorage\n9. Restart app → Project B state persists correctly",
+      "verification": [
+        "Run `pnpm typecheck` from root — no TypeScript errors",
+        "Run `pnpm build` from root — builds successfully",
+        "Manual: Run the full 9-step integration test script above",
+        "Manual: Verify localStorage (DevTools → Application → Local Storage) shows project-keyed data structures"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx",
+        "apps/desktop/src/stores/terminalStore.ts",
+        "apps/desktop/src/stores/detailStore.ts",
+        "apps/desktop/src/stores/kanbanStore.ts"
+      ],
+      "dependencies": [1, 2, 3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 4],
+    "SC2": [1, 4],
+    "SC3": [1, 4],
+    "SC4": [2, 4],
+    "SC5": [3, 4],
+    "SC6": [1, 2, 3, 4],
+    "SC7": [1, 2, 3, 4],
+    "SC8": [1, 2, 3, 4]
+  }
+}

@@ -1,23 +1,29 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useProjectsStore } from './projectsStore';
 
 interface KanbanState {
-  // Filters
-  releaseFilter: string | null;  // null = show all issues
+  // Filters (per-project)
+  releaseFilterByProject: Record<string, string | null>;
 
-  // UI State
-  draggedCardId: number | null;  // Issue number being dragged
+  // UI State (global — dragging is transient)
+  draggedCardId: number | null;
 }
 
 interface KanbanActions {
   setReleaseFilter: (release: string | null) => void;
   setDraggedCard: (issueNumber: number | null) => void;
+  cleanupProject: (projectId: string) => void;
 }
 
 type KanbanStore = KanbanState & KanbanActions;
 
+const getProjectId = (): string => {
+  return useProjectsStore.getState().activeProjectId ?? 'default';
+};
+
 const initialState: KanbanState = {
-  releaseFilter: null,
+  releaseFilterByProject: {},
   draggedCardId: null,
 };
 
@@ -26,15 +32,42 @@ export const useKanbanStore = create<KanbanStore>()(
     (set) => ({
       ...initialState,
 
-      setReleaseFilter: (release) => set({ releaseFilter: release }),
+      setReleaseFilter: (release) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          releaseFilterByProject: {
+            ...state.releaseFilterByProject,
+            [projectId]: release,
+          },
+        }));
+      },
+
       setDraggedCard: (id) => set({ draggedCardId: id }),
+
+      cleanupProject: (projectId) =>
+        set((state) => {
+          const { [projectId]: _removed, ...remaining } = state.releaseFilterByProject;
+          return { releaseFilterByProject: remaining };
+        }),
     }),
     {
       name: 'tiki-kanban',
+      version: 2,
       partialize: (state) => ({
-        releaseFilter: state.releaseFilter,
+        releaseFilterByProject: state.releaseFilterByProject,
         // Don't persist draggedCardId (transient state)
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 0 || version === 1) {
+          const old = persistedState as { releaseFilter?: string | null };
+          const projectId = useProjectsStore.getState().activeProjectId ?? 'default';
+          return {
+            releaseFilterByProject: { [projectId]: old.releaseFilter ?? null },
+            draggedCardId: null,
+          };
+        }
+        return persistedState as KanbanState;
+      },
     }
   )
 );

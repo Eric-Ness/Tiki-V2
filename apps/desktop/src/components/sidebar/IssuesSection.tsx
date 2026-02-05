@@ -82,7 +82,8 @@ export function IssuesSection() {
   }, [fetchIssues]);
 
   const setSelectedIssue = useDetailStore((state) => state.setSelectedIssue);
-  const selectedIssue = useDetailStore((state) => state.selectedIssue);
+  const projectId = useProjectsStore((state) => state.activeProjectId) ?? 'default';
+  const selectedIssue = useDetailStore((state) => state.selectionByProject[projectId]?.selectedIssue ?? null);
 
   const handleFilterChange = (newFilter: IssueFilter) => {
     setFilter(newFilter);

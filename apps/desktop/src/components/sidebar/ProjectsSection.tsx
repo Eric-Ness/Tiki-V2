@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { ProjectCard } from "./ProjectCard";
-import { useProjectsStore } from "../../stores";
+import { useProjectsStore, useTerminalStore, useDetailStore, useKanbanStore } from "../../stores";
 import "./ProjectsSection.css";
 
 export function ProjectsSection() {
@@ -96,6 +96,10 @@ export function ProjectsSection() {
 
     if (confirmed) {
       removeProject(projectId);
+      // Clean up project-scoped state from all stores
+      useTerminalStore.getState().cleanupProject(projectId);
+      useDetailStore.getState().cleanupProject(projectId);
+      useKanbanStore.getState().cleanupProject(projectId);
       setError(null);
     }
   };

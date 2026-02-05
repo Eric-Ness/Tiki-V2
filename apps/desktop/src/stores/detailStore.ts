@@ -1,9 +1,15 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { useProjectsStore } from './projectsStore';
 
-interface DetailState {
+interface ProjectSelection {
   selectedIssue: number | null;
   selectedRelease: string | null;
   selectedTikiRelease: string | null;
+}
+
+interface DetailState {
+  selectionByProject: Record<string, ProjectSelection>;
 }
 
 interface DetailActions {
@@ -11,44 +17,90 @@ interface DetailActions {
   setSelectedRelease: (tagName: string | null) => void;
   setSelectedTikiRelease: (version: string | null) => void;
   clearSelection: () => void;
+  cleanupProject: (projectId: string) => void;
 }
 
 type DetailStore = DetailState & DetailActions;
 
-const initialState: DetailState = {
+const getProjectId = (): string => {
+  return useProjectsStore.getState().activeProjectId ?? 'default';
+};
+
+const emptySelection: ProjectSelection = {
   selectedIssue: null,
   selectedRelease: null,
   selectedTikiRelease: null,
 };
 
-export const useDetailStore = create<DetailStore>()((set) => ({
-  ...initialState,
+const initialState: DetailState = {
+  selectionByProject: {},
+};
 
-  setSelectedIssue: (issueNumber) =>
-    set({
-      selectedIssue: issueNumber,
-      selectedRelease: null,
-      selectedTikiRelease: null,
-    }),
+export const useDetailStore = create<DetailStore>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setSelectedRelease: (tagName) =>
-    set({
-      selectedRelease: tagName,
-      selectedIssue: null,
-      selectedTikiRelease: null,
-    }),
+      setSelectedIssue: (issueNumber) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: {
+              selectedIssue: issueNumber,
+              selectedRelease: null,
+              selectedTikiRelease: null,
+            },
+          },
+        }));
+      },
 
-  setSelectedTikiRelease: (version) =>
-    set({
-      selectedTikiRelease: version,
-      selectedIssue: null,
-      selectedRelease: null,
-    }),
+      setSelectedRelease: (tagName) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: {
+              selectedRelease: tagName,
+              selectedIssue: null,
+              selectedTikiRelease: null,
+            },
+          },
+        }));
+      },
 
-  clearSelection: () =>
-    set({
-      selectedIssue: null,
-      selectedRelease: null,
-      selectedTikiRelease: null,
+      setSelectedTikiRelease: (version) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: {
+              selectedTikiRelease: version,
+              selectedIssue: null,
+              selectedRelease: null,
+            },
+          },
+        }));
+      },
+
+      clearSelection: () => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: { ...emptySelection },
+          },
+        }));
+      },
+
+      cleanupProject: (projectId) =>
+        set((state) => {
+          const { [projectId]: _removed, ...remaining } = state.selectionByProject;
+          return { selectionByProject: remaining };
+        }),
     }),
-}));
+    {
+      name: 'tiki-detail',
+    }
+  )
+);

@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useLayoutStore, useTikiStateStore } from '../../stores';
+import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard, type WorkItem } from './KanbanCard';
@@ -47,9 +47,11 @@ interface ColumnData {
 
 export function KanbanBoard() {
   const issues = useIssuesStore((s) => s.issues);
-  const releaseFilter = useKanbanStore((s) => s.releaseFilter);
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const releaseFilter = useKanbanStore((s) => s.releaseFilterByProject[projectId] ?? null);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
-  const { tabs, activeTabId } = useTerminalStore();
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
   const setActiveView = useLayoutStore((s) => s.setActiveView);
   const activeWork = useTikiStateStore((s) => s.activeWork);
   const recentIssues = useTikiStateStore((s) => s.recentIssues);
@@ -299,7 +301,7 @@ export function KanbanBoard() {
       if (col.id === 'completed') {
         const completedIssues: GitHubIssue[] = recentIssues.slice(0, 8).map((recent) => ({
           number: recent.number,
-          title: recent.title,
+          title: recent.title || `Issue #${recent.number}`,
           state: 'CLOSED',
           body: '',
           labels: [],

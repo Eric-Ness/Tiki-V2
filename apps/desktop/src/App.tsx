@@ -40,16 +40,17 @@ function App() {
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
 
-  // Detail panel state
-  const selectedIssue = useDetailStore((s) => s.selectedIssue);
-  const selectedRelease = useDetailStore((s) => s.selectedRelease);
-  const selectedTikiRelease = useDetailStore((s) => s.selectedTikiRelease);
+  // Active project
+  const activeProject = useProjectsStore((s) => s.getActiveProject());
+  const activeProjectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+
+  // Detail panel state (project-scoped)
+  const selectedIssue = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedIssue ?? null);
+  const selectedRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedRelease ?? null);
+  const selectedTikiRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedTikiRelease ?? null);
   const issues = useIssuesStore((s) => s.issues);
   const releases = useReleasesStore((s) => s.releases);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
-
-  // Active project
-  const activeProject = useProjectsStore((s) => s.getActiveProject());
 
   // Get the selected issue/release objects
   const selectedIssueData = selectedIssue
@@ -143,7 +144,8 @@ function App() {
         }
       } else if (event.payload.type === "releaseChanged") {
         try {
-          const loadedReleases = await invoke<Array<{ version: string; status: string; issues: Array<{ number: number; title: string }>; createdAt: string }>>("load_tiki_releases");
+          const projectTikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+          const loadedReleases = await invoke<Array<{ version: string; status: string; issues: Array<{ number: number; title: string }>; createdAt: string }>>("load_tiki_releases", { tikiPath: projectTikiPath });
           useTikiReleasesStore.getState().setReleases(loadedReleases);
         } catch (e) {
           console.error("Failed to reload releases:", e);
@@ -219,7 +221,10 @@ function App() {
               <button
                 className="start-claude-btn"
                 onClick={async () => {
-                  const { tabs, activeTabId } = useTerminalStore.getState();
+                  const projectId = useProjectsStore.getState().activeProjectId ?? 'default';
+                  const termState = useTerminalStore.getState();
+                  const tabs = termState.tabsByProject[projectId] ?? [];
+                  const activeTabId = termState.activeTabByProject[projectId] ?? null;
                   const activeTab = tabs.find((t) => t.id === activeTabId);
                   if (!activeTab) return;
                   try {

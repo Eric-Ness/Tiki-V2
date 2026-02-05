@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTerminalStore, type TerminalTab } from '../../stores';
+import { useTerminalStore, useProjectsStore, type TerminalTab } from '../../stores';
 
 interface StatusDotProps {
   status: TerminalTab['status'];
@@ -24,8 +24,10 @@ function StatusDot({ status }: StatusDotProps) {
 }
 
 export function TerminalTabs() {
-  const { tabs, activeTabId, addTab, removeTab, setActiveTab, updateTabTitle } =
-    useTerminalStore();
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
+  const { addTab, removeTab, setActiveTab, updateTabTitle } = useTerminalStore();
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useTerminalStore } from '../../stores';
+import { useTerminalStore, useProjectsStore } from '../../stores';
 import { TerminalSplit } from './TerminalSplit';
 import { TerminalTabs } from './TerminalTabs';
 import './Terminal.css';
 
 export function TerminalPane() {
-  const { tabs, activeTabId, addTab, removeTab, setActiveTab, splitTerminal } = useTerminalStore();
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
+  const { addTab, removeTab, setActiveTab, splitTerminal } = useTerminalStore();
   const hasInitialized = useRef(false);
 
   // Create initial tab if none exist
@@ -15,6 +18,11 @@ export function TerminalPane() {
       addTab();
     }
   }, [tabs.length, addTab]);
+
+  // Reset initialization flag when project changes so new projects get a tab
+  useEffect(() => {
+    hasInitialized.current = false;
+  }, [projectId]);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

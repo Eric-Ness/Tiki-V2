@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useProjectsStore } from './projectsStore';
 
 export type TerminalStatus = 'starting' | 'ready' | 'busy' | 'idle' | 'exited';
 
@@ -33,8 +34,8 @@ export interface TerminalTab {
 }
 
 interface TerminalState {
-  tabs: TerminalTab[];
-  activeTabId: string | null;
+  tabsByProject: Record<string, TerminalTab[]>;
+  activeTabByProject: Record<string, string | null>;
 }
 
 interface TerminalActions {
@@ -50,12 +51,17 @@ interface TerminalActions {
   splitTerminal: (tabId: string, terminalId: string, direction: SplitDirection) => void;
   closeSplit: (tabId: string, terminalId: string) => void;
   updateSplitSizes: (tabId: string, nodeId: string, sizes: number[]) => void;
+  cleanupProject: (projectId: string) => void;
 }
 
 type TerminalStore = TerminalState & TerminalActions;
 
 // Counter for generating sequential terminal names
 let tabCounter = 1;
+
+const getProjectId = (): string => {
+  return useProjectsStore.getState().activeProjectId ?? 'default';
+};
 
 const generateId = (): string => {
   return `terminal-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -149,8 +155,8 @@ const getTerminalIds = (node: SplitTreeNode): string[] => {
 };
 
 const initialState: TerminalState = {
-  tabs: [],
-  activeTabId: null,
+  tabsByProject: {},
+  activeTabByProject: {},
 };
 
 export const useTerminalStore = create<TerminalStore>()(
@@ -159,115 +165,187 @@ export const useTerminalStore = create<TerminalStore>()(
       ...initialState,
 
       addTab: () => {
+        const projectId = getProjectId();
         const tabId = generateId();
         const terminalId = generateId();
+        const projectPath = useProjectsStore.getState().getActiveProject()?.path;
         const newTab: TerminalTab = {
           id: tabId,
           title: generateTitle(),
           status: 'starting',
+          cwd: projectPath,
           splitRoot: createLeaf(terminalId),
           activeTerminalId: terminalId,
         };
         set((state) => ({
-          tabs: [...state.tabs, newTab],
-          activeTabId: tabId,
+          tabsByProject: {
+            ...state.tabsByProject,
+            [projectId]: [...(state.tabsByProject[projectId] ?? []), newTab],
+          },
+          activeTabByProject: {
+            ...state.activeTabByProject,
+            [projectId]: tabId,
+          },
         }));
         return tabId;
       },
 
       addTabInBackground: () => {
+        const projectId = getProjectId();
         const tabId = generateId();
         const terminalId = generateId();
+        const projectPath = useProjectsStore.getState().getActiveProject()?.path;
         const newTab: TerminalTab = {
           id: tabId,
           title: generateTitle(),
           status: 'starting',
+          cwd: projectPath,
           splitRoot: createLeaf(terminalId),
           activeTerminalId: terminalId,
           backgroundMode: true,
         };
         set((state) => ({
-          tabs: [...state.tabs, newTab],
-          // Don't change activeTabId - keep current tab focused
+          tabsByProject: {
+            ...state.tabsByProject,
+            [projectId]: [...(state.tabsByProject[projectId] ?? []), newTab],
+          },
+          // Don't change activeTabByProject - keep current tab focused
         }));
         return tabId;
       },
 
       removeTab: (id) =>
         set((state) => {
-          const newTabs = state.tabs.filter((t) => t.id !== id);
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          const activeTabId = state.activeTabByProject[projectId] ?? null;
+          const newTabs = tabs.filter((t) => t.id !== id);
 
           // If removing the last tab, create a new one
           if (newTabs.length === 0) {
             const newTabId = generateId();
             const newTerminalId = generateId();
+            const projectPath = useProjectsStore.getState().getActiveProject()?.path;
             const newTab: TerminalTab = {
               id: newTabId,
               title: generateTitle(),
               status: 'starting',
+              cwd: projectPath,
               splitRoot: createLeaf(newTerminalId),
               activeTerminalId: newTerminalId,
             };
             return {
-              tabs: [newTab],
-              activeTabId: newTabId,
+              tabsByProject: {
+                ...state.tabsByProject,
+                [projectId]: [newTab],
+              },
+              activeTabByProject: {
+                ...state.activeTabByProject,
+                [projectId]: newTabId,
+              },
             };
           }
 
           // If removing the active tab, select the previous tab or the first one
-          let newActiveId = state.activeTabId;
-          if (state.activeTabId === id) {
-            const removedIndex = state.tabs.findIndex((t) => t.id === id);
+          let newActiveId = activeTabId;
+          if (activeTabId === id) {
+            const removedIndex = tabs.findIndex((t) => t.id === id);
             const newIndex = Math.max(0, removedIndex - 1);
             newActiveId = newTabs[newIndex]?.id ?? newTabs[0]?.id ?? null;
           }
 
           return {
-            tabs: newTabs,
-            activeTabId: newActiveId,
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: newTabs,
+            },
+            activeTabByProject: {
+              ...state.activeTabByProject,
+              [projectId]: newActiveId,
+            },
           };
         }),
 
       setActiveTab: (id) =>
-        set((state) => ({
-          activeTabId: id,
-          // Clear backgroundMode when user views the tab
-          tabs: state.tabs.map((t) =>
-            t.id === id && t.backgroundMode ? { ...t, backgroundMode: false } : t
-          ),
-        })),
+        set((state) => {
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          return {
+            activeTabByProject: {
+              ...state.activeTabByProject,
+              [projectId]: id,
+            },
+            // Clear backgroundMode when user views the tab
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === id && t.backgroundMode ? { ...t, backgroundMode: false } : t
+              ),
+            },
+          };
+        }),
 
       setActiveTerminal: (tabId, terminalId) =>
-        set((state) => ({
-          tabs: state.tabs.map((t) =>
-            t.id === tabId ? { ...t, activeTerminalId: terminalId } : t
-          ),
-        })),
+        set((state) => {
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          return {
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === tabId ? { ...t, activeTerminalId: terminalId } : t
+              ),
+            },
+          };
+        }),
 
       updateTabStatus: (id, status) =>
-        set((state) => ({
-          tabs: state.tabs.map((t) =>
-            t.id === id ? { ...t, status } : t
-          ),
-        })),
+        set((state) => {
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          return {
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === id ? { ...t, status } : t
+              ),
+            },
+          };
+        }),
 
       updateTabTitle: (id, title) =>
-        set((state) => ({
-          tabs: state.tabs.map((t) =>
-            t.id === id ? { ...t, title } : t
-          ),
-        })),
+        set((state) => {
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          return {
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === id ? { ...t, title } : t
+              ),
+            },
+          };
+        }),
 
       updateTabCwd: (id, cwd) =>
-        set((state) => ({
-          tabs: state.tabs.map((t) =>
-            t.id === id ? { ...t, cwd } : t
-          ),
-        })),
+        set((state) => {
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          return {
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === id ? { ...t, cwd } : t
+              ),
+            },
+          };
+        }),
 
       splitTerminal: (tabId, terminalId, direction) =>
         set((state) => {
-          const tab = state.tabs.find((t) => t.id === tabId);
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          const tab = tabs.find((t) => t.id === tabId);
           if (!tab) return state;
 
           const newTerminalId = generateId();
@@ -282,17 +360,22 @@ export const useTerminalStore = create<TerminalStore>()(
           const newSplitRoot = replaceInTree(tab.splitRoot, terminalId, splitNode);
 
           return {
-            tabs: state.tabs.map((t) =>
-              t.id === tabId
-                ? { ...t, splitRoot: newSplitRoot, activeTerminalId: newTerminalId }
-                : t
-            ),
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === tabId
+                  ? { ...t, splitRoot: newSplitRoot, activeTerminalId: newTerminalId }
+                  : t
+              ),
+            },
           };
         }),
 
       closeSplit: (tabId, terminalId) =>
         set((state) => {
-          const tab = state.tabs.find((t) => t.id === tabId);
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          const tab = tabs.find((t) => t.id === tabId);
           if (!tab) return state;
 
           const newSplitRoot = removeFromTree(tab.splitRoot, terminalId);
@@ -301,15 +384,18 @@ export const useTerminalStore = create<TerminalStore>()(
           if (newSplitRoot === null) {
             const newTerminalId = generateId();
             return {
-              tabs: state.tabs.map((t) =>
-                t.id === tabId
-                  ? {
-                      ...t,
-                      splitRoot: createLeaf(newTerminalId),
-                      activeTerminalId: newTerminalId,
-                    }
-                  : t
-              ),
+              tabsByProject: {
+                ...state.tabsByProject,
+                [projectId]: tabs.map((t) =>
+                  t.id === tabId
+                    ? {
+                        ...t,
+                        splitRoot: createLeaf(newTerminalId),
+                        activeTerminalId: newTerminalId,
+                      }
+                    : t
+                ),
+              },
             };
           }
 
@@ -321,17 +407,22 @@ export const useTerminalStore = create<TerminalStore>()(
           }
 
           return {
-            tabs: state.tabs.map((t) =>
-              t.id === tabId
-                ? { ...t, splitRoot: newSplitRoot, activeTerminalId: newActiveTerminalId }
-                : t
-            ),
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === tabId
+                  ? { ...t, splitRoot: newSplitRoot, activeTerminalId: newActiveTerminalId }
+                  : t
+              ),
+            },
           };
         }),
 
       updateSplitSizes: (tabId, nodeId, sizes) =>
         set((state) => {
-          const tab = state.tabs.find((t) => t.id === tabId);
+          const projectId = getProjectId();
+          const tabs = state.tabsByProject[projectId] ?? [];
+          const tab = tabs.find((t) => t.id === tabId);
           if (!tab) return state;
 
           const updateSizes = (node: SplitTreeNode): SplitTreeNode => {
@@ -346,34 +437,55 @@ export const useTerminalStore = create<TerminalStore>()(
           };
 
           return {
-            tabs: state.tabs.map((t) =>
-              t.id === tabId ? { ...t, splitRoot: updateSizes(t.splitRoot) } : t
-            ),
+            tabsByProject: {
+              ...state.tabsByProject,
+              [projectId]: tabs.map((t) =>
+                t.id === tabId ? { ...t, splitRoot: updateSizes(t.splitRoot) } : t
+              ),
+            },
+          };
+        }),
+
+      cleanupProject: (projectId) =>
+        set((state) => {
+          const { [projectId]: _removedTabs, ...remainingTabs } = state.tabsByProject;
+          const { [projectId]: _removedActive, ...remainingActive } = state.activeTabByProject;
+          return {
+            tabsByProject: remainingTabs,
+            activeTabByProject: remainingActive,
           };
         }),
     }),
     {
       name: 'tiki-terminals',
-      version: 1,
+      version: 2,
       // Only persist tab metadata, not connection state
-      partialize: (state) => ({
-        tabs: state.tabs.map((t) => ({
-          ...t,
-          status: 'starting' as TerminalStatus, // Reset status on reload
-        })),
-        activeTabId: state.activeTabId,
-      }),
-      // Migrate old persisted state that may be missing splitRoot
+      partialize: (state) => {
+        const serialized: Record<string, TerminalTab[]> = {};
+        for (const [projectId, tabs] of Object.entries(state.tabsByProject)) {
+          serialized[projectId] = tabs.map((t) => ({
+            ...t,
+            status: 'starting' as TerminalStatus, // Reset status on reload
+          }));
+        }
+        return {
+          tabsByProject: serialized,
+          activeTabByProject: state.activeTabByProject,
+        };
+      },
       migrate: (persistedState: unknown, version: number) => {
-        if (version === 0) {
-          const state = persistedState as TerminalState;
+        if (version === 0 || version === 1) {
+          // Migrate from flat {tabs, activeTabId} to project-keyed maps
+          const old = persistedState as { tabs?: TerminalTab[]; activeTabId?: string | null };
+          const projectId = useProjectsStore.getState().activeProjectId ?? 'default';
+          const tabs = (old.tabs ?? []).map((tab) => ({
+            ...tab,
+            splitRoot: tab.splitRoot ?? createLeaf(tab.activeTerminalId || generateId()),
+            activeTerminalId: tab.activeTerminalId || (tab.splitRoot?.type === 'terminal' ? tab.splitRoot.terminalId : generateId()),
+          }));
           return {
-            ...state,
-            tabs: state.tabs.map((tab) => ({
-              ...tab,
-              splitRoot: tab.splitRoot ?? createLeaf(tab.activeTerminalId || generateId()),
-              activeTerminalId: tab.activeTerminalId || (tab.splitRoot?.type === 'terminal' ? tab.splitRoot.terminalId : generateId()),
-            })),
+            tabsByProject: { [projectId]: tabs },
+            activeTabByProject: { [projectId]: old.activeTabId ?? null },
           };
         }
         return persistedState as TerminalState;
