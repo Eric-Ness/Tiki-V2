@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 55,
+    "title": "Still no showing in the kanban board with the following state.json",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/55"
+  },
+  "createdAt": "2026-02-05T10:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Issues with activeWork status 'reviewing' appear in the Review column, even if previously completed"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "Active work status takes precedence over completion history for column placement"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "TypeScript compiles without errors"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Fix Kanban filtering logic to prioritize active work over history",
+      "status": "pending",
+      "content": "In KanbanBoard.tsx, modify the column filtering logic (around line 313-334) to check if an issue has active work with a non-completed status BEFORE excluding it based on completed history.\n\nThe current logic:\n1. Excludes if in completedIssueNumbers\n2. Then checks activeWork\n\nThe fix:\n1. Check activeWork first\n2. If activeWork exists with non-completed status, use that for column placement\n3. Only fall back to completed exclusion if no active work exists\n\nSpecifically, change the filter to:\n- If issue has activeWork with status != 'completed', use statusToColumn to place it\n- Only exclude from non-completed columns if issue has NO activeWork entry",
+      "verification": [
+        "Issue with 'reviewing' status in activeWork appears in Review column",
+        "Issue in completed history but with activeWork 'executing' appears in Execute column",
+        "Completed column still shows historical items correctly"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": ["apps/desktop/src/components/kanban/KanbanBoard.tsx"],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Verify TypeScript compilation",
+      "status": "pending",
+      "content": "Run typecheck to ensure the changes compile correctly without TypeScript errors.",
+      "verification": [
+        "pnpm typecheck passes without errors"
+      ],
+      "addressesCriteria": ["SC3"],
+      "files": [],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2]
+  }
+}

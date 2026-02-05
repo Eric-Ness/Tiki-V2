@@ -1,149 +1,62 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:53": {
+    "issue:55": {
       "type": "issue",
-      "issue": {
-        "number": 53,
-        "title": "tiki:review - review is skipped in kanban"
-      },
+      "id": "issue:55",
       "status": "shipping",
       "pipelineStep": "SHIP",
-      "phase": {
-        "current": 4,
-        "total": 4,
-        "status": "completed"
+      "yolo": true,
+      "issue": {
+        "number": 55,
+        "title": "Still no showing in the kanban board with the following state.json",
+        "body": "This was an issue that should have showed up in the review column...",
+        "state": "OPEN",
+        "labels": ["bug"],
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/55"
       },
-      "createdAt": "2026-02-05T08:00:00.000Z",
-      "lastActivity": "2026-02-05T08:05:00.000Z"
+      "createdAt": "2026-02-05T10:00:00.000Z",
+      "lastActivity": "2026-02-05T10:15:00.000Z",
+      "phase": {
+        "current": 2,
+        "total": 2,
+        "status": "completed"
+      }
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 52,
-      "title": "YOLO pipeline doesn't write correct state.json format for desktop app",
-      "completedAt": "2026-02-05T07:20:00.000Z"
+      "number": 54,
+      "title": "After shipped back to open in kanban",
+      "completedAt": "2026-02-05T09:30:00.000Z"
     },
     "recentIssues": [
-      {
-        "number": 52,
-        "title": "YOLO pipeline doesn't write correct state.json format for desktop app",
-        "completedAt": "2026-02-05T07:20:00.000Z"
-      },
-      {
-        "number": 51,
-        "title": "Test Issue 4",
-        "completedAt": "2026-02-04T07:05:00.000Z"
-      },
-      {
-        "number": 50,
-        "title": "Issues Not moving through Kanban columns",
-        "completedAt": "2026-02-04T06:20:00.000Z"
-      },
-      {
-        "number": 48,
-        "title": "Add Review Column To Kanban",
-        "completedAt": "2026-02-04T05:30:00.000Z"
-      },
-      {
-        "number": 47,
-        "title": "Card Info",
-        "completedAt": "2026-02-04T05:20:00.000Z"
-      },
-      {
-        "number": 44,
-        "title": "Test 3",
-        "completedAt": "2026-02-04T05:00:00.000Z"
-      },
-      {
-        "number": 49,
-        "title": "Phase Current/Total",
-        "completedAt": "2026-02-04T04:30:00.000Z"
-      },
-      {
-        "number": 46,
-        "title": "Delete Issues",
-        "completedAt": "2026-02-04T03:15:00.000Z"
-      },
-      {
-        "number": 26,
-        "title": "test issue",
-        "completedAt": "2026-02-04T01:00:00.000Z"
-      },
-      {
-        "number": 41,
-        "title": "Add release filter dropdown to Kanban board",
-        "completedAt": "2026-02-04T00:30:00.000Z"
-      },
-      {
-        "number": 35,
-        "title": "Create KanbanColumn component",
-        "completedAt": "2026-02-04T00:25:00.000Z"
-      },
-      {
-        "number": 34,
-        "title": "Create KanbanBoard container component",
-        "completedAt": "2026-02-04T00:20:00.000Z"
-      },
-      {
-        "number": 33,
-        "title": "Create Kanban store for board state management",
-        "completedAt": "2026-02-04T00:15:00.000Z"
-      },
-      {
-        "number": 32,
-        "title": "Add tab system to center panel (Terminal | Kanban)",
-        "completedAt": "2026-02-04T00:10:00.000Z"
-      },
-      {
-        "number": 36,
-        "title": "Lots of terminals pop up when background items are working",
-        "completedAt": "2026-02-03T23:45:00.000Z"
-      },
-      {
-        "number": 31,
-        "title": "Create Issue - Enhance error",
-        "completedAt": "2026-02-03T23:00:00.000Z"
-      },
-      {
-        "number": 30,
-        "title": "Release to detail",
-        "completedAt": "2026-02-03T22:30:00.000Z"
-      },
-      {
-        "number": 29,
-        "title": "Add Issue enhancements",
-        "completedAt": "2026-02-03T21:30:00.000Z"
-      },
-      {
-        "number": 28,
-        "title": "feat(framework): Add release command files for multi-issue pipeline execution",
-        "completedAt": "2026-02-03T18:30:00.000Z"
-      },
-      {
-        "number": 25,
-        "title": "As a standalone app 'Not in a GitHub repository. Please open a project with a GitHub remote.'",
-        "completedAt": "2026-02-03T12:30:00.000Z"
-      }
+      { "number": 54, "title": "After shipped back to open in kanban", "completedAt": "2026-02-05T09:30:00.000Z" },
+      { "number": 53, "title": "tiki:review - review is skipped in kanban", "completedAt": "2026-02-05T08:15:00.000Z" },
+      { "number": 52, "title": "YOLO pipeline doesn't write correct state.json format for desktop app", "completedAt": "2026-02-05T07:20:00.000Z" },
+      { "number": 51, "title": "Test Issue 4", "completedAt": "2026-02-04T07:05:00.000Z" },
+      { "number": 50, "title": "Issues Not moving through Kanban columns", "completedAt": "2026-02-04T06:20:00.000Z" },
+      { "number": 48, "title": "Add Review Column To Kanban", "completedAt": "2026-02-04T05:30:00.000Z" },
+      { "number": 47, "title": "Card Info", "completedAt": "2026-02-04T05:20:00.000Z" },
+      { "number": 44, "title": "Test 3", "completedAt": "2026-02-04T05:00:00.000Z" },
+      { "number": 49, "title": "Phase Current/Total", "completedAt": "2026-02-04T04:30:00.000Z" },
+      { "number": 46, "title": "Delete Issues", "completedAt": "2026-02-04T03:15:00.000Z" },
+      { "number": 26, "title": "test issue", "completedAt": "2026-02-04T01:00:00.000Z" },
+      { "number": 41, "title": "Add release filter dropdown to Kanban board", "completedAt": "2026-02-04T00:30:00.000Z" },
+      { "number": 35, "title": "Create KanbanColumn component", "completedAt": "2026-02-04T00:25:00.000Z" },
+      { "number": 34, "title": "Create KanbanBoard container component", "completedAt": "2026-02-04T00:20:00.000Z" },
+      { "number": 33, "title": "Create Kanban store for board state management", "completedAt": "2026-02-04T00:15:00.000Z" },
+      { "number": 32, "title": "Add tab system to center panel (Terminal | Kanban)", "completedAt": "2026-02-04T00:10:00.000Z" },
+      { "number": 36, "title": "Lots of terminals pop up when background items are working", "completedAt": "2026-02-03T23:45:00.000Z" },
+      { "number": 31, "title": "Create Issue - Enhance error", "completedAt": "2026-02-03T23:00:00.000Z" },
+      { "number": 30, "title": "Release to detail", "completedAt": "2026-02-03T22:30:00.000Z" },
+      { "number": 29, "title": "Add Issue enhancements", "completedAt": "2026-02-03T21:30:00.000Z" },
+      { "number": 28, "title": "feat(framework): Add release command files for multi-issue pipeline execution", "completedAt": "2026-02-03T18:30:00.000Z" }
     ],
     "recentReleases": [
-      {
-        "version": "v0.2.1",
-        "issues": [47, 48],
-        "completedAt": "2026-02-04T05:35:00.000Z",
-        "tag": "v0.2.1"
-      },
-      {
-        "version": "v0.2.0",
-        "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43],
-        "completedAt": "2026-02-04T00:10:00.000Z"
-      },
-      {
-        "version": "v0.1.2",
-        "issues": [30, 31],
-        "completedAt": "2026-02-03T23:10:00.000Z",
-        "tag": "v0.1.2"
-      }
+      { "version": "v0.2.1", "issues": [47, 48], "completedAt": "2026-02-04T05:35:00.000Z", "tag": "v0.2.1" },
+      { "version": "v0.2.0", "issues": [32, 33, 34, 35, 41, 37, 38, 42, 39, 40, 43], "completedAt": "2026-02-04T00:10:00.000Z" },
+      { "version": "v0.1.2", "issues": [30, 31], "completedAt": "2026-02-03T23:10:00.000Z", "tag": "v0.1.2" }
     ]
   }
 }

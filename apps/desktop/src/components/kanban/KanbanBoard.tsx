@@ -311,17 +311,19 @@ export function KanbanBoard() {
       }
 
       const colIssues = filteredIssues.filter((issue) => {
-        // Exclude issues that are in the completed history
-        if (completedIssueNumbers.has(issue.number)) {
-          return false;
-        }
-
-        // Check Tiki work state first
+        // Check Tiki work state FIRST - active work takes precedence over history
         const workKey = `issue:${issue.number}`;
         const work = activeWork[workKey];
         if (work && work.type === 'issue') {
+          // If issue has active work, use that status for column placement
+          // This ensures re-opened issues appear in their correct column
           const issueColumn = statusToColumn(work.status);
           return issueColumn === col.id;
+        }
+
+        // Only exclude from non-completed columns if NO active work exists
+        if (completedIssueNumbers.has(issue.number)) {
+          return false;
         }
 
         // Fall back to GitHub state for issues not in Tiki work
