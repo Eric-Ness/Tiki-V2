@@ -235,7 +235,7 @@ Located in `packages/shared/`, provides TypeScript types and JSON schemas used a
 ### Core Types
 
 ```typescript
-type WorkStatus = 'pending' | 'planning' | 'executing' | 'paused' | 'shipping' | 'completed' | 'failed';
+type WorkStatus = 'pending' | 'reviewing' | 'planning' | 'executing' | 'paused' | 'shipping' | 'completed' | 'failed';
 type PhaseStatus = 'pending' | 'executing' | 'completed' | 'failed' | 'skipped';
 type PipelineStep = 'GET' | 'REVIEW' | 'PLAN' | 'AUDIT' | 'EXECUTE' | 'SHIP';
 type WorkId = `issue:${number}` | `release:${string}`;
@@ -412,10 +412,9 @@ tools: Bash, Read
 
 ### Issue Work
 ```
-pending → planning → executing → shipping → completed
-  (GET)    (REVIEW    (EXECUTE)   (SHIP)
-            PLAN
-            AUDIT)
+pending → reviewing → planning → executing → shipping → completed
+  (GET)    (REVIEW)    (PLAN      (EXECUTE)   (SHIP)
+                        AUDIT)
 ```
 
 ### Release Work

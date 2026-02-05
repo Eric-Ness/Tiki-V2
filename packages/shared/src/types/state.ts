@@ -6,6 +6,7 @@
 /** Status of a work item */
 export type WorkStatus =
   | 'pending'
+  | 'reviewing'
   | 'planning'
   | 'executing'
   | 'paused'

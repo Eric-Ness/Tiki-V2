@@ -1,13 +1,35 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "issue:53": {
+      "type": "issue",
+      "issue": {
+        "number": 53,
+        "title": "tiki:review - review is skipped in kanban"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "phase": {
+        "current": 4,
+        "total": 4,
+        "status": "completed"
+      },
+      "createdAt": "2026-02-05T08:00:00.000Z",
+      "lastActivity": "2026-02-05T08:05:00.000Z"
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 51,
-      "title": "Test Issue 4",
-      "completedAt": "2026-02-04T07:05:00.000Z"
+      "number": 52,
+      "title": "YOLO pipeline doesn't write correct state.json format for desktop app",
+      "completedAt": "2026-02-05T07:20:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 52,
+        "title": "YOLO pipeline doesn't write correct state.json format for desktop app",
+        "completedAt": "2026-02-05T07:20:00.000Z"
+      },
       {
         "number": 51,
         "title": "Test Issue 4",

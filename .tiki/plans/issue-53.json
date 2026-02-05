@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 53,
+    "title": "tiki:review - review is skipped in kanban",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/53"
+  },
+  "createdAt": "2026-02-05T08:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Issues appear in the 'Review' column when tiki:review is running"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "Issues move to 'Plan' column only after tiki:plan starts"
+    },
+    {
+      "id": "SC3",
+      "category": "consistency",
+      "description": "pipelineStep and status values align logically with Kanban columns"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "Type definitions match schema and all usages compile (typecheck passes)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add 'reviewing' status to type system",
+      "status": "pending",
+      "content": "Add the new 'reviewing' status to the WorkStatus type in the shared package.\n\n1. Edit `packages/shared/src/types/state.ts`:\n   - Add `'reviewing'` to the WorkStatus union type (after 'pending')\n\n2. Edit `packages/shared/schemas/state.schema.json`:\n   - Add `\"reviewing\"` to the workStatus enum array in $defs/workStatus",
+      "verification": [
+        "WorkStatus type includes 'reviewing' in state.ts",
+        "state.schema.json workStatus enum includes 'reviewing'",
+        "pnpm typecheck passes from root"
+      ],
+      "addressesCriteria": ["SC3", "SC4"],
+      "files": [
+        "packages/shared/src/types/state.ts",
+        "packages/shared/schemas/state.schema.json"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Update Kanban status-to-column mapping",
+      "status": "pending",
+      "content": "Update the KanbanBoard component to map 'reviewing' status to the 'review' column.\n\n1. Edit `apps/desktop/src/components/kanban/KanbanBoard.tsx`:\n   - In COLUMN_CONFIG, update the 'review' column statuses array to include 'reviewing': `statuses: ['pending', 'reviewing']`\n   - In the statusToColumn function, add a case for 'reviewing' that returns 'review'",
+      "verification": [
+        "COLUMN_CONFIG review column includes 'reviewing' in statuses array",
+        "statusToColumn function maps 'reviewing' to 'review'",
+        "pnpm typecheck passes from root",
+        "Desktop app builds without errors"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4"],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Update framework commands to use 'reviewing' status",
+      "status": "pending",
+      "content": "Update the review command and yolo command to set status to 'reviewing' during the REVIEW pipeline step.\n\n1. Edit `packages/framework/commands/review.md`:\n   - In <state-management> section, change `\"status\": \"planning\"` to `\"status\": \"reviewing\"`\n   - Update the prose to say 'Change status from pending to reviewing'\n\n2. Edit `packages/framework/commands/yolo.md`:\n   - Update the REVIEW step state example to use `\"status\": \"reviewing\"`\n   - Update the Pipeline Step table row for REVIEW: change status from `planning` to `reviewing`\n   - Update the list of valid statuses to include `reviewing`\n\n3. Repeat the same changes for the duplicate command files:\n   - `packages/framework/.claude/commands/tiki/review.md`\n   - `packages/framework/.claude/commands/tiki/yolo.md`",
+      "verification": [
+        "review.md uses status: 'reviewing' with pipelineStep: 'REVIEW'",
+        "yolo.md REVIEW step uses status: 'reviewing'",
+        "yolo.md Pipeline Step table shows REVIEW -> reviewing",
+        "yolo.md valid statuses list includes 'reviewing'",
+        "Both .claude/commands/tiki/ duplicate files are updated consistently"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "packages/framework/commands/review.md",
+        "packages/framework/commands/yolo.md",
+        "packages/framework/.claude/commands/tiki/review.md",
+        "packages/framework/.claude/commands/tiki/yolo.md"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 4,
+      "title": "Update documentation",
+      "status": "pending",
+      "content": "Update the FRAMEWORK-DEEP-DIVE.md documentation to reflect the new 'reviewing' status.\n\n1. Edit `docs/FRAMEWORK-DEEP-DIVE.md`:\n   - Update the WorkStatus type definition to include 'reviewing'\n   - Update the Status Progression diagram to show 'reviewing' for REVIEW step\n   - Update any prose that describes status transitions",
+      "verification": [
+        "FRAMEWORK-DEEP-DIVE.md WorkStatus includes 'reviewing'",
+        "Status Progression section shows reviewing for REVIEW step",
+        "Documentation is consistent with implementation"
+      ],
+      "addressesCriteria": ["SC3"],
+      "files": [
+        "docs/FRAMEWORK-DEEP-DIVE.md"
+      ],
+      "dependencies": [1, 2, 3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2, 3],
+    "SC2": [2, 3],
+    "SC3": [1, 3, 4],
+    "SC4": [1, 2]
+  }
+}

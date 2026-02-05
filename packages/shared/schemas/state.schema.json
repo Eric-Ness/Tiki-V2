@@ -50,7 +50,7 @@
   "$defs": {
     "workStatus": {
       "type": "string",
-      "enum": ["pending", "planning", "executing", "paused", "shipping", "completed", "failed"],
+      "enum": ["pending", "reviewing", "planning", "executing", "paused", "shipping", "completed", "failed"],
       "description": "Status of a work item"
     },
     "phaseStatus": {

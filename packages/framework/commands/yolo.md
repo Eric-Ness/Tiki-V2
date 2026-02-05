@@ -121,7 +121,7 @@ Issue #{number} has been fully processed:
 
 The state MUST match the `IssueWork` interface. Key requirements:
 - `issue` MUST be an object with `number` and `title` (NOT top-level fields)
-- `status` MUST be one of: `pending`, `planning`, `executing`, `shipping`, `completed`, `failed`
+- `status` MUST be one of: `pending`, `reviewing`, `planning`, `executing`, `shipping`, `completed`, `failed`
 - `pipelineStep` MUST be one of: `GET`, `REVIEW`, `PLAN`, `AUDIT`, `EXECUTE`, `SHIP`
 - `lastActivity` MUST be updated on EVERY state change
 - Do NOT add extra fields like `yolo`, `github`, `startedAt`, etc.
@@ -149,7 +149,7 @@ The state MUST match the `IssueWork` interface. Key requirements:
 "issue:{number}": {
   "type": "issue",
   "issue": { "number": {number}, "title": "{title}" },
-  "status": "planning",
+  "status": "reviewing",
   "pipelineStep": "REVIEW",
   "createdAt": "{ISO timestamp}",
   "lastActivity": "{ISO timestamp}"
@@ -232,7 +232,7 @@ After completing a phase, update `phase.status` to `"completed"` and increment `
 | Pipeline Step | `status` | `pipelineStep` | `phase` |
 |---------------|----------|----------------|---------|
 | GET | `pending` | `GET` | — |
-| REVIEW | `planning` | `REVIEW` | — |
+| REVIEW | `reviewing` | `REVIEW` | — |
 | PLAN | `planning` | `PLAN` | `{ current: 1, total: N, status: "pending" }` |
 | AUDIT | `planning` | `AUDIT` | `{ current: 1, total: N, status: "pending" }` |
 | EXECUTE (each phase) | `executing` | `EXECUTE` | `{ current: N, total: T, status: "executing" }` |

@@ -113,23 +113,139 @@ Issue #{number} has been fully processed:
 </output>
 
 <state-management>
-YOLO uses the same state management as individual commands, tracking progress through:
+## CRITICAL: State Updates at Each Pipeline Step
 
+**You MUST update `.tiki/state.json` at each pipeline step.** The desktop app relies on this state to display progress in the Kanban board and Active Work panel.
+
+### Required JSON Format
+
+The state MUST match the `IssueWork` interface. Key requirements:
+- `issue` MUST be an object with `number` and `title` (NOT top-level fields)
+- `status` MUST be one of: `pending`, `reviewing`, `planning`, `executing`, `shipping`, `completed`, `failed`
+- `pipelineStep` MUST be one of: `GET`, `REVIEW`, `PLAN`, `AUDIT`, `EXECUTE`, `SHIP`
+- `lastActivity` MUST be updated on EVERY state change
+- Do NOT add extra fields like `yolo`, `github`, `startedAt`, etc.
+
+### State at Each Step
+
+**1. GET Step** — After fetching the issue:
 ```json
 {
   "activeWork": {
     "issue:{number}": {
       "type": "issue",
-      "status": "{current stage}",
-      "yolo": true,
-      "startedAt": "{timestamp}",
-      ...
+      "issue": { "number": {number}, "title": "{title}" },
+      "status": "pending",
+      "pipelineStep": "GET",
+      "createdAt": "{ISO timestamp}",
+      "lastActivity": "{ISO timestamp}"
     }
   }
 }
 ```
 
-The `yolo: true` flag indicates automated pipeline mode.
+**2. REVIEW Step** — Starting analysis:
+```json
+"issue:{number}": {
+  "type": "issue",
+  "issue": { "number": {number}, "title": "{title}" },
+  "status": "reviewing",
+  "pipelineStep": "REVIEW",
+  "createdAt": "{ISO timestamp}",
+  "lastActivity": "{ISO timestamp}"
+}
+```
+
+**3. PLAN Step** — Creating phases:
+```json
+"issue:{number}": {
+  "type": "issue",
+  "issue": { "number": {number}, "title": "{title}" },
+  "status": "planning",
+  "pipelineStep": "PLAN",
+  "phase": { "current": 1, "total": {total phases}, "status": "pending" },
+  "createdAt": "{ISO timestamp}",
+  "lastActivity": "{ISO timestamp}"
+}
+```
+
+**4. AUDIT Step** — Validating plan:
+```json
+"issue:{number}": {
+  "type": "issue",
+  "issue": { "number": {number}, "title": "{title}" },
+  "status": "planning",
+  "pipelineStep": "AUDIT",
+  "phase": { "current": 1, "total": {total phases}, "status": "pending" },
+  "createdAt": "{ISO timestamp}",
+  "lastActivity": "{ISO timestamp}"
+}
+```
+
+**5. EXECUTE Step** — Before EACH phase:
+```json
+"issue:{number}": {
+  "type": "issue",
+  "issue": { "number": {number}, "title": "{title}" },
+  "status": "executing",
+  "pipelineStep": "EXECUTE",
+  "phase": { "current": {N}, "total": {T}, "status": "executing" },
+  "createdAt": "{ISO timestamp}",
+  "lastActivity": "{ISO timestamp}"
+}
+```
+
+After completing a phase, update `phase.status` to `"completed"` and increment `phase.current` for the next phase.
+
+**6. SHIP Step** — After all phases complete:
+```json
+"issue:{number}": {
+  "type": "issue",
+  "issue": { "number": {number}, "title": "{title}" },
+  "status": "shipping",
+  "pipelineStep": "SHIP",
+  "createdAt": "{ISO timestamp}",
+  "lastActivity": "{ISO timestamp}"
+}
+```
+
+**7. Completion** — After shipping, remove from `activeWork` and add to `history`:
+```json
+{
+  "activeWork": {},
+  "history": {
+    "lastCompletedIssue": {
+      "number": {number},
+      "title": "{title}",
+      "completedAt": "{ISO timestamp}"
+    },
+    "recentIssues": [
+      { "number": {number}, "title": "{title}", "completedAt": "{ISO timestamp}" },
+      ...existing entries...
+    ]
+  }
+}
+```
+
+### State Transition Summary
+
+| Pipeline Step | `status` | `pipelineStep` | `phase` |
+|---------------|----------|----------------|---------|
+| GET | `pending` | `GET` | — |
+| REVIEW | `reviewing` | `REVIEW` | — |
+| PLAN | `planning` | `PLAN` | `{ current: 1, total: N, status: "pending" }` |
+| AUDIT | `planning` | `AUDIT` | `{ current: 1, total: N, status: "pending" }` |
+| EXECUTE (each phase) | `executing` | `EXECUTE` | `{ current: N, total: T, status: "executing" }` |
+| SHIP | `shipping` | `SHIP` | — |
+| Complete | (removed) | — | — |
+
+### Critical Requirements
+
+1. **Update state BEFORE starting each step** — The UI needs to show progress in real-time
+2. **Always update `lastActivity`** — Use `new Date().toISOString()` for current timestamp
+3. **Use correct `issue` format** — Must be `{ "number": N, "title": "..." }`, NOT top-level fields
+4. **Track phase progress** — Update `phase.current`, `phase.total`, and `phase.status` during execution
+5. **Clean up on completion** — Remove from `activeWork`, add to `history`
 </state-management>
 
 <errors>

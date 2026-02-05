@@ -20,7 +20,8 @@ import './kanban.css';
 
 // Valid state transitions for drag-and-drop
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  review: ['plan', 'execute'],
+  open: ['review', 'execute'],
+  review: ['open', 'plan', 'execute'],
   plan: ['review', 'execute'],
   execute: ['shipping', 'review'],
   shipping: ['completed', 'execute'],
@@ -29,7 +30,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 // Column configuration mapping to Tiki work statuses
 const COLUMN_CONFIG = [
-  { id: 'review', title: 'Review', statuses: ['pending'] },
+  { id: 'open', title: 'Open', statuses: [] },
+  { id: 'review', title: 'Review', statuses: ['pending', 'reviewing'] },
   { id: 'plan', title: 'Plan', statuses: ['planning'] },
   { id: 'execute', title: 'Execute', statuses: ['executing'] },
   { id: 'shipping', title: 'Shipping', statuses: ['shipping'] },
@@ -94,8 +96,8 @@ export function KanbanBoard() {
 
   // Determine the appropriate command based on source column
   const getExecuteCommand = (issueNumber: number, fromColumn: string): string => {
-    // If coming from Review (no plan yet), run full yolo
-    if (fromColumn === 'review') {
+    // If coming from Open or Review (no plan yet), run full yolo
+    if (fromColumn === 'open' || fromColumn === 'review') {
       return `/tiki:yolo ${issueNumber}`;
     }
     // If coming from Plan (has plan) or resuming, just execute
@@ -152,6 +154,7 @@ export function KanbanBoard() {
   const statusToColumn = (status: string): string => {
     switch (status) {
       case 'pending':
+      case 'reviewing':
       case 'paused':
       case 'failed':
         return 'review';
@@ -182,7 +185,7 @@ export function KanbanBoard() {
 
     // Fall back to GitHub state
     const state = issue.state.toLowerCase();
-    return state === 'closed' ? 'completed' : 'review';
+    return state === 'closed' ? 'completed' : 'open';
   };
 
   // Check if a transition is valid
@@ -299,7 +302,7 @@ export function KanbanBoard() {
         if (col.id === 'completed') {
           return state === 'closed';
         }
-        if (col.id === 'review') {
+        if (col.id === 'open') {
           return state === 'open';
         }
         return false;
