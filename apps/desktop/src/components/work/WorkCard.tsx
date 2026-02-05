@@ -1,4 +1,4 @@
-export type WorkStatus = "pending" | "planning" | "executing" | "paused" | "completed" | "failed" | "shipping";
+export type WorkStatus = "pending" | "reviewing" | "planning" | "executing" | "paused" | "completed" | "failed" | "shipping";
 export type PhaseStatus = "pending" | "running" | "executing" | "completed" | "failed";
 export type PipelineStep = "GET" | "REVIEW" | "PLAN" | "AUDIT" | "EXECUTE" | "SHIP";
 

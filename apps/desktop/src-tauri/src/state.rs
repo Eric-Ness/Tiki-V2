@@ -124,6 +124,7 @@ pub struct ReleaseRef {
 #[serde(rename_all = "lowercase")]
 pub enum WorkStatus {
     Pending,
+    Reviewing,
     Planning,
     Executing,
     Paused,
