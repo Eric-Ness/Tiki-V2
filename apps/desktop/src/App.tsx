@@ -11,7 +11,7 @@ import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/deta
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -20,9 +20,10 @@ interface TikiState {
   schemaVersion: number;
   activeWork: Record<string, WorkContext>;
   history?: {
-    lastCompletedIssue?: { number: number; title: string; completedAt: string };
+    lastCompletedIssue?: { number: number; title?: string; completedAt: string };
     lastCompletedRelease?: { version: string; completedAt: string };
-    recentIssues?: Array<{ number: number; title: string; completedAt: string }>;
+    recentIssues?: Array<{ number: number; title?: string; completedAt: string }>;
+    recentReleases?: Array<{ version: string; issues?: number[]; completedAt: string; tag?: string }>;
   };
 }
 
@@ -185,26 +186,49 @@ function App() {
           className="panel sidebar-panel"
         >
           <div className="sidebar-content">
-            {/* Active Work at the top for visibility */}
-            {state && (
-              <StateSection activeWork={state.activeWork} />
-            )}
+            <div className="sidebar-sections">
+              {/* Active Work at the top for visibility */}
+              {state && (
+                <StateSection activeWork={state.activeWork} />
+              )}
 
-            {error && <div className="error">{error}</div>}
+              {error && <div className="error">{error}</div>}
 
-            {!state && !error && (
-              <div className="empty-state">
-                <p>No .tiki directory found.</p>
-                <p className="hint">
-                  Run <code>tiki:get #issue</code> in Claude Code to start
-                  tracking an issue.
-                </p>
-              </div>
-            )}
+              {!state && !error && (
+                <div className="empty-state">
+                  <p>No .tiki directory found.</p>
+                  <p className="hint">
+                    Run <code>tiki:get #issue</code> in Claude Code to start
+                    tracking an issue.
+                  </p>
+                </div>
+              )}
 
-            <ProjectsSection />
-            <IssuesSection />
-            <ReleasesSection />
+              <ProjectsSection />
+              <IssuesSection />
+              <ReleasesSection />
+            </div>
+            <div className="sidebar-footer">
+              <button
+                className="start-claude-btn"
+                onClick={async () => {
+                  const { tabs, activeTabId } = useTerminalStore.getState();
+                  const activeTab = tabs.find((t) => t.id === activeTabId);
+                  if (!activeTab) return;
+                  try {
+                    await invoke("write_terminal", {
+                      id: activeTab.activeTerminalId,
+                      data: "claude --dangerously-skip-permissions\n",
+                    });
+                  } catch (err) {
+                    console.error("Failed to write to terminal:", err);
+                  }
+                }}
+                title="Paste 'claude --dangerously-skip-permissions' into the active terminal"
+              >
+                Start Claude
+              </button>
+            </div>
           </div>
         </Panel>
 

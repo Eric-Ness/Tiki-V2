@@ -1,36 +1,26 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:55": {
+    "issue:60": {
       "type": "issue",
-      "id": "issue:55",
       "status": "shipping",
-      "pipelineStep": "SHIP",
+      "issueNumber": 60,
+      "issueTitle": "A 'Start Claude' button",
       "yolo": true,
-      "issue": {
-        "number": 55,
-        "title": "Still no showing in the kanban board with the following state.json",
-        "body": "This was an issue that should have showed up in the review column...",
-        "state": "OPEN",
-        "labels": ["bug"],
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/55"
-      },
-      "createdAt": "2026-02-05T10:00:00.000Z",
-      "lastActivity": "2026-02-05T10:15:00.000Z",
-      "phase": {
-        "current": 2,
-        "total": 2,
-        "status": "completed"
-      }
+      "startedAt": "2026-02-05T22:00:00.000Z"
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 54,
-      "title": "After shipped back to open in kanban",
-      "completedAt": "2026-02-05T09:30:00.000Z"
+      "number": 59,
+      "title": "Test 7",
+      "completedAt": "2026-02-05T21:05:00.000Z"
     },
     "recentIssues": [
+      { "number": 59, "title": "Test 7", "completedAt": "2026-02-05T21:05:00.000Z" },
+      { "number": 58, "title": "Test Issue 6", "completedAt": "2026-02-05T20:05:00.000Z" },
+      { "number": 56, "title": "Test Issue 5", "completedAt": "2026-02-05T15:05:00.000Z" },
+      { "number": 55, "title": "Still no showing in the kanban board with the following state.json", "completedAt": "2026-02-05T10:20:00.000Z" },
       { "number": 54, "title": "After shipped back to open in kanban", "completedAt": "2026-02-05T09:30:00.000Z" },
       { "number": 53, "title": "tiki:review - review is skipped in kanban", "completedAt": "2026-02-05T08:15:00.000Z" },
       { "number": 52, "title": "YOLO pipeline doesn't write correct state.json format for desktop app", "completedAt": "2026-02-05T07:20:00.000Z" },
@@ -50,8 +40,7 @@
       { "number": 36, "title": "Lots of terminals pop up when background items are working", "completedAt": "2026-02-03T23:45:00.000Z" },
       { "number": 31, "title": "Create Issue - Enhance error", "completedAt": "2026-02-03T23:00:00.000Z" },
       { "number": 30, "title": "Release to detail", "completedAt": "2026-02-03T22:30:00.000Z" },
-      { "number": 29, "title": "Add Issue enhancements", "completedAt": "2026-02-03T21:30:00.000Z" },
-      { "number": 28, "title": "feat(framework): Add release command files for multi-issue pipeline execution", "completedAt": "2026-02-03T18:30:00.000Z" }
+      { "number": 29, "title": "Add Issue enhancements", "completedAt": "2026-02-03T21:30:00.000Z" }
     ],
     "recentReleases": [
       { "version": "v0.2.1", "issues": [47, 48], "completedAt": "2026-02-04T05:35:00.000Z", "tag": "v0.2.1" },

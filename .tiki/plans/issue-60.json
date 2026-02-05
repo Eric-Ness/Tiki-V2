@@ -1,0 +1,21 @@
+{
+  "issue": {
+    "number": 60,
+    "title": "A 'Start Claude' button",
+    "url": "https://github.com/user/Tiki-V2/issues/60"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add Start Claude button to sidebar and wire terminal command",
+      "content": "Create a 'Start Claude' button at the bottom of the sidebar panel in App.tsx. The button should:\n1. Be positioned at the bottom-left of the sidebar using flexbox layout\n2. When clicked, write 'claude --dangerously-skip-permissions\\n' to the active terminal via invoke('write_terminal')\n3. Get the active terminal ID from the terminal store\n4. Style the button to match the existing UI (blue accent theme)\n\nFiles to modify:\n- apps/desktop/src/App.tsx - Add the button in the sidebar, restructure sidebar-content to use flex with footer\n- apps/desktop/src/components/layout/layout.css - Add styles for sidebar-sections, sidebar-footer, and the button\n\nImplementation approach:\n- Restructure sidebar-content div to have two children: sidebar-sections (scrollable, flex:1) and sidebar-footer (fixed at bottom)\n- Import useTerminalStore and invoke in App.tsx\n- Create onClick handler that reads activeTabId from store, finds the tab's activeTerminalId, then calls invoke('write_terminal')\n- Add CSS for the footer area with a subtle top border and the button styling",
+      "verification": [
+        "The button appears at the bottom-left of the sidebar",
+        "Clicking the button pastes 'claude --dangerously-skip-permissions' into the active terminal",
+        "The command executes in the terminal (newline appended)",
+        "The button has appropriate styling matching the app theme",
+        "Existing sidebar scrolling still works with many items"
+      ]
+    }
+  ]
+}
