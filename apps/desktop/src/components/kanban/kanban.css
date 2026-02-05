@@ -79,8 +79,7 @@
 .kanban-column {
   display: flex;
   flex-direction: column;
-  min-width: 200px;
-  max-width: 280px;
+  min-width: 0;
   flex: 1;
   background: #252525;
   border-radius: 8px;
@@ -137,6 +136,10 @@
 }
 
 /* Column accent colors */
+.kanban-column--open .kanban-column-header {
+  border-left: 3px solid #666;
+}
+
 .kanban-column--review .kanban-column-header {
   border-left: 3px solid #06b6d4;
 }

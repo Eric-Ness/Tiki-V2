@@ -3,6 +3,8 @@
   "issueNumber": 49,
   "issueTitle": "Phase Current/Total + Data Consolidation",
   "createdAt": "2026-02-04T03:30:00.000Z",
+  "completedAt": "2026-02-04T04:30:00.000Z",
+  "shipped": true,
   "review": {
     "summary": "Enhance phase progress display across UI and consolidate GitHub issue data into state.json as single source of truth",
     "requirements": [
