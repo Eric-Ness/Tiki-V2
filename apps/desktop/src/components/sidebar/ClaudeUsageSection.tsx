@@ -134,7 +134,7 @@ export function ClaudeUsageSection() {
 
   const renderBar = (label: string, limit: UsageLimit | null | undefined) => {
     if (!limit) return null;
-    const pct = Math.round(limit.utilization * 100);
+    const pct = Math.round(limit.utilization);
     const color = getUsageColor(pct);
     const reset = formatResetTime(limit.resetsAt);
 
