@@ -48,6 +48,7 @@ pub fn run() {
             github::create_github_issue,
             github::edit_github_issue,
             github::close_github_issue,
+            github::fetch_github_issue_by_number,
             github::enhance_issue_description,
             github::get_current_branch,
             github::list_git_branches,

@@ -13,6 +13,7 @@ import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
+import type { GitHubIssue } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
@@ -55,15 +56,37 @@ function App() {
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
 
   // Get the selected issue/release objects
-  const selectedIssueData = selectedIssue
-    ? issues.find((i) => i.number === selectedIssue)
+  const [fetchedIssue, setFetchedIssue] = useState<GitHubIssue | null>(null);
+  const issueFromStore = selectedIssue
+    ? issues.find((i) => i.number === selectedIssue) ?? null
     : null;
+  const selectedIssueData = issueFromStore ?? fetchedIssue;
   const selectedReleaseData = selectedRelease
     ? releases.find((r) => r.tagName === selectedRelease)
     : null;
   const selectedTikiReleaseData = selectedTikiRelease
     ? tikiReleases.find((r) => r.version === selectedTikiRelease)
     : null;
+
+  // Fetch issue on demand when not found in store (e.g. completed/closed issues)
+  useEffect(() => {
+    if (!selectedIssue) {
+      setFetchedIssue(null);
+      return;
+    }
+    if (issueFromStore) {
+      setFetchedIssue(null);
+      return;
+    }
+    let cancelled = false;
+    invoke<GitHubIssue>("fetch_github_issue_by_number", {
+      number: selectedIssue,
+      projectPath: activeProject?.path ?? null,
+    })
+      .then((issue) => { if (!cancelled) setFetchedIssue(issue); })
+      .catch((err) => { console.error("Failed to fetch issue:", err); });
+    return () => { cancelled = true; };
+  }, [selectedIssue, issueFromStore, activeProject?.path]);
 
   // Get work context for selected issue
   const selectedIssueWork = selectedIssue && state?.activeWork
