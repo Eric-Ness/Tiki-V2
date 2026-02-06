@@ -68,11 +68,12 @@ export function ReleasesSection() {
   // Save release to disk
   const saveTikiRelease = useCallback(async (release: TikiRelease) => {
     try {
-      await invoke("save_tiki_release", { release });
+      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      await invoke("save_tiki_release", { release, tikiPath });
     } catch (err) {
       console.error("Failed to save Tiki release:", err);
     }
-  }, []);
+  }, [activeProject]);
 
   const fetchReleases = useCallback(async () => {
     // Don't fetch GitHub releases if no project is selected

@@ -60,12 +60,17 @@ export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
     openDialog(release);
   };
 
+  const activeProject = useProjectsStore((s) =>
+    s.projects.find((p) => p.id === s.activeProjectId)
+  );
+
   const handleDelete = async () => {
     const confirmed = window.confirm(`Delete release ${release.version}? This cannot be undone.`);
     if (!confirmed) return;
 
     try {
-      await invoke("delete_tiki_release", { version: release.version });
+      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      await invoke("delete_tiki_release", { version: release.version, tikiPath });
       deleteRelease(release.version);
       clearSelection();
     } catch (error) {
