@@ -299,7 +299,10 @@ export function KanbanBoard() {
     const result = COLUMN_CONFIG.map((col) => {
       // For the completed column, use recentIssues from history (limited to 8)
       if (col.id === 'completed') {
-        const completedIssues: GitHubIssue[] = recentIssues.slice(0, 8).map((recent) => ({
+        const completedIssues: GitHubIssue[] = [...recentIssues]
+          .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+          .slice(0, 8)
+          .map((recent) => ({
           number: recent.number,
           title: recent.title || `Issue #${recent.number}`,
           state: 'CLOSED',
