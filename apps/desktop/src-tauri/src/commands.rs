@@ -119,18 +119,27 @@ pub fn load_tiki_releases(tiki_path: Option<String>) -> Result<Vec<TikiRelease>,
 
     let mut releases = Vec::new();
 
-    let entries = std::fs::read_dir(&releases_dir).map_err(|e| e.to_string())?;
+    // Collect directories to scan: top-level releases + archive subdirectory
+    let mut dirs_to_scan = vec![releases_dir.clone()];
+    let archive_dir = releases_dir.join("archive");
+    if archive_dir.exists() {
+        dirs_to_scan.push(archive_dir);
+    }
 
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let file_path = entry.path();
+    for dir in dirs_to_scan {
+        let entries = std::fs::read_dir(&dir).map_err(|e| e.to_string())?;
 
-        if file_path.extension().map_or(false, |ext| ext == "json") {
-            let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-            match serde_json::from_str::<TikiRelease>(&content) {
-                Ok(release) => releases.push(release),
-                Err(e) => {
-                    log::warn!("Failed to parse release file {:?}: {}", file_path, e);
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let file_path = entry.path();
+
+            if file_path.extension().map_or(false, |ext| ext == "json") {
+                let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+                match serde_json::from_str::<TikiRelease>(&content) {
+                    Ok(release) => releases.push(release),
+                    Err(e) => {
+                        log::warn!("Failed to parse release file {:?}: {}", file_path, e);
+                    }
                 }
             }
         }

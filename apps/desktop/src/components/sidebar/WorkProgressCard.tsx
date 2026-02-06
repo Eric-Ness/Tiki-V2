@@ -65,7 +65,7 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
         {isIssue ? (
           <>
             <span className="work-progress-number">#{work.issue.number}</span>
-            <span className="work-progress-name">{work.issue.title}</span>
+            <span className="work-progress-name">{work.issue.title || `Issue #${work.issue.number}`}</span>
           </>
         ) : (
           <span className="work-progress-version">{work.version}</span>

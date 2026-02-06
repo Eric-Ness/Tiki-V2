@@ -146,24 +146,58 @@ For each phase, capture:
 This ensures the desktop app shows the issue in the Active Work panel as soon as planning begins.
 </early-state-update>
 
-<state-management>
-After the plan is fully written:
+<plan-file-format>
+**IMPORTANT:** The plan JSON file MUST use these exact field names. Do NOT use alternatives.
 
-1. Write plan file to `.tiki/plans/issue-{number}.json`:
 ```json
 {
   "schemaVersion": 1,
   "issue": {
-    "number": {number},
-    "title": "{title}",
-    "url": "{url}"
+    "number": 42,
+    "title": "Issue title here",
+    "url": "https://github.com/owner/repo/issues/42"
   },
-  "createdAt": "{ISO timestamp}",
-  "successCriteria": [...],
-  "phases": [...],
-  "coverageMatrix": {...}
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "What must be true for success"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase title",
+      "status": "pending",
+      "content": "Detailed instructions for this phase...",
+      "verification": [
+        "Specific check 1",
+        "Specific check 2"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": ["path/to/file.ts"]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2]
+  }
 }
 ```
+
+**Field name rules:**
+- Use `issue` object (NOT `issueNumber` as a bare number)
+- Use `number` for phase number (NOT `id`)
+- Use `title` for phase title (NOT `name`)
+- Use `content` for phase body (NOT `description`)
+- Use `verification` as an **array of strings** (NOT a single string)
+- Use `addressesCriteria` (NOT `addresses_criteria`)
+</plan-file-format>
+
+<state-management>
+After the plan is fully written:
+
+1. Write plan file to `.tiki/plans/issue-{number}.json` following the exact format in `<plan-file-format>` above.
 
 2. Update `.tiki/state.json` again with phase info:
 - Set `phase.total` to the number of phases

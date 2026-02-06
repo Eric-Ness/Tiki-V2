@@ -191,6 +191,12 @@
   color: var(--text-primary, #cccccc);
 }
 
+.releases-section-badges {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
 .releases-section-tiki-status {
   font-size: 10px;
   font-weight: 500;

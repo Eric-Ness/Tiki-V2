@@ -3,7 +3,7 @@ import type { WorkContext } from '../components/work';
 
 export interface CompletedIssue {
   number: number;
-  title: string;
+  title?: string;
   completedAt: string;
 }
 

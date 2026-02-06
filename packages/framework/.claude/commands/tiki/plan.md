@@ -12,9 +12,11 @@ Break a GitHub issue into a sequence of executable phases. Each phase should be 
 <instructions>
   <step>Load the issue and any existing review from state:
     - Check `.tiki/state.json` for `issue:{number}`
+    - If the issue is NOT in state.json, fetch it via `gh issue view {number} --json number,title,body,state,url,labels,createdAt,updatedAt` and create the activeWork entry
     - If review was done, use its success criteria and complexity assessment
     - If no review exists, perform a quick analysis first
   </step>
+  <step>**Immediately** update `.tiki/state.json` to set `status: "planning"` and `pipelineStep: "PLAN"` so the issue appears in Active Work right away (see early-state-update below)</step>
   <step>Design phases following the planning principles below</step>
   <step>For each phase, define:
     - Clear title and description
@@ -112,27 +114,92 @@ For each phase, capture:
 *Plan written to `.tiki/plans/issue-{number}.json`*
 </output>
 
-<state-management>
-After creating a plan:
+<early-state-update>
+**Before doing any planning work**, update `.tiki/state.json` so the issue appears in Active Work immediately:
 
-1. Write plan file to `.tiki/plans/issue-{number}.json`:
+1. Read the current `.tiki/state.json` (create it if it doesn't exist with `schemaVersion: 1, activeWork: {}, history: {}`)
+2. Add or update the `issue:{number}` entry in `activeWork`:
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "issue": {
+        "number": {number},
+        "title": "{title}",
+        "url": "{url}",
+        "state": "{state}",
+        "labels": [{labels}],
+        "createdAt": "{issue createdAt}",
+        "updatedAt": "{issue updatedAt}"
+      },
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "createdAt": "{existing createdAt or new ISO timestamp}",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+This ensures the desktop app shows the issue in the Active Work panel as soon as planning begins.
+</early-state-update>
+
+<plan-file-format>
+**IMPORTANT:** The plan JSON file MUST use these exact field names. Do NOT use alternatives.
+
 ```json
 {
   "schemaVersion": 1,
   "issue": {
-    "number": {number},
-    "title": "{title}",
-    "url": "{url}"
+    "number": 42,
+    "title": "Issue title here",
+    "url": "https://github.com/owner/repo/issues/42"
   },
-  "createdAt": "{ISO timestamp}",
-  "successCriteria": [...],
-  "phases": [...],
-  "coverageMatrix": {...}
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "What must be true for success"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase title",
+      "status": "pending",
+      "content": "Detailed instructions for this phase...",
+      "verification": [
+        "Specific check 1",
+        "Specific check 2"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": ["path/to/file.ts"]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2]
+  }
 }
 ```
 
-2. Update `.tiki/state.json`:
-- Set `pipelineStep` to `"PLAN"`
+**Field name rules:**
+- Use `issue` object (NOT `issueNumber` as a bare number)
+- Use `number` for phase number (NOT `id`)
+- Use `title` for phase title (NOT `name`)
+- Use `content` for phase body (NOT `description`)
+- Use `verification` as an **array of strings** (NOT a single string)
+- Use `addressesCriteria` (NOT `addresses_criteria`)
+</plan-file-format>
+
+<state-management>
+After the plan is fully written:
+
+1. Write plan file to `.tiki/plans/issue-{number}.json` following the exact format in `<plan-file-format>` above.
+
+2. Update `.tiki/state.json` again with phase info:
 - Set `phase.total` to the number of phases
 - Set `phase.current` to 1
 - Set `phase.status` to `pending`
@@ -164,11 +231,10 @@ After creating a plan:
     /tiki:plan 42
     ```
   </error>
-  <error type="not-loaded">
-    Issue #{number} not found in Tiki state. Please fetch it first:
-    ```
-    /tiki:get {number}
-    ```
+  <error type="not-found">
+    Issue #{number} not found on GitHub. Please check:
+    - The issue number is correct
+    - You have access to this repository
   </error>
   <error type="no-requirements">
     Cannot create a plan without clear requirements. Please either:
