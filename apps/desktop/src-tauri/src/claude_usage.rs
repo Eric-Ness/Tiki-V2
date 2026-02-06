@@ -55,17 +55,22 @@ pub struct UsageLimit {
 fn api_headers(session_key: &str) -> reqwest::header::HeaderMap {
     let mut h = reqwest::header::HeaderMap::new();
     h.insert("accept", "*/*".parse().unwrap());
+    h.insert("accept-language", "en-US,en;q=0.9".parse().unwrap());
     h.insert("content-type", "application/json".parse().unwrap());
     h.insert(
         "anthropic-client-platform",
         "web_claude_ai".parse().unwrap(),
     );
     h.insert("anthropic-client-version", "1.0.0".parse().unwrap());
+    h.insert("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36".parse().unwrap());
     h.insert("origin", "https://claude.ai".parse().unwrap());
     h.insert(
         "referer",
         "https://claude.ai/settings/usage".parse().unwrap(),
     );
+    h.insert("sec-fetch-dest", "empty".parse().unwrap());
+    h.insert("sec-fetch-mode", "cors".parse().unwrap());
+    h.insert("sec-fetch-site", "same-origin".parse().unwrap());
     h.insert(
         "cookie",
         format!("sessionKey={}", session_key).parse().unwrap(),
