@@ -13,7 +13,7 @@ import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
-import type { GitHubIssue } from "./stores";
+import type { GitHubIssue, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
@@ -172,7 +172,7 @@ function App() {
       } else if (event.payload.type === "releaseChanged") {
         try {
           const projectTikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
-          const loadedReleases = await invoke<Array<{ version: string; status: string; issues: Array<{ number: number; title: string }>; createdAt: string }>>("load_tiki_releases", { tikiPath: projectTikiPath });
+          const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath: projectTikiPath });
           useTikiReleasesStore.getState().setReleases(loadedReleases);
         } catch (e) {
           console.error("Failed to reload releases:", e);
