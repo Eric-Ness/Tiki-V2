@@ -10,7 +10,7 @@ interface MainContentProps {
 
 export function MainContent({
   children,
-  defaultSize = 55,
+  defaultSize = 70,
   minSize = 30,
   className = "",
 }: MainContentProps) {

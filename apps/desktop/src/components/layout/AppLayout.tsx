@@ -14,9 +14,9 @@ export function AppLayout({ children, className = "" }: AppLayoutProps) {
   const handleLayoutChange = (layout: Layout) => {
     // Layout is a map of panel id to percentage (0..100)
     const newSizes: PanelSizes = {
-      sidebar: layout["sidebar"] ?? 20,
-      main: layout["main-content"] ?? 55,
-      detail: layout["detail-panel"] ?? 25,
+      sidebar: layout["sidebar"] ?? 15,
+      main: layout["main-content"] ?? 70,
+      detail: layout["detail-panel"] ?? 15,
     };
     setPanelSizes(newSizes);
   };

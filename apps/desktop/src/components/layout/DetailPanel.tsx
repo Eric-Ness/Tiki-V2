@@ -10,7 +10,7 @@ interface DetailPanelProps {
 
 export function DetailPanel({
   children,
-  defaultSize = 25,
+  defaultSize = 15,
   minSize = 15,
   className = "",
 }: DetailPanelProps) {
