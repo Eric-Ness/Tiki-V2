@@ -25,3 +25,4 @@ tauri-plugin-dialog = "2"
 notify = { version = "8", features = ["serde"] }
 tokio = { version = "1", features = ["sync", "rt"] }
 portable-pty = "0.8"
+dirs = "6"

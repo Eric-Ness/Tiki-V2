@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 68,
+    "title": "Claude Usage Widget",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/68"
+  },
+  "createdAt": "2026-02-06T02:05:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "Rust backend can read and parse ~/.claude/stats-cache.json" },
+    { "id": "SC2", "category": "Functional", "criterion": "A new get_claude_usage Tauri IPC command returns parsed usage data to the frontend" },
+    { "id": "SC3", "category": "Functional", "criterion": "A ClaudeUsageSection sidebar component displays today's messages, sessions, and tool calls" },
+    { "id": "SC4", "category": "Functional", "criterion": "Token usage by model is displayed with human-readable model names and formatted counts" },
+    { "id": "SC5", "category": "Functional", "criterion": "Daily activity trend is shown (last 7 days)" },
+    { "id": "SC6", "category": "UI", "criterion": "Widget follows existing sidebar CSS patterns (CollapsibleSection, CSS variables, card styling)" },
+    { "id": "SC7", "category": "Resilience", "criterion": "Widget gracefully handles missing stats file (shows no-data state)" },
+    { "id": "SC8", "category": "Data freshness", "criterion": "Usage data refreshes periodically (polling interval)" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Rust backend - Read and serve Claude stats",
+      "status": "pending",
+      "content": "Create a new Rust module `claude_usage.rs` that:\n\n1. Defines serde structs matching the `~/.claude/stats-cache.json` v2 schema:\n   - `ClaudeUsageStats` (top-level): version, lastComputedDate, dailyActivity, dailyModelTokens, modelUsage, totalSessions, totalMessages, firstSessionDate\n   - `DailyActivity`: date, messageCount, sessionCount, toolCallCount\n   - `DailyModelTokens`: date, tokensByModel (HashMap<String, u64>)\n   - `ModelUsage`: inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens\n\n2. Implement a `get_claude_usage` Tauri command that:\n   - Resolves the home directory using `dirs::home_dir()` or `std::env::var(\"USERPROFILE\")`\n   - Reads `{home}/.claude/stats-cache.json`\n   - Returns `Result<Option<ClaudeUsageStats>, String>` (None if file doesn't exist)\n   - Uses `#[serde(default)]` for optional fields that may be absent\n\n3. Register the module and command in `lib.rs`:\n   - Add `mod claude_usage;` declaration\n   - Add `claude_usage::get_claude_usage` to the invoke_handler list\n\nNote: Add `dirs` crate to Cargo.toml if not already present for cross-platform home directory resolution. Alternatively, use `std::env::var(\"USERPROFILE\")` on Windows with `std::env::var(\"HOME\")` fallback.",
+      "verification": [
+        "cargo check passes in apps/desktop/src-tauri",
+        "New module claude_usage.rs exists with serde structs matching stats-cache.json v2 schema",
+        "get_claude_usage command is registered in lib.rs",
+        "Command returns Result<Option<ClaudeUsageStats>, String>"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC7"],
+      "files": [
+        "apps/desktop/src-tauri/src/claude_usage.rs",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src-tauri/Cargo.toml"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Frontend - ClaudeUsageSection component and styling",
+      "status": "pending",
+      "content": "Create the sidebar widget component and integrate it into the app layout.\n\n1. Create `ClaudeUsageSection.tsx`:\n   - Import and use CollapsibleSection wrapper with a chart/activity icon\n   - Call `invoke('get_claude_usage')` on mount to fetch data\n   - Display three sections:\n     a) **Today's Stats**: Find today's entry in dailyActivity array. Show messageCount, sessionCount, toolCallCount as stat cards.\n     b) **Token Usage by Model**: Iterate modelUsage map. Map model IDs to friendly names:\n        - `claude-opus-4-5-20251101` → \"Opus 4.5\"\n        - `claude-sonnet-4-5-20250929` → \"Sonnet 4.5\"\n        - `claude-sonnet-4-20250514` → \"Sonnet 4\"\n        - `claude-haiku-4-5-20251001` → \"Haiku 4.5\"\n        - Other → use model ID as fallback\n        Format token counts: 1000000 → \"1.0M\", 1000 → \"1K\", <1000 → raw number\n        Show outputTokens as the primary metric (that's what Claude generated)\n     c) **7-Day Activity**: Last 7 entries from dailyActivity. Show as mini horizontal bars (messages) with date labels.\n   - Handle null/undefined data with a \"No usage data available\" empty state\n\n2. Create `ClaudeUsageSection.css`:\n   - Follow existing sidebar section CSS patterns\n   - Use CSS variables for colors (--bg-secondary, --border-color, --text-primary, --text-secondary)\n   - Stat cards: grid layout, subtle background\n   - Activity bars: thin horizontal bars with accent color\n   - Model list: compact list with model name and token count\n\n3. Modify `App.tsx`:\n   - Import ClaudeUsageSection\n   - Add it after ReleasesSection in the sidebar-sections div\n   - No project-scoping needed (Claude usage is global, not per-project)",
+      "verification": [
+        "pnpm typecheck passes from root",
+        "ClaudeUsageSection renders in sidebar with CollapsibleSection pattern",
+        "Today's messages/sessions/tool calls displayed",
+        "Model token counts displayed with human-readable model names",
+        "7-day activity trend visible as mini bars",
+        "No-data state shown when get_claude_usage returns null"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/sidebar/ClaudeUsageSection.tsx",
+        "apps/desktop/src/components/sidebar/ClaudeUsageSection.css",
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Auto-refresh with polling and manual refresh",
+      "status": "pending",
+      "content": "Add periodic data refresh to keep the widget current.\n\n1. In `ClaudeUsageSection.tsx`:\n   - Add a 60-second `setInterval` in the useEffect that fetches data\n   - Clean up interval on unmount\n   - Add a small refresh button (circular arrow icon) in the section header area or next to the title\n   - Clicking refresh triggers an immediate re-fetch\n   - Show a brief loading/spinning state during refresh (opacity change or spinner)\n   - Track `lastRefreshed` timestamp and display it as relative time (\"Updated 30s ago\")\n\n2. CSS updates in `ClaudeUsageSection.css`:\n   - Style the refresh button to match existing action button patterns (26x26px, border, hover effect)\n   - Add subtle loading animation (opacity pulse or spinner)",
+      "verification": [
+        "pnpm typecheck passes from root",
+        "Widget re-fetches data every 60 seconds automatically",
+        "Manual refresh button triggers immediate re-fetch",
+        "Loading indicator shows during refresh"
+      ],
+      "addressesCriteria": ["SC8"],
+      "files": [
+        "apps/desktop/src/components/sidebar/ClaudeUsageSection.tsx",
+        "apps/desktop/src/components/sidebar/ClaudeUsageSection.css"
+      ],
+      "dependencies": [2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [2],
+    "SC5": [2],
+    "SC6": [2],
+    "SC7": [1, 2],
+    "SC8": [3]
+  }
+}

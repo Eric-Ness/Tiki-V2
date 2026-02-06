@@ -4191,6 +4191,7 @@ dependencies = [
 name = "tiki-desktop"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "log",
  "notify",
  "portable-pty",

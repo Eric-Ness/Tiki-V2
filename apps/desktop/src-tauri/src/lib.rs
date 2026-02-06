@@ -1,3 +1,4 @@
+mod claude_usage;
 mod commands;
 mod github;
 mod state;
@@ -54,6 +55,7 @@ pub fn run() {
             terminal::commands::write_terminal,
             terminal::commands::resize_terminal,
             terminal::commands::destroy_terminal,
+            claude_usage::get_claude_usage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

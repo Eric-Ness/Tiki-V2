@@ -6,6 +6,7 @@ import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
 import { StateSection } from "./components/sidebar/StateSection";
+import { ClaudeUsageSection } from "./components/sidebar/ClaudeUsageSection";
 import { TerminalPane } from "./components/terminal";
 import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
@@ -219,6 +220,7 @@ function App() {
               <ProjectsSection />
               <IssuesSection />
               <ReleasesSection />
+              <ClaudeUsageSection />
             </div>
             <div className="sidebar-footer">
               <button
