@@ -1,26 +1,14 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "issue:68": {
-      "type": "issue",
-      "issue": { "number": 68, "title": "Claude Usage Widget" },
-      "status": "shipping",
-      "phase": {
-        "current": 3,
-        "total": 3,
-        "status": "completed"
-      },
-      "createdAt": "2026-02-06T02:00:00.000Z",
-      "lastActivity": "2026-02-06T02:25:00.000Z"
-    },
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 69,
-      "title": "Didn't Parse Phases correctly",
-      "completedAt": "2026-02-05T13:10:00.000Z"
+      "number": 68,
+      "title": "Claude Usage Widget",
+      "completedAt": "2026-02-06T02:30:00.000Z"
     },
     "recentIssues": [
+      { "number": 68, "title": "Claude Usage Widget", "completedAt": "2026-02-06T02:30:00.000Z" },
       { "number": 69, "title": "Didn't Parse Phases correctly", "completedAt": "2026-02-05T13:10:00.000Z" },
       { "number": 66, "title": "Test 8", "completedAt": "2026-02-06T01:10:00.000Z" },
       { "number": 65, "title": "Create Issue Enhancements", "completedAt": "2026-02-06T00:30:00.000Z" },

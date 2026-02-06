@@ -3,81 +3,69 @@ import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import "./ClaudeUsageSection.css";
 
-interface ModelUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadInputTokens: number;
-  cacheCreationInputTokens: number;
-  webSearchRequests: number;
-  costUsd: number;
+interface UsageLimit {
+  utilization: number;
+  resetsAt: string | null;
 }
 
-interface DailyActivity {
-  date: string;
-  messageCount: number;
-  sessionCount: number;
-  toolCallCount: number;
-}
-
-interface ClaudeUsageStats {
-  version: number;
-  lastComputedDate: string;
-  dailyActivity: DailyActivity[];
-  dailyModelTokens: Array<{ date: string; tokensByModel: Record<string, number> }>;
-  modelUsage: Record<string, ModelUsage>;
-  totalSessions: number;
-  totalMessages: number;
-  firstSessionDate: string | null;
-}
-
-const MODEL_NAMES: Record<string, string> = {
-  "claude-opus-4-5-20251101": "Opus 4.5",
-  "claude-opus-4-6": "Opus 4.6",
-  "claude-sonnet-4-5-20250929": "Sonnet 4.5",
-  "claude-sonnet-4-20250514": "Sonnet 4",
-  "claude-haiku-4-5-20251001": "Haiku 4.5",
-};
-
-function getModelName(modelId: string): string {
-  return MODEL_NAMES[modelId] ?? modelId;
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1_000_000_000) return `${(count / 1_000_000_000).toFixed(1)}B`;
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
-  return count.toString();
-}
-
-function formatNumber(num: number): string {
-  return num.toLocaleString();
-}
-
-function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getDayLabel(dateStr: string): string {
-  const parts = dateStr.split("-");
-  return `${parts[1]}/${parts[2]}`;
+interface ClaudeApiUsage {
+  fiveHour: UsageLimit | null;
+  sevenDay: UsageLimit | null;
+  sevenDayOpus: UsageLimit | null;
+  sevenDaySonnet: UsageLimit | null;
 }
 
 const REFRESH_INTERVAL_MS = 60_000;
 
+function getUsageColor(pct: number): string {
+  if (pct >= 90) return "var(--usage-red, #e53935)";
+  if (pct >= 70) return "var(--usage-amber, #f9a825)";
+  return "var(--usage-green, #43a047)";
+}
+
+function formatResetTime(resetsAt: string | null): string {
+  if (!resetsAt) return "";
+  const now = Date.now();
+  const reset = new Date(resetsAt).getTime();
+  const diff = reset - now;
+  if (diff <= 0) return "resetting...";
+
+  const hours = Math.floor(diff / 3_600_000);
+  const mins = Math.floor((diff % 3_600_000) / 60_000);
+
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return `${days}d ${remHours}h`;
+  }
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export function ClaudeUsageSection() {
-  const [stats, setStats] = useState<ClaudeUsageStats | null>(null);
+  const [usage, setUsage] = useState<ClaudeApiUsage | null>(null);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const checkKey = useCallback(async () => {
+    try {
+      const result = await invoke<boolean>("has_claude_session_key");
+      setHasKey(result);
+    } catch {
+      setHasKey(false);
+    }
+  }, []);
 
   const fetchUsage = useCallback(async () => {
     try {
-      const result = await invoke<ClaudeUsageStats | null>("get_claude_usage");
-      setStats(result);
+      const result = await invoke<ClaudeApiUsage | null>("get_claude_usage");
+      setUsage(result);
+      setError(null);
     } catch (err) {
-      console.error("Failed to fetch Claude usage:", err);
+      setError(String(err));
     }
   }, []);
 
@@ -87,11 +75,45 @@ export function ClaudeUsageSection() {
     setRefreshing(false);
   }, [fetchUsage]);
 
+  const handleSaveKey = useCallback(async () => {
+    if (!keyInput.trim()) return;
+    setSaving(true);
+    try {
+      await invoke("save_claude_session_key", { key: keyInput.trim() });
+      setKeyInput("");
+      setHasKey(true);
+      setError(null);
+      await fetchUsage();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setSaving(false);
+    }
+  }, [keyInput, fetchUsage]);
+
+  const handleClearKey = useCallback(async () => {
+    try {
+      await invoke("clear_claude_session_key");
+      setHasKey(false);
+      setUsage(null);
+      setError(null);
+    } catch (err) {
+      setError(String(err));
+    }
+  }, []);
+
+  // Check key on mount
   useEffect(() => {
+    checkKey();
+  }, [checkKey]);
+
+  // Fetch usage + polling when key is set
+  useEffect(() => {
+    if (!hasKey) return;
     fetchUsage();
     const interval = setInterval(fetchUsage, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchUsage]);
+  }, [hasKey, fetchUsage]);
 
   const usageIcon = (
     <svg
@@ -110,20 +132,32 @@ export function ClaudeUsageSection() {
     </svg>
   );
 
-  // Find today's activity
-  const today = getTodayDateString();
-  const todayActivity = stats?.dailyActivity.find((d) => d.date === today);
+  const renderBar = (label: string, limit: UsageLimit | null | undefined) => {
+    if (!limit) return null;
+    const pct = Math.round(limit.utilization * 100);
+    const color = getUsageColor(pct);
+    const reset = formatResetTime(limit.resetsAt);
 
-  // Get last 7 days of activity
-  const last7Days = stats?.dailyActivity.slice(-7) ?? [];
-  const maxMessages = Math.max(...last7Days.map((d) => d.messageCount), 1);
-
-  // Get model usage sorted by output tokens
-  const modelEntries = stats
-    ? Object.entries(stats.modelUsage).sort(
-        ([, a], [, b]) => b.outputTokens - a.outputTokens
-      )
-    : [];
+    return (
+      <div className="claude-usage-limit">
+        <div className="claude-usage-limit-header">
+          <span className="claude-usage-limit-label">{label}</span>
+          <span className="claude-usage-limit-pct" style={{ color }}>
+            {pct}%
+          </span>
+        </div>
+        <div className="claude-usage-bar-bg">
+          <div
+            className="claude-usage-bar-fill"
+            style={{ width: `${pct}%`, backgroundColor: color }}
+          />
+        </div>
+        {reset && (
+          <div className="claude-usage-limit-reset">resets in {reset}</div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <CollapsibleSection
@@ -133,92 +167,73 @@ export function ClaudeUsageSection() {
       defaultCollapsed
     >
       <div className="claude-usage-content">
-        {!stats ? (
-          <div className="claude-usage-empty">No usage data available</div>
-        ) : (
-          <>
-            {/* Today's Stats */}
-            <div className="claude-usage-today">
-              <div className="claude-usage-stat">
-                <span className="claude-usage-stat-value">
-                  {formatNumber(todayActivity?.messageCount ?? 0)}
-                </span>
-                <span className="claude-usage-stat-label">Messages</span>
-              </div>
-              <div className="claude-usage-stat">
-                <span className="claude-usage-stat-value">
-                  {formatNumber(todayActivity?.sessionCount ?? 0)}
-                </span>
-                <span className="claude-usage-stat-label">Sessions</span>
-              </div>
-              <div className="claude-usage-stat">
-                <span className="claude-usage-stat-value">
-                  {formatNumber(todayActivity?.toolCallCount ?? 0)}
-                </span>
-                <span className="claude-usage-stat-label">Tool Calls</span>
-              </div>
+        {hasKey === null ? null : !hasKey ? (
+          // No session key - show setup
+          <div className="claude-usage-setup">
+            <p className="claude-usage-setup-hint">
+              Paste your Claude.ai session key to see plan usage.
+            </p>
+            <div className="claude-usage-key-row">
+              <input
+                type="password"
+                className="claude-usage-key-input"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder="sk-ant-..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveKey();
+                }}
+              />
+              <button
+                className="claude-usage-key-save"
+                onClick={handleSaveKey}
+                disabled={saving || !keyInput.trim()}
+                type="button"
+              >
+                {saving ? "..." : "Save"}
+              </button>
             </div>
-
-            {/* Model Usage */}
-            {modelEntries.length > 0 && (
-              <div className="claude-usage-models">
-                <div className="claude-usage-section-label">Models</div>
-                {modelEntries.map(([modelId, usage]) => (
-                  <div key={modelId} className="claude-usage-model">
-                    <span className="claude-usage-model-name">
-                      {getModelName(modelId)}
-                    </span>
-                    <span className="claude-usage-model-tokens">
-                      {formatTokenCount(usage.outputTokens)} out
-                    </span>
-                  </div>
-                ))}
+          </div>
+        ) : (
+          // Has key - show usage or loading/error
+          <>
+            {error && (
+              <div className="claude-usage-error">
+                <span>{error}</span>
+                <button
+                  className="claude-usage-error-dismiss"
+                  onClick={() => setError(null)}
+                  type="button"
+                >
+                  &times;
+                </button>
               </div>
             )}
 
-            {/* 7-Day Activity */}
-            {last7Days.length > 0 && (
-              <div className="claude-usage-activity">
-                <div className="claude-usage-section-label">Last 7 Days</div>
-                {last7Days.map((day) => (
-                  <div key={day.date} className="claude-usage-day">
-                    <span className="claude-usage-day-label">
-                      {getDayLabel(day.date)}
-                    </span>
-                    <div className="claude-usage-day-bar-bg">
-                      <div
-                        className="claude-usage-day-bar"
-                        style={{
-                          width: `${(day.messageCount / maxMessages) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="claude-usage-day-count">
-                      {formatTokenCount(day.messageCount)}
-                    </span>
-                  </div>
-                ))}
+            {usage ? (
+              <div className="claude-usage-limits">
+                {renderBar("5-Hour Limit", usage.fiveHour)}
+                {renderBar("7-Day Limit", usage.sevenDay)}
+                {renderBar("7-Day Opus", usage.sevenDayOpus)}
+                {renderBar("7-Day Sonnet", usage.sevenDaySonnet)}
               </div>
-            )}
+            ) : !error ? (
+              <div className="claude-usage-loading">Loading...</div>
+            ) : null}
 
-            {/* Totals + Refresh */}
-            <div className="claude-usage-totals">
-              <span>
-                {formatNumber(stats.totalMessages)} total messages
-              </span>
+            <div className="claude-usage-footer">
               <button
                 className="claude-usage-refresh"
                 onClick={handleRefresh}
                 disabled={refreshing}
                 type="button"
-                title="Refresh usage data"
+                title="Refresh"
               >
                 <svg
                   width="12"
                   height="12"
                   viewBox="0 0 12 12"
                   fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
                   className={refreshing ? "spinning" : ""}
                 >
                   <path
@@ -229,6 +244,14 @@ export function ClaudeUsageSection() {
                     strokeLinejoin="round"
                   />
                 </svg>
+              </button>
+              <button
+                className="claude-usage-clear-key"
+                onClick={handleClearKey}
+                type="button"
+                title="Remove session key"
+              >
+                Clear Key
               </button>
             </div>
           </>

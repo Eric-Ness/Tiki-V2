@@ -56,6 +56,9 @@ pub fn run() {
             terminal::commands::resize_terminal,
             terminal::commands::destroy_terminal,
             claude_usage::get_claude_usage,
+            claude_usage::save_claude_session_key,
+            claude_usage::has_claude_session_key,
+            claude_usage::clear_claude_session_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
