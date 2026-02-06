@@ -318,7 +318,8 @@ pub fn create_github_issue(
 }
 
 /// Fetch a single GitHub issue by number
-fn fetch_github_issue_by_number(
+#[tauri::command]
+pub fn fetch_github_issue_by_number(
     number: u32,
     project_path: Option<String>,
 ) -> Result<GitHubIssue, String> {
