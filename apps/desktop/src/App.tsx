@@ -187,8 +187,14 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Tiki</h1>
-        <span className="subtitle">GitHub Issue Workflow</span>
+        <div className="header-left">
+          <h1>Tiki</h1>
+          <span className="subtitle">GitHub Issue Workflow</span>
+        </div>
+        <div className="header-center">
+          {activeProject && <span className="project-title">{activeProject.name}</span>}
+        </div>
+        <div className="header-right" />
       </header>
 
       <Group orientation="horizontal" className="app-layout">
