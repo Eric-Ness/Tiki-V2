@@ -8,6 +8,7 @@ export interface ReleaseDialogProps {
   onClose: () => void;
   onSave: (release: Omit<TikiRelease, "createdAt" | "updatedAt">) => void;
   editingRelease?: TikiRelease;
+  suggestedVersion?: string;
 }
 
 export function ReleaseDialog({
@@ -15,6 +16,7 @@ export function ReleaseDialog({
   onClose,
   onSave,
   editingRelease,
+  suggestedVersion,
 }: ReleaseDialogProps) {
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -66,12 +68,12 @@ export function ReleaseDialog({
         setVersion(editingRelease.version);
         setSelectedIssues([...editingRelease.issues]);
       } else {
-        setVersion("");
+        setVersion(suggestedVersion ?? "");
         setSelectedIssues([]);
       }
       setError(null);
     }
-  }, [isOpen, editingRelease]);
+  }, [isOpen, editingRelease, suggestedVersion]);
 
   // Fetch open issues when dialog opens
   useEffect(() => {
