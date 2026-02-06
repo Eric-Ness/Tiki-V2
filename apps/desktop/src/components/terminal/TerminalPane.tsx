@@ -79,8 +79,8 @@ export function TerminalPane() {
       return;
     }
 
-    // Ctrl + Shift + V: Split vertical
-    if ((e.key === 'v' || e.key === 'V') && e.shiftKey) {
+    // Ctrl + Shift + \: Split vertical (was Ctrl+Shift+V, changed to avoid conflict with paste)
+    if (e.key === '|' && e.shiftKey) {
       e.preventDefault();
       const activeTab = tabs.find(t => t.id === activeTabId);
       if (activeTab && activeTabId) {

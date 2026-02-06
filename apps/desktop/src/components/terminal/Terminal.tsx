@@ -182,6 +182,30 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           terminalFocusRegistry.register(terminalId, () => xterm.focus());
         }
 
+        // Handle copy/paste keyboard shortcuts
+        xterm.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+          // Ctrl+Shift+C: Copy selection to clipboard
+          if (e.ctrlKey && e.shiftKey && e.key === 'C' && e.type === 'keydown') {
+            const selection = xterm.getSelection();
+            if (selection) {
+              navigator.clipboard.writeText(selection);
+            }
+            return false; // Prevent xterm from processing
+          }
+
+          // Ctrl+Shift+V: Paste from clipboard
+          if (e.ctrlKey && e.shiftKey && e.key === 'V' && e.type === 'keydown') {
+            navigator.clipboard.readText().then((text) => {
+              if (text) {
+                xterm.paste(text);
+              }
+            });
+            return false; // Prevent xterm from processing
+          }
+
+          return true; // Let xterm handle all other keys
+        });
+
         // Connect user input to PTY
         xterm.onData((data) => {
           writeTerminalRef.current(data);
