@@ -167,19 +167,45 @@ When starting a release, create the work entry in `.tiki/state.json`:
 }
 ```
 
-**During execution**, update as each issue progresses:
+**During execution**, update as each issue progresses. Note: each child issue also gets its own `issue:N` entry in `activeWork` (created by `/tiki:yolo` with `parentRelease` set via automatic detection):
 
 ```json
 {
-  "release": {
-    "version": "v1.2",
-    "issues": [41, 42, 43],
-    "currentIssue": 42,
-    "completedIssues": [41],
-    "milestone": "v1.2"
-  },
-  "status": "executing",
-  "lastActivity": "2026-02-03T10:30:00.000Z"
+  "activeWork": {
+    "release:v1.2": {
+      "type": "release",
+      "release": {
+        "version": "v1.2",
+        "issues": [41, 42, 43],
+        "currentIssue": 42,
+        "completedIssues": [41],
+        "milestone": "v1.2"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-02-03T10:00:00.000Z",
+      "lastActivity": "2026-02-03T10:30:00.000Z"
+    },
+    "issue:41": {
+      "type": "issue",
+      "issue": { "number": 41, "title": "Add authentication" },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "parentRelease": "v1.2",
+      "createdAt": "2026-02-03T10:00:00.000Z",
+      "lastActivity": "2026-02-03T10:20:00.000Z"
+    },
+    "issue:42": {
+      "type": "issue",
+      "issue": { "number": 42, "title": "Add user profiles" },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "parentRelease": "v1.2",
+      "phase": { "current": 2, "total": 3, "status": "executing" },
+      "createdAt": "2026-02-03T10:20:00.000Z",
+      "lastActivity": "2026-02-03T10:30:00.000Z"
+    }
+  }
 }
 ```
 
@@ -187,23 +213,32 @@ When starting a release, create the work entry in `.tiki/state.json`:
 
 ```json
 {
-  "release": {
-    "version": "v1.2",
-    "issues": [41, 42, 43],
-    "currentIssue": null,
-    "completedIssues": [41, 42, 43],
-    "milestone": "v1.2"
-  },
-  "status": "shipping",
-  "pipelineStep": "SHIP",
-  "lastActivity": "2026-02-03T11:00:00.000Z"
+  "activeWork": {
+    "release:v1.2": {
+      "type": "release",
+      "release": {
+        "version": "v1.2",
+        "issues": [41, 42, 43],
+        "currentIssue": null,
+        "completedIssues": [41, 42, 43],
+        "milestone": "v1.2"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "lastActivity": "2026-02-03T11:00:00.000Z"
+    },
+    "issue:41": { "type": "issue", "status": "completed", "parentRelease": "v1.2", "..." : "..." },
+    "issue:42": { "type": "issue", "status": "completed", "parentRelease": "v1.2", "..." : "..." },
+    "issue:43": { "type": "issue", "status": "completed", "parentRelease": "v1.2", "..." : "..." }
+  }
 }
 ```
 
 **After shipping completes**:
-1. Remove from `activeWork`
-2. Add to `history.recentReleases`
-3. Archive release file to `.tiki/releases/archive/`
+1. Remove `release:{version}` from `activeWork`
+2. Remove ALL child `issue:N` entries from `activeWork` where `parentRelease` matches this release version
+3. Add to `history.recentReleases`
+4. Archive release file to `.tiki/releases/archive/`
 </state-management>
 
 <output>
@@ -659,6 +694,7 @@ After all issues complete, ship the release:
 
 5. **Update state.json**
    - Remove `release:{version}` from `activeWork`
+   - Remove ALL child `issue:N` entries from `activeWork` where `parentRelease` matches this release version
    - Add to `history.recentReleases`:
    ```json
    {

@@ -49,6 +49,8 @@ pub struct IssueContext {
     pub yolo: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_release: Option<String>,
 }
 
 // --- Raw helper structs for deserializing both old and new formats ---
@@ -99,6 +101,8 @@ struct RawIssueContext {
     yolo: Option<bool>,
     #[serde(default)]
     commit: Option<String>,
+    #[serde(default)]
+    parent_release: Option<String>,
 }
 
 /// Leniently deserialize phase progress — returns None if unparseable instead of erroring
@@ -278,6 +282,7 @@ impl<'de> Deserialize<'de> for IssueContext {
             audit_passed: raw.audit_passed,
             yolo: raw.yolo,
             commit: raw.commit,
+            parent_release: raw.parent_release,
         })
     }
 }

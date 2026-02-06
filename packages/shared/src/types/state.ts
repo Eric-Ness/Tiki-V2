@@ -99,6 +99,8 @@ export interface IssueWork {
   createdAt: Timestamp;
   lastActivity: Timestamp;
   error?: WorkError;
+  /** Parent release version if this issue is part of a release (e.g., 'v1.2') */
+  parentRelease?: string;
 }
 
 /** Release metadata */
@@ -144,6 +146,8 @@ export interface CompletedReleaseRecord {
   version: string;
   issues?: number[];
   completedAt: Timestamp;
+  /** Git tag for the release */
+  tag?: string;
 }
 
 /** History of completed work */
@@ -152,6 +156,8 @@ export interface WorkHistory {
   lastCompletedRelease?: CompletedReleaseRecord;
   /** Recently completed issues (for quick reference) */
   recentIssues?: CompletedIssueRecord[];
+  /** Recently completed releases */
+  recentReleases?: CompletedReleaseRecord[];
 }
 
 /** Work ID pattern: 'issue:42' or 'release:v1.2' */

@@ -12,8 +12,8 @@ export interface IssueContext {
   type: "issue";
   issue: {
     number: number;
-    title: string;
-    url: string;
+    title?: string;
+    url?: string;
   };
   status: WorkStatus;
   pipelineStep?: PipelineStep;
@@ -21,6 +21,7 @@ export interface IssueContext {
   createdAt: string;
   lastActivity?: string;
   auditPassed?: boolean;
+  parentRelease?: string;
 }
 
 export interface ReleaseContext {
@@ -55,7 +56,7 @@ export function WorkCard({ work }: WorkCardProps) {
         {isIssue ? (
           <>
             <span className="issue-number">#{work.issue.number}</span>
-            <span className="title">{work.issue.title}</span>
+            <span className="title">{work.issue.title || `Issue #${work.issue.number}`}</span>
           </>
         ) : (
           <span className="version">{work.version}</span>

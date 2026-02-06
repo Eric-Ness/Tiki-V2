@@ -1,0 +1,28 @@
+{
+  "issue": {
+    "number": 78,
+    "title": "Release child issues don't appear in Kanban board or Active Work panel"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add parentRelease field to all type definitions",
+      "content": "Add optional `parentRelease` field across all type layers:\n\n1. **packages/shared/src/types/state.ts** - Add `parentRelease?: string` to `IssueWork` interface\n2. **packages/shared/schemas/state.schema.json** - Add `parentRelease` property to issueWork definition (optional, string type)\n3. **apps/desktop/src-tauri/src/state.rs** - Add `parent_release: Option<String>` to `IssueContext` struct with `#[serde(skip_serializing_if = \"Option::is_none\")]`, add to `RawIssueContext` with `#[serde(default)]`, and pass through in the custom Deserialize impl\n4. **apps/desktop/src/components/work/WorkCard.tsx** - Add `parentRelease?: string` to local `IssueContext` interface\n\nNo changes needed to tikiStateStore.ts (imports WorkContext from WorkCard), KanbanBoard.tsx, or WorkProgressCard.tsx.",
+      "verification": [
+        "Run `cargo check` in apps/desktop/src-tauri — must pass",
+        "Run `pnpm typecheck` from root — must pass",
+        "Confirm parentRelease is optional everywhere (backward compatible)"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Update framework commands with parent release detection and conditional shipping",
+      "content": "Update the three framework command markdown files:\n\n1. **packages/framework/commands/yolo.md** - Add 'Parent Release Detection' section: before creating the initial state entry at GET step, check if any `release:*` entry in activeWork has this issue number in its `issues` array AND status is `executing`. If found, set `parentRelease` on the issue entry. Persist `parentRelease` through all pipeline steps. At completion: if `parentRelease` is set, do NOT remove from activeWork — instead mark as `status: \"completed\"`, `pipelineStep: \"SHIP\"`. Do NOT add to history (the release ship step handles that). Update all JSON state examples to show `parentRelease` as conditionally present.\n\n2. **packages/framework/commands/ship.md** - Add 'Child Issue Shipping' section: when shipping an issue that has `parentRelease` set, do NOT delete from activeWork. Instead set status to `completed`, keep pipelineStep as `SHIP`, update lastActivity. Do NOT add to history. Still archive the plan file. Add example JSON showing completed child issue alongside its parent release entry.\n\n3. **packages/framework/commands/release.md** - Update state examples to show child `issue:N` entries alongside the `release:*` entry. Update the completion/shipping section to add cleanup: remove all `issue:N` entries from activeWork where `parentRelease` matches this release version, then add each to `history.recentIssues`. Add post-ship cleanup example.",
+      "verification": [
+        "Read each modified markdown file and confirm JSON examples are valid",
+        "Trace the full lifecycle mentally: release starts -> yolo detects parent -> yolo sets parentRelease -> ship preserves entry -> release cleans up all child entries",
+        "Confirm logic is consistent across release.md, yolo.md, and ship.md"
+      ]
+    }
+  ]
+}

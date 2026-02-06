@@ -245,7 +245,64 @@ After completing a phase, update `phase.status` to `"completed"` and increment `
 2. **Always update `lastActivity`** — Use `new Date().toISOString()` for current timestamp
 3. **Use correct `issue` format** — Must be `{ "number": N, "title": "..." }`, NOT top-level fields
 4. **Track phase progress** — Update `phase.current`, `phase.total`, and `phase.status` during execution
-5. **Clean up on completion** — Remove from `activeWork`, add to `history`
+5. **Clean up on completion** — Remove from `activeWork`, add to `history` (unless part of a release — see below)
+
+### Parent Release Detection
+
+Before creating the initial state entry (GET step), check if any `release:*` entry exists in `.tiki/state.json` whose `release.issues` array contains this issue number AND whose `status` is `"executing"`.
+
+**If a parent release is found:**
+1. Add `"parentRelease": "{version}"` to the issue's work entry at the GET step
+2. The `parentRelease` field MUST persist through ALL pipeline steps (GET through SHIP)
+3. On completion (step 7): do NOT remove the issue from `activeWork`. Instead, set `status` to `"completed"` and `pipelineStep` to `"SHIP"`. The parent release will handle final cleanup.
+4. Still add the issue to `history.recentIssues` as normal.
+
+**If no parent release is found:**
+- Proceed normally (no `parentRelease` field, remove from `activeWork` on completion)
+
+**Example state when issue #42 is part of release v1.2:**
+```json
+{
+  "activeWork": {
+    "release:v1.2": {
+      "type": "release",
+      "release": { "version": "v1.2", "issues": [41, 42, 43], "currentIssue": 42, "completedIssues": [41] },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "...",
+      "lastActivity": "..."
+    },
+    "issue:42": {
+      "type": "issue",
+      "issue": { "number": 42, "title": "Add user profiles" },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "parentRelease": "v1.2",
+      "phase": { "current": 2, "total": 3, "status": "executing" },
+      "createdAt": "...",
+      "lastActivity": "..."
+    }
+  }
+}
+```
+
+**Completion when `parentRelease` is set (replaces step 7 behavior):**
+```json
+{
+  "activeWork": {
+    "release:v1.2": { "..." : "..." },
+    "issue:42": {
+      "type": "issue",
+      "issue": { "number": 42, "title": "Add user profiles" },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "parentRelease": "v1.2",
+      "createdAt": "...",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
 </state-management>
 
 <errors>

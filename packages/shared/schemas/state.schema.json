@@ -39,9 +39,15 @@
         "recentIssues": {
           "type": "array",
           "description": "Recently completed issues (for quick reference)",
-          "maxItems": 10,
           "items": {
             "$ref": "#/$defs/completedIssueRecord"
+          }
+        },
+        "recentReleases": {
+          "type": "array",
+          "description": "Recently completed releases",
+          "items": {
+            "$ref": "#/$defs/completedReleaseRecord"
           }
         }
       }
@@ -92,10 +98,36 @@
               "type": "string",
               "description": "Issue title (cached from GitHub)"
             },
+            "body": {
+              "type": "string",
+              "description": "Issue body/description"
+            },
+            "state": {
+              "type": "string",
+              "description": "Issue state (OPEN or CLOSED)"
+            },
+            "labels": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Labels as string array"
+            },
+            "labelDetails": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/gitHubLabelInfo" },
+              "description": "Labels with full metadata"
+            },
             "url": {
               "type": "string",
               "format": "uri",
               "description": "Full GitHub issue URL"
+            },
+            "createdAt": {
+              "$ref": "#/$defs/timestamp",
+              "description": "GitHub created timestamp"
+            },
+            "updatedAt": {
+              "$ref": "#/$defs/timestamp",
+              "description": "GitHub updated timestamp"
             }
           }
         },
@@ -132,6 +164,18 @@
         "lastActivity": {
           "$ref": "#/$defs/timestamp"
         },
+        "yolo": {
+          "type": "boolean",
+          "description": "Whether this issue is running in YOLO mode"
+        },
+        "auditPassed": {
+          "type": "boolean",
+          "description": "Whether the plan audit passed"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Commit SHA for the work"
+        },
         "error": {
           "type": "object",
           "description": "Error details if status is 'failed'",
@@ -148,6 +192,10 @@
               "$ref": "#/$defs/timestamp"
             }
           }
+        },
+        "parentRelease": {
+          "type": "string",
+          "description": "Parent release version if this issue is part of a release (e.g., 'v1.2')"
         }
       }
     },
@@ -284,6 +332,33 @@
         },
         "completedAt": {
           "$ref": "#/$defs/timestamp"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Git tag for the release"
+        }
+      }
+    },
+    "gitHubLabelInfo": {
+      "type": "object",
+      "required": ["id", "name", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Label name"
+        },
+        "color": {
+          "type": "string",
+          "description": "Hex color (without #)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description"
         }
       }
     }
