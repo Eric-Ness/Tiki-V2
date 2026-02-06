@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 69,
+    "title": "Didn't Parse Phases correctly",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/69"
+  },
+  "createdAt": "2026-02-05T12:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Compatibility",
+      "description": "Rust backend parses state.json with phases as array + currentPhase/totalPhases fields into PhaseProgress"
+    },
+    {
+      "id": "SC2",
+      "category": "Compatibility",
+      "description": "Existing phase: {total, current, status} format continues to work"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "description": "Phases display correctly in sidebar WorkProgressCard and Kanban board after parsing"
+    },
+    {
+      "id": "SC4",
+      "category": "Build",
+      "description": "cargo check and pnpm typecheck both pass"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add phases-array + currentPhase/totalPhases support to Rust RawIssueContext",
+      "status": "pending",
+      "content": "The Rust `RawIssueContext` in `state.rs` needs to handle a third state.json format where phases are written as:\n\n```json\n{\n  \"currentPhase\": 2,\n  \"totalPhases\": 4,\n  \"phases\": [\n    { \"id\": 1, \"title\": \"...\", \"status\": \"completed\" },\n    { \"id\": 2, \"title\": \"...\", \"status\": \"executing\" }\n  ]\n}\n```\n\nChanges needed in `RawIssueContext`:\n1. Add `current_phase: Option<u32>` field with `#[serde(default, alias = \"currentPhase\")]`\n2. Add `total_phases: Option<u32>` field with `#[serde(default, alias = \"totalPhases\")]`\n3. Add a new field `phases_array: Option<Vec<RawPhaseArrayItem>>` that leniently deserializes the phases array format (separate from the existing `phases` field which expects `RawOldPhases` object)\n4. Create `RawPhaseArrayItem` struct: `{ id: u32, title: Option<String>, status: PhaseStatus }`\n5. Update the `Deserialize` impl for `IssueContext` to also check: if `phase` is None and `phases` (old object format) is None, try to construct `PhaseProgress` from `current_phase`/`total_phases` fields, deriving status from the `phases_array` current entry\n\nThe key challenge: the existing `phases` field uses `RawOldPhases` (an object with `total`, `completed`, `current`). The new format has `phases` as an array. Since both use the same JSON key `\"phases\"`, the lenient deserializer for `phases` already returns `None` when it sees an array (good - it doesn't error). We need a separate serde field to capture the array variant.\n\nApproach: Use `#[serde(default, alias = \"phases\")]` on a new field `phases_array` WON'T work (serde doesn't allow two fields with the same alias). Instead, change the `phases` field to accept EITHER format using a custom deserializer that tries the object format first, then the array format.\n\nBetter approach: Change `deserialize_lenient_phases` to return a new enum `RawPhasesVariant` that can be either `OldObject(RawOldPhases)` or `Array(Vec<RawPhaseArrayItem>)`. Then update the normalization logic in the `Deserialize` impl accordingly.",
+      "verification": [
+        "cargo check passes in apps/desktop/src-tauri",
+        "Create a test JSON with the issue #66 format and verify it parses (manual or unit test)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4"],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Verify frontend display and full build",
+      "status": "pending",
+      "content": "Verify that the frontend correctly displays phase data once the Rust backend normalizes it:\n\n1. The Rust `IssueContext` serializes `phase: { total, current, status }` which matches what the frontend `WorkCard.tsx` `PhaseInfo` type expects (`{ total: number, current: number, status: PhaseStatus }`)\n2. The `KanbanBoard.tsx` workItemsMap reads `work.phase?.current` and `work.phase?.total` — this should work once Rust serializes correctly\n3. The `WorkProgressCard.tsx` reads `work.phase` — same\n4. Run `pnpm typecheck` and `cargo check` to confirm no type/build issues\n5. No frontend changes should be needed since the Rust layer normalizes all formats into the canonical PhaseProgress shape before serializing to the frontend",
+      "verification": [
+        "pnpm typecheck passes from root",
+        "cargo check passes in apps/desktop/src-tauri",
+        "No frontend type changes needed (confirm)"
+      ],
+      "addressesCriteria": ["SC3", "SC4"],
+      "files": [],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [1, 2]
+  }
+}
