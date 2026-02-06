@@ -299,6 +299,24 @@ export function ReleasesSection() {
     </div>
   );
 
+  // Compute suggested next version by incrementing the patch of the highest existing version
+  const suggestedVersion = useMemo(() => {
+    const versions = mergedReleases.map((r) => r.version);
+    if (versions.length === 0) return "v0.1.0";
+    const sorted = [...versions].sort((a, b) => {
+      const pa = a.replace(/^v/, "").split(".").map(Number);
+      const pb = b.replace(/^v/, "").split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+      }
+      return 0;
+    });
+    const latest = sorted[0].replace(/-.*$/, ""); // strip pre-release suffix
+    const parts = latest.replace(/^v/, "").split(".").map(Number);
+    parts[2] = (parts[2] || 0) + 1;
+    return `v${parts.join(".")}`;
+  }, [mergedReleases]);
+
   const totalCount = mergedReleases.length;
 
   return (
@@ -399,6 +417,7 @@ export function ReleasesSection() {
         onClose={handleDialogClose}
         onSave={handleDialogSave}
         editingRelease={editingRelease}
+        suggestedVersion={suggestedVersion}
       />
     </>
   );
