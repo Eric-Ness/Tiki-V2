@@ -6,9 +6,9 @@ export type ViewType = 'terminal' | 'kanban';
 
 // Default panel sizes (percentages)
 const DEFAULT_SIZES = {
-  sidebar: 20,
-  main: 55,
-  detail: 25,
+  sidebar: 15,
+  main: 70,
+  detail: 15,
 } as const;
 
 export interface PanelSizes {

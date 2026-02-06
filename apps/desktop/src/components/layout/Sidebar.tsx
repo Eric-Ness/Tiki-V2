@@ -10,7 +10,7 @@ interface SidebarProps {
 
 export function Sidebar({
   children,
-  defaultSize = 20,
+  defaultSize = 15,
   minSize = 15,
   className = "",
 }: SidebarProps) {
