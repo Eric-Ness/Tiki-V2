@@ -1,6 +1,7 @@
 import { check } from "@tauri-apps/plugin-updater";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { useToastStore } from "../stores";
 
 export async function checkForAppUpdates(showNoUpdateMessage: boolean) {
   try {
@@ -15,6 +16,8 @@ export async function checkForAppUpdates(showNoUpdateMessage: boolean) {
       }
       return;
     }
+
+    useToastStore.getState().addToast(`Update available: v${update.version}`, 'info', 6000);
 
     const shouldUpdate = await ask(
       `Version ${update.version} is available!\n\n${update.body ?? ""}`,

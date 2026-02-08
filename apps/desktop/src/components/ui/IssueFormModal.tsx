@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useProjectsStore, useTikiReleasesStore, useSettingsStore, type GitHubIssue } from "../../stores";
+import { useProjectsStore, useTikiReleasesStore, useSettingsStore, useToastStore, type GitHubIssue } from "../../stores";
 import "./IssueFormModal.css";
 
 interface LabelInfo {
@@ -249,6 +249,11 @@ export function IssueFormModal({
       onClose();
     } catch (err) {
       setError(String(err));
+      useToastStore.getState().addToast(
+        isEditMode ? 'Failed to update issue' : 'Failed to create issue',
+        'error',
+        6000
+      );
     } finally {
       setLoading(false);
     }

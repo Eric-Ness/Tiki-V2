@@ -49,13 +49,22 @@ export { useKanbanStore } from './kanbanStore';
 export { useTikiStateStore } from './tikiStateStore';
 
 export {
+  useToastStore,
+  type Toast,
+  type ToastType,
+} from './toastStore';
+
+export {
   useSettingsStore,
   DEFAULT_TERMINAL_SETTINGS,
   DEFAULT_APPEARANCE_SETTINGS,
   DEFAULT_WORKFLOW_SETTINGS,
   DEFAULT_GITHUB_SETTINGS,
+  DEFAULT_NOTIFICATION_SETTINGS,
   type TerminalSettings,
   type AppearanceSettings,
   type WorkflowSettings,
   type GitHubSettings,
+  type NotificationSettings,
+  type ToastPosition,
 } from './settingsStore';

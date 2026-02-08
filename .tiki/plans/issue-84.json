@@ -1,0 +1,48 @@
+{
+  "issue": {
+    "number": 84,
+    "title": "Notification / toast system"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Core toast infrastructure",
+      "content": "Build the foundational toast notification system with Zustand store, Toast component, ToastContainer, and animations.\n\nFiles to create:\n\n1. `apps/desktop/src/stores/toastStore.ts` - Zustand store:\n   - ToastType = 'success' | 'error' | 'warning' | 'info'\n   - Toast interface: { id, type, message, duration?, createdAt }\n   - State: toasts: Toast[]\n   - Actions: addToast(message, type, duration?): string, removeToast(id): void, clearAll(): void\n   - Auto-dismiss via setTimeout, defaults 5000ms\n   - Max 5 toasts visible, oldest removed if exceeded\n\n2. `apps/desktop/src/components/ui/Toast.tsx` + `Toast.css` - Individual toast component:\n   - Props: { toast: Toast; onClose: () => void }\n   - Inline SVG icons for each type\n   - Colors: success #3fb950, error #f85149, warning #d29922, info #58a6ff\n   - framer-motion enter/exit: slide up + fade in, fade out on close\n   - Close button with hover effect\n\n3. `apps/desktop/src/components/ui/ToastContainer.tsx` - Container:\n   - Subscribe to toastStore\n   - position: fixed, bottom: 16px, right: 16px, z-index: 2000\n   - AnimatePresence from framer-motion for list animations\n   - Stack toasts vertically with 8px gap\n\n4. Update `apps/desktop/src/App.tsx`:\n   - Import and render <ToastContainer /> as last child in app div",
+      "verification": [
+        "pnpm typecheck passes with no errors",
+        "ToastContainer renders in bottom-right corner at z-index 2000",
+        "addToast() creates toast with correct type styling and auto-dismisses after 5 seconds",
+        "Close button manually dismisses toast with fade-out animation",
+        "Multiple toasts stack vertically with 8px gap, max 5 visible",
+        "All 4 toast variants (success, error, warning, info) display with correct colors and icons"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Integration with existing events",
+      "content": "Wire up toast notifications to existing state changes, errors, and events.\n\nIntegration points:\n\n1. State changes in App.tsx:\n   - In tiki-file-changed listener, detect phase completion (status executing -> completed), show success toast\n   - Detect work completion (status -> completed), show success toast with issue number\n   - Detect work failure (status -> failed), show error toast\n   - Detect pipeline step transitions: AUDIT -> EXECUTE = audit passed, SHIP completed = shipped\n\n2. GitHub API errors:\n   - IssueFormModal.tsx: In handleSubmit catch block, show error toast\n   - issuesStore.ts: In fetchIssues error handling, show error toast\n\n3. Update available:\n   - updater.ts: Show info toast when update detected\n\n4. Create a detectStateChanges helper function in App.tsx that compares old vs new state and fires appropriate toasts.\n\nStore a ref to previous state to enable comparison on each state change event.",
+      "verification": [
+        "Phase completion triggers success toast",
+        "Issue completion triggers success toast with issue number",
+        "GitHub API errors show error toasts",
+        "Audit pass shows success toast",
+        "Ship success shows success toast",
+        "Update available shows info toast"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Settings integration and preferences",
+      "content": "Add notification preferences to settings page.\n\n1. Extend settingsStore.ts:\n   - NotificationSettings interface: enabled, position, duration, maxVisible\n   - Defaults: enabled=true, position='bottom-right', duration=5000, maxVisible=5\n   - Add updateNotifications and resetNotifications actions\n\n2. Update ToastContainer:\n   - Read settings from settingsStore\n   - If !enabled, return null\n   - Dynamic positioning based on position setting\n   - Position styles: bottom-right, bottom-left, top-right (80px top for header), top-left\n\n3. Update toastStore:\n   - Read settings.duration as default duration\n   - Read settings.maxVisible to enforce limit\n   - Check settings.enabled before adding toast\n\n4. Add Notifications section to SettingsPage.tsx:\n   - Enable/disable checkbox\n   - Position dropdown (4 corners)\n   - Duration number input (1000-15000ms, step 1000)\n   - Max visible number input (1-10)\n   - Reset button\n   - All controls disabled when notifications disabled",
+      "verification": [
+        "Settings page shows Notifications section with all controls",
+        "Toggle enabled off stops all toasts",
+        "Changing position moves toasts to selected corner",
+        "Changing duration affects auto-dismiss timing",
+        "Changing max visible enforces the limit",
+        "Reset restores defaults",
+        "Settings persist across app restart"
+      ]
+    }
+  ]
+}

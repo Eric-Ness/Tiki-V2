@@ -53,12 +53,30 @@ export const DEFAULT_GITHUB_SETTINGS: GitHubSettings = {
   defaultLabels: [],
 };
 
+// --- Notification Settings ---
+export type ToastPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
+export interface NotificationSettings {
+  enabled: boolean;
+  position: ToastPosition;
+  duration: number;
+  maxVisible: number;
+}
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  position: 'bottom-right',
+  duration: 5000,
+  maxVisible: 5,
+};
+
 // --- Store ---
 interface SettingsState {
   terminal: TerminalSettings;
   appearance: AppearanceSettings;
   workflow: WorkflowSettings;
   github: GitHubSettings;
+  notifications: NotificationSettings;
 }
 
 interface SettingsActions {
@@ -66,10 +84,12 @@ interface SettingsActions {
   updateAppearance: (updates: Partial<AppearanceSettings>) => void;
   updateWorkflow: (updates: Partial<WorkflowSettings>) => void;
   updateGitHub: (updates: Partial<GitHubSettings>) => void;
+  updateNotifications: (updates: Partial<NotificationSettings>) => void;
   resetTerminal: () => void;
   resetAppearance: () => void;
   resetWorkflow: () => void;
   resetGitHub: () => void;
+  resetNotifications: () => void;
   resetAll: () => void;
 }
 
@@ -80,6 +100,7 @@ const initialState: SettingsState = {
   appearance: { ...DEFAULT_APPEARANCE_SETTINGS },
   workflow: { ...DEFAULT_WORKFLOW_SETTINGS },
   github: { ...DEFAULT_GITHUB_SETTINGS },
+  notifications: { ...DEFAULT_NOTIFICATION_SETTINGS },
 };
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -99,10 +120,14 @@ export const useSettingsStore = create<SettingsStore>()(
       updateGitHub: (updates) =>
         set((state) => ({ github: { ...state.github, ...updates } })),
 
+      updateNotifications: (updates) =>
+        set((state) => ({ notifications: { ...state.notifications, ...updates } })),
+
       resetTerminal: () => set({ terminal: { ...DEFAULT_TERMINAL_SETTINGS } }),
       resetAppearance: () => set({ appearance: { ...DEFAULT_APPEARANCE_SETTINGS } }),
       resetWorkflow: () => set({ workflow: { ...DEFAULT_WORKFLOW_SETTINGS } }),
       resetGitHub: () => set({ github: { ...DEFAULT_GITHUB_SETTINGS } }),
+      resetNotifications: () => set({ notifications: { ...DEFAULT_NOTIFICATION_SETTINGS } }),
       resetAll: () => set({ ...initialState }),
     }),
     {

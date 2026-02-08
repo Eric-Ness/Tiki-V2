@@ -155,6 +155,48 @@
   border-color: var(--accent-color, #007acc);
 }
 
+/* Checkbox label */
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #cccccc);
+  cursor: pointer;
+}
+
+.settings-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent-color, #007acc);
+  cursor: pointer;
+}
+
+/* Test button */
+.settings-test-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-test-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--text-secondary, #858585);
+  color: var(--text-primary, #cccccc);
+}
+
+.settings-test-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 /* Hint text */
 .settings-hint {
   margin: 0;

@@ -1,9 +1,12 @@
 import {
   useSettingsStore,
+  useToastStore,
   DEFAULT_TERMINAL_SETTINGS,
   DEFAULT_APPEARANCE_SETTINGS,
   DEFAULT_WORKFLOW_SETTINGS,
   DEFAULT_GITHUB_SETTINGS,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  type NotificationSettings,
 } from "../../stores";
 import "./SettingsPage.css";
 
@@ -12,19 +15,23 @@ export function SettingsPage() {
   const appearance = useSettingsStore((s) => s.appearance);
   const workflow = useSettingsStore((s) => s.workflow);
   const github = useSettingsStore((s) => s.github);
+  const notifications = useSettingsStore((s) => s.notifications);
   const updateTerminal = useSettingsStore((s) => s.updateTerminal);
   const updateAppearance = useSettingsStore((s) => s.updateAppearance);
   const updateWorkflow = useSettingsStore((s) => s.updateWorkflow);
   const updateGitHub = useSettingsStore((s) => s.updateGitHub);
+  const updateNotifications = useSettingsStore((s) => s.updateNotifications);
   const resetTerminal = useSettingsStore((s) => s.resetTerminal);
   const resetAppearance = useSettingsStore((s) => s.resetAppearance);
   const resetWorkflow = useSettingsStore((s) => s.resetWorkflow);
   const resetGitHub = useSettingsStore((s) => s.resetGitHub);
+  const resetNotifications = useSettingsStore((s) => s.resetNotifications);
 
   const isTerminalDefault = JSON.stringify(terminal) === JSON.stringify(DEFAULT_TERMINAL_SETTINGS);
   const isAppearanceDefault = JSON.stringify(appearance) === JSON.stringify(DEFAULT_APPEARANCE_SETTINGS);
   const isWorkflowDefault = JSON.stringify(workflow) === JSON.stringify(DEFAULT_WORKFLOW_SETTINGS);
   const isGitHubDefault = JSON.stringify(github) === JSON.stringify(DEFAULT_GITHUB_SETTINGS);
+  const isNotificationsDefault = JSON.stringify(notifications) === JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS);
 
   return (
     <div className="settings-page">
@@ -266,6 +273,90 @@ export function SettingsPage() {
             />
           </div>
           <p className="settings-hint">Comma-separated list of labels to apply by default.</p>
+        </div>
+
+        {/* Notifications */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <h3>Notifications</h3>
+            <button
+              className="settings-reset-btn"
+              onClick={resetNotifications}
+              disabled={isNotificationsDefault}
+              title="Reset notification settings to defaults"
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="settings-row">
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={notifications.enabled}
+                onChange={(e) => updateNotifications({ enabled: e.target.checked })}
+              />
+              <span>Enable toast notifications</span>
+            </label>
+          </div>
+
+          <div className="settings-row">
+            <label htmlFor="settings-toast-position">Position</label>
+            <select
+              id="settings-toast-position"
+              className="settings-select"
+              value={notifications.position}
+              onChange={(e) => updateNotifications({ position: e.target.value as NotificationSettings['position'] })}
+              disabled={!notifications.enabled}
+            >
+              <option value="bottom-right">Bottom Right</option>
+              <option value="bottom-left">Bottom Left</option>
+              <option value="top-right">Top Right</option>
+              <option value="top-left">Top Left</option>
+            </select>
+          </div>
+
+          <div className="settings-row">
+            <label htmlFor="settings-toast-duration">Auto-dismiss Duration</label>
+            <div className="settings-input-group">
+              <input
+                id="settings-toast-duration"
+                type="number"
+                className="settings-input settings-input-narrow"
+                value={notifications.duration / 1000}
+                onChange={(e) => updateNotifications({ duration: Number(e.target.value) * 1000 })}
+                min={1}
+                max={15}
+                step={1}
+                disabled={!notifications.enabled}
+              />
+              <span className="settings-input-suffix">seconds</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <label htmlFor="settings-toast-max">Max Visible</label>
+            <input
+              id="settings-toast-max"
+              type="number"
+              className="settings-input settings-input-narrow"
+              value={notifications.maxVisible}
+              onChange={(e) => updateNotifications({ maxVisible: Number(e.target.value) })}
+              min={1}
+              max={10}
+              disabled={!notifications.enabled}
+            />
+          </div>
+
+          <div className="settings-row">
+            <button
+              className="settings-test-btn"
+              onClick={() => useToastStore.getState().addToast('This is a test notification', 'info')}
+              disabled={!notifications.enabled}
+            >
+              Test Notification
+            </button>
+          </div>
         </div>
       </div>
     </div>

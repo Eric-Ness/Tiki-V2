@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
@@ -14,8 +14,9 @@ import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/deta
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { SettingsPage } from "./components/settings";
+import { ToastContainer } from "./components/ui/ToastContainer";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore } from "./stores";
 import type { GitHubIssue, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
@@ -39,11 +40,61 @@ interface FileEvent {
   version?: string;
 }
 
+function detectStateChanges(
+  oldState: TikiState | null,
+  newState: TikiState | null,
+) {
+  if (!oldState || !newState) return;
+  const addToast = useToastStore.getState().addToast;
+  const oldWork = oldState.activeWork;
+  const newWork = newState.activeWork;
+
+  for (const [workId, newItem] of Object.entries(newWork)) {
+    const oldItem = oldWork[workId];
+    if (!oldItem) continue;
+
+    // Detect status changes
+    if (oldItem.status !== newItem.status) {
+      if (newItem.status === 'completed' && newItem.type === 'issue') {
+        addToast(`Issue #${newItem.issue.number} completed`, 'success', 5000);
+      } else if (newItem.status === 'failed' && newItem.type === 'issue') {
+        addToast(`Issue #${newItem.issue.number} failed`, 'error', 8000);
+      } else if (newItem.status === 'shipping' && newItem.type === 'issue') {
+        addToast(`Shipping issue #${newItem.issue.number}...`, 'info', 3000);
+      }
+    }
+
+    // Detect phase completion for issues
+    if (newItem.type === 'issue' && oldItem.type === 'issue') {
+      const oldPhase = oldItem.phase;
+      const newPhase = newItem.phase;
+      if (oldPhase && newPhase && oldPhase.completed !== newPhase.completed && newPhase.completed > oldPhase.completed) {
+        addToast(`Phase ${newPhase.completed}/${newPhase.total} completed`, 'success', 4000);
+      }
+    }
+
+    // Detect pipeline step transitions
+    if (oldItem.pipelineStep !== newItem.pipelineStep) {
+      if (oldItem.pipelineStep === 'AUDIT' && newItem.pipelineStep === 'EXECUTE') {
+        addToast('Audit passed', 'success', 3000);
+      }
+    }
+  }
+
+  // Detect work removed from activeWork (completed and moved to history)
+  for (const [workId, oldItem] of Object.entries(oldWork)) {
+    if (!newWork[workId] && oldItem.type === 'issue') {
+      addToast(`Issue #${oldItem.issue.number} shipped`, 'success', 5000);
+    }
+  }
+}
+
 function App() {
   const [state, setState] = useState<TikiState | null>(null);
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [appVersion, setAppVersion] = useState<string>("");
+  const prevStateRef = useRef<TikiState | null>(null);
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
 
@@ -109,6 +160,7 @@ function App() {
 
           const currentState = await invoke<TikiState | null>("get_state", {});
           console.log("State loaded:", currentState);
+          prevStateRef.current = currentState;
           setState(currentState);
           // Sync to tikiStateStore for Kanban
           if (currentState?.activeWork) {
@@ -133,6 +185,7 @@ function App() {
           tikiPath: projectTikiPath,
         });
         console.log("State loaded:", currentState);
+        prevStateRef.current = currentState;
         setState(currentState);
         // Sync to tikiStateStore for Kanban
         if (currentState?.activeWork) {
@@ -160,6 +213,8 @@ function App() {
             tikiPath: projectTikiPath,
           });
           console.log("State reloaded, activeWork keys:", currentState?.activeWork ? Object.keys(currentState.activeWork) : 'none');
+          detectStateChanges(prevStateRef.current, currentState);
+          prevStateRef.current = currentState;
           setState(currentState);
           // Sync to tikiStateStore for Kanban
           if (currentState?.activeWork) {
@@ -374,6 +429,8 @@ function App() {
           Reset Layout
         </button>
       </footer>
+
+      <ToastContainer />
     </div>
   );
 }
