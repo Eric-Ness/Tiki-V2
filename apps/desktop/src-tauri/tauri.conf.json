@@ -39,9 +39,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "PLACEHOLDER_UNTIL_KEY_GENERATED",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc5NTMzQ0U0RDlFODU5RjYKUldUMldlalo1RHhUZVRzbnI0djNRWEFQTFhUbXhxdnhCd1hBdG9pSnVOWHh4bFhod0lrVnY2TlcK",
       "endpoints": [
-        "https://github.com/ericnichols/Tiki-V2/releases/latest/download/latest.json"
+        "https://github.com/Eric-Ness/Tiki-V2/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
