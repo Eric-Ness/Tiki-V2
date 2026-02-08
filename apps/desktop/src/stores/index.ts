@@ -47,3 +47,15 @@ export { useReleaseDialogStore } from './releaseDialogStore';
 export { useKanbanStore } from './kanbanStore';
 
 export { useTikiStateStore } from './tikiStateStore';
+
+export {
+  useSettingsStore,
+  DEFAULT_TERMINAL_SETTINGS,
+  DEFAULT_APPEARANCE_SETTINGS,
+  DEFAULT_WORKFLOW_SETTINGS,
+  DEFAULT_GITHUB_SETTINGS,
+  type TerminalSettings,
+  type AppearanceSettings,
+  type WorkflowSettings,
+  type GitHubSettings,
+} from './settingsStore';

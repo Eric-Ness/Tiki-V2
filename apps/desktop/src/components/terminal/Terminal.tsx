@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { useTerminal } from "./useTerminal";
 import { terminalFocusRegistry } from "../../stores/terminalStore";
+import { useSettingsStore } from "../../stores";
 import "xterm/css/xterm.css";
 import "./Terminal.css";
 
@@ -16,6 +17,8 @@ interface TerminalProps {
 }
 
 export function Terminal({ className = "", cwd, shell, terminalId, onStatusChange }: TerminalProps) {
+  // Settings apply to new terminal instances only (existing terminals keep their config)
+  const terminalSettings = useSettingsStore((s) => s.terminal);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -62,7 +65,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
     onOutput: handleOutput,
     onExit: handleExit,
     cwd,
-    shell,
+    shell: shell ?? (terminalSettings.defaultShell || undefined),
     externalId: terminalId,
   });
 
@@ -150,8 +153,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
             brightCyan: "#29b8db",
             brightWhite: "#e5e5e5",
           },
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-          fontSize: 13,
+          fontFamily: terminalSettings.fontFamily,
+          fontSize: terminalSettings.fontSize,
+          scrollback: terminalSettings.scrollbackBuffer,
           lineHeight: 1.2,
           cursorBlink: true,
           cursorStyle: "block",

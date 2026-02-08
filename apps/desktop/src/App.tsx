@@ -13,6 +13,7 @@ import { TerminalPane } from "./components/terminal";
 import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
+import { SettingsPage } from "./components/settings";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore } from "./stores";
 import type { GitHubIssue, TikiRelease } from "./stores";
@@ -202,6 +203,9 @@ function App() {
         } else if (e.key === '2') {
           e.preventDefault();
           useLayoutStore.getState().setActiveView('kanban');
+        } else if (e.key === ',') {
+          e.preventDefault();
+          useLayoutStore.getState().setActiveView('settings');
         }
       }
     };
@@ -261,6 +265,17 @@ function App() {
               <ClaudeUsageSection />
             </div>
             <div className="sidebar-footer">
+              <div className="sidebar-footer-actions">
+              <button
+                className="sidebar-settings-btn"
+                onClick={() => useLayoutStore.getState().setActiveView('settings')}
+                title="Settings (Ctrl+,)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6.5 1.5L6.8 3.1C6.1 3.4 5.5 3.8 5 4.3L3.5 3.7L2 6.3L3.3 7.3C3.2 7.5 3.2 7.7 3.2 8C3.2 8.3 3.2 8.5 3.3 8.7L2 9.7L3.5 12.3L5 11.7C5.5 12.2 6.1 12.6 6.8 12.9L6.5 14.5H9.5L9.2 12.9C9.9 12.6 10.5 12.2 11 11.7L12.5 12.3L14 9.7L12.7 8.7C12.8 8.5 12.8 8.3 12.8 8C12.8 7.7 12.8 7.5 12.7 7.3L14 6.3L12.5 3.7L11 4.3C10.5 3.8 9.9 3.4 9.2 3.1L9.5 1.5H6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                </svg>
+              </button>
               <button
                 className="start-claude-btn"
                 onClick={async () => {
@@ -285,6 +300,7 @@ function App() {
               >
                 Start Claude
               </button>
+              </div>
             </div>
           </div>
         </Panel>
@@ -305,6 +321,9 @@ function App() {
               </section>
               <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
                 <KanbanBoard />
+              </section>
+              <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>
+                <SettingsPage />
               </section>
             </main>
           </div>

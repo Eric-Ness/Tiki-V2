@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 89,
+    "title": "Settings / preferences page",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/89"
+  },
+  "createdAt": "2026-02-08T16:30:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "A settings store exists with Zustand + persist for all setting categories (terminal, appearance, workflow, GitHub)" },
+    { "id": "SC2", "category": "Functional", "criterion": "A gear icon button in the sidebar footer opens the settings page" },
+    { "id": "SC3", "category": "Functional", "criterion": "Settings page displays categorized settings with appropriate input controls (selects, number inputs, text inputs)" },
+    { "id": "SC4", "category": "Functional", "criterion": "Terminal settings (font size, font family, scrollback) are consumed by the Terminal component and apply immediately" },
+    { "id": "SC5", "category": "Functional", "criterion": "Appearance settings (theme) apply immediately without restart" },
+    { "id": "SC6", "category": "Functional", "criterion": "Workflow and GitHub settings are persisted and readable by other components" },
+    { "id": "SC7", "category": "Functional", "criterion": "Settings page has a Reset to Defaults button per category" },
+    { "id": "SC8", "category": "Build", "criterion": "pnpm typecheck passes" },
+    { "id": "SC9", "category": "UX", "criterion": "Settings page styling matches existing dark theme and app aesthetic" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create settings store with all setting categories",
+      "status": "pending",
+      "content": "Create a new Zustand store with localStorage persistence for all application settings.\n\nSteps:\n1. Create `apps/desktop/src/stores/settingsStore.ts` with the following structure:\n   - **TerminalSettings** interface: `fontSize` (number, default 13), `fontFamily` (string, default \"'JetBrains Mono', 'Fira Code', 'Consolas', monospace\"), `scrollbackBuffer` (number, default 1000), `defaultShell` (string, default '' meaning system default)\n   - **AppearanceSettings** interface: `theme` ('dark' | 'light' | 'system', default 'dark'), `sidebarDefaultSize` (number, default 15), `detailDefaultSize` (number, default 15)\n   - **WorkflowSettings** interface: `defaultBranchStrategy` ('current' | 'auto' | 'custom', default 'current'), `defaultModel` ('sonnet' | 'opus' | 'haiku', default 'sonnet'), `defaultPlanningType` ('skip' | 'lite' | 'spec' | 'full', default 'full')\n   - **GitHubSettings** interface: `issueFetchLimit` (number, default 30), `defaultLabels` (string[], default [])\n   - **SettingsState** combines all four plus actions: `updateTerminal`, `updateAppearance`, `updateWorkflow`, `updateGitHub`, `resetTerminal`, `resetAppearance`, `resetWorkflow`, `resetGitHub`, `resetAll`\n   - Use `persist` middleware with storage key `'tiki-settings'`\n   - Export `useSettingsStore` hook and all settings type interfaces\n   - Export `DEFAULT_TERMINAL_SETTINGS`, `DEFAULT_APPEARANCE_SETTINGS`, `DEFAULT_WORKFLOW_SETTINGS`, `DEFAULT_GITHUB_SETTINGS` constants\n\n2. Update `apps/desktop/src/stores/index.ts`:\n   - Add export for `useSettingsStore` and all settings types\n\nThe store should use partial update functions (spread existing + override) so individual fields can be changed without affecting others.",
+      "verification": [
+        "settingsStore.ts exists with all four settings interfaces and Zustand store",
+        "Store is exported from stores/index.ts",
+        "All default values are defined as exported constants",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC1", "SC8"],
+      "files": [
+        "apps/desktop/src/stores/settingsStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Build the SettingsPage component with categorized UI",
+      "status": "pending",
+      "content": "Create the settings page component with tabbed/sectioned categories and appropriate form controls.\n\nSteps:\n1. Create `apps/desktop/src/components/settings/SettingsPage.tsx`:\n   - Import `useSettingsStore` and all default constants from stores\n   - Render a full-height scrollable page with a title 'Settings' and category sections\n   - **Terminal section**: \n     - Default Shell: text input (placeholder: 'System default')\n     - Font Size: number input (min 8, max 24, step 1)\n     - Font Family: text input with current value\n     - Scrollback Buffer: number input (min 100, max 50000, step 100)\n   - **Appearance section**:\n     - Theme: select with Dark/Light/System options\n     - Sidebar Default Size: number input (min 10, max 40) with '%' suffix\n     - Detail Panel Default Size: number input (min 10, max 40) with '%' suffix\n   - **Workflow section**:\n     - Default Branch Strategy: select with Current/Auto/Custom options\n     - Default Claude Model: select with Sonnet/Opus/Haiku options\n     - Default Planning Type: select with Full/Spec/Lite/Skip options\n   - **GitHub section**:\n     - Issue Fetch Limit: number input (min 10, max 100, step 10)\n     - Default Labels: text input (comma-separated) with hint text\n   - Each section has a 'Reset to Defaults' button that calls the corresponding reset function\n   - All inputs call the appropriate `update*` store function on change for immediate persistence\n   - Use a consistent layout: each setting is a row with label on left, control on right\n\n2. Create `apps/desktop/src/components/settings/SettingsPage.css`:\n   - Full-height scrollable container matching the dark theme\n   - Section styling with subtle dividers matching the sidebar section pattern\n   - Form controls styled consistently with IssueFormModal inputs/selects\n   - Use existing CSS variable patterns (--bg-primary, --bg-secondary, --border-color, --text-primary, --text-secondary, --accent-color)\n   - Responsive row layout for setting items (label + control)\n   - Reset button styled like the footer buttons (subtle, secondary style)\n\n3. Create `apps/desktop/src/components/settings/index.ts`:\n   - Export SettingsPage component\n\nStyling should match the existing app aesthetic: dark backgrounds (#1e1e1e, #252526), muted text colors, blue accent (#007acc / #60a5fa), 6px border-radius, consistent font sizes (12-13px).",
+      "verification": [
+        "SettingsPage.tsx renders all four setting categories with appropriate controls",
+        "Each category has a Reset to Defaults button",
+        "All form controls are wired to settingsStore actions",
+        "CSS matches existing dark theme aesthetic",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC3", "SC7", "SC8", "SC9"],
+      "files": [
+        "apps/desktop/src/components/settings/SettingsPage.tsx",
+        "apps/desktop/src/components/settings/SettingsPage.css",
+        "apps/desktop/src/components/settings/index.ts"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add settings gear icon to sidebar and wire up navigation",
+      "status": "pending",
+      "content": "Add a gear icon button to the sidebar footer (next to the 'Start Claude' button) and integrate the settings page as a new view in the center panel.\n\nSteps:\n1. Update `apps/desktop/src/stores/layoutStore.ts`:\n   - Extend `ViewType` to include 'settings': `'terminal' | 'kanban' | 'settings'`\n   - No other changes needed -- the existing `setActiveView` action handles any ViewType value\n\n2. Update `apps/desktop/src/App.tsx`:\n   - Import `SettingsPage` from `./components/settings`\n   - Add a new `<section>` in the main content area (alongside terminal and kanban) for the settings view:\n     ```tsx\n     <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>\n       <SettingsPage />\n     </section>\n     ```\n   - In the sidebar footer (`.sidebar-footer` div), add a gear icon button BEFORE the 'Start Claude' button:\n     ```tsx\n     <div className=\"sidebar-footer\">\n       <div className=\"sidebar-footer-actions\">\n         <button\n           className=\"sidebar-settings-btn\"\n           onClick={() => useLayoutStore.getState().setActiveView('settings')}\n           title=\"Settings\"\n         >\n           {/* Gear SVG icon */}\n         </button>\n         <button className=\"start-claude-btn\" ...>Start Claude</button>\n       </div>\n     </div>\n     ```\n   - The gear SVG icon should be a standard 16x16 cog/gear icon\n\n3. Update `apps/desktop/src/components/layout/layout.css`:\n   - Add `.sidebar-footer-actions` flex layout (row, gap, align-items center)\n   - Style `.sidebar-settings-btn` as a small icon button (similar to .reset-layout-btn but icon-sized)\n   - Make `.start-claude-btn` flex: 1 so it fills remaining space\n\n4. Optionally update `apps/desktop/src/components/layout/CenterTabs.tsx`:\n   - Do NOT add a tab for settings in the center tabs bar -- the settings page is accessed only via the gear icon\n   - But ensure the 'Terminal' and 'Kanban' tabs still work as active-view toggles\n\n5. Add keyboard shortcut Ctrl+, to open settings:\n   - In App.tsx's existing keydown handler, add: if (e.key === ',') setActiveView('settings')\n\nThe gear icon in the sidebar footer provides the primary access point. When clicked, the center panel switches to show the SettingsPage. Users can return to terminal/kanban via Ctrl+1/Ctrl+2 or the center tabs.",
+      "verification": [
+        "Gear icon appears in sidebar footer area",
+        "Clicking gear icon switches center panel to settings page",
+        "Ctrl+, keyboard shortcut opens settings",
+        "Ctrl+1 and Ctrl+2 still switch back to terminal and kanban",
+        "Settings page is scrollable and fills the center panel",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC2", "SC8", "SC9"],
+      "files": [
+        "apps/desktop/src/stores/layoutStore.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/layout/layout.css"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Wire settings to Terminal component and IssueFormModal defaults",
+      "status": "pending",
+      "content": "Connect the settings store values to the components that currently have hardcoded values.\n\nSteps:\n1. Update `apps/desktop/src/components/terminal/Terminal.tsx`:\n   - Import `useSettingsStore` from stores\n   - At the top of the component, read terminal settings: `const terminalSettings = useSettingsStore((s) => s.terminal)`\n   - Replace hardcoded XTerm options with settings values:\n     - `fontSize: 13` -> `fontSize: terminalSettings.fontSize`\n     - `fontFamily: \"'JetBrains Mono'...\"` -> `fontFamily: terminalSettings.fontFamily`\n   - Add `scrollback: terminalSettings.scrollbackBuffer` to the XTerm options\n   - IMPORTANT: The XTerm instance is created once in a useEffect. To apply setting changes to existing terminals, we would need to reinitialize or use xterm options API. For MVP, settings apply to NEW terminals only. Add a comment noting this limitation.\n   - Pass `terminalSettings.defaultShell` to the shell prop if no explicit shell is passed: `shell: shell ?? (terminalSettings.defaultShell || undefined)`\n\n2. Update `apps/desktop/src/components/sidebar/IssuesSection.tsx`:\n   - Import `useSettingsStore` from stores\n   - Replace the hardcoded `limit: 30` in the `fetch_github_issues` invoke call with `useSettingsStore.getState().github.issueFetchLimit`\n\n3. Update `apps/desktop/src/components/ui/IssueFormModal.tsx`:\n   - Import `useSettingsStore` from stores\n   - Use workflow settings as defaults for form state initialization:\n     - `setBranchStrategy` initial value: `useSettingsStore.getState().workflow.defaultBranchStrategy`\n     - `setAiModel` initial value: `useSettingsStore.getState().workflow.defaultModel`\n     - `setPlanningType` initial value: `useSettingsStore.getState().workflow.defaultPlanningType`\n   - These replace the hardcoded defaults ('current', 'sonnet', 'full') in the useEffect that resets form state when the modal opens\n\nThese changes ensure that settings from the store are consumed by the components that previously had hardcoded values. All changes are backward-compatible since the store defaults match the current hardcoded values.",
+      "verification": [
+        "New terminal instances use fontSize and fontFamily from settings store",
+        "New terminal instances respect the defaultShell setting",
+        "IssuesSection uses issueFetchLimit from settings for API calls",
+        "IssueFormModal initializes branch strategy, AI model, and planning type from workflow settings",
+        "Existing behavior is unchanged when settings are at defaults",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC4", "SC5", "SC6", "SC8"],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/ui/IssueFormModal.tsx"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [3],
+    "SC3": [2],
+    "SC4": [4],
+    "SC5": [4],
+    "SC6": [4],
+    "SC7": [2],
+    "SC8": [1, 2, 3, 4],
+    "SC9": [2, 3]
+  }
+}

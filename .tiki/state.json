@@ -3,11 +3,12 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 83,
-      "title": "A Tiki and Tiki Desktop Version System",
-      "completedAt": "2026-02-07T01:15:00.000Z"
+      "number": 89,
+      "title": "Settings / preferences page",
+      "completedAt": "2026-02-08T17:00:00.000Z"
     },
     "recentIssues": [
+      { "number": 89, "title": "Settings / preferences page", "completedAt": "2026-02-08T17:00:00.000Z" },
       { "number": 83, "title": "A Tiki and Tiki Desktop Version System", "completedAt": "2026-02-07T01:15:00.000Z" },
       { "number": 80, "title": "Click on a panel in kanban", "completedAt": "2026-02-06T20:30:00.000Z" },
       { "number": 79, "title": "Sort completed kanban items", "completedAt": "2026-02-06T20:15:00.000Z" },

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useProjectsStore, useTikiReleasesStore, type GitHubIssue } from "../../stores";
+import { useProjectsStore, useTikiReleasesStore, useSettingsStore, type GitHubIssue } from "../../stores";
 import "./IssueFormModal.css";
 
 interface LabelInfo {
@@ -98,11 +98,12 @@ export function IssueFormModal({
       setError(null);
       setTitleTouched(false);
       setPriority(null);
-      setBranchStrategy("current");
+      const workflowDefaults = useSettingsStore.getState().workflow;
+      setBranchStrategy(workflowDefaults.defaultBranchStrategy);
       setCustomBranch("");
       setAiSettingsExpanded(false);
-      setAiModel("sonnet");
-      setPlanningType("full");
+      setAiModel(workflowDefaults.defaultModel);
+      setPlanningType(workflowDefaults.defaultPlanningType);
       setRunTests(false);
       setSelectedRelease("");
       setEnhanceDropdownOpen(false);

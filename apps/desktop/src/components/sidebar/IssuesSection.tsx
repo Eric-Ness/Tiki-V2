@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useSettingsStore, type GitHubIssue, type IssueFilter } from "../../stores";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
@@ -60,7 +60,7 @@ export function IssuesSection() {
       console.log('[IssuesSection] Fetching issues for project:', activeProject.path);
       const fetchedIssues = await invoke<GitHubIssue[]>("fetch_github_issues", {
         state: filter,
-        limit: 30,
+        limit: useSettingsStore.getState().github.issueFetchLimit,
         projectPath: activeProject.path,
       });
 
