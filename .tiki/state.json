@@ -1,41 +1,14 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "issue:85": {
-      "type": "issue",
-      "issue": {
-        "number": 85,
-        "title": "Issue comments thread in detail panel",
-        "labels": ["enhancement", "desktop"]
-      },
-      "status": "shipping",
-      "yolo": true,
-      "pipelineStep": "SHIP",
-      "phases": { "total": 3, "completed": 3, "current": 3 },
-      "createdAt": "2026-02-08T17:50:00.000Z",
-      "lastActivity": "2026-02-08T17:50:00.000Z"
-    },
-    "release:v0.2.7": {
-      "type": "release",
-      "release": {
-        "version": "v0.2.7",
-        "issues": [84, 85],
-        "currentIssue": 85,
-        "completedIssues": [84]
-      },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "createdAt": "2026-02-08T17:15:00.000Z",
-      "lastActivity": "2026-02-08T17:15:00.000Z"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 84,
-      "title": "Notification / toast system",
-      "completedAt": "2026-02-08T17:45:00.000Z"
+      "number": 85,
+      "title": "Issue comments thread in detail panel",
+      "completedAt": "2026-02-08T18:30:00.000Z"
     },
     "recentIssues": [
+      { "number": 85, "title": "Issue comments thread in detail panel", "completedAt": "2026-02-08T18:30:00.000Z" },
       { "number": 84, "title": "Notification / toast system", "completedAt": "2026-02-08T17:45:00.000Z" },
       { "number": 89, "title": "Settings / preferences page", "completedAt": "2026-02-08T17:00:00.000Z" },
       { "number": 83, "title": "A Tiki and Tiki Desktop Version System", "completedAt": "2026-02-07T01:15:00.000Z" },
@@ -57,6 +30,7 @@
       { "number": 56, "title": "Test Issue 5", "completedAt": "2026-02-05T15:05:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.2.7", "issues": [84, 85], "completedAt": "2026-02-08T18:30:00.000Z", "tag": "v0.2.7" },
       { "version": "v0.2.3", "issues": [79, 80], "completedAt": "2026-02-06T20:30:00.000Z", "tag": "v0.2.3" },
       { "version": "v0.2.2", "issues": [72, 73, 74], "completedAt": "2026-02-06T14:35:00.000Z", "tag": "v0.2.2" },
       { "version": "v0.2.1", "issues": [47, 48], "completedAt": "2026-02-04T05:35:00.000Z", "tag": "v0.2.1" },

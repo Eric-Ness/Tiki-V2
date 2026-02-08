@@ -1,6 +1,6 @@
 [package]
 name = "tiki-desktop"
-version = "0.2.6"
+version = "0.2.7"
 description = "Tiki Desktop - GitHub issue workflow manager"
 authors = ["Eric Nichols"]
 license = "MIT"
