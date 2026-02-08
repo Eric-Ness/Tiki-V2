@@ -10,6 +10,7 @@ mod watcher;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Initialize logging in debug mode
             if cfg!(debug_assertions) {
@@ -19,6 +20,9 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Initialize updater plugin
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
 
             // Start file watcher for .tiki directory
             let app_handle = app.handle().clone();

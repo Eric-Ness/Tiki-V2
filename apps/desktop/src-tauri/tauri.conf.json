@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Tiki",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "identifier": "com.tiki.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -28,6 +28,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,5 +36,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PLACEHOLDER_UNTIL_KEY_GENERATED",
+      "endpoints": [
+        "https://github.com/ericnichols/Tiki-V2/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

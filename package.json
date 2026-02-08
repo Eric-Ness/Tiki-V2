@@ -7,7 +7,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "clean": "pnpm -r clean",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "version-bump": "node scripts/version-bump.mjs"
   },
   "engines": {
     "node": ">=20.0.0",

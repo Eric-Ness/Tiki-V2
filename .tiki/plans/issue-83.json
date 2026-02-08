@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 83,
+    "title": "A Tiki and Tiki Desktop Version System",
+    "url": "https://github.com/ericnichols/Tiki-V2/issues/83"
+  },
+  "createdAt": "2026-02-07T00:15:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "Desktop app displays its own version number in the UI footer" },
+    { "id": "SC2", "category": "Functional", "criterion": "A runtime API exists to retrieve the app version (getVersion)" },
+    { "id": "SC3", "category": "Functional", "criterion": "Tauri updater plugin is configured for auto-updates from GitHub Releases" },
+    { "id": "SC4", "category": "Functional", "criterion": "Users can check for updates manually via a button and silently on startup" },
+    { "id": "SC5", "category": "Functional", "criterion": "Framework has a plugin.json manifest with version metadata" },
+    { "id": "SC6", "category": "Functional", "criterion": "/tiki:version command shows installed version and checks for updates" },
+    { "id": "SC7", "category": "Build", "criterion": "CI/CD generates updater artifacts (latest.json + .sig files) on release" },
+    { "id": "SC8", "category": "Build", "criterion": "Version numbers are consistent across tauri.conf.json, Cargo.toml, and plugin.json" },
+    { "id": "SC9", "category": "Build", "criterion": "cargo check passes, pnpm typecheck passes" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Desktop version display in footer",
+      "status": "pending",
+      "content": "Add the app version to the desktop footer using Tauri's built-in getVersion() API.\n\nSteps:\n1. In App.tsx, import `getVersion` from `@tauri-apps/api/app`\n2. Add a `useState<string>` for `appVersion` initialized to empty string\n3. Add a `useEffect` that calls `getVersion().then(setAppVersion)` on mount\n4. Display the version in the existing `<footer>` element, e.g. `<span className=\"app-version\">v{appVersion}</span>` between the path and reset button\n5. Add minimal CSS styling in App.css for `.app-version` (muted color, small font)\n\nNo new dependencies needed — `@tauri-apps/api` is already in devDependencies.",
+      "verification": [
+        "Version number appears in the desktop app footer",
+        "Version matches the value in tauri.conf.json (currently 0.1.0)",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC9"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/App.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Tauri updater plugin setup",
+      "status": "pending",
+      "content": "Add the Tauri updater plugin and process plugin to enable auto-updates from GitHub Releases.\n\nSteps:\n1. Add Rust dependencies to Cargo.toml:\n   - `tauri-plugin-updater = \"2\"` \n   - `tauri-plugin-process = \"2\"`\n2. Add npm dependencies to apps/desktop/package.json:\n   - `@tauri-apps/plugin-updater`\n   - `@tauri-apps/plugin-process`\n3. Register plugins in lib.rs:\n   - In the `.setup()` closure, add: `app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;`\n   - Before `.setup()`, add: `.plugin(tauri_plugin_process::init())`\n4. Update tauri.conf.json:\n   - Add `\"createUpdaterArtifacts\": \"v2\"` to the `bundle` section\n   - Add a `plugins` section with updater config:\n     ```json\n     \"plugins\": {\n       \"updater\": {\n         \"pubkey\": \"PLACEHOLDER_UNTIL_KEY_GENERATED\",\n         \"endpoints\": [\"https://github.com/ericnichols/Tiki-V2/releases/latest/download/latest.json\"],\n         \"windows\": { \"installMode\": \"passive\" }\n       }\n     }\n     ```\n5. Update capabilities/default.json:\n   - Add `\"updater:default\"` and `\"process:allow-restart\"` to permissions array\n6. Run `pnpm install` in apps/desktop to install new npm packages\n7. Run `cargo check` in apps/desktop/src-tauri to verify Rust compiles\n\nIMPORTANT: The pubkey placeholder must be replaced with a real key before the updater will work. Key generation is interactive and must be done by the user:\n  `pnpm tauri signer generate -- -w ~/.tauri/tiki.key`\nThe private key + password become GitHub Secrets: TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+      "verification": [
+        "cargo check passes with new updater dependencies",
+        "tauri.conf.json has plugins.updater section with endpoint",
+        "capabilities/default.json includes updater:default and process:allow-restart",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC3", "SC9"],
+      "files": [
+        "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src-tauri/tauri.conf.json",
+        "apps/desktop/src-tauri/capabilities/default.json",
+        "apps/desktop/package.json"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Desktop update check UI",
+      "status": "pending",
+      "content": "Add the frontend update checking flow — both a silent check on startup and a manual 'Check for Updates' option.\n\nSteps:\n1. Create `apps/desktop/src/utils/updater.ts`:\n   - Import `check` from `@tauri-apps/plugin-updater`\n   - Import `ask`, `message` from `@tauri-apps/plugin-dialog`  \n   - Import `relaunch` from `@tauri-apps/plugin-process`\n   - Export `checkForAppUpdates(showNoUpdateMessage: boolean)` function:\n     - Call `check()` to query the configured endpoint\n     - If update is null and showNoUpdateMessage: show 'You are on the latest version' dialog\n     - If update available: show ask dialog with version + body (release notes), Update/Later buttons\n     - If user confirms: call `update.downloadAndInstall()` then `relaunch()`\n     - Wrap in try/catch, log errors to console (don't crash on failure)\n2. In App.tsx:\n   - Import `checkForAppUpdates` from utils/updater\n   - Add a `useEffect` that calls `checkForAppUpdates(false)` on mount (silent startup check)\n   - Add a 'Check for Updates' button in the footer area that calls `checkForAppUpdates(true)`\n3. Style the button in App.css to match the existing footer aesthetic",
+      "verification": [
+        "updater.ts exports checkForAppUpdates function",
+        "Silent update check runs on app startup (no errors in console when no update server is available)",
+        "Manual 'Check for Updates' button is visible in footer and clickable",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC4", "SC9"],
+      "files": [
+        "apps/desktop/src/utils/updater.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/App.css"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Convert framework to Claude Code plugin",
+      "status": "pending",
+      "content": "Convert packages/framework/ into a Claude Code plugin with a proper plugin.json manifest and add a /tiki:version command.\n\nSteps:\n1. Create directory `packages/framework/.claude-plugin/`\n2. Create `packages/framework/.claude-plugin/plugin.json`:\n   ```json\n   {\n     \"name\": \"tiki-framework\",\n     \"description\": \"GitHub-issue-centric workflow framework for Claude Code\",\n     \"version\": \"0.2.4\",\n     \"author\": {\n       \"name\": \"Eric Nichols\"\n     }\n   }\n   ```\n3. Create `packages/framework/commands/version.md` — a `/tiki:version` command that:\n   - Reads the version from `.claude-plugin/plugin.json` (or a known location)\n   - Runs `gh api repos/ericnichols/Tiki-V2/releases/latest --jq .tag_name` to get latest version\n   - Compares installed vs latest and reports if an update is available\n   - Shows both framework and desktop version info\n4. The existing commands/ directory structure already matches Claude Code plugin conventions — no restructuring needed\n\nNote: Also install the version.md command locally to .claude/commands/tiki/ for immediate use.",
+      "verification": [
+        "packages/framework/.claude-plugin/plugin.json exists with correct metadata",
+        "/tiki:version command file exists at packages/framework/commands/version.md",
+        "Existing framework commands remain functional"
+      ],
+      "addressesCriteria": ["SC5", "SC6"],
+      "files": [
+        "packages/framework/.claude-plugin/plugin.json",
+        "packages/framework/commands/version.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 5,
+      "title": "Update CI/CD and sync version numbers",
+      "status": "pending",
+      "content": "Update the GitHub Actions release workflow to generate updater artifacts and ensure all version numbers are consistent.\n\nSteps:\n1. Update `.github/workflows/release.yml`:\n   - Add environment variables to the build step:\n     ```yaml\n     env:\n       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}\n       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}\n     ```\n   - Add `includeUpdaterJson: true` to the tauri-action `with:` section\n   - The tauri-action automatically generates latest.json when createUpdaterArtifacts is set\n2. Bump version numbers to current release version (e.g., 0.2.4):\n   - `apps/desktop/src-tauri/tauri.conf.json` — `version` field\n   - `apps/desktop/src-tauri/Cargo.toml` — `version` field\n   - `packages/framework/.claude-plugin/plugin.json` — `version` field\n3. Add a `version-bump` script to root package.json:\n   - A simple node script or a package.json script using `npx json` that updates all 3 locations\n   - Usage: `pnpm version-bump 0.2.5`\n\nNote: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD GitHub Secrets must be configured manually in repo settings after key generation.",
+      "verification": [
+        "release.yml includes TAURI_SIGNING_PRIVATE_KEY env vars and includeUpdaterJson: true",
+        "All version numbers are consistent (tauri.conf.json, Cargo.toml, plugin.json)",
+        "version-bump script exists and is documented"
+      ],
+      "addressesCriteria": ["SC7", "SC8"],
+      "files": [
+        ".github/workflows/release.yml",
+        "apps/desktop/src-tauri/tauri.conf.json",
+        "apps/desktop/src-tauri/Cargo.toml",
+        "packages/framework/.claude-plugin/plugin.json",
+        "package.json"
+      ],
+      "dependencies": [2, 4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [3],
+    "SC5": [4],
+    "SC6": [4],
+    "SC7": [5],
+    "SC8": [5],
+    "SC9": [1, 2, 3]
+  }
+}

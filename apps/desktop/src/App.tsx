@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { Panel, Separator, Group } from "react-resizable-panels";
+import { checkForAppUpdates } from "./utils/updater";
 import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
@@ -40,6 +42,7 @@ function App() {
   const [state, setState] = useState<TikiState | null>(null);
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [appVersion, setAppVersion] = useState<string>("");
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
 
@@ -207,6 +210,12 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Fetch app version and check for updates on mount
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+    checkForAppUpdates(false);
+  }, []);
+
   return (
     <div className="app">
       <header className="header">
@@ -330,6 +339,14 @@ function App() {
 
       <footer className="footer">
         <span className="path">{tikiPath}</span>
+        {appVersion && <span className="app-version">v{appVersion}</span>}
+        <button
+          className="reset-layout-btn"
+          onClick={() => checkForAppUpdates(true)}
+          title="Check for updates"
+        >
+          Check for Updates
+        </button>
         <button
           className="reset-layout-btn"
           onClick={handleResetLayout}
