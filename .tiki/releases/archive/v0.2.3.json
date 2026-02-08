@@ -1,0 +1,18 @@
+{
+  "version": "v0.2.3",
+  "status": "completed",
+  "issues": [
+    {
+      "number": 79,
+      "title": "Sort completed kanban items"
+    },
+    {
+      "number": 80,
+      "title": "Click on a panel in kanban"
+    }
+  ],
+  "createdAt": "2026-02-06T20:05:15.834Z",
+  "completedAt": "2026-02-06T20:30:00.000Z",
+  "shipped": true,
+  "tag": "v0.2.3"
+}

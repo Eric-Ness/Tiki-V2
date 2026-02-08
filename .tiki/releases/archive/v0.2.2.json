@@ -1,0 +1,22 @@
+{
+  "version": "v0.2.2",
+  "status": "completed",
+  "issues": [
+    {
+      "number": 72,
+      "title": "Left Right Default Panel Size"
+    },
+    {
+      "number": 73,
+      "title": "Project Title"
+    },
+    {
+      "number": 74,
+      "title": "Create Issue Increment"
+    }
+  ],
+  "createdAt": "2026-02-06T14:07:38.441Z",
+  "completedAt": "2026-02-06T14:35:00.000Z",
+  "shipped": true,
+  "tag": "v0.2.2"
+}

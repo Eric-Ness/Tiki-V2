@@ -1,6 +1,6 @@
 {
   "version": "v0.1.2",
-  "status": "shipped",
+  "status": "completed",
   "issues": [
     { "number": 30, "title": "Release to detail" },
     { "number": 31, "title": "Create Issue - Enhance error" }
