@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore } from "../../stores";
+import { IssueComments } from "./IssueComments";
 import "./DetailPanel.css";
 
 interface WorkContext {
@@ -198,6 +199,8 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           <div className="detail-body">{issue.body}</div>
         </div>
       )}
+
+      <IssueComments issueNumber={issue.number} />
     </div>
   );
 }

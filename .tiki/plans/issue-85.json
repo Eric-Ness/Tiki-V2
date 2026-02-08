@@ -1,0 +1,36 @@
+{
+  "issue": {
+    "number": 85,
+    "title": "Issue comments thread in detail panel"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Backend: Rust commands for fetch/post comments",
+      "content": "Add Rust commands to fetch and post GitHub issue comments via gh CLI.\n\nFiles to modify:\n1. apps/desktop/src-tauri/src/github.rs - Add GitHubComment/GitHubUser structs, fetch_issue_comments and post_issue_comment commands\n2. apps/desktop/src-tauri/src/lib.rs - Register new commands in generate_handler! macro",
+      "verification": [
+        "cargo check in apps/desktop/src-tauri compiles without errors"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Frontend: Comments display with markdown rendering",
+      "content": "Install react-markdown + remark-gfm, create IssueComments component, integrate into IssueDetail.\n\nFiles:\n1. Install react-markdown and remark-gfm in apps/desktop\n2. apps/desktop/src/components/detail/IssueComments.tsx - New component to fetch and display comments\n3. apps/desktop/src/components/detail/IssueComments.css - Styling\n4. apps/desktop/src/components/detail/IssueDetail.tsx - Integrate IssueComments below body",
+      "verification": [
+        "pnpm typecheck passes",
+        "Comments display below issue body with avatars, author, timestamp, markdown-rendered body"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Post comment form and polish",
+      "content": "Add textarea + submit button for posting new comments with loading states, error handling, auto-refresh, and Ctrl+Enter shortcut.",
+      "verification": [
+        "pnpm typecheck passes",
+        "Comment form appears below thread with textarea and submit button",
+        "Ctrl+Enter posts the comment",
+        "Form clears and comments refresh after successful post"
+      ]
+    }
+  ]
+}

@@ -1,27 +1,27 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:84": {
+    "issue:85": {
       "type": "issue",
       "issue": {
-        "number": 84,
-        "title": "Notification / toast system",
-        "labels": ["enhancement", "desktop", "ux"]
+        "number": 85,
+        "title": "Issue comments thread in detail panel",
+        "labels": ["enhancement", "desktop"]
       },
       "status": "shipping",
       "yolo": true,
       "pipelineStep": "SHIP",
       "phases": { "total": 3, "completed": 3, "current": 3 },
-      "createdAt": "2026-02-08T17:16:00.000Z",
-      "lastActivity": "2026-02-08T17:16:00.000Z"
+      "createdAt": "2026-02-08T17:50:00.000Z",
+      "lastActivity": "2026-02-08T17:50:00.000Z"
     },
     "release:v0.2.7": {
       "type": "release",
       "release": {
         "version": "v0.2.7",
         "issues": [84, 85],
-        "currentIssue": 84,
-        "completedIssues": []
+        "currentIssue": 85,
+        "completedIssues": [84]
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
@@ -31,11 +31,12 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 89,
-      "title": "Settings / preferences page",
-      "completedAt": "2026-02-08T17:00:00.000Z"
+      "number": 84,
+      "title": "Notification / toast system",
+      "completedAt": "2026-02-08T17:45:00.000Z"
     },
     "recentIssues": [
+      { "number": 84, "title": "Notification / toast system", "completedAt": "2026-02-08T17:45:00.000Z" },
       { "number": 89, "title": "Settings / preferences page", "completedAt": "2026-02-08T17:00:00.000Z" },
       { "number": 83, "title": "A Tiki and Tiki Desktop Version System", "completedAt": "2026-02-07T01:15:00.000Z" },
       { "number": 80, "title": "Click on a panel in kanban", "completedAt": "2026-02-06T20:30:00.000Z" },

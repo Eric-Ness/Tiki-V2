@@ -354,6 +354,117 @@ pub fn fetch_github_issue_by_number(
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse issue: {}", e))
 }
 
+/// A GitHub user (comment author)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubCommentAuthor {
+    pub login: String,
+}
+
+/// A GitHub issue comment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubComment {
+    pub id: String,
+    pub author: GitHubCommentAuthor,
+    pub body: String,
+    pub created_at: String,
+    pub url: String,
+}
+
+/// Fetch comments for a GitHub issue
+/// Uses `gh issue view` with --comments and --json to fetch comments
+#[tauri::command]
+pub fn fetch_issue_comments(
+    number: u32,
+    project_path: Option<String>,
+) -> Result<Vec<GitHubComment>, String> {
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "issue",
+        "view",
+        &number.to_string(),
+        "--json",
+        "comments",
+        "--jq",
+        ".comments",
+    ]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        return Err(format!("Failed to fetch comments: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() || trimmed == "null" {
+        return Ok(vec![]);
+    }
+
+    serde_json::from_str(trimmed)
+        .map_err(|e| format!("Failed to parse comments: {}", e))
+}
+
+/// Post a comment on a GitHub issue
+#[tauri::command]
+pub fn post_issue_comment(
+    number: u32,
+    body: String,
+    project_path: Option<String>,
+) -> Result<(), String> {
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "issue",
+        "comment",
+        &number.to_string(),
+        "--body",
+        &body,
+    ]);
+
+    if let Some(path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        return Err(format!("Failed to post comment: {}", stderr));
+    }
+
+    Ok(())
+}
+
 /// Enhance an issue description using Claude AI
 /// - description: The current description text to enhance
 /// - enhancement_type: One of "clarity", "technical", "simplify", "acceptance"
