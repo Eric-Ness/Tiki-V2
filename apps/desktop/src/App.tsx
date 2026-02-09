@@ -18,7 +18,7 @@ import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore } from "./stores";
-import type { GitHubIssue, GitHubPullRequest, TikiRelease } from "./stores";
+import type { GitHubIssue, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
@@ -69,8 +69,8 @@ function detectStateChanges(
     if (newItem.type === 'issue' && oldItem.type === 'issue') {
       const oldPhase = oldItem.phase;
       const newPhase = newItem.phase;
-      if (oldPhase && newPhase && oldPhase.completed !== newPhase.completed && newPhase.completed > oldPhase.completed) {
-        addToast(`Phase ${newPhase.completed}/${newPhase.total} completed`, 'success', 4000);
+      if (oldPhase && newPhase && oldPhase.current !== newPhase.current && newPhase.current > oldPhase.current) {
+        addToast(`Phase ${newPhase.current}/${newPhase.total} completed`, 'success', 4000);
       }
     }
 

@@ -7,7 +7,7 @@ interface ToastProps {
   onClose: () => void;
 }
 
-const icons: Record<ToastType["type"], JSX.Element> = {
+const icons: Record<ToastType["type"], React.ReactNode> = {
   success: (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
       <circle cx="9" cy="9" r="8" stroke="currentColor" strokeWidth="1.5" />
