@@ -156,3 +156,62 @@
 .issues-section-error-dismiss:hover {
   opacity: 1;
 }
+
+.issues-section-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  position: relative;
+}
+
+.issues-section-search-input {
+  flex: 1;
+  padding: 4px 8px;
+  padding-right: 24px;
+  font-size: 11px;
+  background-color: var(--bg-secondary, #1e1e1e);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 4px;
+  color: var(--text-primary, #cccccc);
+  transition: border-color 0.15s ease;
+  outline: none;
+}
+
+.issues-section-search-input::placeholder {
+  color: var(--text-secondary, #858585);
+}
+
+.issues-section-search-input:focus {
+  border-color: var(--accent-color, #007acc);
+}
+
+.issues-section-search-clear {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0;
+}
+
+.issues-section-search-clear:hover {
+  opacity: 1;
+  color: var(--text-primary, #cccccc);
+}
+
+.issues-section-search-count {
+  font-size: 10px;
+  color: var(--text-secondary, #858585);
+  white-space: nowrap;
+  flex-shrink: 0;
+}

@@ -13,6 +13,7 @@ export {
 
 export {
   useIssuesStore,
+  filterIssuesBySearch,
   type GitHubIssue,
   type GitHubLabel,
   type IssueFilter,

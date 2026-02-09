@@ -1,16 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useSettingsStore, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useSettingsStore, filterIssuesBySearch, type GitHubIssue, type IssueFilter } from "../../stores";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingIssue, setEditingIssue] = useState<GitHubIssue | null>(null);
+  const [searchInput, setSearchInput] = useState('');
 
   const issues = useIssuesStore((state) => state.issues);
+  const searchQuery = useIssuesStore((state) => state.searchQuery);
+  const setSearchQuery = useIssuesStore((state) => state.setSearchQuery);
   const filter = useIssuesStore((state) => state.filter);
   const isLoading = useIssuesStore((state) => state.isLoading);
   const error = useIssuesStore((state) => state.error);
@@ -26,6 +29,18 @@ export function IssuesSection() {
     state.projects.find((p) => p.id === state.activeProjectId)
   );
   const activeWork = useTikiStateStore((state) => state.activeWork);
+
+  // Debounce search input to store
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, setSearchQuery]);
+
+  // Filter issues by search query
+  const filteredIssues = useMemo(
+    () => filterIssuesBySearch(issues, searchQuery),
+    [issues, searchQuery]
+  );
 
   // Debug: track activeProject changes
   useEffect(() => {
@@ -211,6 +226,33 @@ export function IssuesSection() {
         <div className="issues-section-content">
           {headerActions}
 
+          {hasProject && (
+            <div className="issues-section-search">
+              <input
+                type="text"
+                className="issues-section-search-input"
+                placeholder="Search issues..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+              {searchInput && (
+                <button
+                  className="issues-section-search-clear"
+                  onClick={() => { setSearchInput(''); setSearchQuery(''); }}
+                  type="button"
+                  aria-label="Clear search"
+                >
+                  &times;
+                </button>
+              )}
+              {searchQuery && (
+                <span className="issues-section-search-count">
+                  {filteredIssues.length} of {issues.length}
+                </span>
+              )}
+            </div>
+          )}
+
           {error && (
             <div className="issues-section-error">
               <span>{error}</span>
@@ -244,9 +286,15 @@ export function IssuesSection() {
             </div>
           )}
 
-          {issues.length > 0 && (
+          {hasProject && !isLoading && !error && issues.length > 0 && filteredIssues.length === 0 && searchQuery && (
+            <div className="issues-section-empty">
+              No issues matching &ldquo;{searchQuery}&rdquo;
+            </div>
+          )}
+
+          {filteredIssues.length > 0 && (
             <div className="issues-section-list">
-              {issues.map((issue) => {
+              {filteredIssues.map((issue) => {
                 const workKey = `issue:${issue.number}`;
                 const work = activeWork[workKey];
                 const workProgress = work && work.type === 'issue' ? {

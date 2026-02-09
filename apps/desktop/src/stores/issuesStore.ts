@@ -23,6 +23,7 @@ export type IssueFilter = 'open' | 'closed' | 'all';
 interface IssuesState {
   issues: GitHubIssue[];
   filter: IssueFilter;
+  searchQuery: string;
   isLoading: boolean;
   error: string | null;
   lastFetched: string | null;
@@ -32,6 +33,7 @@ interface IssuesState {
 interface IssuesActions {
   setIssues: (issues: GitHubIssue[]) => void;
   setFilter: (filter: IssueFilter) => void;
+  setSearchQuery: (query: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
@@ -44,6 +46,7 @@ type IssuesStore = IssuesState & IssuesActions;
 const initialState: IssuesState = {
   issues: [],
   filter: 'open',
+  searchQuery: '',
   isLoading: false,
   error: null,
   lastFetched: null,
@@ -57,6 +60,8 @@ export const useIssuesStore = create<IssuesStore>()((set) => ({
 
   setFilter: (filter) => set({ filter }),
 
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+
   setLoading: (isLoading) => set({ isLoading }),
 
   setError: (error) => set({ error }),
@@ -67,3 +72,16 @@ export const useIssuesStore = create<IssuesStore>()((set) => ({
 
   triggerRefetch: () => set((state) => ({ refetchCounter: state.refetchCounter + 1 })),
 }));
+
+export function filterIssuesBySearch(issues: GitHubIssue[], query: string): GitHubIssue[] {
+  if (!query.trim()) return issues;
+  const lowerQuery = query.toLowerCase();
+  return issues.filter((issue) => {
+    const titleMatch = issue.title.toLowerCase().includes(lowerQuery);
+    const bodyMatch = issue.body?.toLowerCase().includes(lowerQuery) ?? false;
+    const labelMatch = issue.labels.some((label) =>
+      label.name.toLowerCase().includes(lowerQuery)
+    );
+    return titleMatch || bodyMatch || labelMatch;
+  });
+}

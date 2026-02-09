@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore } from '../../stores';
+import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore, filterIssuesBySearch } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard, type WorkItem } from './KanbanCard';
@@ -47,6 +47,7 @@ interface ColumnData {
 
 export function KanbanBoard() {
   const issues = useIssuesStore((s) => s.issues);
+  const searchQuery = useIssuesStore((s) => s.searchQuery);
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const releaseFilter = useKanbanStore((s) => s.releaseFilterByProject[projectId] ?? null);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
@@ -239,36 +240,40 @@ export function KanbanBoard() {
     return assigned;
   }, [tikiReleases]);
 
-  // Filter issues by release if filter is set
+  // Filter issues by release and search query
   const filteredIssues = useMemo(() => {
     console.log('[Kanban] Computing filteredIssues...');
     console.log('[Kanban] - releaseFilter:', releaseFilter);
+    console.log('[Kanban] - searchQuery:', searchQuery);
     console.log('[Kanban] - issues count:', issues.length);
 
+    let result: GitHubIssue[];
+
     if (!releaseFilter) {
-      console.log('[Kanban] - No filter, returning all issues');
-      return issues;
-    }
-
-    // Handle "unassigned" filter
-    if (releaseFilter === 'unassigned') {
-      const result = issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
+      console.log('[Kanban] - No release filter, using all issues');
+      result = issues;
+    } else if (releaseFilter === 'unassigned') {
+      // Handle "unassigned" filter
+      result = issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
       console.log('[Kanban] - Unassigned filter, returning:', result.length);
-      return result;
+    } else {
+      // Find the release and get its issues
+      const release = tikiReleases.find((r) => r.version === releaseFilter);
+      if (!release) {
+        console.log('[Kanban] - Release not found, returning all issues');
+        result = issues;
+      } else {
+        const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));
+        result = issues.filter((issue) => releaseIssueNumbers.has(issue.number));
+        console.log('[Kanban] - Filtered by release, returning:', result.length, result.map(i => i.number));
+      }
     }
 
-    // Find the release and get its issues
-    const release = tikiReleases.find((r) => r.version === releaseFilter);
-    if (!release) {
-      console.log('[Kanban] - Release not found, returning all issues');
-      return issues;
-    }
-
-    const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));
-    const result = issues.filter((issue) => releaseIssueNumbers.has(issue.number));
-    console.log('[Kanban] - Filtered by release, returning:', result.length, result.map(i => i.number));
+    // Apply search filter on top of release filter
+    result = filterIssuesBySearch(result, searchQuery);
+    console.log('[Kanban] - After search filter, returning:', result.length);
     return result;
-  }, [issues, releaseFilter, tikiReleases, assignedIssueNumbers]);
+  }, [issues, releaseFilter, searchQuery, tikiReleases, assignedIssueNumbers]);
 
   // Create workItems map from activeWork for phase progress display
   const workItemsMap: Map<number, WorkItem> = useMemo(() => {
@@ -312,7 +317,7 @@ export function KanbanBoard() {
           createdAt: recent.completedAt,
           updatedAt: recent.completedAt,
         }));
-        return { ...col, issues: completedIssues };
+        return { ...col, issues: filterIssuesBySearch(completedIssues, searchQuery) };
       }
 
       const colIssues = filteredIssues.filter((issue) => {
@@ -342,7 +347,7 @@ export function KanbanBoard() {
     });
     console.log('[Kanban] Columns:', result.map(c => `${c.id}: ${c.issues.length}`).join(', '));
     return result;
-  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers]);
+  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers, searchQuery]);
 
   return (
     <DndContext
