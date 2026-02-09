@@ -3,7 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
 import { IssueCard } from "./IssueCard";
-import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useSettingsStore, filterIssuesBySearch, type GitHubIssue, type IssueFilter } from "../../stores";
+import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useTerminalStore, useLayoutStore, useSettingsStore, filterIssuesBySearch, type GitHubIssue, type IssueFilter } from "../../stores";
+import { terminalFocusRegistry } from "../../stores/terminalStore";
 import "./IssuesSection.css";
 
 export function IssuesSection() {
@@ -116,6 +117,47 @@ export function IssuesSection() {
   const handleEditIssue = (issue: GitHubIssue) => {
     setEditingIssue(issue);
   };
+
+  const handleOpenInGitHub = useCallback((issue: GitHubIssue) => {
+    window.open(issue.url, "_blank");
+  }, []);
+
+  const handleCopyUrl = useCallback((issue: GitHubIssue) => {
+    navigator.clipboard.writeText(issue.url).catch((err) => {
+      console.error("Failed to copy URL:", err);
+    });
+  }, []);
+
+  const handleRunYolo = useCallback((issue: GitHubIssue) => {
+    const projectId = useProjectsStore.getState().activeProjectId ?? 'default';
+    const termState = useTerminalStore.getState();
+    const tabs = termState.tabsByProject[projectId] ?? [];
+    const activeTabId = termState.activeTabByProject[projectId] ?? null;
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (!activeTab) return;
+
+    useLayoutStore.getState().setActiveView('terminal');
+    invoke('write_terminal', {
+      id: activeTab.activeTerminalId,
+      data: `/tiki:yolo ${issue.number}\n`,
+    }).then(() => {
+      terminalFocusRegistry.focus(activeTab.activeTerminalId);
+    }).catch((err) => {
+      console.error('Failed to write to terminal:', err);
+    });
+  }, []);
+
+  const handleCloseIssue = useCallback(async (issue: GitHubIssue) => {
+    try {
+      await invoke("close_github_issue", {
+        number: issue.number,
+        projectPath: activeProject?.path,
+      });
+      fetchIssues();
+    } catch (err) {
+      console.error("Failed to close issue:", err);
+    }
+  }, [activeProject, fetchIssues]);
 
   const handleCloseModal = () => {
     setLocalShowCreate(false);
@@ -315,6 +357,10 @@ export function IssuesSection() {
                     isSelected={selectedIssue === issue.number}
                     onClick={() => handleIssueClick(issue)}
                     onEdit={handleEditIssue}
+                    onOpenInGitHub={handleOpenInGitHub}
+                    onCopyUrl={handleCopyUrl}
+                    onRunYolo={handleRunYolo}
+                    onCloseIssue={handleCloseIssue}
                   />
                 );
               })}

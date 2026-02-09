@@ -11,6 +11,8 @@ export interface KanbanColumnProps {
   workItems?: Map<number, WorkItem>;
   activeId?: number | null;
   onExecute?: (issueNumber: number) => void;
+  onShip?: (issueNumber: number) => void;
+  onOpenInGitHub?: (issue: GitHubIssue) => void;
 }
 
 const cardVariants = {
@@ -19,7 +21,7 @@ const cardVariants = {
   exit: { opacity: 0, y: -20 },
 };
 
-export function KanbanColumn({ id, title, issues, workItems, activeId, onExecute }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, issues, workItems, activeId, onExecute, onShip, onOpenInGitHub }: KanbanColumnProps) {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const selectedIssue = useDetailStore((s) => s.selectionByProject[projectId]?.selectedIssue ?? null);
   const { isOver, setNodeRef } = useDroppable({ id });
@@ -72,6 +74,8 @@ export function KanbanColumn({ id, title, issues, workItems, activeId, onExecute
                   isSelected={selectedIssue === issue.number}
                   isBeingDragged={activeId === issue.number}
                   onExecute={onExecute}
+                  onShip={onShip}
+                  onOpenInGitHub={onOpenInGitHub}
                 />
               </motion.div>
             ))}

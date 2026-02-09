@@ -154,6 +154,11 @@ export function KanbanBoard() {
     setShipConfirmation(null);
   }, []);
 
+  // Open issue in GitHub (for context menu)
+  const handleOpenInGitHub = useCallback((issue: GitHubIssue) => {
+    window.open(issue.url, '_blank');
+  }, []);
+
   // Map Tiki work status to column ID
   const statusToColumn = (status: string): string => {
     switch (status) {
@@ -373,6 +378,8 @@ export function KanbanBoard() {
               workItems={workItemsMap}
               activeId={activeId}
               onExecute={(issueNumber) => triggerExecution(issueNumber, column.id)}
+              onShip={requestShipConfirmation}
+              onOpenInGitHub={handleOpenInGitHub}
             />
           ))}
         </div>

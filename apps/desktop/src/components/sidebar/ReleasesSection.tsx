@@ -2,6 +2,7 @@ import { useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { ReleaseDialog } from "../releases";
+import { useContextMenu, ContextMenu, type ContextMenuEntry } from "../ui/ContextMenu";
 import {
   useReleasesStore,
   useDetailStore,
@@ -23,8 +24,127 @@ interface MergedRelease {
   isDraft?: boolean;
   isPrerelease?: boolean;
   publishedAt?: string;
+  url?: string;
   hasGitHub: boolean;
   hasTiki: boolean;
+}
+
+/** Inner component for a release card with its own context menu */
+function ReleaseCardWithMenu({
+  release,
+  isSelected,
+  onClick,
+  onEdit,
+  onDelete,
+}: {
+  release: MergedRelease;
+  isSelected: boolean;
+  onClick: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
+  const contextMenu = useContextMenu();
+
+  const menuItems: ContextMenuEntry[] = [];
+
+  if (release.hasGitHub && release.url) {
+    menuItems.push({
+      key: "open-github",
+      label: "View on GitHub",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+          <polyline points="15 3 21 3 21 9" />
+          <line x1="10" y1="14" x2="21" y2="3" />
+        </svg>
+      ),
+      onClick: () => window.open(release.url, "_blank"),
+    });
+  }
+
+  if (onEdit) {
+    menuItems.push({
+      key: "edit",
+      label: "Edit Release",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8.5 1.5L10.5 3.5L4 10H2V8L8.5 1.5Z" />
+        </svg>
+      ),
+      onClick: onEdit,
+      disabled: !release.hasTiki,
+    });
+  }
+
+  if (onDelete) {
+    if (menuItems.length > 0) {
+      menuItems.push({ key: "sep-1", separator: true });
+    }
+    menuItems.push({
+      key: "delete",
+      label: "Delete Release",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      ),
+      onClick: onDelete,
+      danger: true,
+      disabled: !release.hasTiki,
+    });
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+    contextMenu.handleKeyDown(e);
+  };
+
+  return (
+    <>
+      <div
+        className={`releases-section-tiki-card${isSelected ? " selected" : ""}`}
+        onClick={onClick}
+        onContextMenu={contextMenu.handleContextMenu}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+      >
+        <div className="releases-section-tiki-header">
+          <span className="releases-section-tiki-version">{release.version}</span>
+          <div className="releases-section-badges">
+            {release.status && (
+              <span className={`releases-section-tiki-status ${release.status}`}>
+                {release.status}
+              </span>
+            )}
+            {release.isDraft && (
+              <span className="releases-section-tiki-status">draft</span>
+            )}
+            {release.isPrerelease && (
+              <span className="releases-section-tiki-status">pre-release</span>
+            )}
+          </div>
+        </div>
+        {release.issueCount !== undefined && (
+          <div className="releases-section-tiki-issues">
+            {release.issueCount} issue{release.issueCount !== 1 ? "s" : ""}
+          </div>
+        )}
+      </div>
+      {menuItems.length > 0 && (
+        <ContextMenu
+          isOpen={contextMenu.isOpen}
+          position={contextMenu.position}
+          items={menuItems}
+          onClose={contextMenu.close}
+        />
+      )}
+    </>
+  );
 }
 
 export function ReleasesSection() {
@@ -138,6 +258,7 @@ export function ReleasesSection() {
         isDraft: gh.isDraft,
         isPrerelease: gh.isPrerelease,
         publishedAt: gh.publishedAt,
+        url: gh.url,
         hasGitHub: true,
         hasTiki: false,
       });
@@ -174,6 +295,25 @@ export function ReleasesSection() {
       setSelectedRelease(merged.version);
     }
   };
+
+  const handleEditRelease = useCallback((version: string) => {
+    const tikiRelease = tikiReleases.find((r) => r.version === version);
+    if (tikiRelease) {
+      openDialog(tikiRelease);
+    }
+  }, [tikiReleases, openDialog]);
+
+  const handleDeleteRelease = useCallback(async (version: string) => {
+    try {
+      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      await invoke("delete_tiki_release", { version, tikiPath });
+      useTikiReleasesStore.getState().deleteRelease(version);
+    } catch (err) {
+      console.error("Failed to delete Tiki release:", err);
+      // Still remove from UI store even if disk delete fails
+      useTikiReleasesStore.getState().deleteRelease(version);
+    }
+  }, [activeProject]);
 
   const handleAddClick = () => {
     openDialog(undefined);
@@ -358,41 +498,14 @@ export function ReleasesSection() {
                   ? selectedTikiRelease === release.version
                   : selectedRelease === release.version;
                 return (
-                  <div
+                  <ReleaseCardWithMenu
                     key={release.version}
-                    className={`releases-section-tiki-card${isSelected ? " selected" : ""}`}
+                    release={release}
+                    isSelected={isSelected}
                     onClick={() => handleReleaseClick(release)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleReleaseClick(release);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                  >
-                    <div className="releases-section-tiki-header">
-                      <span className="releases-section-tiki-version">{release.version}</span>
-                      <div className="releases-section-badges">
-                        {release.status && (
-                          <span className={`releases-section-tiki-status ${release.status}`}>
-                            {release.status}
-                          </span>
-                        )}
-                        {release.isDraft && (
-                          <span className="releases-section-tiki-status">draft</span>
-                        )}
-                        {release.isPrerelease && (
-                          <span className="releases-section-tiki-status">pre-release</span>
-                        )}
-                      </div>
-                    </div>
-                    {release.issueCount !== undefined && (
-                      <div className="releases-section-tiki-issues">
-                        {release.issueCount} issue{release.issueCount !== 1 ? "s" : ""}
-                      </div>
-                    )}
-                  </div>
+                    onEdit={() => handleEditRelease(release.version)}
+                    onDelete={() => handleDeleteRelease(release.version)}
+                  />
                 );
               })}
             </div>

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 98,
+    "title": "Context menus (right-click) on UI elements",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/98"
+  },
+  "createdAt": "2026-02-09T00:20:00.000Z",
+  "successCriteria": [
+    "Right-click on issue cards shows context menu with: Open in GitHub, Copy URL, Run YOLO, Edit, Close",
+    "Right-click on kanban cards shows context menu with: Open in GitHub, Execute, Ship, View detail",
+    "Right-click on terminal tabs shows context menu with: Rename, Split horizontal, Split vertical, Close",
+    "Right-click on release cards shows context menu with: Edit, Delete, View on GitHub",
+    "Context menus use native-feeling dark theme styling consistent with the app",
+    "Context menus are keyboard accessible (Shift+F10 or context menu key)",
+    "Context menus dismiss on click outside, Escape key, or scroll",
+    "pnpm typecheck passes"
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Create reusable ContextMenu component",
+      "description": "Build a shared ContextMenu component in apps/desktop/src/components/ui/ that handles viewport-aware positioning, keyboard navigation (arrow keys, Enter, Escape), backdrop click dismiss, and native-feeling dark theme styling. The component accepts an array of menu items with label, icon (optional), onClick handler, disabled state, and separator support. Also add a useContextMenu hook for easy integration.",
+      "files": [
+        "apps/desktop/src/components/ui/ContextMenu.tsx",
+        "apps/desktop/src/components/ui/ContextMenu.css"
+      ],
+      "verification": "pnpm typecheck passes from root."
+    },
+    {
+      "phase": 2,
+      "title": "Add context menus to sidebar issue cards, release cards, and kanban cards",
+      "description": "Integrate context menus into IssueCard (Open in GitHub, Copy URL, Run YOLO, Edit, Close Issue), KanbanCard (Open in GitHub, Execute, Ship, View Detail), and ReleasesSection release cards (Edit, Delete, View on GitHub). Wire up actions using existing store methods and invoke() for terminal commands. Open GitHub URLs via window.open().",
+      "files": [
+        "apps/desktop/src/components/sidebar/IssueCard.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/kanban/KanbanCard.tsx",
+        "apps/desktop/src/components/kanban/KanbanColumn.tsx",
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "verification": "pnpm typecheck passes from root."
+    },
+    {
+      "phase": 3,
+      "title": "Add context menus to terminal tabs",
+      "description": "Add context menu to terminal tab buttons in TerminalTabs.tsx with Rename, Split Horizontal, Split Vertical, and Close actions. Rename triggers the existing inline-edit flow, splits use the splitTerminal store action, and close uses removeTab.",
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalTabs.tsx"
+      ],
+      "verification": "pnpm typecheck passes from root."
+    }
+  ]
+}

@@ -9,12 +9,12 @@
       "createdAt": "2026-02-09T00:00:00.000Z",
       "lastActivity": "2026-02-09T00:00:00.000Z"
     },
-    "issue:88": {
+    "issue:98": {
       "type": "issue",
-      "issue": { "number": 88, "title": "Keyboard shortcuts reference panel" },
+      "issue": { "number": 98, "title": "Context menus (right-click) on UI elements" },
       "status": "executing",
-      "phase": { "current": 1, "total": 2, "status": "executing" },
-      "lastActivity": "2026-02-09T00:10:00.000Z"
+      "phase": { "current": 1, "total": 3, "status": "executing" },
+      "lastActivity": "2026-02-09T00:20:00.000Z"
     }
   },
   "history": {
