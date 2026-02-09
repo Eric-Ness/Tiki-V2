@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
@@ -16,7 +16,7 @@ import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
-import { CommandPalette } from "./components/ui";
+import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions } from "./hooks";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore } from "./stores";
@@ -97,10 +97,12 @@ function App() {
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [appVersion, setAppVersion] = useState<string>("");
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const openShortcuts = useCallback(() => setShowShortcuts(true), []);
   const prevStateRef = useRef<TikiState | null>(null);
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
-  const actions = useCommandActions();
+  const actions = useCommandActions({ onOpenShortcuts: openShortcuts });
 
   // Active project
   const activeProject = useProjectsStore((s) => s.getActiveProject());
@@ -267,6 +269,13 @@ function App() {
         return;
       }
 
+      // Keyboard shortcuts panel (Ctrl+/)
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShowShortcuts((prev) => !prev);
+        return;
+      }
+
       if (e.ctrlKey && !e.shiftKey && !e.altKey) {
         if (e.key === '1') {
           e.preventDefault();
@@ -338,6 +347,16 @@ function App() {
             </div>
             <div className="sidebar-footer">
               <div className="sidebar-footer-actions">
+              <button
+                className="sidebar-settings-btn"
+                onClick={() => setShowShortcuts(true)}
+                title="Keyboard Shortcuts (Ctrl+/)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <text x="8" y="11" textAnchor="middle" fill="currentColor" fontSize="9" fontWeight="600" fontFamily="inherit">?</text>
+                </svg>
+              </button>
               <button
                 className="sidebar-settings-btn"
                 onClick={() => useLayoutStore.getState().setActiveView('settings')}
@@ -451,6 +470,7 @@ function App() {
 
       <ToastContainer />
       <CommandPalette actions={actions} />
+      <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

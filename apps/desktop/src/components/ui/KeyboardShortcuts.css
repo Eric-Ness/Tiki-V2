@@ -1,0 +1,198 @@
+/* Keyboard shortcuts overlay */
+.keyboard-shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+}
+
+/* Dialog container */
+.keyboard-shortcuts-dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 120px);
+  background: var(--bg-secondary, #252526);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.keyboard-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+}
+
+.keyboard-shortcuts-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+}
+
+.keyboard-shortcuts-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.keyboard-shortcuts-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #cccccc);
+}
+
+/* Body */
+.keyboard-shortcuts-body {
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.keyboard-shortcuts-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.keyboard-shortcuts-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.keyboard-shortcuts-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.keyboard-shortcuts-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Group */
+.keyboard-shortcuts-group {
+  padding: 8px 0;
+}
+
+.keyboard-shortcuts-group:not(:last-child) {
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+}
+
+.keyboard-shortcuts-group-title {
+  margin: 0;
+  padding: 4px 20px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #858585);
+  user-select: none;
+}
+
+/* Shortcut row */
+.keyboard-shortcuts-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.keyboard-shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  gap: 16px;
+}
+
+.keyboard-shortcuts-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.keyboard-shortcuts-description {
+  font-size: 13px;
+  color: var(--text-primary, #cccccc);
+  flex: 1;
+  min-width: 0;
+}
+
+.keyboard-shortcuts-keys {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.keyboard-shortcuts-key-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.keyboard-shortcuts-separator {
+  margin: 0 2px;
+  font-size: 10px;
+  color: var(--text-secondary, #858585);
+  opacity: 0.5;
+}
+
+/* Key cap */
+.keyboard-shortcuts-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-secondary, #858585);
+  background: var(--bg-primary, #1e1e1e);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  user-select: none;
+}
+
+/* Footer */
+.keyboard-shortcuts-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color, #3c3c3c);
+}
+
+.keyboard-shortcuts-footer-hint {
+  font-size: 11px;
+  color: var(--text-secondary, #858585);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.keyboard-shortcuts-footer-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--text-secondary, #858585);
+  background: var(--bg-primary, #1e1e1e);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 3px;
+}

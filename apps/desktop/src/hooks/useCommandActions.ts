@@ -34,11 +34,15 @@ async function writeToActiveTerminal(command: string): Promise<void> {
   }
 }
 
+interface UseCommandActionsOptions {
+  onOpenShortcuts?: () => void;
+}
+
 /**
  * Builds the full list of CommandAction items for the command palette.
  * The list updates reactively when the underlying store data changes.
  */
-export function useCommandActions(): CommandAction[] {
+export function useCommandActions(options?: UseCommandActionsOptions): CommandAction[] {
   // Subscribe to store slices that drive dynamic actions
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
@@ -75,6 +79,17 @@ export function useCommandActions(): CommandAction[] {
       shortcut: 'Ctrl+,',
       execute: () => useLayoutStore.getState().setActiveView('settings'),
     });
+
+    if (options?.onOpenShortcuts) {
+      actions.push({
+        id: 'nav:shortcuts',
+        title: 'Keyboard Shortcuts',
+        category: 'navigation',
+        keywords: ['keyboard', 'shortcuts', 'keys', 'hotkeys', 'help'],
+        shortcut: 'Ctrl+/',
+        execute: options.onOpenShortcuts,
+      });
+    }
 
     // ---- Project actions (one per project) ----
     for (const project of projects) {
@@ -149,5 +164,5 @@ export function useCommandActions(): CommandAction[] {
     }
 
     return actions;
-  }, [projects, activeProjectId, issues, activeView]);
+  }, [projects, activeProjectId, issues, activeView, options?.onOpenShortcuts]);
 }

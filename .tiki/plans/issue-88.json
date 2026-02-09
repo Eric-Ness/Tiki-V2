@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 88,
+    "title": "Keyboard shortcuts reference panel",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/88"
+  },
+  "createdAt": "2026-02-09T00:10:00.000Z",
+  "successCriteria": [
+    "A KeyboardShortcuts modal component exists with all app shortcuts grouped by area",
+    "Shortcuts are displayed with styled key cap badges matching the CommandPalette kbd style",
+    "Modal opens via Ctrl+/ keyboard shortcut and a ? button in the sidebar footer",
+    "Modal is dismissible with Escape key or clicking outside",
+    "Modal uses framer-motion animations consistent with CommandPalette",
+    "Component is exported from components/ui/index.ts",
+    "Keyboard Shortcuts action is available in the command palette",
+    "pnpm typecheck passes with no errors"
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create KeyboardShortcuts component and CSS",
+      "content": "Create KeyboardShortcuts.tsx and KeyboardShortcuts.css in components/ui/. The component renders a modal overlay with all keyboard shortcuts grouped into sections: General, Navigation, Terminal, and Command Palette. Each shortcut shows a description and styled key caps. Uses framer-motion AnimatePresence for enter/exit animations. Accepts isOpen and onClose props. Export from components/ui/index.ts.",
+      "verification": [
+        "KeyboardShortcuts.tsx exists in components/ui/",
+        "KeyboardShortcuts.css exists in components/ui/",
+        "Component is exported from components/ui/index.ts"
+      ],
+      "status": "pending"
+    },
+    {
+      "number": 2,
+      "title": "Wire up Ctrl+/ shortcut, ? button, and command palette action",
+      "content": "Add Ctrl+/ keyboard shortcut handler in App.tsx to toggle the shortcuts panel. Add a ? button in the sidebar footer next to the settings gear. Add a 'Keyboard Shortcuts' action to the command palette via useCommandActions. Import and render KeyboardShortcuts component in App.tsx.",
+      "verification": [
+        "Ctrl+/ opens the shortcuts panel",
+        "? button in sidebar footer opens the shortcuts panel",
+        "Command palette has a Keyboard Shortcuts action",
+        "pnpm typecheck passes"
+      ],
+      "status": "pending"
+    }
+  ]
+}
