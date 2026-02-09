@@ -24,6 +24,7 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.5.8",
+    "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "xterm": "^5.3.0",
     "zustand": "^5.0.11"

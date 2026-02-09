@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore } from "../../stores";
 import { IssueComments } from "./IssueComments";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import "./DetailPanel.css";
 
 interface WorkContext {
@@ -196,7 +197,9 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
       {issue.body && (
         <div className="detail-section detail-body-section">
           <h3 className="detail-section-title">Description</h3>
-          <div className="detail-body">{issue.body}</div>
+          <div className="detail-body markdown-body">
+            <MarkdownRenderer>{issue.body}</MarkdownRenderer>
+          </div>
         </div>
       )}
 

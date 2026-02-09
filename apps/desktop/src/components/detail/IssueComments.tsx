@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useProjectsStore } from "../../stores";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import "./IssueComments.css";
 
 interface CommentAuthor {
@@ -126,10 +125,8 @@ export function IssueComments({ issueNumber }: IssueCommentsProps) {
                   {formatTimestamp(comment.createdAt)}
                 </span>
               </div>
-              <div className="comment-body">
-                <Markdown remarkPlugins={[remarkGfm]}>
-                  {comment.body}
-                </Markdown>
+              <div className="comment-body markdown-body">
+                <MarkdownRenderer>{comment.body}</MarkdownRenderer>
               </div>
             </div>
           ))}
