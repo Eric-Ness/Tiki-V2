@@ -3,11 +3,14 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 85,
-      "title": "Issue comments thread in detail panel",
-      "completedAt": "2026-02-08T18:30:00.000Z"
+      "number": 86,
+      "title": "Pull request integration panel",
+      "completedAt": "2026-02-08T21:00:00.000Z"
     },
     "recentIssues": [
+      { "number": 86, "title": "Pull request integration panel", "completedAt": "2026-02-08T21:00:00.000Z" },
+      { "number": 95, "title": "Issue search and text filtering", "completedAt": "2026-02-08T20:15:00.000Z" },
+      { "number": 115, "title": "Markdown rendering in issue body and comments", "completedAt": "2026-02-08T19:30:00.000Z" },
       { "number": 85, "title": "Issue comments thread in detail panel", "completedAt": "2026-02-08T18:30:00.000Z" },
       { "number": 84, "title": "Notification / toast system", "completedAt": "2026-02-08T17:45:00.000Z" },
       { "number": 89, "title": "Settings / preferences page", "completedAt": "2026-02-08T17:00:00.000Z" },
@@ -24,12 +27,10 @@
       { "number": 63, "title": "Refresh Side Panel", "completedAt": "2026-02-06T00:10:00.000Z" },
       { "number": 62, "title": "Start Claude button", "completedAt": "2026-02-06T00:00:00.000Z" },
       { "number": 61, "title": "Project-scoped isolation for terminals, sidebar panels, and kanban board", "completedAt": "2026-02-05T23:40:00.000Z" },
-      { "number": 60, "title": "A 'Start Claude' button", "completedAt": "2026-02-05T22:10:00.000Z" },
-      { "number": 59, "title": "Test 7", "completedAt": "2026-02-05T21:05:00.000Z" },
-      { "number": 58, "title": "Test Issue 6", "completedAt": "2026-02-05T20:05:00.000Z" },
-      { "number": 56, "title": "Test Issue 5", "completedAt": "2026-02-05T15:05:00.000Z" }
+      { "number": 60, "title": "A 'Start Claude' button", "completedAt": "2026-02-05T22:10:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.2.8", "issues": [115, 95, 86], "completedAt": "2026-02-08T21:00:00.000Z", "tag": "v0.2.8" },
       { "version": "v0.2.7", "issues": [84, 85], "completedAt": "2026-02-08T18:30:00.000Z", "tag": "v0.2.7" },
       { "version": "v0.2.3", "issues": [79, 80], "completedAt": "2026-02-06T20:30:00.000Z", "tag": "v0.2.3" },
       { "version": "v0.2.2", "issues": [72, 73, 74], "completedAt": "2026-02-06T14:35:00.000Z", "tag": "v0.2.2" },
