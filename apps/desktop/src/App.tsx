@@ -16,8 +16,10 @@ import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
+import { CommandPalette } from "./components/ui";
+import { useCommandActions } from "./hooks";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore } from "./stores";
 import type { GitHubIssue, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
@@ -98,6 +100,7 @@ function App() {
   const prevStateRef = useRef<TikiState | null>(null);
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
+  const actions = useCommandActions();
 
   // Active project
   const activeProject = useProjectsStore((s) => s.getActiveProject());
@@ -257,6 +260,13 @@ function App() {
   // Keyboard shortcuts for view switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Command palette toggle (Ctrl+K / Cmd+K)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        useCommandPaletteStore.getState().toggle();
+        return;
+      }
+
       if (e.ctrlKey && !e.shiftKey && !e.altKey) {
         if (e.key === '1') {
           e.preventDefault();
@@ -440,6 +450,7 @@ function App() {
       </footer>
 
       <ToastContainer />
+      <CommandPalette actions={actions} />
     </div>
   );
 }

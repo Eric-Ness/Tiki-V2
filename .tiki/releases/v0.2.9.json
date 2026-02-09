@@ -1,0 +1,19 @@
+{
+  "version": "v0.2.9",
+  "status": "in_progress",
+  "issues": [
+    {
+      "number": 94,
+      "title": "Command palette (Ctrl+K)"
+    },
+    {
+      "number": 88,
+      "title": "Keyboard shortcuts reference panel"
+    },
+    {
+      "number": 98,
+      "title": "Context menus (right-click) on UI elements"
+    }
+  ],
+  "createdAt": "2026-02-09T00:00:00.000Z"
+}

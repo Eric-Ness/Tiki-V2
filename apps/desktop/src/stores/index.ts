@@ -77,3 +77,12 @@ export {
   type NotificationSettings,
   type ToastPosition,
 } from './settingsStore';
+
+export {
+  useCommandPaletteStore,
+  fuzzyMatch,
+  filterAndSortActions,
+  type CommandAction,
+  type CommandCategory,
+  type FuzzyMatchResult,
+} from './commandPaletteStore';

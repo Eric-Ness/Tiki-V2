@@ -7,9 +7,13 @@ import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, us
 import "./IssuesSection.css";
 
 export function IssuesSection() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingIssue, setEditingIssue] = useState<GitHubIssue | null>(null);
   const [searchInput, setSearchInput] = useState('');
+
+  const showCreateForm = useIssuesStore((state) => state.showCreateForm);
+  const setShowCreateForm = useIssuesStore((state) => state.setShowCreateForm);
+  const [localShowCreate, setLocalShowCreate] = useState(false);
+  const showCreateModal = localShowCreate || showCreateForm;
 
   const issues = useIssuesStore((state) => state.issues);
   const searchQuery = useIssuesStore((state) => state.searchQuery);
@@ -114,7 +118,8 @@ export function IssuesSection() {
   };
 
   const handleCloseModal = () => {
-    setShowCreateModal(false);
+    setLocalShowCreate(false);
+    setShowCreateForm(false);
     setEditingIssue(null);
   };
 
@@ -153,7 +158,7 @@ export function IssuesSection() {
       </select>
       <button
         className="issues-section-add"
-        onClick={() => setShowCreateModal(true)}
+        onClick={() => setLocalShowCreate(true)}
         type="button"
         aria-label="Create new issue"
         title={hasProject ? "Create new issue" : "Select a project first"}

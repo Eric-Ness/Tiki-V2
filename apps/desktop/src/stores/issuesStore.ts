@@ -28,6 +28,8 @@ interface IssuesState {
   error: string | null;
   lastFetched: string | null;
   refetchCounter: number;
+  /** When true, the issue creation modal should be shown (set by command palette) */
+  showCreateForm: boolean;
 }
 
 interface IssuesActions {
@@ -39,6 +41,7 @@ interface IssuesActions {
   clearError: () => void;
   setLastFetched: (timestamp: string) => void;
   triggerRefetch: () => void;
+  setShowCreateForm: (show: boolean) => void;
 }
 
 type IssuesStore = IssuesState & IssuesActions;
@@ -51,6 +54,7 @@ const initialState: IssuesState = {
   error: null,
   lastFetched: null,
   refetchCounter: 0,
+  showCreateForm: false,
 };
 
 export const useIssuesStore = create<IssuesStore>()((set) => ({
@@ -71,6 +75,8 @@ export const useIssuesStore = create<IssuesStore>()((set) => ({
   setLastFetched: (lastFetched) => set({ lastFetched }),
 
   triggerRefetch: () => set((state) => ({ refetchCounter: state.refetchCounter + 1 })),
+
+  setShowCreateForm: (show) => set({ showCreateForm: show }),
 }));
 
 export function filterIssuesBySearch(issues: GitHubIssue[], query: string): GitHubIssue[] {

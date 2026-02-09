@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 94,
+    "title": "Command palette (Ctrl+K)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/94"
+  },
+  "createdAt": "2026-02-09T00:01:00.000Z",
+  "successCriteria": [
+    "Ctrl+K (and Cmd+K on macOS) opens the command palette overlay from anywhere in the app",
+    "Fuzzy search filters actions in real-time as the user types",
+    "Actions include: switch project, open issue by number, run tiki command, navigate to view (terminal/kanban/settings), create issue, create release",
+    "Recently used commands appear at the top of the list (persisted across sessions)",
+    "Arrow keys navigate the result list, Enter executes the selected action, Escape dismisses",
+    "Action registry is extensible - adding new commands requires only adding an entry to the registry",
+    "pnpm typecheck passes with no errors"
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create the command palette store and action registry",
+      "status": "pending",
+      "content": "Create a new Zustand store `commandPaletteStore.ts` in `apps/desktop/src/stores/` that manages:\n\n1. **Store state:**\n   - `isOpen: boolean` - whether the palette is visible\n   - `query: string` - current search input\n   - `selectedIndex: number` - currently highlighted result index\n   - `recentCommandIds: string[]` - ordered list of recently used command IDs (most recent first, max 10)\n\n2. **Store actions:**\n   - `open()` - opens the palette, resets query and selectedIndex\n   - `close()` - closes the palette\n   - `toggle()` - toggles open/close\n   - `setQuery(query: string)` - updates the search query, resets selectedIndex to 0\n   - `setSelectedIndex(index: number)` - sets the highlighted index\n   - `addRecentCommand(id: string)` - adds a command ID to the front of recents (deduplicating)\n\n3. **Action registry types** (define in the same file or a separate `commandPaletteActions.ts`):\n   - `CommandAction` interface: `{ id: string; title: string; subtitle?: string; category: string; keywords: string[]; icon?: string; execute: () => void }`\n   - Categories: `'navigation'`, `'project'`, `'issue'`, `'release'`, `'command'`\n\n4. **Fuzzy search function:**\n   - Create a `fuzzyMatch(query: string, text: string): { match: boolean; score: number }` function\n   - Match each character of the query in order within the text (case-insensitive)\n   - Score based on consecutive matches, word boundary matches, and position\n   - Export a `filterAndSortActions(actions: CommandAction[], query: string, recentIds: string[]): CommandAction[]` function that:\n     - Returns all actions (sorted: recents first) when query is empty\n     - Filters by fuzzy match against title + subtitle + keywords when query is non-empty\n     - Sorts by: recent usage first, then match score, then alphabetically\n\n5. **Persist** `recentCommandIds` using zustand `persist` middleware (storage key: `'tiki-command-palette'`).\n\n6. **Export** the store and types from `stores/index.ts`.\n\nThe store should follow the same patterns as existing stores (e.g., `releaseDialogStore.ts` for open/close, `settingsStore.ts` for persist).",
+      "verification": [
+        "File apps/desktop/src/stores/commandPaletteStore.ts exists with all types, state, and actions defined",
+        "Store is exported from apps/desktop/src/stores/index.ts",
+        "fuzzyMatch and filterAndSortActions functions are exported and handle edge cases (empty query, no matches)",
+        "pnpm typecheck passes from root"
+      ],
+      "files": [
+        "apps/desktop/src/stores/commandPaletteStore.ts",
+        "apps/desktop/src/stores/index.ts"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Build the command palette UI component",
+      "status": "pending",
+      "content": "Create the `CommandPalette` React component and its CSS in `apps/desktop/src/components/ui/`.\n\n1. **Create `CommandPalette.tsx`:**\n   - Renders only when `isOpen` is true from the store\n   - Full-screen overlay (same pattern as `IssueFormModal` - fixed position, backdrop blur, z-index 1000+)\n   - Centered dialog, narrow width (~520px max), positioned toward the top of the screen (top: ~20%)\n   - Contains:\n     - **Search input** at the top with a magnifying glass icon, auto-focused on open, placeholder \"Type a command...\"\n     - **Results list** below the input, scrollable, max height ~400px\n     - Each result item shows: category icon (left), title (main text), subtitle (dimmed, right-aligned or below), keyboard shortcut hint if applicable\n     - Highlighted/selected item has a distinct background color (like VS Code's command palette)\n     - When query is empty, show section header \"Recent\" above recent commands, then \"All Commands\" section\n   - **Keyboard handling** (on the dialog container's onKeyDown):\n     - `ArrowDown` / `ArrowUp` - move selectedIndex (wrap around)\n     - `Enter` - execute the selected action, then close\n     - `Escape` - close the palette\n     - Typing in the input updates the query via store\n   - **Click handling:**\n     - Clicking a result item executes it and closes\n     - Clicking the backdrop closes the palette\n   - Scroll the selected item into view when selectedIndex changes (use `scrollIntoView`)\n\n2. **Create `CommandPalette.css`:**\n   - Style the overlay, dialog, search input, results list, and result items\n   - Use existing CSS variable patterns from the project (var(--bg-primary), var(--bg-secondary), var(--text-primary), var(--text-secondary), var(--accent-color), var(--border-color))\n   - Match the visual style of existing modals (IssueFormModal, ReleaseDialog)\n   - Add smooth transitions for item highlight\n   - Ensure the search input has no visible border initially, large font, padding - like VS Code/Raycast style\n\n3. **Export** from `apps/desktop/src/components/ui/index.ts`.\n\nDo NOT wire up the global keyboard shortcut or define the actual actions yet - that comes in later phases. The component should accept actions as a prop or read them from a hook/context for testability.",
+      "verification": [
+        "File apps/desktop/src/components/ui/CommandPalette.tsx exists with overlay, search input, results list, keyboard navigation",
+        "File apps/desktop/src/components/ui/CommandPalette.css exists with styling matching project conventions",
+        "Component is exported from apps/desktop/src/components/ui/index.ts",
+        "pnpm typecheck passes from root"
+      ],
+      "files": [
+        "apps/desktop/src/components/ui/CommandPalette.tsx",
+        "apps/desktop/src/components/ui/CommandPalette.css",
+        "apps/desktop/src/components/ui/index.ts"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Define built-in command actions and hook",
+      "status": "pending",
+      "content": "Create a custom hook that builds the list of available `CommandAction` items by reading from existing stores.\n\n1. **Create `apps/desktop/src/hooks/useCommandActions.ts`:**\n   - Returns `CommandAction[]` that updates reactively when store data changes\n   - **Navigation actions (always available):**\n     - \"Switch to Terminal view\" - calls `useLayoutStore.getState().setActiveView('terminal')`, keywords: ['terminal', 'shell', 'console'], shortcut hint: 'Ctrl+1'\n     - \"Switch to Kanban view\" - calls `setActiveView('kanban')`, keywords: ['kanban', 'board', 'issues'], shortcut hint: 'Ctrl+2'\n     - \"Open Settings\" - calls `setActiveView('settings')`, keywords: ['settings', 'preferences', 'config'], shortcut hint: 'Ctrl+,'\n   - **Project actions (dynamic, one per project):**\n     - For each project in `useProjectsStore`, create \"Switch to {project.name}\" action, category 'project', keywords include project path\n     - Execute calls `useProjectsStore.getState().setActiveProject(project.id)`\n   - **Issue actions (dynamic, one per open issue):**\n     - For each issue in `useIssuesStore`, create \"Open Issue #{number}: {title}\" action, category 'issue'\n     - Execute calls `useDetailStore.getState().setSelectedIssue(issue.number)`\n   - **Release actions:**\n     - \"Create Release\" - opens the release dialog: `useReleaseDialogStore.getState().openDialog()`, category 'release'\n   - **Issue creation:**\n     - \"Create Issue\" - this action needs to signal the IssuesSection to open its modal. Use a simple event approach: set a flag in a lightweight store or use a callback pattern. The simplest approach: have the command palette store include an `onCreateIssue` callback that App.tsx or IssuesSection can register.\n     - Alternative simpler approach: export a small `useIssueFormStore` (or add `openIssueForm` to an existing store) with `isOpen` boolean, and have IssuesSection read from it.\n   - **Tiki command actions:**\n     - \"Run tiki:get\" - writes `tiki:get ` to active terminal, keywords: ['get', 'fetch', 'issue']\n     - \"Run tiki:plan\" - writes `tiki:plan` to active terminal, keywords: ['plan', 'phases']\n     - \"Run tiki:execute\" - writes `tiki:execute` to active terminal, keywords: ['execute', 'run']\n     - \"Run tiki:ship\" - writes `tiki:ship` to active terminal, keywords: ['ship', 'commit', 'push']\n     - \"Run tiki:yolo\" - writes `tiki:yolo` to active terminal, keywords: ['yolo', 'auto', 'pipeline']\n     - For terminal write commands, use the same pattern as the \"Start Claude\" button in App.tsx: get active tab/terminal from `useTerminalStore`, call `invoke('write_terminal', { id, data })`, then focus the terminal.\n\n2. **Create `apps/desktop/src/hooks/` directory** if it doesn't exist, and add an `index.ts` barrel export.\n\nEach action must have a unique `id` string (e.g., `'nav:terminal'`, `'project:{id}'`, `'issue:{number}'`, `'cmd:tiki-get'`, etc.).",
+      "verification": [
+        "File apps/desktop/src/hooks/useCommandActions.ts exists and returns an array of CommandAction objects",
+        "Navigation actions (terminal, kanban, settings) are included",
+        "Dynamic project and issue actions are generated from store data",
+        "Tiki command actions write to the active terminal",
+        "pnpm typecheck passes from root"
+      ],
+      "files": [
+        "apps/desktop/src/hooks/useCommandActions.ts",
+        "apps/desktop/src/hooks/index.ts"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Wire up global keyboard shortcut and mount the command palette",
+      "status": "pending",
+      "content": "Integrate the command palette into the app and add the global Ctrl+K / Cmd+K keyboard shortcut.\n\n1. **Update `apps/desktop/src/App.tsx`:**\n   - Import `CommandPalette` from `components/ui`\n   - Import `useCommandPaletteStore` from stores\n   - Import `useCommandActions` hook\n   - Add the `CommandPalette` component to the render tree (after `ToastContainer`, inside the `.app` div)\n   - Pass the actions from `useCommandActions()` to the `CommandPalette` component (or have the component call the hook internally)\n\n2. **Update the existing keyboard shortcut handler in App.tsx:**\n   - In the existing `handleKeyDown` useEffect (lines ~258-276), add a case for `Ctrl+K` (and `Meta+K` for macOS):\n     ```\n     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {\n       e.preventDefault();\n       useCommandPaletteStore.getState().toggle();\n     }\n     ```\n   - Place this check BEFORE the existing Ctrl+1/2/, checks so it takes priority\n   - Also ensure the command palette closes when pressing Ctrl+K again while it's open (the toggle handles this)\n\n3. **Ensure the palette doesn't conflict with terminal input:**\n   - The Ctrl+K shortcut is registered on `window`, so it will fire regardless of focus\n   - When the palette is open, it should capture all keyboard input (the overlay + autofocused input handle this naturally)\n   - When closed, keyboard events flow normally to the terminal\n\n4. **Add a visual hint** in the header or footer for discoverability:\n   - Optionally add a small \"Ctrl+K\" badge/button in the header-right area that opens the palette on click\n   - This is a nice-to-have, not required",
+      "verification": [
+        "Pressing Ctrl+K anywhere in the app opens the command palette",
+        "Pressing Ctrl+K again (or Escape) closes it",
+        "The command palette shows actions and fuzzy search works",
+        "Selecting an action executes it (e.g., switching views, opening issues)",
+        "Recently used commands persist and appear at the top on next open",
+        "Existing keyboard shortcuts (Ctrl+1, Ctrl+2, Ctrl+,) still work when palette is closed",
+        "pnpm typecheck passes from root"
+      ],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/ui/CommandPalette.tsx"
+      ]
+    }
+  ]
+}
