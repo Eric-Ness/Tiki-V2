@@ -58,6 +58,8 @@ pub fn run() {
             github::enhance_issue_description,
             github::get_current_branch,
             github::list_git_branches,
+            github::fetch_github_prs,
+            github::fetch_github_pr_detail,
             terminal::commands::create_terminal,
             terminal::commands::write_terminal,
             terminal::commands::resize_terminal,

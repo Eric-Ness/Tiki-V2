@@ -1,0 +1,150 @@
+.pr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+  background-color: var(--bg-secondary, #1e1e1e);
+  border-left: 3px solid #3fb950;
+}
+
+.pr-card.CLOSED {
+  border-left-color: #f85149;
+}
+
+.pr-card.MERGED {
+  border-left-color: #a371f7;
+}
+
+.pr-card:hover {
+  background-color: var(--bg-hover, #2a2a2a);
+}
+
+.pr-card:focus {
+  outline: none;
+  border-color: var(--accent-color, #007acc);
+}
+
+.pr-card.selected {
+  background-color: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.pr-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pr-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pr-card-number {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #858585);
+}
+
+.pr-card-state {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.pr-card-state.OPEN {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.pr-card-state.CLOSED {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.pr-card-state.MERGED {
+  background-color: rgba(163, 113, 247, 0.15);
+  color: #a371f7;
+}
+
+.pr-card-draft {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background-color: rgba(139, 148, 158, 0.15);
+  color: #8b949e;
+  text-transform: uppercase;
+}
+
+.pr-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #cccccc);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pr-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.pr-card-branch {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-secondary, #858585);
+  background-color: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-card-review {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.pr-card-review.APPROVED {
+  color: #3fb950;
+}
+
+.pr-card-review.CHANGES_REQUESTED {
+  color: #f85149;
+}
+
+.pr-card-review.REVIEW_REQUIRED {
+  color: #d29922;
+}
+
+.pr-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.pr-card-label {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}

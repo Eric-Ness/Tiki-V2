@@ -6,18 +6,19 @@ import { Panel, Separator, Group } from "react-resizable-panels";
 import { checkForAppUpdates } from "./utils/updater";
 import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
+import { PullRequestsSection } from "./components/sidebar/PullRequestsSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { ClaudeUsageSection } from "./components/sidebar/ClaudeUsageSection";
 import { TerminalPane } from "./components/terminal";
-import { IssueDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
+import { IssueDetail, PullRequestDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore } from "./stores";
-import type { GitHubIssue, TikiRelease } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore } from "./stores";
+import type { GitHubIssue, GitHubPullRequest, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
@@ -106,9 +107,11 @@ function App() {
   const selectedIssue = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedIssue ?? null);
   const selectedRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedRelease ?? null);
   const selectedTikiRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedTikiRelease ?? null);
+  const selectedPr = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedPr ?? null);
   const issues = useIssuesStore((s) => s.issues);
   const releases = useReleasesStore((s) => s.releases);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
+  const prs = usePullRequestsStore((s) => s.prs);
 
   // Get the selected issue/release objects
   const [fetchedIssue, setFetchedIssue] = useState<GitHubIssue | null>(null);
@@ -121,6 +124,9 @@ function App() {
     : null;
   const selectedTikiReleaseData = selectedTikiRelease
     ? tikiReleases.find((r) => r.version === selectedTikiRelease)
+    : null;
+  const selectedPrData = selectedPr
+    ? prs.find((p) => p.number === selectedPr) ?? null
     : null;
 
   // Fetch issue on demand when not found in store (e.g. completed/closed issues)
@@ -316,6 +322,7 @@ function App() {
 
               <ProjectsSection />
               <IssuesSection />
+              <PullRequestsSection />
               <ReleasesSection />
               <ClaudeUsageSection />
             </div>
@@ -395,6 +402,8 @@ function App() {
           <div className="detail-content">
             {selectedIssueData ? (
               <IssueDetail issue={selectedIssueData} work={selectedIssueWork} />
+            ) : selectedPrData ? (
+              <PullRequestDetail pr={selectedPrData} />
             ) : selectedReleaseData ? (
               <ReleaseDetail release={selectedReleaseData} />
             ) : selectedTikiReleaseData ? (

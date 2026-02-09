@@ -6,6 +6,7 @@ interface ProjectSelection {
   selectedIssue: number | null;
   selectedRelease: string | null;
   selectedTikiRelease: string | null;
+  selectedPr: number | null;
 }
 
 interface DetailState {
@@ -16,6 +17,7 @@ interface DetailActions {
   setSelectedIssue: (issueNumber: number | null) => void;
   setSelectedRelease: (tagName: string | null) => void;
   setSelectedTikiRelease: (version: string | null) => void;
+  setSelectedPr: (prNumber: number | null) => void;
   clearSelection: () => void;
   cleanupProject: (projectId: string) => void;
 }
@@ -30,6 +32,7 @@ const emptySelection: ProjectSelection = {
   selectedIssue: null,
   selectedRelease: null,
   selectedTikiRelease: null,
+  selectedPr: null,
 };
 
 const initialState: DetailState = {
@@ -50,6 +53,7 @@ export const useDetailStore = create<DetailStore>()(
               selectedIssue: issueNumber,
               selectedRelease: null,
               selectedTikiRelease: null,
+              selectedPr: null,
             },
           },
         }));
@@ -64,6 +68,7 @@ export const useDetailStore = create<DetailStore>()(
               selectedRelease: tagName,
               selectedIssue: null,
               selectedTikiRelease: null,
+              selectedPr: null,
             },
           },
         }));
@@ -78,6 +83,22 @@ export const useDetailStore = create<DetailStore>()(
               selectedTikiRelease: version,
               selectedIssue: null,
               selectedRelease: null,
+              selectedPr: null,
+            },
+          },
+        }));
+      },
+
+      setSelectedPr: (prNumber) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: {
+              selectedPr: prNumber,
+              selectedIssue: null,
+              selectedRelease: null,
+              selectedTikiRelease: null,
             },
           },
         }));

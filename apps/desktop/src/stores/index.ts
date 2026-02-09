@@ -45,6 +45,14 @@ export {
 
 export { useReleaseDialogStore } from './releaseDialogStore';
 
+export {
+  usePullRequestsStore,
+  filterPrsBySearch,
+  type GitHubPullRequest,
+  type GitHubPrAuthor,
+  type PrFilter,
+} from './pullRequestsStore';
+
 export { useKanbanStore } from './kanbanStore';
 
 export { useTikiStateStore } from './tikiStateStore';

@@ -28,6 +28,237 @@ pub struct GitHubIssue {
     pub updated_at: String,
 }
 
+// ─── Pull Request Types ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrAuthor {
+    pub login: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrStatusCheck {
+    #[serde(default)]
+    pub context: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub state: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub conclusion: Option<String>,
+    #[serde(default)]
+    pub details_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPullRequest {
+    pub number: u32,
+    pub title: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub head_ref_name: String,
+    #[serde(default)]
+    pub base_ref_name: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub is_draft: bool,
+    #[serde(default)]
+    pub review_decision: Option<String>,
+    #[serde(default)]
+    pub author: Option<GitHubPrAuthor>,
+    #[serde(default)]
+    pub labels: Vec<GitHubLabel>,
+    #[serde(default)]
+    pub body: Option<String>,
+    #[serde(default)]
+    pub status_check_rollup: Vec<GitHubPrStatusCheck>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrFile {
+    pub path: String,
+    #[serde(default)]
+    pub additions: u32,
+    #[serde(default)]
+    pub deletions: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrReview {
+    #[serde(default)]
+    pub author: Option<GitHubPrAuthor>,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub body: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitHubPrDetail {
+    pub number: u32,
+    pub title: String,
+    #[serde(default)]
+    pub body: Option<String>,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub head_ref_name: String,
+    #[serde(default)]
+    pub base_ref_name: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub is_draft: bool,
+    #[serde(default)]
+    pub review_decision: Option<String>,
+    #[serde(default)]
+    pub author: Option<GitHubPrAuthor>,
+    #[serde(default)]
+    pub labels: Vec<GitHubLabel>,
+    #[serde(default)]
+    pub status_check_rollup: Vec<GitHubPrStatusCheck>,
+    #[serde(default)]
+    pub additions: u32,
+    #[serde(default)]
+    pub deletions: u32,
+    #[serde(default)]
+    pub commits: serde_json::Value,
+    #[serde(default)]
+    pub files: Vec<GitHubPrFile>,
+    #[serde(default)]
+    pub reviews: Vec<GitHubPrReview>,
+}
+
+// ─── Pull Request Commands ────────────────────────────────────────────────────
+
+/// Fetch GitHub pull requests from a repository
+/// - state_filter: Filter by PR state ("open", "closed", "merged", "all"). Defaults to "open"
+/// - limit: Maximum number of PRs to fetch. Defaults to 30
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
+#[tauri::command]
+pub fn fetch_github_prs(
+    state_filter: Option<String>,
+    limit: Option<u32>,
+    project_path: Option<String>,
+) -> Result<Vec<GitHubPullRequest>, String> {
+    let filter = state_filter.unwrap_or_else(|| "open".to_string());
+    let pr_limit = limit.unwrap_or(30);
+
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "pr",
+        "list",
+        "--json",
+        "number,title,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,body,author",
+        "--state",
+        &filter,
+        "--limit",
+        &pr_limit.to_string(),
+    ]);
+
+    if let Some(ref path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("gh pr list failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+
+    if trimmed.is_empty() || trimmed == "[]" {
+        return Ok(vec![]);
+    }
+
+    serde_json::from_str(trimmed)
+        .map_err(|e| format!("Failed to parse PR list: {}", e))
+}
+
+/// Fetch detailed information about a single GitHub pull request
+/// - number: The PR number to fetch
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
+#[tauri::command]
+pub fn fetch_github_pr_detail(
+    number: u32,
+    project_path: Option<String>,
+) -> Result<GitHubPrDetail, String> {
+    let mut cmd = Command::new("gh");
+    cmd.args([
+        "pr",
+        "view",
+        &number.to_string(),
+        "--json",
+        "number,title,body,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,author,additions,deletions,commits,files,reviews",
+    ]);
+
+    if let Some(ref path) = project_path {
+        cmd.current_dir(path);
+    }
+
+    let output = cmd.output().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                .to_string()
+        } else {
+            format!("Failed to run gh CLI: {}", e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not logged in") || stderr.contains("authentication") {
+            return Err(
+                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
+            );
+        }
+        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
+            return Err(
+                "Not in a GitHub repository. Please open a project with a GitHub remote."
+                    .to_string(),
+            );
+        }
+        return Err(format!("gh pr view failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    serde_json::from_str(stdout.trim())
+        .map_err(|e| format!("Failed to parse PR detail: {}", e))
+}
+
+// ─── CLI Check Commands ───────────────────────────────────────────────────────
+
 /// Check if Claude CLI is installed and accessible
 /// Returns Ok(true) if installed, Ok(false) if not installed
 #[tauri::command]

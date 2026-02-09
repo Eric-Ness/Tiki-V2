@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
-import { useProjectsStore, useIssuesStore } from "../../stores";
+import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore } from "../../stores";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import "./DetailPanel.css";
@@ -35,12 +35,67 @@ function getContrastColor(hexColor: string): string {
   return luminance > 0.5 ? "#000000" : "#ffffff";
 }
 
+function getPrStateBadgeClass(state: string): string {
+  const normalized = state.toLowerCase();
+  if (normalized === "merged") return "pr-state-merged";
+  if (normalized === "closed") return "pr-state-closed";
+  return "pr-state-open";
+}
+
+function getPrStateBadgeLabel(state: string): string {
+  const normalized = state.toLowerCase();
+  if (normalized === "merged") return "Merged";
+  if (normalized === "closed") return "Closed";
+  return "Open";
+}
+
+function getLinkedPrReviewBadgeClass(decision: string): string {
+  const normalized = decision.toUpperCase();
+  if (normalized === "APPROVED") return "detail-review-badge--approved";
+  if (normalized === "CHANGES_REQUESTED") return "detail-review-badge--changes-requested";
+  return "detail-review-badge--review-required";
+}
+
+function getLinkedPrReviewLabel(decision: string): string {
+  const normalized = decision.toUpperCase();
+  if (normalized === "APPROVED") return "Approved";
+  if (normalized === "CHANGES_REQUESTED") return "Changes";
+  return "Review";
+}
+
 export function IssueDetail({ issue, work }: IssueDetailProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
   const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
+  const prs = usePullRequestsStore((state) => state.prs);
+  const setSelectedPr = useDetailStore((state) => state.setSelectedPr);
+
+  // Find PRs linked to this issue
+  const linkedPrs = prs.filter((pr) => {
+    const issueNum = String(issue.number);
+    // Check body for linking keywords
+    if (pr.body) {
+      const bodyLower = pr.body.toLowerCase();
+      const patterns = [
+        `fixes #${issueNum}`,
+        `closes #${issueNum}`,
+        `resolves #${issueNum}`,
+        `fix #${issueNum}`,
+        `close #${issueNum}`,
+        `resolve #${issueNum}`,
+      ];
+      if (patterns.some((p) => bodyLower.includes(p))) {
+        return true;
+      }
+    }
+    // Check branch name for issue number
+    if (pr.headRefName.includes(issueNum)) {
+      return true;
+    }
+    return false;
+  });
 
   const normalizedState = issue.state.toLowerCase();
   const badgeClass = stateBadgeStyles[normalizedState] || stateBadgeStyles.open;
@@ -153,6 +208,34 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
               >
                 {label.name}
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {linkedPrs.length > 0 && (
+        <div className="detail-section">
+          <h3 className="detail-section-title">Linked Pull Requests</h3>
+          <div className="detail-linked-prs">
+            {linkedPrs.map((pr) => (
+              <div
+                key={pr.number}
+                className="detail-linked-pr-card"
+                onClick={() => setSelectedPr(pr.number)}
+              >
+                <span className="detail-linked-pr-number">#{pr.number}</span>
+                <span className="detail-linked-pr-title">{pr.title}</span>
+                <div className="detail-linked-pr-badges">
+                  <span className={`detail-linked-pr-state ${getPrStateBadgeClass(pr.state)}`}>
+                    {getPrStateBadgeLabel(pr.state)}
+                  </span>
+                  {pr.reviewDecision && (
+                    <span className={`detail-linked-pr-review ${getLinkedPrReviewBadgeClass(pr.reviewDecision)}`}>
+                      {getLinkedPrReviewLabel(pr.reviewDecision)}
+                    </span>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </div>
