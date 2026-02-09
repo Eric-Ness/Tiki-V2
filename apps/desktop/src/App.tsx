@@ -19,7 +19,7 @@ import { ToastContainer } from "./components/ui/ToastContainer";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions } from "./hooks";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useSettingsStore } from "./stores";
 import type { GitHubIssue, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
@@ -107,6 +107,29 @@ function App() {
   // Active project
   const activeProject = useProjectsStore((s) => s.getActiveProject());
   const activeProjectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+
+  // Apply theme from settings
+  const theme = useSettingsStore((s) => s.appearance.theme);
+  useEffect(() => {
+    const applyTheme = (resolved: 'dark' | 'light') => {
+      document.documentElement.setAttribute('data-theme', resolved);
+    };
+
+    if (theme === 'dark' || theme === 'light') {
+      applyTheme(theme);
+      return;
+    }
+
+    // theme === 'system'
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    applyTheme(mediaQuery.matches ? 'dark' : 'light');
+
+    const handler = (e: MediaQueryListEvent) => {
+      applyTheme(e.matches ? 'dark' : 'light');
+    };
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, [theme]);
 
   // Detail panel state (project-scoped)
   const selectedIssue = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedIssue ?? null);

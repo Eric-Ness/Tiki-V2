@@ -34,7 +34,7 @@
 .sidebar-footer {
   flex-shrink: 0;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-color);
 }
 
 .sidebar-footer-actions {
@@ -50,18 +50,18 @@
   width: 32px;
   height: 32px;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .sidebar-settings-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
 }
 
 .start-claude-btn {
@@ -70,7 +70,7 @@
   background: rgba(96, 165, 250, 0.15);
   border: 1px solid rgba(96, 165, 250, 0.25);
   border-radius: 6px;
-  color: #60a5fa;
+  color: var(--link-color);
   cursor: pointer;
   font-size: 0.813rem;
   font-weight: 500;
@@ -83,7 +83,7 @@
 .start-claude-btn:hover {
   background: rgba(96, 165, 250, 0.25);
   border-color: rgba(96, 165, 250, 0.4);
-  color: #93c5fd;
+  color: var(--link-hover);
 }
 
 .start-claude-btn:active {
@@ -116,7 +116,7 @@
 /* Resize handle */
 .resize-handle {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-color);
   transition: background 0.15s ease;
 }
 
@@ -139,6 +139,5 @@
 
 /* Active/dragging state */
 .resize-handle[data-resize-handle-active] {
-  background: #60a5fa;
+  background: var(--link-color);
 }
-

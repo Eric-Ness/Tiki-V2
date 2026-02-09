@@ -12,8 +12,8 @@
   min-width: 320px;
   max-width: 420px;
   padding: 10px 14px;
-  background: #252526;
-  border: 1px solid #3c3c3c;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -64,7 +64,7 @@
   flex: 1;
   font-size: 13px;
   line-height: 1.4;
-  color: #cccccc;
+  color: var(--text-primary);
   word-wrap: break-word;
 }
 
@@ -78,12 +78,12 @@
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #858585;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .toast-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #cccccc;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }

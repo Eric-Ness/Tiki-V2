@@ -5,8 +5,69 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { useTerminal } from "./useTerminal";
 import { terminalFocusRegistry } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
+import type { ITheme } from "xterm";
 import "xterm/css/xterm.css";
 import "./Terminal.css";
+
+// --- Terminal theme definitions ---
+
+const DARK_TERMINAL_THEME: ITheme = {
+  background: "#1e1e1e",
+  foreground: "#cccccc",
+  cursor: "#aeafad",
+  cursorAccent: "#1e1e1e",
+  selectionBackground: "#264f78",
+  selectionForeground: "#ffffff",
+  black: "#000000",
+  red: "#cd3131",
+  green: "#0dbc79",
+  yellow: "#e5e510",
+  blue: "#2472c8",
+  magenta: "#bc3fbc",
+  cyan: "#11a8cd",
+  white: "#e5e5e5",
+  brightBlack: "#666666",
+  brightRed: "#f14c4c",
+  brightGreen: "#23d18b",
+  brightYellow: "#f5f543",
+  brightBlue: "#3b8eea",
+  brightMagenta: "#d670d6",
+  brightCyan: "#29b8db",
+  brightWhite: "#e5e5e5",
+};
+
+const LIGHT_TERMINAL_THEME: ITheme = {
+  background: "#ffffff",
+  foreground: "#383a42",
+  cursor: "#526eff",
+  cursorAccent: "#ffffff",
+  selectionBackground: "#add6ff",
+  selectionForeground: "#000000",
+  black: "#000000",
+  red: "#e45649",
+  green: "#50a14f",
+  yellow: "#c18401",
+  blue: "#4078f2",
+  magenta: "#a626a4",
+  cyan: "#0184bc",
+  white: "#a0a1a7",
+  brightBlack: "#4f525e",
+  brightRed: "#e06c75",
+  brightGreen: "#98c379",
+  brightYellow: "#e5c07b",
+  brightBlue: "#61afef",
+  brightMagenta: "#c678dd",
+  brightCyan: "#56b6c2",
+  brightWhite: "#ffffff",
+};
+
+/** Resolve 'system' theme preference to 'dark' or 'light' */
+function getEffectiveTheme(theme: 'dark' | 'light' | 'system'): 'dark' | 'light' {
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return theme;
+}
 
 interface TerminalProps {
   className?: string;
@@ -17,8 +78,9 @@ interface TerminalProps {
 }
 
 export function Terminal({ className = "", cwd, shell, terminalId, onStatusChange }: TerminalProps) {
-  // Settings apply to new terminal instances only (existing terminals keep their config)
+  // Settings
   const terminalSettings = useSettingsStore((s) => s.terminal);
+  const themeSetting = useSettingsStore((s) => s.appearance.theme);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -126,33 +188,10 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           return;
         }
 
-        // Create terminal instance with VS Code dark theme colors
+        // Create terminal instance with theme matching app setting
+        const currentTheme = getEffectiveTheme(useSettingsStore.getState().appearance.theme);
         const xterm = new XTerm({
-          theme: {
-            background: "#1e1e1e",
-            foreground: "#cccccc",
-            cursor: "#aeafad",
-            cursorAccent: "#1e1e1e",
-            selectionBackground: "#264f78",
-            selectionForeground: "#ffffff",
-            // ANSI colors matching VS Code dark theme
-            black: "#000000",
-            red: "#cd3131",
-            green: "#0dbc79",
-            yellow: "#e5e510",
-            blue: "#2472c8",
-            magenta: "#bc3fbc",
-            cyan: "#11a8cd",
-            white: "#e5e5e5",
-            brightBlack: "#666666",
-            brightRed: "#f14c4c",
-            brightGreen: "#23d18b",
-            brightYellow: "#f5f543",
-            brightBlue: "#3b8eea",
-            brightMagenta: "#d670d6",
-            brightCyan: "#29b8db",
-            brightWhite: "#e5e5e5",
-          },
+          theme: currentTheme === 'dark' ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME,
           fontFamily: terminalSettings.fontFamily,
           fontSize: terminalSettings.fontSize,
           scrollback: terminalSettings.scrollbackBuffer,
@@ -257,6 +296,29 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
       destroyTerminalRef.current();
     };
   }, [isVisible]);
+
+  // Update xterm theme when the app theme setting changes
+  useEffect(() => {
+    const applyTheme = (effective: 'dark' | 'light') => {
+      const xterm = xtermRef.current;
+      if (xterm) {
+        xterm.options.theme = effective === 'dark' ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
+      }
+    };
+
+    // Apply the theme immediately for the current setting
+    applyTheme(getEffectiveTheme(themeSetting));
+
+    // If the user chose 'system', listen for OS-level preference changes
+    if (themeSetting === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => {
+        applyTheme(e.matches ? 'dark' : 'light');
+      };
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [themeSetting]);
 
   return (
     <div className={`terminal-container ${className}`.trim()}>

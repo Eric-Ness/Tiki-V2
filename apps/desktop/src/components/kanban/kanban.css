@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1e1e1e;
+  background: var(--bg-primary);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -14,14 +14,14 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #252525;
-  border-bottom: 1px solid #333;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
 .kanban-filters-label {
   font-size: 12px;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .kanban-no-issues-hint {
@@ -35,12 +35,12 @@
 }
 
 .kanban-filters-select {
-  background: #1e1e1e;
-  border: 1px solid #444;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   min-width: 180px;
   cursor: pointer;
   outline: none;
@@ -56,12 +56,12 @@
 }
 
 .kanban-filters-select option {
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .kanban-filters-select optgroup {
-  color: #888;
+  color: var(--text-secondary);
   font-style: normal;
 }
 
@@ -81,7 +81,7 @@
   flex-direction: column;
   min-width: 0;
   flex: 1;
-  background: #252525;
+  background: var(--bg-secondary);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -91,19 +91,19 @@
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
 .kanban-column-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--text-primary);
 }
 
 .kanban-column-count {
   font-size: 12px;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .kanban-column-body {
@@ -120,14 +120,14 @@
   align-items: center;
   justify-content: center;
   height: 60px;
-  color: #555;
+  color: var(--text-tertiary);
   font-size: 12px;
   font-style: italic;
 }
 
 /* Drop target highlighting */
 .kanban-column--drop-target {
-  background: #2a2a2a;
+  background: var(--bg-hover);
 }
 
 .kanban-column--drop-target .kanban-column-body {
@@ -162,8 +162,8 @@
 
 /* Card Styles */
 .kanban-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 10px 12px;
   cursor: grab;
@@ -226,7 +226,7 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #888;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   opacity: 0;
@@ -243,7 +243,7 @@
 
 .kanban-card-number {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .kanban-card-badge {
@@ -262,7 +262,7 @@
 
 .kanban-card-title {
   font-size: 13px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -285,7 +285,7 @@
 /* Phase Progress */
 .kanban-card-progress {
   margin-top: 8px;
-  background: #252525;
+  background: var(--bg-secondary);
   border-radius: 4px;
   height: 20px;
   position: relative;
@@ -308,7 +308,7 @@
   padding: 0 8px;
   font-size: 11px;
   line-height: 20px;
-  color: #ccc;
+  color: var(--text-primary);
 }
 
 /* Empty Board State */
@@ -318,13 +318,13 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #666;
+  color: var(--text-tertiary);
   text-align: center;
   padding: 24px;
 }
 
 .kanban-empty-icon {
-  color: #444;
+  color: var(--border-color);
   margin-bottom: 16px;
 }
 
@@ -332,13 +332,13 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 500;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .kanban-empty-text {
   margin: 0;
   font-size: 14px;
-  color: #666;
+  color: var(--text-tertiary);
 }
 
 /* Scrollbar styling */
@@ -355,13 +355,13 @@
 
 .kanban-columns::-webkit-scrollbar-thumb,
 .kanban-column-body::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .kanban-columns::-webkit-scrollbar-thumb:hover,
 .kanban-column-body::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: var(--bg-tertiary);
 }
 
 /* Ship Confirmation Dialog */
@@ -376,8 +376,8 @@
 }
 
 .kanban-dialog {
-  background: #252525;
-  border: 1px solid #444;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 20px;
   max-width: 400px;
@@ -389,21 +389,21 @@
   margin: 0 0 12px;
   font-size: 16px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--text-primary);
 }
 
 .kanban-dialog-message {
   margin: 0 0 8px;
   font-size: 13px;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .kanban-dialog-issue-title {
   margin: 0 0 20px;
   font-size: 14px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   padding: 10px;
-  background: #1e1e1e;
+  background: var(--bg-primary);
   border-radius: 4px;
   border-left: 3px solid #8b5cf6;
 }
@@ -425,12 +425,12 @@
 }
 
 .kanban-dialog-btn--cancel {
-  background: #333;
-  color: #e0e0e0;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .kanban-dialog-btn--cancel:hover {
-  background: #444;
+  background: var(--border-color);
 }
 
 .kanban-dialog-btn--confirm {

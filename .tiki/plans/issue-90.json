@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 90,
+    "title": "Light theme support",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/90"
+  },
+  "createdAt": "2026-02-09T01:30:00.000Z",
+  "successCriteria": [
+    "SC1: Selecting 'Light' in settings applies a light color palette across all UI",
+    "SC2: Selecting 'Dark' restores the current dark theme",
+    "SC3: Selecting 'System' follows OS prefers-color-scheme preference",
+    "SC4: Terminal switches between dark and light xterm themes",
+    "SC5: Theme preference persists across app restarts",
+    "SC6: All component CSS files render correctly in both themes",
+    "SC7: pnpm typecheck passes with no errors"
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Define CSS variable themes and wire theme application",
+      "status": "pending",
+      "content": "This phase establishes the theming foundation: defining CSS variables for both dark and light themes on `:root`, and adding the React logic to apply the theme based on the settings store.\n\n1. **Update `apps/desktop/src/index.css`:**\n   - Add `:root` (or `:root, [data-theme='dark']`) block with all dark theme CSS variables:\n     - `--bg-primary: #1e1e1e`\n     - `--bg-secondary: #252526`\n     - `--bg-hover: #2a2a2a`\n     - `--bg-tertiary: #333333`\n     - `--text-primary: #cccccc`\n     - `--text-secondary: #858585`\n     - `--text-tertiary: #6b6b6b`\n     - `--accent-color: #007acc`\n     - `--accent-hover: #1a8ad4`\n     - `--border-color: #3c3c3c`\n     - `--error-bg: #5a1d1d`\n     - `--error-border: #be1100`\n     - `--error-text: #f48771`\n     - `--warning-border: #856404`\n     - `--warning-text: #f0ad4e`\n     - `--scrollbar-thumb: #3a3a3a`\n     - `--scrollbar-track: #1e1e1e`\n     - `--link-color: #60a5fa`\n     - `--link-hover: #93c5fd`\n   - Add `[data-theme='light']` block with light palette:\n     - `--bg-primary: #ffffff`\n     - `--bg-secondary: #f3f3f3`\n     - `--bg-hover: #e8e8e8`\n     - `--bg-tertiary: #d4d4d4`\n     - `--text-primary: #1e1e1e`\n     - `--text-secondary: #656565`\n     - `--text-tertiary: #8b8b8b`\n     - `--accent-color: #0066b8`\n     - `--accent-hover: #005ba4`\n     - `--border-color: #d4d4d4`\n     - `--error-bg: #fce8e8`\n     - `--error-border: #e51400`\n     - `--error-text: #c72e12`\n     - `--warning-border: #c09a00`\n     - `--warning-text: #795e00`\n     - `--scrollbar-thumb: #c1c1c1`\n     - `--scrollbar-track: #f3f3f3`\n     - `--link-color: #0066b8`\n     - `--link-hover: #005ba4`\n   - Update the existing `:root` styles to use variables: `color: var(--text-primary)`, `background-color: var(--bg-primary)`, keep `color-scheme: dark` as default but override in light\n   - In `[data-theme='light']`: set `color-scheme: light`\n   - Update `a` color to use `var(--link-color)` and `a:hover` to `var(--link-hover)`\n\n2. **Update `apps/desktop/src/App.tsx`:**\n   - Add a `useEffect` that reads `appearance.theme` from `useSettingsStore`\n   - When theme is 'dark': set `document.documentElement.setAttribute('data-theme', 'dark')`\n   - When theme is 'light': set `document.documentElement.setAttribute('data-theme', 'light')`\n   - When theme is 'system': use `window.matchMedia('(prefers-color-scheme: dark)')` to detect, and add a listener for changes\n   - Clean up the matchMedia listener on unmount\n   - The effect should run on theme setting change\n\nAfter this phase, switching the theme dropdown in settings will immediately change the entire app's colors for all components that already use CSS variables (the majority).",
+      "verification": [
+        "CSS variables are defined in index.css for both dark and light themes",
+        "App.tsx has a useEffect that applies data-theme attribute based on settings",
+        "System theme detection works with matchMedia listener",
+        "pnpm typecheck passes from root"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC5", "SC7"],
+      "files": [
+        "apps/desktop/src/index.css",
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Convert hardcoded CSS files to use theme variables",
+      "status": "pending",
+      "content": "Several CSS files use hardcoded color values instead of CSS variables. Convert them all.\n\n1. **`apps/desktop/src/components/terminal/Terminal.css`** - Has ~15 hardcoded colors:\n   - Replace `#1e1e1e` with `var(--bg-primary)`\n   - Replace `#333` with `var(--bg-tertiary)`\n   - Replace `#3a3a3a` scrollbar colors with `var(--scrollbar-thumb)` and `var(--scrollbar-track)`\n   - Replace `#252525` with `var(--bg-secondary)`\n   - Replace any hardcoded text colors with appropriate variables\n   - Check for tab styling colors\n\n2. **`apps/desktop/src/components/kanban/kanban.css`** - Has ~12 hardcoded colors:\n   - Replace `#1e1e1e` with `var(--bg-primary)`\n   - Replace `#333` with `var(--bg-tertiary)`\n   - Replace `#2a2a2a` with `var(--bg-hover)`\n   - Replace border colors `#333` with `var(--border-color)` or `var(--bg-tertiary)`\n\n3. **`apps/desktop/src/components/releases/ReleaseDialog.css`** - Has ~12 hardcoded colors:\n   - Replace `#252526` with `var(--bg-secondary)`\n   - Replace `#3c3c3c` with `var(--border-color)`\n   - Replace `#1e1e1e` with `var(--bg-primary)`\n   - Replace `#2a2a2a` with `var(--bg-hover)`\n\n4. **`apps/desktop/src/App.css`** - Check for hardcoded colors in layout/header/sidebar\n\n5. **`apps/desktop/src/components/layout/layout.css`** - Check for hardcoded layout colors\n\n6. **`apps/desktop/src/components/detail/DetailPanel.css`** - Check for hardcoded colors\n\n7. **`apps/desktop/src/components/detail/IssueComments.css`** - Check for hardcoded colors\n\n8. **`apps/desktop/src/components/detail/markdown.css`** - Check for hardcoded colors in code blocks, blockquotes, etc.\n\n9. **`apps/desktop/src/components/ui/Toast.css`** - Check for hardcoded colors\n\n10. **`apps/desktop/src/components/terminal/TerminalTabs.css`** - If separate from Terminal.css, check for hardcoded colors\n\n11. **`apps/desktop/src/components/sidebar/CollapsibleSection.css`** - Check for hardcoded colors\n\n12. **`apps/desktop/src/components/layout/CenterTabs.css`** - Check for hardcoded colors\n\nFor each file: read it, find all hardcoded hex colors, replace with the appropriate CSS variable. Use `var(--variable-name)` WITHOUT fallbacks since we now define the variables on `:root`.\n\nAlso update the MarkdownRenderer to support both light and dark syntax highlight themes. Currently it imports `highlight.js/styles/github-dark.css`. We need to either:\n- Import both themes and conditionally apply one, OR\n- Use CSS variables for code block styling in markdown.css\nThe simplest approach: keep the dark import for now and add CSS variable overrides in markdown.css for `.hljs` background/color that respond to the theme.",
+      "verification": [
+        "No hardcoded dark theme hex colors (#1e1e1e, #252526, #333, #3c3c3c, #2a2a2a) remain in any CSS file except inside var() fallbacks",
+        "All CSS files use var(--variable-name) for colors",
+        "Markdown code blocks have appropriate styling in both themes",
+        "pnpm typecheck passes from root"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC6"],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.css",
+        "apps/desktop/src/components/kanban/kanban.css",
+        "apps/desktop/src/components/releases/ReleaseDialog.css",
+        "apps/desktop/src/App.css",
+        "apps/desktop/src/components/layout/layout.css",
+        "apps/desktop/src/components/detail/DetailPanel.css",
+        "apps/desktop/src/components/detail/IssueComments.css",
+        "apps/desktop/src/components/detail/markdown.css",
+        "apps/desktop/src/components/ui/Toast.css",
+        "apps/desktop/src/components/layout/CenterTabs.css",
+        "apps/desktop/src/components/sidebar/CollapsibleSection.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Add terminal theme switching",
+      "status": "pending",
+      "content": "Make the xterm.js terminal respond to the theme setting.\n\n1. **Update `apps/desktop/src/components/terminal/Terminal.tsx`:**\n   - Import `useSettingsStore` and subscribe to `appearance.theme`\n   - Define two theme objects: `DARK_TERMINAL_THEME` and `LIGHT_TERMINAL_THEME`\n   - Dark theme: the current hardcoded values (background: #1e1e1e, foreground: #cccccc, etc.)\n   - Light terminal theme:\n     - background: '#ffffff'\n     - foreground: '#383a42'\n     - cursor: '#526eff'\n     - cursorAccent: '#ffffff'\n     - selectionBackground: '#add6ff'\n     - selectionForeground: '#000000'\n     - ANSI colors based on VS Code light theme (One Light or similar):\n       - black: '#000000', red: '#e45649', green: '#50a14f', yellow: '#c18401'\n       - blue: '#4078f2', magenta: '#a626a4', cyan: '#0184bc', white: '#a0a1a7'\n       - bright variants accordingly\n   - Determine the effective theme: if setting is 'system', check `matchMedia('(prefers-color-scheme: dark)')`; otherwise use the setting directly\n   - On initial terminal creation, use the correct theme\n   - Add an effect that updates existing terminal instances when theme changes: call `xterm.options.theme = newTheme` on each open terminal\n   - Store the xterm instances somewhere accessible (they may already be in a ref or the terminal store)\n\n2. **Handle theme change for existing terminals:**\n   - When the theme setting changes, iterate over all open terminals and update their theme\n   - xterm supports changing theme at runtime via `term.options.theme = { ... }`\n   - Also need to handle the matchMedia listener for 'system' mode",
+      "verification": [
+        "Terminal uses light colors when light theme is active",
+        "Terminal uses dark colors when dark theme is active",
+        "Switching theme updates existing open terminals in real-time",
+        "System theme detection works for terminal",
+        "pnpm typecheck passes from root"
+      ],
+      "addressesCriteria": ["SC4", "SC7"],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.tsx"
+      ],
+      "dependencies": [1]
+    }
+  ]
+}

@@ -29,7 +29,7 @@
 }
 
 .markdown-body a {
-  color: #58a6ff;
+  color: var(--link-color);
   text-decoration: none;
 }
 
@@ -44,10 +44,10 @@
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid rgba(255, 255, 255, 0.15);
+  border-left: 3px solid var(--border-color);
   margin: 8px 0;
   padding-left: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .markdown-body img {
@@ -60,7 +60,7 @@
 .markdown-body h3,
 .markdown-body h4 {
   margin: 12px 0 6px 0;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
 }
 
 .markdown-body h1 { font-size: 1.2em; }
@@ -76,20 +76,20 @@
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-color);
   padding: 6px 10px;
   font-size: 0.9em;
 }
 
 .markdown-body th {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
 }
 
 /* Strikethrough (GFM) */
 .markdown-body del {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 /* Task lists (GFM) */
@@ -111,6 +111,12 @@
 /* Horizontal rule */
 .markdown-body hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid var(--border-color);
   margin: 12px 0;
+}
+
+/* Light theme overrides for syntax highlighting */
+[data-theme='light'] .hljs {
+  background: #f6f8fa;
+  color: #24292e;
 }
