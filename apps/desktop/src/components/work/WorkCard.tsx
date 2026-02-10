@@ -8,6 +8,12 @@ export interface PhaseInfo {
   status: PhaseStatus;
 }
 
+export interface PipelineStepRecord {
+  step: PipelineStep;
+  startedAt: string;
+  completedAt?: string;
+}
+
 export interface IssueContext {
   type: "issue";
   issue: {
@@ -17,6 +23,7 @@ export interface IssueContext {
   };
   status: WorkStatus;
   pipelineStep?: PipelineStep;
+  pipelineHistory?: PipelineStepRecord[];
   phase?: PhaseInfo;
   createdAt: string;
   lastActivity?: string;

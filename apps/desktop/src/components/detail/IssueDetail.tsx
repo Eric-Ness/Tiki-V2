@@ -2,8 +2,10 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore } from "../../stores";
+import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { PipelineTimeline } from "./PipelineTimeline";
 import "./DetailPanel.css";
 
 interface WorkContext {
@@ -14,6 +16,8 @@ interface WorkContext {
     total?: number;
     status?: string;
   };
+  createdAt?: string;
+  lastActivity?: string;
 }
 
 interface IssueDetailProps {
@@ -243,37 +247,29 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
 
       {work && (
         <div className="detail-section">
-          <h3 className="detail-section-title">Workflow Progress</h3>
-          <div className="detail-workflow">
-            <div className="detail-workflow-status">
-              <span className="detail-workflow-label">Status</span>
-              <span className={`detail-workflow-badge detail-workflow-badge--${work.status}`}>
-                {work.status}
-              </span>
+          <h3 className="detail-section-title">Pipeline Progress</h3>
+          <PipelineTimeline
+            currentStep={work.pipelineStep as PipelineStep | undefined}
+            workStatus={work.status}
+            createdAt={work.createdAt}
+            lastActivity={work.lastActivity}
+          />
+          {work.phase && work.phase.current && work.phase.total && (
+            <div className="detail-workflow-phase">
+              <div className="detail-workflow-phase-header">
+                <span className="detail-workflow-label">Phase Progress</span>
+                <span className="detail-workflow-phase-count">
+                  {work.phase.current} / {work.phase.total}
+                </span>
+              </div>
+              <div className="detail-workflow-phase-bar">
+                <div
+                  className="detail-workflow-phase-fill"
+                  style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
+                />
+              </div>
             </div>
-            {work.pipelineStep && (
-              <div className="detail-workflow-status">
-                <span className="detail-workflow-label">Step</span>
-                <span className="detail-workflow-value">{work.pipelineStep}</span>
-              </div>
-            )}
-            {work.phase && work.phase.current && work.phase.total && (
-              <div className="detail-workflow-phase">
-                <div className="detail-workflow-phase-header">
-                  <span className="detail-workflow-label">Phase Progress</span>
-                  <span className="detail-workflow-phase-count">
-                    {work.phase.current} / {work.phase.total}
-                  </span>
-                </div>
-                <div className="detail-workflow-phase-bar">
-                  <div
-                    className="detail-workflow-phase-fill"
-                    style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
 

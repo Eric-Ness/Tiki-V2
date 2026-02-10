@@ -1,0 +1,37 @@
+{
+  "issue": { "number": 91, "title": "Pipeline progress timeline view" },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create PipelineTimeline component and CSS",
+      "content": "Create the core visual PipelineTimeline component and its CSS in apps/desktop/src/components/detail/. The component renders a horizontal stepper showing 6 pipeline stages (GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP). Each step has a circular indicator, label, and status. Steps before current = completed (green checkmark), current step = active (pulsing blue dot), steps after = pending (dimmed). Connector lines between steps show progress (solid green if completed, dimmed if pending). Show total elapsed time using createdAt timestamp with a live-updating 1s interval timer. Support both light and dark themes using existing CSS variables. Follow existing animation patterns from WorkProgressCard.css (pulse-segment keyframe).",
+      "verification": [
+        "File apps/desktop/src/components/detail/PipelineTimeline.tsx exists and exports PipelineTimeline component",
+        "File apps/desktop/src/components/detail/PipelineTimeline.css exists with animations",
+        "pnpm typecheck passes from root"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Integrate into IssueDetail and extend types for per-step timing",
+      "content": "Wire PipelineTimeline into IssueDetail.tsx by replacing the existing Workflow Progress section (lines 244-277) with the new component. Keep the phase progress bar below the timeline for EXECUTE step context. Extend types to support optional pipelineHistory array for per-step timing: add PipelineStepRecord to WorkCard.tsx IssueContext, packages/shared/src/types/state.ts IssueWork, and apps/desktop/src-tauri/src/state.rs IssueContext struct. The pipelineHistory field is optional for backward compatibility. Update WorkContext interface in IssueDetail.tsx to include createdAt, lastActivity, and pipelineHistory fields.",
+      "verification": [
+        "pnpm typecheck passes from root",
+        "cargo check passes in apps/desktop/src-tauri",
+        "IssueDetail.tsx renders PipelineTimeline component instead of old Workflow Progress section",
+        "Pipeline timeline visible in the detail panel when an active work item is selected"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Add transition animations and polish",
+      "content": "Add smooth transition animations between pipeline steps: connector line fills left-to-right using scaleX transform (0.5s), newly-active step gets a scale-up pop animation (0.4s), checkmark appears with a brief pop. Track previous step via useRef to trigger animations on step change. Add useEffect with 1s setInterval for live elapsed time updates on active step and total time. Polish visual presentation: ensure clean layout at various panel widths, proper spacing, readable labels, and consistent appearance in both light and dark themes.",
+      "verification": [
+        "pnpm typecheck passes from root",
+        "Animations play smoothly when pipeline step changes",
+        "Timer updates live every second for active work items",
+        "Component looks good in both light and dark themes"
+      ]
+    }
+  ]
+}

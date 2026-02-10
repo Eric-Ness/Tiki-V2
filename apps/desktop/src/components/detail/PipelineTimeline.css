@@ -1,0 +1,203 @@
+/* Pipeline Timeline */
+.pipeline-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.2));
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+/* Steps row */
+.pipeline-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Individual step */
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* Circle indicators */
+.pipeline-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+
+/* Completed step */
+.pipeline-step-circle.step-completed {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 2px solid #22c55e;
+}
+
+/* Active step */
+.pipeline-step-circle.step-active {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  border: 2px solid #60a5fa;
+  animation: pipeline-pulse 2s ease-in-out infinite;
+}
+
+/* Failed step */
+.pipeline-step-circle.step-failed {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border: 2px solid #f87171;
+}
+
+/* Pending step */
+.pipeline-step-circle.step-pending {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Step labels */
+.pipeline-step-label {
+  font-size: 10px;
+  color: var(--text-secondary, #858585);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 48px;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.pipeline-step-label.label-completed {
+  color: #22c55e;
+}
+
+.pipeline-step-label.label-active {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.pipeline-step-label.label-failed {
+  color: #f87171;
+}
+
+/* Connector lines */
+.pipeline-connector {
+  flex: 1;
+  height: 2px;
+  min-width: 8px;
+  margin: 0 2px;
+  margin-bottom: 18px; /* Align with circles, not labels */
+  border-radius: 1px;
+  transition: background-color 0.3s ease;
+  position: relative;
+}
+
+.pipeline-connector.connector-completed {
+  background: #22c55e;
+}
+
+.pipeline-connector.connector-pending {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Elapsed time */
+.pipeline-elapsed {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--text-secondary, #858585);
+  font-family: monospace;
+  padding-top: 2px;
+}
+
+/* ==========================================
+   Transition Animations
+   ========================================== */
+
+/* Pulse animation for active step */
+@keyframes pipeline-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 6px rgba(96, 165, 250, 0);
+  }
+}
+
+/* Connector fills from left to right */
+@keyframes connector-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.pipeline-connector.filling {
+  animation: connector-fill 0.5s ease-out forwards;
+  transform-origin: left;
+}
+
+/* Step node activation pop */
+@keyframes step-activate {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pipeline-step-circle.activating {
+  animation: step-activate 0.4s ease-out forwards;
+}
+
+/* Checkmark pop on completion */
+@keyframes step-complete {
+  0% { transform: scale(0.5); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.pipeline-step-circle.completing {
+  animation: step-complete 0.3s ease-out forwards;
+}
+
+/* ==========================================
+   Light theme overrides
+   ========================================== */
+
+[data-theme='light'] .pipeline-timeline {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .pipeline-step-circle.step-pending {
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .pipeline-connector.connector-pending {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .pipeline-step-label {
+  color: var(--text-secondary, #6b7280);
+}
+
+[data-theme='light'] .pipeline-elapsed {
+  color: var(--text-secondary, #6b7280);
+}

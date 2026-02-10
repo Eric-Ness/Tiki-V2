@@ -68,6 +68,16 @@ export interface IssueInfo {
   updatedAt?: Timestamp;
 }
 
+/** Record of a pipeline step with timing */
+export interface PipelineStepRecord {
+  /** Pipeline step name */
+  step: PipelineStep;
+  /** ISO 8601 timestamp when this step started */
+  startedAt: Timestamp;
+  /** ISO 8601 timestamp when this step completed */
+  completedAt?: Timestamp;
+}
+
 /** Current phase execution state */
 export interface PhaseProgress {
   /** Current phase number (1-indexed) */
@@ -95,6 +105,8 @@ export interface IssueWork {
   status: WorkStatus;
   /** Current pipeline step (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP) */
   pipelineStep?: PipelineStep;
+  /** History of pipeline step transitions with timing */
+  pipelineHistory?: PipelineStepRecord[];
   phase?: PhaseProgress;
   createdAt: Timestamp;
   lastActivity: Timestamp;
