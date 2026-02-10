@@ -39,6 +39,8 @@ pub struct IssueContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pipeline_step: Option<PipelineStep>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline_history: Option<Vec<PipelineStepRecord>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<PhaseProgress>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -103,6 +105,8 @@ struct RawIssueContext {
     commit: Option<String>,
     #[serde(default)]
     parent_release: Option<String>,
+    #[serde(default)]
+    pipeline_history: Option<Vec<PipelineStepRecord>>,
 }
 
 /// Leniently deserialize phase progress — returns None if unparseable instead of erroring
@@ -276,6 +280,7 @@ impl<'de> Deserialize<'de> for IssueContext {
             issue,
             status: raw.status,
             pipeline_step: raw.pipeline_step,
+            pipeline_history: raw.pipeline_history,
             phase,
             created_at,
             last_activity: raw.last_activity,
@@ -392,6 +397,16 @@ pub enum PipelineStep {
     Audit,
     Execute,
     Ship,
+}
+
+/// Record of a pipeline step with timing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineStepRecord {
+    pub step: String,
+    pub started_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
 }
 
 /// History tracking
