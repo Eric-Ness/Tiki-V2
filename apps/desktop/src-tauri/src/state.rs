@@ -354,6 +354,7 @@ pub struct ReleaseContext {
     pub status: WorkStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pipeline_step: Option<PipelineStep>,
+    #[serde(default)]
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_activity: Option<String>,
@@ -364,9 +365,11 @@ pub struct ReleaseContext {
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRef {
     pub version: String,
+    #[serde(default)]
     pub issues: Vec<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_issue: Option<u32>,
+    #[serde(default)]
     pub completed_issues: Vec<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub milestone: Option<String>,
