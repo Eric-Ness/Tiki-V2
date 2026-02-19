@@ -52,6 +52,10 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
   const isIssue = work.type === "issue";
   const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
 
+  // Extract issue-specific fields with proper type narrowing
+  const issueNumber = work.type === "issue" ? work.issue.number : undefined;
+  const issueTitle = work.type === "issue" ? work.issue.title : undefined;
+
   // Get pipeline step and display label
   const pipelineStep = work.pipelineStep;
   const pipelineLabel = pipelineStep ? STEP_DISPLAY_LABELS[pipelineStep] : null;
@@ -67,11 +71,11 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
 
   // Load plan for phase duration data
   useEffect(() => {
-    if (!isIssue || !showPhaseProgress) return;
-    invoke<{ phases: PlanPhase[] } | null>("get_plan", { issueNumber: work.issue.number })
+    if (!issueNumber || !showPhaseProgress) return;
+    invoke<{ phases: PlanPhase[] } | null>("get_plan", { issueNumber })
       .then((plan) => setPlanPhases(plan?.phases ?? []))
       .catch(() => setPlanPhases([]));
-  }, [isIssue, showPhaseProgress, work.issue?.number, currentPhase]);
+  }, [issueNumber, showPhaseProgress, currentPhase]);
 
   // Find executing phase's startedAt for live timer
   const executingPhase = planPhases.find((p) => p.status === "executing");
@@ -90,8 +94,8 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
       <div className="work-progress-title">
         {isIssue ? (
           <>
-            <span className="work-progress-number">#{work.issue.number}</span>
-            <span className="work-progress-name">{work.issue.title || `Issue #${work.issue.number}`}</span>
+            <span className="work-progress-number">#{issueNumber}</span>
+            <span className="work-progress-name">{issueTitle || `Issue #${issueNumber}`}</span>
           </>
         ) : (
           <span className="work-progress-version">{work.version}</span>
