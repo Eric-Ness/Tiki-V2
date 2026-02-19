@@ -8,15 +8,15 @@
         "title": "Atomic state file writes",
         "url": "https://github.com/Eric-Ness/Tiki-V2/issues/108"
       },
-      "status": "planning",
-      "pipelineStep": "PLAN",
+      "status": "completed",
+      "pipelineStep": "SHIP",
       "phase": {
         "total": 2,
-        "current": 1,
-        "status": "pending"
+        "current": 2,
+        "status": "completed"
       },
       "createdAt": "2026-02-19T18:45:00.000Z",
-      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T22:00:00.000Z",
       "parentRelease": "v0.2.11"
     },
     "issue:109": {
@@ -26,15 +26,15 @@
         "title": "State file backup before destructive operations",
         "url": "https://github.com/Eric-Ness/Tiki-V2/issues/109"
       },
-      "status": "planning",
-      "pipelineStep": "PLAN",
+      "status": "completed",
+      "pipelineStep": "SHIP",
       "phase": {
         "total": 2,
-        "current": 1,
-        "status": "pending"
+        "current": 2,
+        "status": "completed"
       },
       "createdAt": "2026-02-19T18:45:00.000Z",
-      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T22:00:00.000Z",
       "parentRelease": "v0.2.11"
     },
     "issue:105": {
@@ -44,15 +44,15 @@
         "title": "Phase duration tracking and display",
         "url": "https://github.com/Eric-Ness/Tiki-V2/issues/105"
       },
-      "status": "planning",
-      "pipelineStep": "PLAN",
+      "status": "completed",
+      "pipelineStep": "SHIP",
       "phase": {
         "total": 2,
-        "current": 1,
-        "status": "pending"
+        "current": 2,
+        "status": "completed"
       },
       "createdAt": "2026-02-19T18:45:00.000Z",
-      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T22:00:00.000Z",
       "parentRelease": "v0.2.11"
     },
     "issue:117": {
@@ -62,15 +62,15 @@
         "title": "Release changelog generation",
         "url": "https://github.com/Eric-Ness/Tiki-V2/issues/117"
       },
-      "status": "planning",
-      "pipelineStep": "PLAN",
+      "status": "completed",
+      "pipelineStep": "SHIP",
       "phase": {
         "total": 3,
-        "current": 1,
-        "status": "pending"
+        "current": 3,
+        "status": "completed"
       },
       "createdAt": "2026-02-19T18:45:00.000Z",
-      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T22:00:00.000Z",
       "parentRelease": "v0.2.11"
     }
   },
