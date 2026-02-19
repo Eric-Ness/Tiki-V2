@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore } from "../../stores";
@@ -6,6 +6,8 @@ import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
+import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
+import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./DetailPanel.css";
 
 interface WorkContext {
@@ -20,9 +22,47 @@ interface WorkContext {
   lastActivity?: string;
 }
 
+interface PlanPhase {
+  number: number;
+  title: string;
+  status: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  summary?: string | null;
+}
+
+interface TikiPlan {
+  phases: PlanPhase[];
+}
+
 interface IssueDetailProps {
   issue: GitHubIssue;
   work?: WorkContext | null;
+}
+
+function PhaseItem({ phase }: { phase: PlanPhase }) {
+  const duration = calculatePhaseDuration(phase.startedAt ?? null, phase.completedAt ?? null);
+  const liveTimer = useElapsedTimer(
+    phase.status === "executing" ? (phase.startedAt ?? null) : null
+  );
+  const statusClass =
+    phase.status === "completed" ? "phase-status-completed" :
+    phase.status === "executing" ? "phase-status-executing" :
+    phase.status === "failed" ? "phase-status-failed" :
+    "phase-status-pending";
+
+  return (
+    <div className={`detail-phase-item ${statusClass}`}>
+      <span className="detail-phase-number">{phase.number}</span>
+      <span className="detail-phase-title">{phase.title}</span>
+      {duration !== null && (
+        <span className="detail-phase-duration">{formatDuration(duration)}</span>
+      )}
+      {liveTimer !== null && (
+        <span className="detail-phase-duration detail-phase-live">{liveTimer}</span>
+      )}
+    </div>
+  );
 }
 
 const stateBadgeStyles: Record<string, string> = {
@@ -75,6 +115,19 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
   const prs = usePullRequestsStore((state) => state.prs);
   const setSelectedPr = useDetailStore((state) => state.setSelectedPr);
+  const [plan, setPlan] = useState<TikiPlan | null>(null);
+
+  // Load plan data for phase duration display
+  useEffect(() => {
+    if (!work) {
+      setPlan(null);
+      return;
+    }
+    const tikiPath = activeProject?.path ? `${activeProject.path}/.tiki` : undefined;
+    invoke<TikiPlan | null>("get_plan", { issueNumber: issue.number, tikiPath })
+      .then((data) => setPlan(data ?? null))
+      .catch(() => setPlan(null));
+  }, [issue.number, work, activeProject?.path]);
 
   // Find PRs linked to this issue
   const linkedPrs = prs.filter((pr) => {
@@ -260,6 +313,12 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
                 <span className="detail-workflow-label">Phase Progress</span>
                 <span className="detail-workflow-phase-count">
                   {work.phase.current} / {work.phase.total}
+                  {plan && plan.phases.length > 0 && (() => {
+                    const total = calculateTotalDuration(plan.phases);
+                    return total > 0 ? (
+                      <span className="detail-phase-total-duration"> ({formatDuration(total)} total)</span>
+                    ) : null;
+                  })()}
                 </span>
               </div>
               <div className="detail-workflow-phase-bar">
@@ -268,6 +327,13 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
                   style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
                 />
               </div>
+              {plan && plan.phases.length > 0 && (
+                <div className="detail-phase-list">
+                  {plan.phases.map((phase) => (
+                    <PhaseItem key={phase.number} phase={phase} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

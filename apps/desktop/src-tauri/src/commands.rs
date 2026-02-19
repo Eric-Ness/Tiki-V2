@@ -1,3 +1,4 @@
+use crate::fs_utils::{self, BackupInfo};
 use crate::state::{TikiPlan, TikiRelease, TikiState};
 use crate::watcher;
 use std::path::PathBuf;
@@ -174,7 +175,7 @@ pub fn save_tiki_release(release: TikiRelease, tiki_path: Option<String>) -> Res
     let file_path = releases_dir.join(format!("{}.json", safe_version));
 
     let content = serde_json::to_string_pretty(&release).map_err(|e| e.to_string())?;
-    std::fs::write(&file_path, content).map_err(|e| e.to_string())?;
+    fs_utils::atomic_write(&file_path, &content)?;
 
     log::info!("Saved release {} to {:?}", release.version, file_path);
     Ok(())
@@ -201,4 +202,37 @@ pub fn delete_tiki_release(version: String, tiki_path: Option<String>) -> Result
     }
 
     Ok(())
+}
+
+/// Back up state.json before a destructive operation
+#[tauri::command]
+pub fn backup_state(tiki_path: Option<String>) -> Result<String, String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    let backup_path = fs_utils::backup_state(&path)?;
+    Ok(backup_path.to_string_lossy().to_string())
+}
+
+/// List available state backups, newest first
+#[tauri::command]
+pub fn list_backups(tiki_path: Option<String>) -> Result<Vec<BackupInfo>, String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    fs_utils::list_backup_files(&path)
+}
+
+/// Restore state.json from a backup file
+#[tauri::command]
+pub fn restore_backup(backup_filename: String, tiki_path: Option<String>) -> Result<(), String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    fs_utils::restore_from_backup(&path, &backup_filename)
+}
+
+/// Helper to resolve the .tiki path from an optional parameter
+fn resolve_tiki_path(tiki_path: Option<String>) -> Result<PathBuf, String> {
+    match tiki_path {
+        Some(p) => Ok(PathBuf::from(p)),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            Ok(cwd.join(".tiki"))
+        }
+    }
 }

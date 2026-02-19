@@ -1,3 +1,4 @@
+use crate::fs_utils;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -29,7 +30,7 @@ fn save_config(config: &ApiConfig) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| e.to_string())
+    fs_utils::atomic_write(&path, &json)
 }
 
 // --- API response types (serialized as camelCase to frontend) ---

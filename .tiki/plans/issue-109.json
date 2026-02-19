@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 109,
+    "title": "State file backup before destructive operations",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/109"
+  },
+  "createdAt": "2026-02-19T18:45:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "reliability",
+      "description": "State.json is snapshotted to .tiki/backups/ before SHIP deletes work from activeWork"
+    },
+    {
+      "id": "SC2",
+      "category": "reliability",
+      "description": "State.json is snapshotted before release ship cleans up child issues"
+    },
+    {
+      "id": "SC3",
+      "category": "usability",
+      "description": "Backup files are timestamped (e.g., state.2026-02-07T12-00-00.json)"
+    },
+    {
+      "id": "SC4",
+      "category": "usability",
+      "description": "Configurable retention with default of 10 backups, old backups auto-cleaned"
+    },
+    {
+      "id": "SC5",
+      "category": "usability",
+      "description": "Restore mechanism exists to recover state from a backup file"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Backup utility in Rust with retention and cleanup",
+      "status": "pending",
+      "content": "Create a backup utility in `apps/desktop/src-tauri/src/fs_utils.rs` (extending the module from issue #108). Implement the following:\n\n1. **`backup_state` function**: Takes the path to `state.json` and copies it to `.tiki/backups/state.{timestamp}.json` where timestamp is formatted as `YYYY-MM-DDTHH-MM-SS` (colons replaced with hyphens for filesystem compatibility). Create the `.tiki/backups/` directory if it doesn't exist.\n\n2. **`cleanup_old_backups` function**: Takes the backups directory path and a retention count (default 10). Lists all `state.*.json` files in the directory, sorts by timestamp descending, and deletes any beyond the retention limit.\n\n3. **`list_backups` Tauri command**: New IPC command in `commands.rs` that returns a list of available backup files with their timestamps and file sizes, sorted newest first.\n\n4. **`restore_backup` Tauri command**: New IPC command in `commands.rs` that takes a backup filename, validates it exists in `.tiki/backups/`, creates a backup of the current state first (safety net), then copies the selected backup over `state.json` using the atomic write utility from #108.\n\n5. **Retention configuration**: Read retention count from `.tiki/config.json` field `backupRetention` if it exists, otherwise default to 10. Add a serde struct for the config file if one doesn't already exist.\n\nRegister the new Tauri commands in `lib.rs`.",
+      "verification": [
+        "cargo check passes in apps/desktop/src-tauri",
+        "fs_utils.rs contains backup_state and cleanup_old_backups functions",
+        "commands.rs has list_backups and restore_backup Tauri commands",
+        "lib.rs registers the new commands in the invoke_handler",
+        "Backup files use timestamp format state.YYYY-MM-DDTHH-MM-SS.json"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs",
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Integrate backup into ship command and add restore mechanism",
+      "status": "pending",
+      "content": "Integrate the backup mechanism into the framework ship command and ensure it fires at the right points:\n\n1. **Framework ship.md**: Update `packages/framework/commands/ship.md` to instruct Claude Code to call the backup before destructive operations. Add instructions that before removing an issue from activeWork, the agent should invoke the `backup_state` Tauri command (or, since framework commands run in CLI context, add a shell step that copies state.json to `.tiki/backups/` with timestamp). Specifically:\n   - Before single-issue ship removes the issue from activeWork\n   - Before release ship cleans up all child issues from activeWork\n\n2. **Backup call in commands.rs write paths**: As a belt-and-suspenders approach, add a `backup_state` call inside the `save_tiki_state` command (or a new `ship_issue` / `ship_release` command) in commands.rs so that the desktop app backend also triggers backups when state is modified destructively.\n\n3. **Watcher filter**: Update `watcher.rs` to ignore file events from the `.tiki/backups/` directory so backup creation doesn't trigger unnecessary UI refreshes.\n\n4. **Cleanup integration**: After creating a backup, call `cleanup_old_backups` to enforce the retention limit.\n\n5. **Verify end-to-end**: Confirm that running a ship flow creates a backup, that list_backups returns it, and that restore_backup can recover state.",
+      "verification": [
+        "ship.md contains instructions to backup state before destructive operations",
+        "watcher.rs ignores events from .tiki/backups/ directory",
+        "cargo check passes in apps/desktop/src-tauri",
+        "pnpm build from root succeeds",
+        "Backup is created when state is modified destructively"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC4"],
+      "files": [
+        "packages/framework/commands/ship.md",
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/watcher.rs"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [2],
+    "SC3": [1],
+    "SC4": [1, 2],
+    "SC5": [1]
+  }
+}

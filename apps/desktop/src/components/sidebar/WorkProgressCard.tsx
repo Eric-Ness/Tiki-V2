@@ -1,5 +1,17 @@
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { WorkContext, PhaseStatus, PipelineStep } from "../work/WorkCard";
+import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
+import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./WorkProgressCard.css";
+
+interface PlanPhase {
+  number: number;
+  title: string;
+  status: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
 
 /** Human-readable labels for pipeline steps (present tense) */
 const STEP_DISPLAY_LABELS: Record<PipelineStep, string> = {
@@ -38,6 +50,7 @@ function getPhaseSegmentStatus(
 
 export function WorkProgressCard({ work }: WorkProgressCardProps) {
   const isIssue = work.type === "issue";
+  const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
 
   // Get pipeline step and display label
   const pipelineStep = work.pipelineStep;
@@ -51,6 +64,19 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
 
   // Show phase progress when we have phases (during EXECUTE or any phase-based work)
   const showPhaseProgress = phase && totalPhases > 0;
+
+  // Load plan for phase duration data
+  useEffect(() => {
+    if (!isIssue || !showPhaseProgress) return;
+    invoke<{ phases: PlanPhase[] } | null>("get_plan", { issueNumber: work.issue.number })
+      .then((plan) => setPlanPhases(plan?.phases ?? []))
+      .catch(() => setPlanPhases([]));
+  }, [isIssue, showPhaseProgress, work.issue?.number, currentPhase]);
+
+  // Find executing phase's startedAt for live timer
+  const executingPhase = planPhases.find((p) => p.status === "executing");
+  const liveTimer = useElapsedTimer(executingPhase?.startedAt ?? null);
+  const totalDuration = planPhases.length > 0 ? calculateTotalDuration(planPhases) : 0;
 
   return (
     <div className={`work-progress-card status-${work.status}`}>
@@ -79,17 +105,26 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
             {Array.from({ length: totalPhases }).map((_, index) => {
               const phaseNum = index + 1;
               const segmentStatus = getPhaseSegmentStatus(phaseNum, currentPhase, phaseStatus);
+              const planPhase = planPhases.find((p) => p.number === phaseNum);
+              const duration = planPhase
+                ? calculatePhaseDuration(planPhase.startedAt ?? null, planPhase.completedAt ?? null)
+                : null;
+              const durationStr = duration !== null ? ` (${formatDuration(duration)})` : "";
               return (
                 <div
                   key={phaseNum}
                   className={`phase-segment segment-${segmentStatus}`}
-                  title={`Phase ${phaseNum}: ${segmentStatus}`}
+                  title={`Phase ${phaseNum}: ${segmentStatus}${durationStr}`}
                 />
               );
             })}
           </div>
           <span className="work-progress-text">
             Phase {currentPhase}/{totalPhases}
+            {liveTimer && <span className="work-progress-timer"> {liveTimer}</span>}
+            {!liveTimer && totalDuration > 0 && (
+              <span className="work-progress-total-duration"> ({formatDuration(totalDuration)})</span>
+            )}
           </span>
         </div>
       )}

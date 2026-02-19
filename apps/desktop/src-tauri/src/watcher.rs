@@ -168,6 +168,16 @@ fn process_event(event: &Event) -> Option<TikiFileEvent> {
         if let Some(file_name) = path.file_name() {
             let name = file_name.to_string_lossy();
 
+            // Ignore temp files from atomic writes
+            if name.ends_with(".tmp") {
+                continue;
+            }
+
+            // Ignore backup directory events
+            if is_in_backups_dir(path) {
+                continue;
+            }
+
             // Check for state.json
             if name == "state.json" {
                 return Some(TikiFileEvent::StateChanged);
@@ -199,4 +209,9 @@ fn process_event(event: &Event) -> Option<TikiFileEvent> {
 /// Check if a path is inside the releases directory
 fn is_in_releases_dir(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "releases")
+}
+
+/// Check if a path is inside the backups directory
+fn is_in_backups_dir(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str() == "backups")
 }

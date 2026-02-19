@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 105,
+    "title": "Phase duration tracking and display",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/105"
+  },
+  "createdAt": "2026-02-19T18:45:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "usability",
+      "description": "Completed phases display their duration (completedAt - startedAt) in human-readable format"
+    },
+    {
+      "id": "SC2",
+      "category": "usability",
+      "description": "Currently executing phase shows a live running timer"
+    },
+    {
+      "id": "SC3",
+      "category": "usability",
+      "description": "Total execution time for the issue is displayed (sum of all phase durations)"
+    },
+    {
+      "id": "SC4",
+      "category": "usability",
+      "description": "Duration is shown on WorkProgressCard phase segments in sidebar"
+    },
+    {
+      "id": "SC5",
+      "category": "usability",
+      "description": "Duration is shown in phase summary/detail view"
+    },
+    {
+      "id": "SC6",
+      "category": "usability",
+      "description": "Durations are formatted human-readably (e.g., '2m 34s', '1h 12m')"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Duration utility and IssueDetail phase list display",
+      "status": "pending",
+      "content": "Create a duration formatting utility and integrate duration display into the IssueDetail component.\n\n1. **Duration utility**: Create a new utility file `apps/desktop/src/utils/duration.ts` with the following functions:\n   - `formatDuration(ms: number): string` - Converts milliseconds to human-readable format. Rules: if < 60s show '${s}s', if < 60m show '${m}m ${s}s', if >= 60m show '${h}h ${m}m'. Round seconds to nearest integer.\n   - `calculatePhaseDuration(startedAt: string | null, completedAt: string | null): number | null` - Returns duration in ms between two ISO timestamps, or null if either is missing.\n   - `calculateTotalDuration(phases: Phase[]): number` - Sums durations of all completed phases.\n   - `getElapsedSince(startedAt: string): number` - Returns ms elapsed from startedAt to now (for live timers).\n\n2. **IssueDetail phase list**: In `apps/desktop/src/components/detail/IssueDetail.tsx`, find where phases are listed/displayed. For each completed phase, show the formatted duration next to the phase title (e.g., 'Phase 1: Setup (2m 34s)'). For the total, add a summary line showing total execution time below the phase list.\n\n3. **PipelineTimeline integration**: In `apps/desktop/src/components/detail/PipelineTimeline.tsx`, if individual pipeline steps correspond to phases, add duration display to completed steps.\n\n4. **Styling**: Use muted/secondary text color for duration display so it doesn't compete with phase titles. Use a monospace or tabular-nums font-feature for timer digits if appropriate.",
+      "verification": [
+        "duration.ts exists with formatDuration, calculatePhaseDuration, calculateTotalDuration, getElapsedSince functions",
+        "IssueDetail.tsx shows duration next to completed phase titles",
+        "Total execution time is displayed in IssueDetail",
+        "pnpm typecheck passes from root",
+        "Duration format matches spec (e.g., '2m 34s', '1h 12m')"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/utils/duration.ts",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/detail/PipelineTimeline.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Live timer for executing phase and WorkProgressCard duration",
+      "status": "pending",
+      "content": "Add a live running timer for the currently executing phase and integrate duration display into the WorkProgressCard sidebar segments.\n\n1. **Live timer hook**: Create a custom React hook `useElapsedTimer(startedAt: string | null): string | null` in `apps/desktop/src/hooks/useElapsedTimer.ts`. This hook should:\n   - Return null if startedAt is null\n   - Use `setInterval` (every 1 second) to update elapsed time\n   - Return the formatted duration string using `formatDuration` from the duration utility\n   - Clean up the interval on unmount or when startedAt changes\n\n2. **IssueDetail live timer**: In `IssueDetail.tsx`, for the currently executing phase (status === 'executing'), use the `useElapsedTimer` hook with the phase's `startedAt` to show a live ticking timer instead of a static duration.\n\n3. **WorkProgressCard segments**: In `apps/desktop/src/components/sidebar/WorkProgressCard.tsx`, find where phase segments are rendered. For each completed segment, add a small duration label. For the executing segment, show the live timer. Consider using a tooltip if inline display is too crowded — show duration on hover over the segment.\n\n4. **Performance consideration**: Ensure the 1-second interval only runs when there is an executing phase. When no phase is executing, the hook should not set up an interval. Use `useEffect` cleanup properly.\n\n5. **Visual polish**: The live timer should have a subtle pulsing or blinking indicator (CSS animation) to show it's live. Use the same muted text styling as Phase 1 for consistency.",
+      "verification": [
+        "useElapsedTimer.ts hook exists and updates every second",
+        "Currently executing phase shows a live ticking timer in IssueDetail",
+        "WorkProgressCard phase segments show duration for completed phases",
+        "WorkProgressCard shows live timer for executing phase segment",
+        "Timer stops/cleans up when phase completes or component unmounts",
+        "pnpm typecheck passes from root",
+        "pnpm build from root succeeds"
+      ],
+      "addressesCriteria": ["SC2", "SC4", "SC6"],
+      "files": [
+        "apps/desktop/src/hooks/useElapsedTimer.ts",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.tsx"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [1],
+    "SC4": [2],
+    "SC5": [1],
+    "SC6": [1, 2]
+  }
+}

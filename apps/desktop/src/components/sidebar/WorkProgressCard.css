@@ -175,6 +175,20 @@
   text-align: right;
 }
 
+/* Duration display in progress text */
+.work-progress-timer {
+  color: #60a5fa;
+  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+  animation: pulse-segment 1.5s ease-in-out infinite;
+}
+
+.work-progress-total-duration {
+  color: var(--text-tertiary, #666666);
+  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Release progress */
 .work-progress-release {
   display: flex;

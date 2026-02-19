@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 108,
+    "title": "Atomic state file writes",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/108"
+  },
+  "createdAt": "2026-02-19T18:45:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "reliability",
+      "description": "All JSON file writes use write-to-temp + atomic rename pattern"
+    },
+    {
+      "id": "SC2",
+      "category": "reliability",
+      "description": "Same atomic pattern applied to plan and release file writes"
+    },
+    {
+      "id": "SC3",
+      "category": "reliability",
+      "description": "Stale .tmp files from crashes are cleaned up on startup"
+    },
+    {
+      "id": "SC4",
+      "category": "compatibility",
+      "description": "File watcher ignores .tmp file events (no UI flicker)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Atomic write utility and watcher filter",
+      "status": "pending",
+      "content": "Create a reusable `atomic_write` utility function in a new `src-tauri/src/fs_utils.rs` module. The function should:\n\n1. Write content to a `.tmp` sibling file (e.g., `state.json.tmp`)\n2. Call `std::fs::rename` to atomically replace the target file\n3. On Windows, handle the case where rename fails if target exists by using `std::fs::rename` (which overwrites on Windows for same-volume renames via MoveFileEx internally)\n4. Return a descriptive error if any step fails\n\nAlso update `watcher.rs` to filter out `.tmp` file events in `process_event()` — if the filename ends with `.tmp`, return `None` early.\n\nFinally, add stale `.tmp` cleanup logic: create a `cleanup_stale_tmp_files` function that scans the `.tiki/` directory (recursively) for any `.tmp` files and removes them. Call this from `lib.rs` in the `setup` closure before starting the watcher.\n\nRegister the new module in `lib.rs`.",
+      "verification": [
+        "cargo check passes in apps/desktop/src-tauri",
+        "New fs_utils.rs module exists with atomic_write function",
+        "watcher.rs process_event returns None for .tmp files",
+        "lib.rs setup calls cleanup_stale_tmp_files before starting watcher"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs",
+        "apps/desktop/src-tauri/src/watcher.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Apply atomic writes to all write paths",
+      "status": "pending",
+      "content": "Replace all direct `std::fs::write` calls with the new `atomic_write` utility:\n\n1. **commands.rs** `save_tiki_release` (line ~177): Replace `std::fs::write(&file_path, content)` with `fs_utils::atomic_write(&file_path, content)`\n\n2. **claude_usage.rs** `save_config` (line ~32): Replace `std::fs::write(path, json)` with `fs_utils::atomic_write(&path, json)`\n\nAfter making changes, verify with `cargo check` that everything compiles. Then manually test by running the desktop app in dev mode, saving a release, and confirming no .tmp files linger.",
+      "verification": [
+        "cargo check passes in apps/desktop/src-tauri",
+        "No remaining direct std::fs::write calls for JSON data (grep confirms)",
+        "pnpm build from root succeeds"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/claude_usage.rs"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [2],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}

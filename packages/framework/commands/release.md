@@ -46,8 +46,19 @@ Execute a multi-issue release pipeline. Loads a release definition, calculates i
       5. Continue to next issue
     - If an issue fails, pause and offer recovery options
   </step>
-  <step>**Ship the release** after all issues complete:
+  <step>**Generate changelog** after all issues complete:
+    - Read the release file from `.tiki/releases/{version}.json` to get issue list
+    - For each issue, read `.tiki/plans/issue-{N}.json` to extract phase summaries
+    - Run `git log --oneline` filtering for commits mentioning each issue number
+    - Categorize changes by conventional commit prefix (feat/fix/refactor/docs/perf/chore)
+    - Generate structured markdown changelog with issue references and links
+    - Write to `.tiki/releases/{version}-changelog.md`
+    - Present changelog to user for review/editing before publishing
+    (See `<changelog-generation>` section for detailed format)
+  </step>
+  <step>**Ship the release** after changelog is approved:
     - Create and push git tag
+    - Create GitHub release with changelog as body (`gh release create`)
     - Close GitHub milestone (if linked)
     - Archive release file
     - Update state history
@@ -657,10 +668,103 @@ Show release status information.
 4. Cross-reference to build complete status picture
 </status-subcommand>
 
+<changelog-generation>
+## Changelog Generation
+
+Generate a structured changelog before shipping the release.
+
+**Step 1: Gather data**
+
+For each issue in the release:
+1. Read plan file: `.tiki/plans/issue-{N}.json`
+   - Extract phase titles and `summary` fields from completed phases
+2. Run git log for commits related to the issue:
+   ```bash
+   git log --oneline --grep="#{N}" --grep="issue-{N}" --all-match
+   ```
+   Also check for commits with conventional commit prefixes mentioning the issue.
+
+**Step 2: Categorize changes**
+
+Map each issue to a changelog category based on its commits or labels:
+
+| Commit Prefix | Changelog Category |
+|---------------|-------------------|
+| `feat:` | Features |
+| `fix:` | Bug Fixes |
+| `refactor:` | Refactoring |
+| `docs:` | Documentation |
+| `perf:` | Performance |
+| `chore:`, `test:`, other | Other Changes |
+
+If an issue has multiple commit types, use the most prominent one.
+If no conventional commits found, categorize by issue labels:
+- `enhancement` -> Features
+- `bug` -> Bug Fixes
+- Otherwise -> Other Changes
+
+**Step 3: Generate changelog markdown**
+
+```markdown
+# {version}
+
+## Features
+- {Issue title} (#{number}) - {brief summary from phase summaries}
+
+## Bug Fixes
+- {Issue title} (#{number}) - {brief summary}
+
+## Refactoring
+- {Issue title} (#{number}) - {brief summary}
+
+## Other Changes
+- {Issue title} (#{number}) - {brief summary}
+
+**Full Changelog**: https://github.com/{owner}/{repo}/compare/{previous_tag}...{version}
+```
+
+Omit empty categories. Determine `{previous_tag}` with:
+```bash
+git describe --tags --abbrev=0 HEAD
+```
+
+**Step 4: Check for custom config**
+
+If `.tiki/config.json` exists with a `changelog` section, apply customizations:
+```json
+{
+  "changelog": {
+    "template": ".tiki/changelog-template.md",
+    "categories": {
+      "feat": "New Features",
+      "fix": "Bug Fixes",
+      "refactor": "Code Improvements",
+      "default": "Other Changes"
+    },
+    "includeCommitHashes": false,
+    "includeAuthors": false
+  }
+}
+```
+
+If `template` path is specified and exists, use it with these placeholders:
+`{{version}}`, `{{date}}`, `{{features}}`, `{{fixes}}`, `{{refactoring}}`, `{{other}}`, `{{full_changelog_url}}`
+
+If custom `categories` are specified, use those display names instead of defaults.
+
+**Step 5: Write and review**
+
+1. Write the changelog to `.tiki/releases/{version}-changelog.md`
+2. Present the changelog content to the user
+3. Ask: "Would you like to edit this changelog before publishing?"
+4. If yes, let the user make edits, then re-read the file
+5. If no, proceed to shipping
+</changelog-generation>
+
 <release-shipping>
 ## Release Shipping
 
-After all issues complete, ship the release:
+After all issues complete and changelog is approved, ship the release:
 
 **Shipping steps:**
 
@@ -669,14 +773,31 @@ After all issues complete, ship the release:
    - No failed issues
    - All issue branches merged
 
-2. **Create git tag**
+2. **Back up state before destructive changes**
+   ```bash
+   mkdir -p .tiki/backups
+   cp .tiki/state.json ".tiki/backups/state.$(date -u +%Y-%m-%dT%H-%M-%S).json"
+   ```
+
+3. **Create git tag**
    ```bash
    git tag -a {version} -m "Release {version}"
    git push origin {version}
    ```
    Skip if `--no-tag` flag was provided.
 
-3. **Close GitHub milestone** (if linked)
+4. **Create GitHub release with changelog**
+   ```bash
+   gh release create {version} --title "{version}" \
+     --notes-file .tiki/releases/{version}-changelog.md
+   ```
+   If a release already exists for the tag:
+   ```bash
+   gh release edit {version} \
+     --notes-file .tiki/releases/{version}-changelog.md
+   ```
+
+5. **Close GitHub milestone** (if linked)
    ```bash
    gh api repos/{owner}/{repo}/milestones/{milestone_number} \
      -X PATCH -f state=closed
@@ -687,12 +808,12 @@ After all issues complete, ship the release:
      --jq '.[] | select(.title=="{milestone}") | .number'
    ```
 
-4. **Archive release file**
+6. **Archive release file**
    - Create `.tiki/releases/archive/` if needed
    - Move `.tiki/releases/{version}.json` to archive
    - Add `completedAt` and `shipped: true` to archived file
 
-5. **Update state.json**
+7. **Update state.json**
    - Remove `release:{version}` from `activeWork`
    - Remove ALL child `issue:N` entries from `activeWork` where `parentRelease` matches this release version
    - Add to `history.recentReleases`:
@@ -721,12 +842,15 @@ After all issues complete, ship the release:
 |-------|--------|
 | All issues complete | PASS (3/3) |
 | No failed issues | PASS |
+| Changelog generated | PASS |
 | Git working tree clean | PASS |
 
 ### Shipping...
 
+- [x] Backing up state.json...
 - [x] Creating git tag v1.2...
 - [x] Pushing tag to origin...
+- [x] Creating GitHub release with changelog...
 - [x] Closing milestone "v1.2"...
 - [x] Archiving release file...
 - [x] Updating state...
@@ -736,6 +860,7 @@ After all issues complete, ship the release:
 **Tag:** v1.2
 **Commit:** abc1234
 **Milestone:** Closed
+**GitHub Release:** https://github.com/{owner}/{repo}/releases/tag/v1.2
 **Archived:** .tiki/releases/archive/v1.2.json
 
 **Issues shipped:**

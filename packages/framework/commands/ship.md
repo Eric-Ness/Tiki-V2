@@ -21,6 +21,13 @@ Finalize an issue by committing changes, pushing to remote, and closing the GitH
   <step>Stage and commit changes with a descriptive message</step>
   <step>Push to remote</step>
   <step>Close the GitHub issue with a summary comment</step>
+  <step>**Back up state before destructive changes:** Before modifying `activeWork`, create a timestamped backup of `state.json`:
+    ```bash
+    mkdir -p .tiki/backups
+    cp .tiki/state.json ".tiki/backups/state.$(date -u +%Y-%m-%dT%H-%M-%S).json"
+    ```
+    This ensures state can be recovered if the ship operation corrupts data. Keep the last 10 backups and delete older ones.
+  </step>
   <step>Update `activeWork` in `.tiki/state.json` (see state-management section). If the issue has a `parentRelease` field, keep it in `activeWork` with `status: "completed"`. Otherwise, remove it from `activeWork`. In both cases, add to `history`.</step>
   <step>Archive the plan file</step>
 </instructions>

@@ -410,8 +410,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link 0.2.1",
 ]
 
@@ -4478,8 +4480,9 @@ dependencies = [
 
 [[package]]
 name = "tiki-desktop"
-version = "0.2.7"
+version = "0.2.9"
 dependencies = [
+ "chrono",
  "dirs",
  "log",
  "notify",

@@ -1,5 +1,6 @@
 mod claude_usage;
 mod commands;
+mod fs_utils;
 mod github;
 mod state;
 mod terminal;
@@ -24,6 +25,11 @@ pub fn run() {
             // Initialize updater plugin
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
 
+            // Clean up any stale .tmp files from previous crashes
+            if let Ok(cwd) = std::env::current_dir() {
+                fs_utils::cleanup_stale_tmp_files(&cwd.join(".tiki"));
+            }
+
             // Start file watcher for .tiki directory
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -44,6 +50,9 @@ pub fn run() {
             commands::load_tiki_releases,
             commands::save_tiki_release,
             commands::delete_tiki_release,
+            commands::backup_state,
+            commands::list_backups,
+            commands::restore_backup,
             github::check_claude_cli,
             github::check_gh_auth,
             github::fetch_github_issues,

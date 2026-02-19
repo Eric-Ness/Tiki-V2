@@ -362,6 +362,80 @@
   transition: width 0.3s ease;
 }
 
+/* Phase List */
+.detail-phase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.detail-phase-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.detail-phase-item.phase-status-completed {
+  border-left: 2px solid #22c55e;
+}
+
+.detail-phase-item.phase-status-executing {
+  border-left: 2px solid #60a5fa;
+}
+
+.detail-phase-item.phase-status-failed {
+  border-left: 2px solid #f87171;
+}
+
+.detail-phase-item.phase-status-pending {
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.detail-phase-number {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  font-family: monospace;
+  min-width: 16px;
+  text-align: center;
+}
+
+.detail-phase-title {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-phase-duration {
+  color: rgba(255, 255, 255, 0.45);
+  font-family: monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.detail-phase-live {
+  color: #60a5fa;
+  animation: phase-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes phase-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.detail-phase-total-duration {
+  font-weight: 400;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 /* PR State Badges */
 .pr-state-open {
   background: rgba(63, 185, 80, 0.2);

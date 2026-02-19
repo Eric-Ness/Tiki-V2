@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 117,
+    "title": "Release changelog generation",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/117"
+  },
+  "createdAt": "2026-02-19T18:45:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "Phase summaries from all issues in the release are aggregated into changelog"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Conventional commit messages are collected and categorized (Features, Bug Fixes, Refactoring, etc.)"
+    },
+    {
+      "id": "SC3",
+      "category": "usability",
+      "description": "Changelog is formatted as markdown suitable for GitHub release notes"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "Issue references and links are included in changelog entries"
+    },
+    {
+      "id": "SC5",
+      "category": "functionality",
+      "description": "GitHub release body is auto-populated via gh release create --notes"
+    },
+    {
+      "id": "SC6",
+      "category": "usability",
+      "description": "Custom changelog template supported via .tiki/config.json"
+    },
+    {
+      "id": "SC7",
+      "category": "usability",
+      "description": "Option to edit generated changelog before publishing"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Changelog generation logic in ship.md for release flow",
+      "status": "pending",
+      "content": "Add changelog generation logic to the release ship flow in `packages/framework/commands/ship.md`.\n\n1. **Data aggregation instructions**: In the release ship section of ship.md, add instructions for the agent to:\n   - Read the release file from `.tiki/releases/{version}.json` to get the list of issue numbers\n   - For each issue, read the plan file from `.tiki/plans/issue-{N}.json` to extract phase titles and content summaries\n   - Run `git log --oneline` for commits related to each issue (using issue number in commit messages or branch names)\n   - Parse conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `perf:`, `test:`\n\n2. **Changelog structure**: Generate a markdown changelog with the following structure:\n   ```\n   # {version}\n   \n   ## Features\n   - Description (#issue) \n   \n   ## Bug Fixes\n   - Description (#issue)\n   \n   ## Refactoring\n   - Description (#issue)\n   \n   ## Other Changes\n   - Description (#issue)\n   ```\n   Each entry should include the issue title, a brief summary from phase content, and a link to the issue.\n\n3. **Category mapping**: Map conventional commit prefixes to changelog categories:\n   - `feat:` -> Features\n   - `fix:` -> Bug Fixes  \n   - `refactor:` -> Refactoring\n   - `docs:` -> Documentation\n   - `perf:` -> Performance\n   - `chore:`, `test:`, other -> Other Changes\n   If an issue has no conventional commit, categorize based on issue title keywords or default to Other Changes.\n\n4. **Output**: Write the generated changelog to `.tiki/releases/{version}-changelog.md` for review.",
+      "verification": [
+        "ship.md release flow section contains changelog generation instructions",
+        "Instructions cover reading release file, plan files, and git log",
+        "Changelog markdown structure matches the specified format",
+        "Conventional commit prefix to category mapping is documented",
+        "Output file path .tiki/releases/{version}-changelog.md is specified"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "packages/framework/commands/ship.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Integrate with GitHub release creation",
+      "status": "pending",
+      "content": "Add instructions to ship.md to use the generated changelog when creating a GitHub release.\n\n1. **GitHub release integration**: In ship.md, after generating the changelog, add instructions for the agent to:\n   - Read the generated changelog from `.tiki/releases/{version}-changelog.md`\n   - Use `gh release create {tag} --title \"{version}\" --notes-file .tiki/releases/{version}-changelog.md` to create the GitHub release with the changelog as the body\n   - If a release already exists for the tag, use `gh release edit {tag} --notes-file .tiki/releases/{version}-changelog.md` to update it\n\n2. **Edit before publish option**: Add a step where the agent presents the generated changelog to the user and asks for confirmation or edits before creating the GitHub release. The agent should:\n   - Display the changelog content\n   - Ask the user: 'Would you like to edit this changelog before publishing? (yes/no)'\n   - If yes, let the user make edits to the file, then proceed\n   - If no, proceed directly with gh release create\n\n3. **Fallback for missing data**: If plan files are missing or git log returns no relevant commits, generate a minimal changelog with just the issue titles and numbers from the release file.\n\n4. **Include full diff link**: Add a line at the bottom of the changelog: `**Full Changelog**: https://github.com/Eric-Ness/Tiki-V2/compare/{previous_tag}...{version}` where previous_tag is determined from `git describe --tags --abbrev=0 {tag}^`.",
+      "verification": [
+        "ship.md includes gh release create with --notes-file flag",
+        "Edit-before-publish prompt is documented in ship.md",
+        "Fallback for missing plan files is handled",
+        "Full diff comparison link is included in changelog",
+        "gh release edit is used as fallback if release already exists"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC5", "SC7"],
+      "files": [
+        "packages/framework/commands/ship.md"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Custom changelog template support via config",
+      "status": "pending",
+      "content": "Add support for custom changelog templates configured in `.tiki/config.json`.\n\n1. **Config schema**: Define a `changelogTemplate` field in `.tiki/config.json` with the following structure:\n   ```json\n   {\n     \"changelog\": {\n       \"template\": \"path/to/template.md\",\n       \"categories\": {\n         \"feat\": \"New Features\",\n         \"fix\": \"Bug Fixes\",\n         \"refactor\": \"Code Improvements\",\n         \"docs\": \"Documentation\",\n         \"perf\": \"Performance\",\n         \"default\": \"Other Changes\"\n       },\n       \"includeCommitHashes\": false,\n       \"includeAuthors\": false\n     }\n   }\n   ```\n\n2. **Template support in ship.md**: Update the changelog generation instructions in ship.md to:\n   - Check if `.tiki/config.json` exists and has a `changelog` section\n   - If a `template` path is specified, read that file and use it as the markdown template. The template uses `{{version}}`, `{{features}}`, `{{fixes}}`, `{{refactoring}}`, `{{other}}`, `{{date}}` placeholders.\n   - If custom `categories` mapping is specified, use those display names instead of defaults\n   - If `includeCommitHashes` is true, append commit SHAs to each entry\n   - If `includeAuthors` is true, include commit author names\n\n3. **Default template**: If no config exists, use the default template from Phase 1. Document the default template in ship.md so users know what they can customize.\n\n4. **Validation**: Add instructions for the agent to validate the config.json changelog section before using it. If the template file path doesn't exist, warn the user and fall back to defaults.\n\n5. **Update shared types**: If `@tiki/shared` has a config type definition, add the changelog configuration fields to it. Check `packages/shared/src/` for existing config types.",
+      "verification": [
+        "ship.md documents the config.json changelog configuration schema",
+        "Template placeholder substitution logic is documented",
+        "Custom category names override defaults when configured",
+        "Missing template file falls back to default with a warning",
+        "pnpm typecheck passes from root if shared types were modified",
+        "pnpm build from root succeeds"
+      ],
+      "addressesCriteria": ["SC6"],
+      "files": [
+        "packages/framework/commands/ship.md",
+        "packages/shared/src/types.ts"
+      ],
+      "dependencies": [1, 2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1, 2],
+    "SC4": [1, 2],
+    "SC5": [2],
+    "SC6": [3],
+    "SC7": [2]
+  }
+}

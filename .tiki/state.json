@@ -1,21 +1,87 @@
 {
   "schemaVersion": 1,
   "activeWork": {
-    "issue:90": {
+    "issue:108": {
       "type": "issue",
-      "issue": { "number": 90, "title": "Light theme support" },
-      "status": "executing",
-      "phase": { "current": 3, "total": 3, "status": "executing" },
-      "lastActivity": "2026-02-09T02:00:00.000Z"
+      "issue": {
+        "number": 108,
+        "title": "Atomic state file writes",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/108"
+      },
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "phase": {
+        "total": 2,
+        "current": 1,
+        "status": "pending"
+      },
+      "createdAt": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "parentRelease": "v0.2.11"
+    },
+    "issue:109": {
+      "type": "issue",
+      "issue": {
+        "number": 109,
+        "title": "State file backup before destructive operations",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/109"
+      },
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "phase": {
+        "total": 2,
+        "current": 1,
+        "status": "pending"
+      },
+      "createdAt": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "parentRelease": "v0.2.11"
+    },
+    "issue:105": {
+      "type": "issue",
+      "issue": {
+        "number": 105,
+        "title": "Phase duration tracking and display",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/105"
+      },
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "phase": {
+        "total": 2,
+        "current": 1,
+        "status": "pending"
+      },
+      "createdAt": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "parentRelease": "v0.2.11"
+    },
+    "issue:117": {
+      "type": "issue",
+      "issue": {
+        "number": 117,
+        "title": "Release changelog generation",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/117"
+      },
+      "status": "planning",
+      "pipelineStep": "PLAN",
+      "phase": {
+        "total": 3,
+        "current": 1,
+        "status": "pending"
+      },
+      "createdAt": "2026-02-19T18:45:00.000Z",
+      "lastActivity": "2026-02-19T18:45:00.000Z",
+      "parentRelease": "v0.2.11"
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 98,
-      "title": "Context menus (right-click) on UI elements",
-      "completedAt": "2026-02-09T01:00:00.000Z"
+      "number": 90,
+      "title": "Light theme support",
+      "completedAt": "2026-02-09T02:00:00.000Z"
     },
     "recentIssues": [
+      { "number": 90, "title": "Light theme support", "completedAt": "2026-02-09T02:00:00.000Z" },
       { "number": 98, "title": "Context menus (right-click) on UI elements", "completedAt": "2026-02-09T01:00:00.000Z" },
       { "number": 88, "title": "Keyboard shortcuts reference panel", "completedAt": "2026-02-09T00:45:00.000Z" },
       { "number": 94, "title": "Command palette (Ctrl+K)", "completedAt": "2026-02-09T00:30:00.000Z" },

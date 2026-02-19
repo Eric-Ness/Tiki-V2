@@ -1,0 +1,23 @@
+{
+  "version": "v0.2.11",
+  "status": "active",
+  "issues": [
+    {
+      "number": 108,
+      "title": "Atomic state file writes"
+    },
+    {
+      "number": 109,
+      "title": "State file backup before destructive operations"
+    },
+    {
+      "number": 105,
+      "title": "Phase duration tracking and display"
+    },
+    {
+      "number": 117,
+      "title": "Release changelog generation"
+    }
+  ],
+  "createdAt": "2026-02-19T00:00:00.000Z"
+}
