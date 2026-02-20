@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import type { GitHubIssue } from "../../stores";
 import { useContextMenu, ContextMenu, type ContextMenuEntry } from "../ui/ContextMenu";
 import "./IssueCard.css";
@@ -20,7 +21,7 @@ export interface IssueCardProps {
   onCloseIssue?: (issue: GitHubIssue) => void;
 }
 
-export function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGitHub, onCopyUrl, onRunYolo, onCloseIssue }: IssueCardProps) {
+export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGitHub, onCopyUrl, onRunYolo, onCloseIssue }: IssueCardProps) {
   const contextMenu = useContextMenu();
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -48,7 +49,7 @@ export function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGi
 
   const isOpen = issue.state === "OPEN";
 
-  const menuItems: ContextMenuEntry[] = [
+  const menuItems: ContextMenuEntry[] = useMemo(() => [
     {
       key: "open-github",
       label: "Open in GitHub",
@@ -117,7 +118,7 @@ export function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGi
       onClick: () => onCloseIssue?.(issue),
       danger: isOpen,
     },
-  ];
+  ], [issue, isOpen, onOpenInGitHub, onCopyUrl, onRunYolo, onEdit, onCloseIssue]);
 
   return (
     <>
@@ -194,4 +195,4 @@ export function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGi
       />
     </>
   );
-}
+});

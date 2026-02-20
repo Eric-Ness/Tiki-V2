@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   DndContext,
@@ -58,15 +58,6 @@ export function KanbanBoard() {
   const recentIssues = useTikiStateStore((s) => s.recentIssues);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [shipConfirmation, setShipConfirmation] = useState<{ issueNumber: number; title: string } | null>(null);
-
-  // Debug logging for Kanban state
-  useEffect(() => {
-    console.log('[Kanban] === STATE UPDATE ===');
-    console.log('[Kanban] issues count:', issues.length, 'numbers:', issues.map(i => i.number));
-    console.log('[Kanban] activeWork:', Object.entries(activeWork).map(([k, v]) => `${k}: ${v.status}`));
-    console.log('[Kanban] releaseFilter:', releaseFilter);
-    console.log('[Kanban] tikiReleases count:', tikiReleases.length);
-  }, [activeWork, issues, releaseFilter, tikiReleases]);
 
   // Configure DnD sensors
   const sensors = useSensors(
@@ -247,37 +238,23 @@ export function KanbanBoard() {
 
   // Filter issues by release and search query
   const filteredIssues = useMemo(() => {
-    console.log('[Kanban] Computing filteredIssues...');
-    console.log('[Kanban] - releaseFilter:', releaseFilter);
-    console.log('[Kanban] - searchQuery:', searchQuery);
-    console.log('[Kanban] - issues count:', issues.length);
-
     let result: GitHubIssue[];
 
     if (!releaseFilter) {
-      console.log('[Kanban] - No release filter, using all issues');
       result = issues;
     } else if (releaseFilter === 'unassigned') {
-      // Handle "unassigned" filter
       result = issues.filter((issue) => !assignedIssueNumbers.has(issue.number));
-      console.log('[Kanban] - Unassigned filter, returning:', result.length);
     } else {
-      // Find the release and get its issues
       const release = tikiReleases.find((r) => r.version === releaseFilter);
       if (!release) {
-        console.log('[Kanban] - Release not found, returning all issues');
         result = issues;
       } else {
         const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));
         result = issues.filter((issue) => releaseIssueNumbers.has(issue.number));
-        console.log('[Kanban] - Filtered by release, returning:', result.length, result.map(i => i.number));
       }
     }
 
-    // Apply search filter on top of release filter
-    result = filterIssuesBySearch(result, searchQuery);
-    console.log('[Kanban] - After search filter, returning:', result.length);
-    return result;
+    return filterIssuesBySearch(result, searchQuery);
   }, [issues, releaseFilter, searchQuery, tikiReleases, assignedIssueNumbers]);
 
   // Create workItems map from activeWork for phase progress display
@@ -304,8 +281,6 @@ export function KanbanBoard() {
 
   // Organize issues into columns based on Tiki work status
   const columns: ColumnData[] = useMemo(() => {
-    console.log('[Kanban] Computing columns from', filteredIssues.length, 'filtered issues');
-    console.log('[Kanban] recentIssues count:', recentIssues.length);
     const result = COLUMN_CONFIG.map((col) => {
       // For the completed column, use recentIssues from history (limited to 8)
       if (col.id === 'completed') {
@@ -350,7 +325,6 @@ export function KanbanBoard() {
       });
       return { ...col, issues: colIssues };
     });
-    console.log('[Kanban] Columns:', result.map(c => `${c.id}: ${c.issues.length}`).join(', '));
     return result;
   }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers, searchQuery]);
 

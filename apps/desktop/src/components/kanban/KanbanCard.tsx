@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { useDetailStore } from '../../stores';
@@ -22,7 +23,7 @@ export interface KanbanCardProps {
   onOpenInGitHub?: (issue: GitHubIssue) => void;
 }
 
-export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, onExecute, onShip, onOpenInGitHub }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, onExecute, onShip, onOpenInGitHub }: KanbanCardProps) {
   const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
   const contextMenu = useContextMenu();
 
@@ -50,7 +51,7 @@ export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDra
     .filter(Boolean)
     .join(' ');
 
-  const menuItems: ContextMenuEntry[] = [
+  const menuItems: ContextMenuEntry[] = useMemo(() => [
     {
       key: 'open-github',
       label: 'Open in GitHub',
@@ -98,7 +99,7 @@ export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDra
       onClick: () => onShip?.(issue.number),
       disabled: !canShip,
     },
-  ];
+  ], [issue, canExecute, canShip, onOpenInGitHub, onExecute, onShip, setSelectedIssue]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     // Don't show context menu if currently dragging
@@ -175,4 +176,4 @@ export function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDra
       />
     </>
   );
-}
+});
