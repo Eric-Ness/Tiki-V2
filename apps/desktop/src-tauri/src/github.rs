@@ -2,6 +2,19 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+/// Create a Command that suppresses console window creation on Windows.
+/// On non-Windows platforms, this is identical to `Command::new()`.
+fn hidden_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 /// A GitHub label attached to an issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,7 +166,7 @@ pub fn fetch_github_prs(
     let filter = state_filter.unwrap_or_else(|| "open".to_string());
     let pr_limit = limit.unwrap_or(30);
 
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "pr",
         "list",
@@ -213,7 +226,7 @@ pub fn fetch_github_pr_detail(
     number: u32,
     project_path: Option<String>,
 ) -> Result<GitHubPrDetail, String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "pr",
         "view",
@@ -265,12 +278,12 @@ pub fn fetch_github_pr_detail(
 pub fn check_claude_cli() -> Result<bool, String> {
     // On Windows, we need to run through cmd.exe to find .cmd files in PATH
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd")
+    let output = hidden_command("cmd")
         .args(["/C", "claude", "--version"])
         .output();
 
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new("claude")
+    let output = hidden_command("claude")
         .args(["--version"])
         .output();
 
@@ -291,7 +304,7 @@ pub fn check_claude_cli() -> Result<bool, String> {
 /// Err if gh CLI is not installed
 #[tauri::command]
 pub fn check_gh_auth() -> Result<bool, String> {
-    let output = Command::new("gh")
+    let output = hidden_command("gh")
         .args(["auth", "status"])
         .output()
         .map_err(|e| {
@@ -318,7 +331,7 @@ pub fn fetch_github_issues(
     let state_filter = state.unwrap_or_else(|| "open".to_string());
     let limit_val = limit.unwrap_or(30);
 
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "issue",
         "list",
@@ -384,7 +397,7 @@ pub fn fetch_github_releases(
 ) -> Result<Vec<GitHubRelease>, String> {
     let limit_val = limit.unwrap_or(20);
 
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "release",
         "list",
@@ -438,7 +451,7 @@ pub struct LabelInfo {
 /// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn fetch_github_labels(project_path: Option<String>) -> Result<Vec<LabelInfo>, String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args(["label", "list", "--json", "name,color", "--limit", "100"]);
 
     if let Some(path) = project_path {
@@ -500,7 +513,7 @@ pub fn create_github_issue(
         args.push(label);
     }
 
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args(&args);
 
     if let Some(ref path) = project_path {
@@ -554,7 +567,7 @@ pub fn fetch_github_issue_by_number(
     number: u32,
     project_path: Option<String>,
 ) -> Result<GitHubIssue, String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "issue",
         "view",
@@ -610,7 +623,7 @@ pub fn fetch_issue_comments(
     number: u32,
     project_path: Option<String>,
 ) -> Result<Vec<GitHubComment>, String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "issue",
         "view",
@@ -661,7 +674,7 @@ pub fn post_issue_comment(
     body: String,
     project_path: Option<String>,
 ) -> Result<(), String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args([
         "issue",
         "comment",
@@ -728,7 +741,7 @@ pub fn enhance_issue_description(
     // Pipe the prompt via stdin to avoid shell metacharacter issues
 
     #[cfg(target_os = "windows")]
-    let mut child = Command::new("cmd")
+    let mut child = hidden_command("cmd")
         .args(["/C", "claude", "-p"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -743,7 +756,7 @@ pub fn enhance_issue_description(
         })?;
 
     #[cfg(not(target_os = "windows"))]
-    let mut child = Command::new("claude")
+    let mut child = hidden_command("claude")
         .args(["-p"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -777,7 +790,7 @@ pub fn enhance_issue_description(
 /// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn get_current_branch(project_path: Option<String>) -> Result<String, String> {
-    let mut cmd = Command::new("git");
+    let mut cmd = hidden_command("git");
     cmd.args(["rev-parse", "--abbrev-ref", "HEAD"]);
 
     if let Some(path) = project_path {
@@ -808,7 +821,7 @@ pub fn get_current_branch(project_path: Option<String>) -> Result<String, String
 /// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn list_git_branches(project_path: Option<String>) -> Result<Vec<String>, String> {
-    let mut cmd = Command::new("git");
+    let mut cmd = hidden_command("git");
     cmd.args(["branch", "--format=%(refname:short)"]);
 
     if let Some(path) = project_path {
@@ -846,7 +859,7 @@ pub fn list_git_branches(project_path: Option<String>) -> Result<Vec<String>, St
 /// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn close_github_issue(number: u32, project_path: Option<String>) -> Result<(), String> {
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args(["issue", "close", &number.to_string()]);
 
     if let Some(path) = project_path {
@@ -918,7 +931,7 @@ pub fn edit_github_issue(
         args.push(label);
     }
 
-    let mut cmd = Command::new("gh");
+    let mut cmd = hidden_command("gh");
     cmd.args(&args);
 
     if let Some(path) = project_path {
