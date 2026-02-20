@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, CommandBuilder, PtyPair, PtySize};
+use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, PtyPair, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -26,6 +26,8 @@ pub struct TerminalExitEvent {
 pub struct TerminalSession {
     pty_pair: PtyPair,
     writer: Box<dyn Write + Send>,
+    /// Child process handle for retrieving exit code
+    child: Option<Box<dyn PtyChild + Send + Sync>>,
     /// Stop signal sender for the reader thread (set when streaming is started)
     stop_signal: Option<Sender<()>>,
 }
@@ -68,7 +70,7 @@ impl TerminalSession {
         }
 
         // Spawn the shell process
-        let _child = pty_pair
+        let child = pty_pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| format!("Failed to spawn shell: {}", e))?;
@@ -82,6 +84,7 @@ impl TerminalSession {
         Ok(Self {
             pty_pair,
             writer,
+            child: Some(child),
             stop_signal: None,
         })
     }
@@ -122,6 +125,11 @@ impl TerminalSession {
     /// Set the stop signal sender for cleanup
     pub fn set_stop_signal(&mut self, sender: Sender<()>) {
         self.stop_signal = Some(sender);
+    }
+
+    /// Take the child process handle (for retrieving exit code)
+    pub fn take_child(&mut self) -> Option<Box<dyn PtyChild + Send + Sync>> {
+        self.child.take()
     }
 
     /// Signal the reader thread to stop
@@ -274,10 +282,32 @@ pub fn start_output_reader(
 
         // Emit terminal-exit event (unless manually stopped via destroy_terminal)
         if !was_stopped {
-            log::info!("Emitting terminal-exit event for '{}'", thread_id);
+            // Retrieve exit code from the child process handle
+            let exit_code = {
+                let manager = get_terminal_manager();
+                let mut child = manager
+                    .lock()
+                    .ok()
+                    .and_then(|mut guard| {
+                        guard.get_session_mut(&thread_id)
+                            .and_then(|session| session.take_child())
+                    });
+                // Process already exited (EOF reached), so wait() returns immediately
+                child.as_mut().and_then(|c| {
+                    match c.wait() {
+                        Ok(status) => Some(status.exit_code() as i32),
+                        Err(e) => {
+                            log::warn!("Failed to get exit code for '{}': {}", thread_id, e);
+                            None
+                        }
+                    }
+                })
+            };
+
+            log::info!("Emitting terminal-exit event for '{}' (exit_code: {:?})", thread_id, exit_code);
             let exit_event = TerminalExitEvent {
                 id: thread_id.clone(),
-                exit_code: None, // Exit code not available from portable-pty
+                exit_code,
             };
 
             if let Err(e) = app_handle.emit("terminal-exit", exit_event) {

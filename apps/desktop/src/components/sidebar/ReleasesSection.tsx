@@ -15,6 +15,16 @@ import {
 } from "../../stores";
 import "./ReleasesSection.css";
 
+/** Compare two version strings by semver (descending). */
+function compareSemver(a: string, b: string): number {
+  const pa = a.replace(/^v/, "").split(".").map(Number);
+  const pb = b.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+  }
+  return 0;
+}
+
 /** Merged release combining GitHub + local tiki data */
 interface MergedRelease {
   version: string;
@@ -283,8 +293,8 @@ export function ReleasesSection() {
       }
     }
 
-    // Sort by version descending
-    return Array.from(map.values()).sort((a, b) => b.version.localeCompare(a.version));
+    // Sort by version descending (semver-aware)
+    return Array.from(map.values()).sort((a, b) => compareSemver(a.version, b.version));
   }, [releases, tikiReleases]);
 
   const handleReleaseClick = (merged: MergedRelease) => {
@@ -443,14 +453,7 @@ export function ReleasesSection() {
   const suggestedVersion = useMemo(() => {
     const versions = mergedReleases.map((r) => r.version);
     if (versions.length === 0) return "v0.1.0";
-    const sorted = [...versions].sort((a, b) => {
-      const pa = a.replace(/^v/, "").split(".").map(Number);
-      const pb = b.replace(/^v/, "").split(".").map(Number);
-      for (let i = 0; i < 3; i++) {
-        if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
-      }
-      return 0;
-    });
+    const sorted = [...versions].sort(compareSemver);
     const latest = sorted[0].replace(/-.*$/, ""); // strip pre-release suffix
     const parts = latest.replace(/^v/, "").split(".").map(Number);
     parts[2] = (parts[2] || 0) + 1;

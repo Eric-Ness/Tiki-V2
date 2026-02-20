@@ -1,8 +1,30 @@
 use crate::fs_utils::{self, BackupInfo};
 use crate::state::{TikiPlan, TikiRelease, TikiState};
 use crate::watcher;
+use std::cmp::Ordering;
 use std::path::PathBuf;
 use tauri_plugin_dialog::DialogExt;
+
+/// Compare two version strings by semver segments numerically.
+fn cmp_semver(a: &str, b: &str) -> Ordering {
+    let parse = |v: &str| -> Vec<u64> {
+        v.trim_start_matches('v')
+            .split('.')
+            .map(|s| s.parse::<u64>().unwrap_or(0))
+            .collect()
+    };
+    let pa = parse(a);
+    let pb = parse(b);
+    for i in 0..3 {
+        let sa = pa.get(i).copied().unwrap_or(0);
+        let sb = pb.get(i).copied().unwrap_or(0);
+        match sa.cmp(&sb) {
+            Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    Ordering::Equal
+}
 
 /// Get the path to the .tiki directory in the current working directory
 #[tauri::command]
@@ -146,8 +168,8 @@ pub fn load_tiki_releases(tiki_path: Option<String>) -> Result<Vec<TikiRelease>,
         }
     }
 
-    // Sort by version (descending)
-    releases.sort_by(|a, b| b.version.cmp(&a.version));
+    // Sort by version (descending, semver-aware)
+    releases.sort_by(|a, b| cmp_semver(&b.version, &a.version));
 
     Ok(releases)
 }

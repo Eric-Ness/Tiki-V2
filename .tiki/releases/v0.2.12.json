@@ -1,0 +1,7 @@
+{
+  "version": "v0.2.12",
+  "status": "planning",
+  "issues": [120, 111],
+  "createdAt": "2026-02-20T00:00:00Z",
+  "description": "Bug fix and terminal improvements: semver sorting for release list, exit code propagation for terminal processes"
+}
