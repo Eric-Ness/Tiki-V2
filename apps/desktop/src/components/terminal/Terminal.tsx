@@ -246,6 +246,16 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
             return false; // Prevent xterm from processing
           }
 
+          // Ctrl+V: Standard paste (supports voice-to-text apps like Wispr)
+          if (e.ctrlKey && !e.shiftKey && e.key === 'v' && e.type === 'keydown') {
+            navigator.clipboard.readText().then((text) => {
+              if (text) {
+                xterm.paste(text);
+              }
+            });
+            return false; // Prevent xterm from processing
+          }
+
           return true; // Let xterm handle all other keys
         });
 
