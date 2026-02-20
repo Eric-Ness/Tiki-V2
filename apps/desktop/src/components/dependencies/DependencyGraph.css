@@ -1,0 +1,272 @@
+.dependency-graph {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Toolbar with release selector */
+.dependency-graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary, #383850);
+  background: var(--bg-secondary, #1e1e2e);
+  flex-shrink: 0;
+}
+
+.dependency-graph-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+}
+
+.dependency-graph-select {
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--bg-primary, #0d1117);
+  color: var(--text-primary, #e0e0e0);
+  border: 1px solid var(--border-primary, #383850);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.dependency-graph-select:focus {
+  border-color: var(--accent-primary, #58a6ff);
+}
+
+/* Toolbar buttons */
+.dependency-graph-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-primary, #0d1117);
+  color: var(--text-secondary, #888);
+  border: 1px solid var(--border-primary, #383850);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.dependency-graph-btn:hover {
+  background: var(--bg-hover, #2a2a3e);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.dependency-graph-btn-active {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+/* Graph container fills remaining space */
+.dependency-graph-container {
+  flex: 1;
+  position: relative;
+}
+
+/* No-dependencies banner overlay */
+.dependency-graph-no-deps-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-primary, #383850);
+  border-radius: 6px;
+}
+
+/* Empty / loading states */
+.dependency-graph-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #888);
+  gap: 8px;
+}
+
+.dependency-graph-empty h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+  margin: 0;
+}
+
+.dependency-graph-empty p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.dependency-graph-error {
+  color: var(--status-failed, #f85149);
+}
+
+/* Override React Flow theme to match Tiki */
+.dependency-graph .react-flow__background {
+  background-color: var(--bg-primary, #0d1117);
+}
+
+.dependency-graph .react-flow__controls {
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-primary, #383850);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.dependency-graph .react-flow__controls-button {
+  background: var(--bg-secondary, #1e1e2e);
+  border-color: var(--border-primary, #383850);
+  fill: var(--text-secondary, #888);
+}
+
+.dependency-graph .react-flow__controls-button:hover {
+  background: var(--bg-hover, #2a2a3e);
+}
+
+.dependency-graph .react-flow__edge-path {
+  stroke: var(--text-secondary, #555);
+  stroke-width: 2;
+}
+
+.dependency-graph .react-flow__background pattern circle {
+  fill: var(--border-primary, #383850);
+}
+
+/* Legend */
+.dependency-graph-legend {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-primary, #383850);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  z-index: 5;
+}
+
+.dependency-graph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dependency-graph-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot-open {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.legend-dot-executing {
+  background: #60a5fa;
+}
+
+.legend-dot-completed {
+  background: #22c55e;
+}
+
+.legend-dot-failed {
+  background: #ef4444;
+}
+
+.legend-dot-critical {
+  background: #f59e0b;
+}
+
+/* Critical path node highlighting */
+.critical-path-node .issue-node {
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+  border-color: #f59e0b;
+}
+
+.dimmed-node .issue-node {
+  opacity: 0.4;
+}
+
+/* Cycle warning banner */
+.dependency-graph-cycle-warning {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+}
+
+/* Light theme overrides */
+[data-theme="light"] .dependency-graph-toolbar {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .dependency-graph-select {
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #1f2328);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .dependency-graph .react-flow__background {
+  background-color: var(--bg-primary, #ffffff);
+}
+
+[data-theme="light"] .dependency-graph .react-flow__controls {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .dependency-graph .react-flow__controls-button {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+  fill: var(--text-secondary, #656d76);
+}
+
+[data-theme="light"] .dependency-graph .react-flow__edge-path {
+  stroke: var(--text-secondary, #656d76);
+}
+
+[data-theme="light"] .dependency-graph-legend {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .legend-dot-open {
+  background: #8b949e;
+}
+
+[data-theme="light"] .dependency-graph-no-deps-banner {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .dependency-graph-btn {
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-secondary, #656d76);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .dependency-graph-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #1f2328);
+}

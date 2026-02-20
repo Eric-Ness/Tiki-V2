@@ -1,7 +1,18 @@
 {
   "version": "v0.2.12",
-  "status": "planning",
-  "issues": [120, 111],
+  "status": "completed",
+  "completedAt": "2026-02-20T00:00:00.000Z",
+  "tag": "v0.2.12",
+  "issues": [
+    {
+      "number": 120,
+      "title": "Release list sorts versions lexicographically instead of by semver"
+    },
+    {
+      "number": 111,
+      "title": "Terminal exit code propagation"
+    }
+  ],
   "createdAt": "2026-02-20T00:00:00Z",
   "description": "Bug fix and terminal improvements: semver sorting for release list, exit code propagation for terminal processes"
 }

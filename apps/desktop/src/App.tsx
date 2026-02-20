@@ -14,6 +14,7 @@ import { TerminalPane } from "./components/terminal";
 import { IssueDetail, PullRequestDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
+import { DependencyGraph } from "./components/dependencies/DependencyGraph";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
@@ -306,6 +307,9 @@ function App() {
         } else if (e.key === '2') {
           e.preventDefault();
           useLayoutStore.getState().setActiveView('kanban');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          useLayoutStore.getState().setActiveView('dependencies');
         } else if (e.key === ',') {
           e.preventDefault();
           useLayoutStore.getState().setActiveView('settings');
@@ -435,6 +439,9 @@ function App() {
               </section>
               <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
                 <KanbanBoard />
+              </section>
+              <section className={`section terminal-section ${activeView !== 'dependencies' ? 'hidden' : ''}`}>
+                <DependencyGraph />
               </section>
               <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>
                 <SettingsPage />

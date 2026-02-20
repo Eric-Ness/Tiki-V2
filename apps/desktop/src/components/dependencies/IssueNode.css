@@ -1,0 +1,106 @@
+.issue-node {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-primary, #383850);
+  border-left: 3px solid var(--border-primary, #383850);
+  min-width: 160px;
+  max-width: 220px;
+  cursor: default;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.issue-node:hover {
+  border-color: var(--text-secondary, #888);
+}
+
+/* Status-based left border coloring */
+.issue-node-pending,
+.issue-node-open {
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+.issue-node-executing {
+  border-left-color: #60a5fa;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.15);
+}
+
+.issue-node-completed,
+.issue-node-closed {
+  border-left-color: #22c55e;
+}
+
+.issue-node-failed {
+  border-left-color: #ef4444;
+}
+
+/* Header row with number and status */
+.issue-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.issue-node-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary, #888);
+}
+
+/* Status badge */
+.issue-node-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.issue-node-status-pending,
+.issue-node-status-open {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.issue-node-status-executing {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.issue-node-status-completed,
+.issue-node-status-closed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.issue-node-status-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.issue-node-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #e0e0e0);
+  line-height: 1.3;
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .issue-node {
+  background: var(--bg-secondary, #f6f8fa);
+  border-color: var(--border-primary, #d0d7de);
+}
+
+[data-theme="light"] .issue-node-pending,
+[data-theme="light"] .issue-node-open {
+  border-left-color: #8b949e;
+}
+
+[data-theme="light"] .issue-node-status-pending,
+[data-theme="light"] .issue-node-status-open {
+  background: rgba(0, 0, 0, 0.06);
+  color: #656d76;
+}

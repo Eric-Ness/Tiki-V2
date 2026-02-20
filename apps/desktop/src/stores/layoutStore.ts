@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 // View types for center panel
-export type ViewType = 'terminal' | 'kanban' | 'settings';
+export type ViewType = 'terminal' | 'kanban' | 'dependencies' | 'settings';
 
 // Default panel sizes (percentages)
 const DEFAULT_SIZES = {

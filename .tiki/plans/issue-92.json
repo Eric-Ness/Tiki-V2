@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 92,
+    "title": "Issue dependency graph visualization",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/92"
+  },
+  "createdAt": "2026-02-20T01:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "A 'Dependencies' tab exists in the main panel alongside Terminal and Kanban" },
+    { "id": "SC2", "category": "Functional", "criterion": "Users can select a release and see its issues as a directed graph" },
+    { "id": "SC3", "category": "Functional", "criterion": "Nodes display issue number and abbreviated title" },
+    { "id": "SC4", "category": "Functional", "criterion": "Edges correctly represent 'depends on' relationships parsed from issue bodies" },
+    { "id": "SC5", "category": "Visual", "criterion": "Nodes are color-coded by work status (pending, executing, completed, failed)" },
+    { "id": "SC6", "category": "Visual", "criterion": "Critical path through the graph is visually highlighted" },
+    { "id": "SC7", "category": "Visual", "criterion": "Graph works in both light and dark themes" },
+    { "id": "SC8", "category": "UX", "criterion": "Graceful empty/fallback states when no release selected or no dependencies exist" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Tab infrastructure and placeholder component",
+      "status": "completed",
+      "completedAt": "2026-02-20T01:10:00.000Z",
+      "summary": "Added 'dependencies' to ViewType, added tab to CenterTabs with Ctrl+3 shortcut, added section in App.tsx, created placeholder DependencyGraph component and CSS. Build passes.",
+      "content": "Add the Dependencies tab to the main panel tab system.\n\n1. In `apps/desktop/src/stores/layoutStore.ts`, add `'dependencies'` to the `ViewType` union type.\n2. In `apps/desktop/src/components/layout/CenterTabs.tsx`, add a new entry to the `TABS` array: `{ id: 'dependencies', label: 'Dependencies', shortcut: 'Ctrl+3' }`.\n3. In `apps/desktop/src/App.tsx`:\n   - Add a new `<section>` for the dependencies view following the existing pattern (conditional `hidden` class based on `activeView`).\n   - Add `Ctrl+3` keyboard shortcut in the `handleKeyDown` function to switch to the dependencies view.\n4. Create `apps/desktop/src/components/dependencies/DependencyGraph.tsx` with a placeholder that says 'Dependency Graph - Coming Soon'.\n5. Create `apps/desktop/src/components/dependencies/DependencyGraph.css` with basic container styling.",
+      "verification": [
+        "The 'Dependencies' tab appears in the tab bar between Kanban and Settings",
+        "Clicking the tab switches to the dependencies panel",
+        "Ctrl+3 keyboard shortcut switches to the dependencies panel",
+        "pnpm build passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": [
+        "apps/desktop/src/stores/layoutStore.ts",
+        "apps/desktop/src/components/layout/CenterTabs.tsx",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Install React Flow and build basic graph with mock data",
+      "status": "completed",
+      "completedAt": "2026-02-20T01:20:00.000Z",
+      "summary": "Installed @xyflow/react and dagre. Created IssueNode custom component with number+title display. Built DependencyGraph with dagre auto-layout (TB direction) and mock data (5 nodes, 4 edges). Used type alias instead of interface for IssueNodeData to satisfy tsc -b Record<string,unknown> constraint. Added React Flow theme overrides. Build passes.",
+      "content": "Install the graph visualization library and create the core graph rendering component with mock data.\n\n1. Install dependencies in `apps/desktop/`: `pnpm add @xyflow/react dagre @types/dagre`\n2. Create a custom node component `apps/desktop/src/components/dependencies/IssueNode.tsx`:\n   - Display issue number (e.g., `#92`) prominently\n   - Display abbreviated title (truncate at ~30 chars)\n   - Style with a card-like appearance using CSS variables for theming\n   - Accept a `status` data field for future color-coding\n3. Create `apps/desktop/src/components/dependencies/IssueNode.css` for node styling.\n4. Update `DependencyGraph.tsx` to:\n   - Import and configure ReactFlow with dagre layout\n   - Create a `getLayoutedElements` function using dagre to auto-position nodes in a top-to-bottom DAG layout\n   - Render a hardcoded mock graph (5 nodes, 4 edges) to validate the setup\n   - Include ReactFlow controls (zoom, fit view)\n   - Register the custom IssueNode type\n5. Update `DependencyGraph.css` with ReactFlow container styles (must set explicit height).",
+      "verification": [
+        "Dependencies tab shows a rendered graph with mock nodes and edges",
+        "Nodes display issue number and title",
+        "Dagre automatically positions nodes in a top-to-bottom layout",
+        "Graph supports pan and zoom",
+        "pnpm build passes"
+      ],
+      "addressesCriteria": ["SC3"],
+      "files": [
+        "apps/desktop/package.json",
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css",
+        "apps/desktop/src/components/dependencies/IssueNode.tsx",
+        "apps/desktop/src/components/dependencies/IssueNode.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Release selector and dependency data extraction",
+      "status": "completed",
+      "completedAt": "2026-02-20T01:35:00.000Z",
+      "summary": "Created parseDependencies.ts utility (regex: depends on/blocked by/requires/after #N). Created useDependencyGraph hook that fetches issue bodies via invoke, parses deps, and builds layouted nodes+edges. Added release selector dropdown with active-first sorting. Added loading/empty/error states. Used getActiveProject() from projects store. Simplified DependencyGraph to pass nodes/edges directly to ReactFlow (no useNodesState needed for read-only display). Build passes.",
+      "content": "Add a release selector dropdown and build the data pipeline to extract dependency relationships from issue bodies.\n\n1. Add a release selector at the top of the DependencyGraph component:\n   - Dropdown listing all releases from `useTikiReleasesStore`\n   - Auto-select the most recent active release if one exists\n   - Show release version and issue count in dropdown options\n2. Create a utility function `parseDependencies(body: string, releaseIssueNumbers: number[]): number[]` in `apps/desktop/src/components/dependencies/parseDependencies.ts`:\n   - Parse issue bodies using the regex: `/(?:depends on|blocked by|requires|after)\\s+#(\\d+)/gi`\n   - Only return dependencies that are within the selected release's issue set\n   - Return array of issue numbers that this issue depends on\n3. Create a custom hook `useDependencyGraph(releaseVersion: string | null)` in `apps/desktop/src/components/dependencies/useDependencyGraph.ts`:\n   - Fetch the release's issue list from the tiki releases store\n   - For each issue, fetch the full issue details (including body) using `invoke('fetch_github_issue_by_number')`\n   - Parse dependencies from each issue body\n   - Build React Flow nodes and edges arrays\n   - Return `{ nodes, edges, isLoading, error }`\n4. Wire up the hook in DependencyGraph.tsx, replacing mock data with real data.\n5. Add loading and empty states.",
+      "verification": [
+        "Release selector dropdown shows available releases",
+        "Selecting a release fetches issue data and renders the graph",
+        "Dependencies parsed from issue bodies are shown as edges",
+        "Loading spinner shows while fetching issue data",
+        "Empty state shows when release has no dependencies",
+        "pnpm build passes"
+      ],
+      "addressesCriteria": ["SC2", "SC4", "SC8"],
+      "files": [
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css",
+        "apps/desktop/src/components/dependencies/parseDependencies.ts",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Status color-coding and theme support",
+      "status": "completed",
+      "completedAt": "2026-02-20T01:50:00.000Z",
+      "summary": "Added status resolution: checks activeWork for executing/failed/completed, then recentIssues for completed, falls back to GitHub state. IssueNode now shows colored left border + status badge (pending=gray, executing=blue, completed=green, failed=red). Added directional arrow markers on edges via MarkerType.ArrowClosed. Added status legend overlay. Full light theme overrides for toolbar, graph, controls, legend, nodes. Build passes.",
+      "content": "Color-code graph nodes by issue work status and ensure full light/dark theme support.\n\n1. Update `IssueNode.tsx` to accept and display status:\n   - Map issue status to colors: pending (gray), executing (blue/pulsing), completed (green), failed (red)\n   - Add a colored left border or background tint to indicate status\n   - Add a small status indicator dot or icon\n2. Update `useDependencyGraph.ts` to resolve issue status:\n   - Check `useTikiStateStore` for active work status (`issue:N`)\n   - Check GitHub issue state (open/closed) as fallback\n   - Check `recentIssues` in state history for completed status\n   - Pass status as node data\n3. Style edges with arrow markers (directional arrows showing dependency direction).\n4. Update `IssueNode.css` and `DependencyGraph.css` for theme support:\n   - Use existing CSS variables (`--bg-primary`, `--bg-secondary`, `--text-primary`, etc.)\n   - Override React Flow's default theme colors to match Tiki's theme\n   - Test both light and dark themes\n5. Add a legend showing what each status color means.",
+      "verification": [
+        "Nodes display different colors based on issue status",
+        "Completed issues show green, executing shows blue, failed shows red",
+        "Edges have directional arrows",
+        "Graph looks correct in both dark and light themes",
+        "Legend is visible and accurate",
+        "pnpm build passes"
+      ],
+      "addressesCriteria": ["SC5", "SC7"],
+      "files": [
+        "apps/desktop/src/components/dependencies/IssueNode.tsx",
+        "apps/desktop/src/components/dependencies/IssueNode.css",
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Critical path highlighting and polish",
+      "status": "completed",
+      "completedAt": "2026-02-20T02:00:00.000Z",
+      "summary": "Created criticalPath.ts with topological sort + longest-path DP algorithm with cycle detection. Added Critical Path toggle button and Fit View button to toolbar. Critical path edges highlighted in amber with animation, non-critical dimmed. Critical path nodes get glow, non-critical dimmed. Cycle detection shows warning banner. Wrapped component in ReactFlowProvider. Added legend entry for critical path. Full light theme support for new elements. Build passes.",
+      "content": "Implement critical path calculation and final polish.\n\n1. Create `apps/desktop/src/components/dependencies/criticalPath.ts`:\n   - Implement longest-path algorithm on the DAG\n   - The critical path is the longest chain of dependencies from any root to any leaf\n   - Return the set of node IDs and edge IDs on the critical path\n2. Update `DependencyGraph.tsx` to highlight the critical path:\n   - Add a toggle button 'Show Critical Path' in the toolbar\n   - When active, highlight critical path edges (thicker, brighter color) and dim non-critical edges\n   - Highlight critical path nodes with a subtle glow or border\n3. Handle edge cases:\n   - Releases with zero issues: show friendly empty state\n   - All issues independent (no edges): show nodes in a grid layout with message 'No dependencies found'\n   - Circular dependencies: detect and show warning, render what we can\n   - Single issue: show single node centered\n4. Add a 'Fit View' button to reset the viewport.\n5. Polish animations: smooth transitions when switching releases or toggling critical path.",
+      "verification": [
+        "Critical path is visually distinct from other paths",
+        "Toggle button enables/disables critical path highlighting",
+        "Empty state renders gracefully for releases with no issues",
+        "No-dependency state shows nodes without edges",
+        "Circular dependency detection shows a warning",
+        "Fit View button works",
+        "pnpm build passes"
+      ],
+      "addressesCriteria": ["SC6", "SC8"],
+      "files": [
+        "apps/desktop/src/components/dependencies/criticalPath.ts",
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css"
+      ],
+      "dependencies": [4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [3],
+    "SC3": [2],
+    "SC4": [3],
+    "SC5": [4],
+    "SC6": [5],
+    "SC7": [4],
+    "SC8": [3, 5]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": "v0.2.13",
+  "status": "active",
+  "issues": [
+    {
+      "number": 92,
+      "title": "Issue dependency graph visualization"
+    }
+  ],
+  "createdAt": "2026-02-20T00:00:00.000Z",
+  "description": "Issue dependency graph visualization"
+}

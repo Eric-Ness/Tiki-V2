@@ -10,6 +10,7 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   { id: 'terminal', label: 'Terminal', shortcut: 'Ctrl+1' },
   { id: 'kanban', label: 'Kanban', shortcut: 'Ctrl+2' },
+  { id: 'dependencies', label: 'Dependencies', shortcut: 'Ctrl+3' },
 ];
 
 export function CenterTabs() {
