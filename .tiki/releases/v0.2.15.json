@@ -1,0 +1,20 @@
+{
+  "version": "v0.2.15",
+  "status": "active",
+  "issues": [
+    {
+      "number": 129,
+      "title": "Persisted terminal tabs reference dead PTY sessions on app restart"
+    },
+    {
+      "number": 130,
+      "title": "Kanban routes `failed` and `paused` to Review column — drag-back triggers full yolo"
+    },
+    {
+      "number": 131,
+      "title": "`cleanup_stale_tmp_files` never cleans `state.json.tmp` — extension mismatch"
+    }
+  ],
+  "createdAt": "2026-05-08T20:27:00.000Z",
+  "description": "Reliability fixes: terminal PTY hydration on restart, kanban status differentiation between failed/paused/reviewing, and stale temp file cleanup."
+}
