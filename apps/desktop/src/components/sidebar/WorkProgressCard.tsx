@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { WorkContext, PhaseStatus, PipelineStep } from "../work/WorkCard";
+import { useProjectsStore } from "../../stores";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./WorkProgressCard.css";
@@ -51,6 +52,7 @@ function getPhaseSegmentStatus(
 export function WorkProgressCard({ work }: WorkProgressCardProps) {
   const isIssue = work.type === "issue";
   const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
+  const activeProject = useProjectsStore((state) => state.getActiveProject());
 
   // Extract issue-specific fields with proper type narrowing
   const issueNumber = work.type === "issue" ? work.issue.number : undefined;
@@ -72,10 +74,11 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
   // Load plan for phase duration data
   useEffect(() => {
     if (!issueNumber || !showPhaseProgress) return;
-    invoke<{ phases: PlanPhase[] } | null>("get_plan", { issueNumber })
+    const tikiPath = activeProject?.path ? `${activeProject.path}/.tiki` : undefined;
+    invoke<{ phases: PlanPhase[] } | null>("get_plan", { issueNumber, tikiPath })
       .then((plan) => setPlanPhases(plan?.phases ?? []))
       .catch(() => setPlanPhases([]));
-  }, [issueNumber, showPhaseProgress, currentPhase]);
+  }, [issueNumber, showPhaseProgress, currentPhase, activeProject?.path]);
 
   // Find executing phase's startedAt for live timer
   const executingPhase = planPhases.find((p) => p.status === "executing");
