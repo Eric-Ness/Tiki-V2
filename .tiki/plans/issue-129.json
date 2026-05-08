@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 129,
+    "title": "Persisted terminal IDs survive restart but PTYs don't — terminals stuck on \"Connecting...\"",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/129"
+  },
+  "createdAt": "2026-05-08T20:30:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "reliability",
+      "description": "Persisted tabs use fresh terminal IDs on every load, so the Terminal component can always create new PTY sessions without collisions"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Tab restoration still works — count, titles, cwd, split layout, and active-leaf position are preserved across restart"
+    },
+    {
+      "id": "SC3",
+      "category": "reliability",
+      "description": "activeTerminalId always points at a real leaf in the regenerated splitRoot tree (no dangling reference)"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "pnpm build from the repo root passes (tsc -b across packages)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Regenerate leaf terminalIds in partialize before persistence",
+      "status": "pending",
+      "content": "Modify the `partialize` callback in `apps/desktop/src/stores/terminalStore.ts` so the snapshot written to localStorage no longer carries the live PTY session IDs from the in-memory `splitRoot` tree.\n\nDesign:\n1. Add a recursive helper `regenerateLeafIds(node: SplitTreeNode): SplitTreeNode` (free function above the store, near `getTerminalIds`/`removeFromTree`). It returns a new tree where every leaf has a fresh `terminalId` from `generateId()` and split branches are deep-cloned with their `direction`/`sizes`/`id` preserved (split-node IDs are local React-keying tokens and don't matter for PTY lookup; preserving them keeps diffs stable).\n2. Add a helper `firstLeafId(node: SplitTreeNode): string` that returns the `terminalId` of the first leaf encountered in a depth-first walk.\n3. In `partialize`, for each tab: build `splitRoot = regenerateLeafIds(t.splitRoot)`, then set `activeTerminalId = firstLeafId(splitRoot)`. Keep the existing `status: 'starting'` reset.\n\nWhy first-leaf for activeTerminalId: tracking the old activeTerminalId's path through the tree and picking the leaf at the same path in the regenerated tree would also work, but the simpler first-leaf strategy is fine — when the user reopens a tab post-restart, all PTYs are starting fresh anyway, so which split is initially focused is cosmetic. The locked design decision in the issue explicitly allows either approach.\n\nDo NOT bump the persist `version` (currently 2). The change is purely in what we *write*; the *shape* of the persisted state is unchanged, so older v2 snapshots already in localStorage load correctly through the normal path (they'll have stale IDs for one boot, but the next save will regenerate them). The `migrate` function is left untouched.",
+      "verification": [
+        "regenerateLeafIds is a recursive function that replaces every leaf's terminalId with generateId() output",
+        "firstLeafId returns the terminalId of the first leaf via depth-first traversal",
+        "partialize calls regenerateLeafIds on each tab's splitRoot and sets activeTerminalId to firstLeafId of the new tree",
+        "status is still reset to 'starting' in partialize",
+        "version remains 2; migrate is unchanged",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src/stores/terminalStore.ts"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}

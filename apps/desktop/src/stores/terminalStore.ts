@@ -154,6 +154,28 @@ const getTerminalIds = (node: SplitTreeNode): string[] => {
   return node.children.flatMap(getTerminalIds);
 };
 
+// Helper to deep-clone a split tree, replacing every leaf's terminalId with a
+// fresh ID. Used in `partialize` so persisted PTY session IDs don't survive a
+// process restart (the Rust TerminalManager's PTY sessions don't survive, so
+// reusing the old IDs leaves the Terminal component stuck on "Connecting...").
+const regenerateLeafIds = (node: SplitTreeNode): SplitTreeNode => {
+  if (node.type === 'terminal') {
+    return { type: 'terminal', terminalId: generateId() };
+  }
+  return {
+    ...node,
+    children: node.children.map(regenerateLeafIds),
+  };
+};
+
+// Helper to return the terminalId of the first leaf in a depth-first walk.
+const firstLeafId = (node: SplitTreeNode): string => {
+  if (node.type === 'terminal') {
+    return node.terminalId;
+  }
+  return firstLeafId(node.children[0]);
+};
+
 // Terminal focus function registry (not persisted, not reactive)
 const terminalFocusFns = new Map<string, () => void>();
 
@@ -474,14 +496,22 @@ export const useTerminalStore = create<TerminalStore>()(
     {
       name: 'tiki-terminals',
       version: 2,
-      // Only persist tab metadata, not connection state
+      // Only persist tab metadata, not connection state.
+      // Regenerate every leaf's terminalId on persist so the next load starts
+      // with fresh IDs that can never collide with anything in the Rust
+      // TerminalManager (PTY sessions don't survive process restart).
       partialize: (state) => {
         const serialized: Record<string, TerminalTab[]> = {};
         for (const [projectId, tabs] of Object.entries(state.tabsByProject)) {
-          serialized[projectId] = tabs.map((t) => ({
-            ...t,
-            status: 'starting' as TerminalStatus, // Reset status on reload
-          }));
+          serialized[projectId] = tabs.map((t) => {
+            const splitRoot = regenerateLeafIds(t.splitRoot);
+            return {
+              ...t,
+              splitRoot,
+              activeTerminalId: firstLeafId(splitRoot),
+              status: 'starting' as TerminalStatus, // Reset status on reload
+            };
+          });
         }
         return {
           tabsByProject: serialized,
