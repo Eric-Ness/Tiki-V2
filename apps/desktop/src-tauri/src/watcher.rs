@@ -1,8 +1,9 @@
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 /// Global state for the watcher - allows switching projects
@@ -120,6 +121,12 @@ fn start_watcher_internal(
 
     log::info!("Watching .tiki directory for changes: {:?}", tiki_path);
 
+    // Leading-edge debounce: a single atomic write produces 3-5 raw notify
+    // events; we coalesce them per logical target so the frontend gets one
+    // reload instead of a storm. Bounded by issue/release cardinality.
+    let mut last_emissions: HashMap<String, Instant> = HashMap::new();
+    const DEBOUNCE: Duration = Duration::from_millis(50);
+
     // Process events
     loop {
         // Check for stop signal (non-blocking)
@@ -132,9 +139,13 @@ fn start_watcher_internal(
         match rx.recv_timeout(Duration::from_millis(500)) {
             Ok(Ok(event)) => {
                 if let Some(file_event) = process_event(&event) {
-                    log::info!("Tiki file changed: {:?}", file_event);
-                    if let Err(e) = app_handle.emit("tiki-file-changed", file_event) {
-                        log::error!("Failed to emit event: {}", e);
+                    if should_emit(&mut last_emissions, &file_event, DEBOUNCE) {
+                        log::info!("Tiki file changed: {:?}", file_event);
+                        if let Err(e) = app_handle.emit("tiki-file-changed", file_event) {
+                            log::error!("Failed to emit event: {}", e);
+                        }
+                    } else {
+                        log::debug!("Debounced duplicate event: {:?}", file_event);
                     }
                 }
             }
@@ -152,6 +163,35 @@ fn start_watcher_internal(
     }
 
     Ok(())
+}
+
+/// Stable debounce key per logical event target. Different targets debounce
+/// independently so a fast plan write right after a state write isn't dropped.
+fn debounce_key(file_event: &TikiFileEvent) -> String {
+    match file_event {
+        TikiFileEvent::StateChanged => "state".to_string(),
+        TikiFileEvent::PlanChanged { issue_number } => format!("plan-{}", issue_number),
+        TikiFileEvent::ReleaseChanged { version } => format!("release-{}", version),
+    }
+}
+
+/// Leading-edge debounce check. Returns true if this event should be emitted
+/// (and records the emission); false if it falls within the debounce window
+/// of a prior emission for the same key.
+fn should_emit(
+    last_emissions: &mut HashMap<String, Instant>,
+    file_event: &TikiFileEvent,
+    debounce: Duration,
+) -> bool {
+    let key = debounce_key(file_event);
+    let now = Instant::now();
+    match last_emissions.get(&key) {
+        Some(t) if now.duration_since(*t) < debounce => false,
+        _ => {
+            last_emissions.insert(key, now);
+            true
+        }
+    }
 }
 
 /// Process a file system event and determine what Tiki event to emit

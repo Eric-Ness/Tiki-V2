@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 128,
+    "title": "File watcher emits StateChanged on every raw event — no debounce, IPC storms",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/128"
+  },
+  "createdAt": "2026-05-08T20:23:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "reliability",
+      "description": "A single logical write to state.json or a plan file produces at most one IPC event to the frontend"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Different event keys (state vs plan-N vs release-V) are debounced independently — a fast plan write after a state write is not dropped"
+    },
+    {
+      "id": "SC3",
+      "category": "reliability",
+      "description": "Debounce window is short enough (~50ms) that legitimate back-to-back updates from the framework still produce visible UI updates"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "cargo check passes with no warnings beyond pre-existing"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add per-key leading-edge debouncer to the watcher event loop",
+      "status": "pending",
+      "content": "Add leading-edge debouncing to `apps/desktop/src-tauri/src/watcher.rs`. The current event loop emits an IPC `tiki-file-changed` event for every raw notify event, causing 3-5 redundant frontend reads per atomic write.\n\nDesign:\n1. Add a small free function `debounce_key(file_event: &TikiFileEvent) -> String` that produces a stable key per logical target:\n   - `StateChanged` → `\"state\"`\n   - `PlanChanged { issue_number }` → `\"plan-{issue_number}\"`\n   - `ReleaseChanged { version }` → `\"release-{version}\"`\n2. Add a free function `should_emit(last_emissions: &mut HashMap<String, Instant>, file_event: &TikiFileEvent, debounce: Duration) -> bool` that:\n   - Looks up the entry by `debounce_key`\n   - Returns `false` if the last emission for that key was within `debounce` (caller skips emit)\n   - Otherwise updates the map with `Instant::now()` and returns `true`\n3. In `start_watcher_internal`, declare `let mut last_emissions: HashMap<String, Instant> = HashMap::new();` and `const DEBOUNCE: Duration = Duration::from_millis(50);` before the recv loop.\n4. In the `Ok(Ok(event))` arm, wrap the existing `if let Some(file_event)` block to gate the `app_handle.emit` call on `should_emit(...)`. Add `log::debug!` for the suppressed case so the debounce is observable in logs.\n\nLeading-edge (not trailing-edge) is the right shape: the frontend sees the first signal immediately, and #127's `read_json_resilient` already absorbs the rare race where the first event arrives mid-rename. Trailing-edge would add 50ms to every update.\n\nImports needed:\n- `std::collections::HashMap`\n- `std::time::Instant` (Duration is already imported)\n\nThe HashMap is bounded by issue/release cardinality (small, finite per project), so no cleanup pass is needed.",
+      "verification": [
+        "watcher.rs declares `last_emissions: HashMap<String, Instant>` and `const DEBOUNCE: Duration` in start_watcher_internal",
+        "should_emit gates the app_handle.emit call",
+        "debounce_key produces distinct keys per StateChanged / PlanChanged / ReleaseChanged",
+        "Suppressed events are logged at debug level",
+        "cargo check from apps/desktop/src-tauri passes",
+        "pnpm build from root passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src-tauri/src/watcher.rs"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}
