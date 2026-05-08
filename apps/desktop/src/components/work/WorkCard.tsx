@@ -31,14 +31,19 @@ export interface IssueContext {
   parentRelease?: string;
 }
 
-export interface ReleaseContext {
-  type: "release";
+export interface ReleaseInfo {
   version: string;
   issues: number[];
+  currentIssue?: number;
+  completedIssues?: number[];
+  milestone?: string;
+}
+
+export interface ReleaseContext {
+  type: "release";
+  release: ReleaseInfo;
   status: WorkStatus;
   pipelineStep?: PipelineStep;
-  currentIssue?: number;
-  completedIssues: number[];
   createdAt: string;
   lastActivity?: string;
 }
@@ -66,7 +71,7 @@ export function WorkCard({ work }: WorkCardProps) {
             <span className="title">{work.issue.title || `Issue #${work.issue.number}`}</span>
           </>
         ) : (
-          <span className="version">{work.version}</span>
+          <span className="version">{work.release.version}</span>
         )}
       </div>
 
@@ -87,11 +92,11 @@ export function WorkCard({ work }: WorkCardProps) {
       {!isIssue && (
         <div className="release-progress">
           <span>
-            {work.completedIssues.length} / {work.issues.length} issues
+            {work.release.completedIssues?.length ?? 0} / {work.release.issues.length} issues
             completed
           </span>
-          {work.currentIssue && (
-            <span className="current">Working on #{work.currentIssue}</span>
+          {work.release.currentIssue && (
+            <span className="current">Working on #{work.release.currentIssue}</span>
           )}
         </div>
       )}
