@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 127,
+    "title": "`get_state` reads state.json mid-write — silent JSON parse failures",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/127"
+  },
+  "createdAt": "2026-05-08T20:15:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "reliability",
+      "description": "Transient read failures during atomic-write race conditions retry instead of bubbling up as silent frontend errors"
+    },
+    {
+      "id": "SC2",
+      "category": "reliability",
+      "description": "Legitimate missing-file case (no state.json yet) still returns Ok(None) without delay"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Same fix applies to get_plan (same race pattern for plan files written by /tiki:execute)"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "cargo check and pnpm build pass with no regressions"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add read_json_resilient helper to fs_utils.rs",
+      "status": "pending",
+      "content": "Add a generic helper `read_json_resilient<T: DeserializeOwned>(path: &Path) -> Result<Option<T>, String>` to `apps/desktop/src-tauri/src/fs_utils.rs`.\n\nBehavior:\n1. If `path.exists()` returns false, return `Ok(None)` immediately (fast path for legitimate missing-file case — no retry, no delay).\n2. Otherwise, attempt up to 3 reads with 25ms sleep between attempts.\n3. On each attempt: try `read_to_string` then `serde_json::from_str::<T>`. Return `Ok(Some(parsed))` on success.\n4. On NotFound errors mid-read (file disappeared during a rename), retry. On parse errors, retry. On other read errors, retry.\n5. After all attempts fail, return `Err` with the last error message including which attempt failed and why.\n6. Log each retry at warn level for diagnosability.\n\nImports needed:\n- `use serde::de::DeserializeOwned;`\n- `use std::time::Duration;` (already imported as crate uses chrono — verify)\n\nThe helper handles three real race conditions during atomic writes:\n- File temporarily missing between exists() check and open\n- Windows ERROR_SHARING_VIOLATION during MoveFileEx rename\n- Partial JSON readable between write and rename in unusual filesystem states",
+      "verification": [
+        "fs_utils.rs contains `pub fn read_json_resilient<T: DeserializeOwned>` definition",
+        "Function returns Ok(None) immediately when path doesn't exist",
+        "Function retries up to 3 times with 25ms sleep on read or parse failures",
+        "Function logs each retry at warn level",
+        "cargo check passes from apps/desktop/src-tauri"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Refactor get_state and get_plan to use read_json_resilient",
+      "status": "pending",
+      "content": "Update `apps/desktop/src-tauri/src/commands.rs` so that `get_state` and `get_plan` delegate their file read + parse logic to the new `fs_utils::read_json_resilient` helper.\n\nChanges:\n1. `get_state` (around line 39): replace the existence check + `read_to_string` + `from_str` block (lines 50-58) with a single call to `fs_utils::read_json_resilient::<TikiState>(&state_file)`.\n2. `get_plan` (around line 63): replace the equivalent block (lines 74-82) with `fs_utils::read_json_resilient::<TikiPlan>(&plan_file)`.\n3. Both functions retain their existing path-resolution logic (tiki_path argument or fall back to current_dir).\n\nThis closes the same race for plan reads since `/tiki:execute` rewrites plan files between phases and the Active Work sidebar reads them on watcher events.",
+      "verification": [
+        "get_state calls fs_utils::read_json_resilient::<TikiState>",
+        "get_plan calls fs_utils::read_json_resilient::<TikiPlan>",
+        "No direct read_to_string + serde_json::from_str pairs remain in get_state/get_plan",
+        "Existing path-resolution behavior preserved (tiki_path arg or current_dir fallback)",
+        "cargo check passes",
+        "pnpm build passes from root"
+      ],
+      "addressesCriteria": ["SC1", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1, 2],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [2]
+  }
+}

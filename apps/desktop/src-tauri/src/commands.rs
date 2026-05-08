@@ -34,7 +34,11 @@ pub fn get_tiki_path() -> Result<String, String> {
     Ok(tiki_path.to_string_lossy().to_string())
 }
 
-/// Read and return the current Tiki state
+/// Read and return the current Tiki state.
+///
+/// Uses `fs_utils::read_json_resilient` to absorb transient races against
+/// atomic writes by the framework (state.json is rewritten on every pipeline
+/// transition, and the watcher fires reads during the rename window).
 #[tauri::command]
 pub fn get_state(tiki_path: Option<String>) -> Result<Option<TikiState>, String> {
     let path = match tiki_path {
@@ -46,19 +50,13 @@ pub fn get_state(tiki_path: Option<String>) -> Result<Option<TikiState>, String>
     };
 
     let state_file = path.join("state.json");
-
-    if !state_file.exists() {
-        return Ok(None);
-    }
-
-    let content = std::fs::read_to_string(&state_file).map_err(|e| e.to_string())?;
-
-    let state: TikiState = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
-    Ok(Some(state))
+    fs_utils::read_json_resilient::<TikiState>(&state_file)
 }
 
-/// Read and return a plan for a specific issue
+/// Read and return a plan for a specific issue.
+///
+/// Uses the same resilient read as `get_state` since plan files are rewritten
+/// between phases by `/tiki:execute` and reads can race those writes.
 #[tauri::command]
 pub fn get_plan(issue_number: u32, tiki_path: Option<String>) -> Result<Option<TikiPlan>, String> {
     let path = match tiki_path {
@@ -70,16 +68,7 @@ pub fn get_plan(issue_number: u32, tiki_path: Option<String>) -> Result<Option<T
     };
 
     let plan_file = path.join("plans").join(format!("issue-{}.json", issue_number));
-
-    if !plan_file.exists() {
-        return Ok(None);
-    }
-
-    let content = std::fs::read_to_string(&plan_file).map_err(|e| e.to_string())?;
-
-    let plan: TikiPlan = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
-    Ok(Some(plan))
+    fs_utils::read_json_resilient::<TikiPlan>(&plan_file)
 }
 
 /// Open a native folder picker dialog and return the selected path

@@ -3,11 +3,12 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 125,
-      "title": "Hardcoded backslash in `.tiki` path construction breaks macOS/Linux",
-      "completedAt": "2026-05-08T20:09:00.000Z"
+      "number": 127,
+      "title": "`get_state` reads state.json mid-write — silent JSON parse failures",
+      "completedAt": "2026-05-08T20:18:00.000Z"
     },
     "recentIssues": [
+      { "number": 127, "title": "`get_state` reads state.json mid-write — silent JSON parse failures", "completedAt": "2026-05-08T20:18:00.000Z" },
       { "number": 125, "title": "Hardcoded backslash in `.tiki` path construction breaks macOS/Linux", "completedAt": "2026-05-08T20:09:00.000Z" },
       { "number": 126, "title": "`get_plan` invoked without tikiPath — reads plan from wrong project", "completedAt": "2026-05-08T20:07:00.000Z" },
       { "number": 124, "title": "Release work renders blank in sidebar/Active Work — frontend type doesn't match Rust shape", "completedAt": "2026-05-08T19:58:00.000Z" },

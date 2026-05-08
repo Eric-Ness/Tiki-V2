@@ -1,4 +1,67 @@
+use serde::de::DeserializeOwned;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+/// Read and JSON-parse a file with retry tolerance for atomic-write races.
+///
+/// Returns `Ok(None)` immediately if the path doesn't exist (the legitimate
+/// missing-file case — fresh project, plan not yet written, etc.).
+///
+/// If the path exists at entry, attempts up to 3 reads with 25ms backoff. The
+/// retry covers transient failures during atomic writes:
+/// - File momentarily missing between Windows MoveFileEx steps
+/// - ERROR_SHARING_VIOLATION while a writer holds the file
+/// - Partial JSON observable in unusual filesystem states
+///
+/// Worst-case added latency is ~50ms in the racy path; zero in the common
+/// success path.
+pub fn read_json_resilient<T: DeserializeOwned>(path: &Path) -> Result<Option<T>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    const MAX_ATTEMPTS: u32 = 3;
+    const RETRY_DELAY: Duration = Duration::from_millis(25);
+
+    let mut last_err: Option<String> = None;
+    for attempt in 1..=MAX_ATTEMPTS {
+        match std::fs::read_to_string(path) {
+            Ok(content) => match serde_json::from_str::<T>(&content) {
+                Ok(parsed) => return Ok(Some(parsed)),
+                Err(e) => {
+                    log::warn!(
+                        "read_json_resilient parse error on {:?} attempt {}: {}",
+                        path,
+                        attempt,
+                        e
+                    );
+                    last_err = Some(format!("parse error (attempt {}): {}", attempt, e));
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                log::warn!(
+                    "read_json_resilient: {:?} disappeared mid-read on attempt {}",
+                    path,
+                    attempt
+                );
+                last_err = Some(format!("file disappeared mid-read (attempt {})", attempt));
+            }
+            Err(e) => {
+                log::warn!(
+                    "read_json_resilient read error on {:?} attempt {}: {}",
+                    path,
+                    attempt,
+                    e
+                );
+                last_err = Some(format!("read error (attempt {}): {}", attempt, e));
+            }
+        }
+        if attempt < MAX_ATTEMPTS {
+            std::thread::sleep(RETRY_DELAY);
+        }
+    }
+    Err(last_err.unwrap_or_else(|| "unknown error".to_string()))
+}
 
 /// Atomically write content to a file by writing to a `.tmp` sibling first,
 /// then renaming. This prevents readers from seeing partial/corrupt JSON.
