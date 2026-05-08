@@ -1,6 +1,8 @@
 {
   "version": "v0.2.15",
-  "status": "active",
+  "status": "completed",
+  "completedAt": "2026-05-08T20:36:00.000Z",
+  "tag": "v0.2.15",
   "issues": [
     {
       "number": 129,
