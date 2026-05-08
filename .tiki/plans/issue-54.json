@@ -1,0 +1,56 @@
+{
+  "issueNumber": 54,
+  "title": "After shipped back to open in kanban",
+  "createdAt": "2026-02-05T09:05:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Extend tikiStateStore with history data",
+      "description": "Add recentIssues array to tikiStateStore to track completed issues for the Kanban completed column",
+      "status": "pending",
+      "tasks": [
+        "Add CompletedIssue interface with number, title, completedAt",
+        "Add recentIssues state to TikiStateState interface",
+        "Add setRecentIssues action to update the list",
+        "Initialize recentIssues as empty array"
+      ],
+      "verification": "tikiStateStore.ts exports recentIssues state and setRecentIssues action"
+    },
+    {
+      "id": 2,
+      "name": "Update App.tsx to sync history data",
+      "description": "Modify state loading to also sync history.recentIssues to tikiStateStore",
+      "status": "pending",
+      "tasks": [
+        "Update TikiState interface to include full recentIssues array",
+        "Call setRecentIssues when loading state",
+        "Call setRecentIssues when state changes (file watcher event)"
+      ],
+      "verification": "App.tsx syncs recentIssues to store on state load and change"
+    },
+    {
+      "id": 3,
+      "name": "Update KanbanBoard to show completed issues from history",
+      "description": "Modify the Completed column logic to use recentIssues (limited to 8) instead of relying on GitHub state",
+      "status": "pending",
+      "tasks": [
+        "Import recentIssues from useTikiStateStore",
+        "In columns memo, populate Completed column with first 8 items from recentIssues",
+        "Create synthetic GitHubIssue objects from recentIssues for display",
+        "Ensure completed issues don't appear in other columns"
+      ],
+      "verification": "Completed column shows last 8 completed issues from history"
+    },
+    {
+      "id": 4,
+      "name": "Build and verify",
+      "description": "Run typecheck and build to ensure no errors",
+      "status": "pending",
+      "tasks": [
+        "Run pnpm typecheck",
+        "Run pnpm build"
+      ],
+      "verification": "Build succeeds with no type errors"
+    }
+  ]
+}

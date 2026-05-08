@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 86,
+    "title": "Pull request integration panel",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/86"
+  },
+  "createdAt": "2026-02-09T12:00:00.000Z",
+  "successCriteria": [
+    "Rust backend can fetch PR list and PR detail via gh CLI",
+    "PRs section appears in the sidebar with PR cards showing number, title, state, draft status, and review decision",
+    "Clicking a PR card shows full PR detail in the detail panel (title, body, branch info, review status, CI checks, file stats)",
+    "Issue detail view shows linked PRs (PRs that reference the issue in body or branch name)",
+    "All new commands registered in lib.rs and types exported from stores/index.ts",
+    "cargo check and pnpm typecheck pass"
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Rust backend: PR fetch commands",
+      "description": "Add two new Tauri commands to github.rs for fetching pull requests via the gh CLI. 1) `fetch_github_prs` fetches a list of PRs using `gh pr list --json number,title,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,body,author --state <filter> --limit <limit>`. 2) `fetch_github_pr_detail` fetches a single PR by number using `gh pr view <number> --json number,title,body,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,author,additions,deletions,commits,files,reviews,checks`. Define Rust structs for: GitHubPullRequest (list item: number, title, state, headRefName, baseRefName, url, isDraft, reviewDecision, author, labels, body, statusCheckRollup), GitHubPrAuthor (login), GitHubPrDetail (extends list item with: additions, deletions, commits, files, reviews, checks), GitHubPrFile (path, additions, deletions), GitHubPrReview (author, state, body), GitHubPrCheck (name, status, conclusion, detailsUrl). Use the same error handling pattern as fetch_github_issues (check for NotFound, auth errors, repo errors). Use `#[serde(rename_all = \"camelCase\")]` on all structs. statusCheckRollup is a Vec of check objects with context.name and state/conclusion. Register both commands in lib.rs invoke_handler. Follow the existing pattern from fetch_github_issues/fetch_github_releases exactly for project_path handling and error messages.",
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "verification": [
+        "Run `cargo check` in apps/desktop/src-tauri - should pass with no errors",
+        "Verify both fetch_github_prs and fetch_github_pr_detail are registered in lib.rs"
+      ]
+    },
+    {
+      "phase": 2,
+      "title": "PR store and sidebar section",
+      "description": "Create the frontend infrastructure for PRs. 1) Create `stores/pullRequestsStore.ts` following the pattern of issuesStore.ts: define TypeScript interfaces GitHubPrAuthor, GitHubPullRequest (matching Rust struct fields: number, title, state, headRefName, baseRefName, url, isDraft, reviewDecision, author, labels, body, statusCheckRollup), and a PrFilter type ('open'|'closed'|'merged'|'all'). Create the Zustand store with: prs array, filter, isLoading, error, lastFetched, searchQuery, refetchCounter, and corresponding setters. Add a filterPrsBySearch helper. 2) Export all new types and the store from stores/index.ts. 3) Update detailStore.ts to add selectedPr (number|null) to ProjectSelection and a setSelectedPr action that clears other selections. 4) Create `components/sidebar/PullRequestCard.tsx` and `PullRequestCard.css` - a card component showing: PR number, title, state badge (open/closed/merged), draft badge if isDraft, review decision indicator (approved/changes_requested/review_required), branch name (headRefName). Style similar to IssueCard. 5) Create `components/sidebar/PullRequestsSection.tsx` and `PullRequestsSection.css` following IssuesSection pattern exactly: use CollapsibleSection, fetch PRs via invoke('fetch_github_prs'), show filter dropdown (open/closed/merged/all), refresh button, search bar, loading/error/empty states, and PR cards. Use a git-pull-request SVG icon. 6) Add <PullRequestsSection /> to App.tsx sidebar between <IssuesSection /> and <ReleasesSection />.",
+      "files": [
+        "apps/desktop/src/stores/pullRequestsStore.ts",
+        "apps/desktop/src/stores/index.ts",
+        "apps/desktop/src/stores/detailStore.ts",
+        "apps/desktop/src/components/sidebar/PullRequestCard.tsx",
+        "apps/desktop/src/components/sidebar/PullRequestCard.css",
+        "apps/desktop/src/components/sidebar/PullRequestsSection.tsx",
+        "apps/desktop/src/components/sidebar/PullRequestsSection.css",
+        "apps/desktop/src/App.tsx"
+      ],
+      "verification": [
+        "Run `pnpm typecheck` from root - should pass",
+        "PRs section should appear in the sidebar between Issues and Releases",
+        "Clicking a PR card should set selectedPr in the detail store"
+      ]
+    },
+    {
+      "phase": 3,
+      "title": "PR detail view and linked PRs on issue detail",
+      "description": "1) Create `components/detail/PullRequestDetail.tsx` and update the detail CSS. The PR detail view should show: header with PR number and state badge (Open/Closed/Merged), title, draft indicator, branch info (headRefName -> baseRefName), review decision badge (APPROVED/CHANGES_REQUESTED/REVIEW_REQUIRED with color coding: green/red/yellow), CI/check status section showing each check with name and pass/fail/pending indicator (green checkmark, red X, yellow dot), file stats (additions in green, deletions in red, file count), PR body rendered with MarkdownRenderer, and an 'Open in GitHub' button linking to the PR URL. Fetch full detail on mount via invoke('fetch_github_pr_detail'). 2) Export PullRequestDetail from components/detail/index.ts. 3) In App.tsx, add the PR detail routing: track selectedPr from detailStore, fetch PR detail when selected (similar to fetchedIssue pattern), and render <PullRequestDetail> in the detail panel conditional chain (after issue, before release). 4) Add a 'Linked Pull Requests' section to IssueDetail.tsx: when an issue is displayed, scan the pullRequestsStore for PRs whose body contains 'fixes #N', 'closes #N', 'resolves #N' (case-insensitive) where N matches the issue number, OR whose headRefName contains the issue number (e.g., 'issue-86', '86-feature'). Show matched PRs as clickable mini-cards with PR number, title, state, and review decision. Clicking navigates to the PR detail via setSelectedPr.",
+      "files": [
+        "apps/desktop/src/components/detail/PullRequestDetail.tsx",
+        "apps/desktop/src/components/detail/index.ts",
+        "apps/desktop/src/components/detail/DetailPanel.css",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/detail/IssueDetail.tsx"
+      ],
+      "verification": [
+        "Run `pnpm typecheck` from root - should pass",
+        "Clicking a PR in the sidebar should show its full detail in the right panel",
+        "CI checks should display with pass/fail indicators",
+        "Issue detail should show linked PRs section when PRs reference the issue",
+        "Clicking a linked PR in issue detail should navigate to the PR detail view"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "issue": 80,
+  "title": "Click on a panel in kanban to show issue details",
+  "totalPhases": 2,
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Expose single issue fetch as Tauri command",
+      "description": "Make fetch_github_issue_by_number a public Tauri command so the frontend can fetch a single issue by number. Register it in lib.rs invoke_handler.",
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "verification": "cargo check passes in src-tauri directory."
+    },
+    {
+      "phase": 2,
+      "title": "Fetch and display issue details when clicking completed kanban cards",
+      "description": "In App.tsx, when selectedIssue is set but not found in the issues store, call the new fetch_github_issue_by_number command to get the full issue data. Store it locally so the detail panel can render it. This covers completed/closed issues that aren't in the main issues array.",
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "verification": "pnpm typecheck passes. Clicking a completed kanban card should show issue details in the right panel."
+    }
+  ]
+}

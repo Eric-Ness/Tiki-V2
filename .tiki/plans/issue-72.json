@@ -1,0 +1,20 @@
+{
+  "issue": {
+    "number": 72,
+    "title": "Left Right Default Panel Size",
+    "url": "https://github.com/anthropics/Tiki-V2/issues/72"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Update default panel sizes to 15/70/15",
+      "content": "Update the DEFAULT_SIZES constant in layoutStore.ts to set sidebar=15, main=70, detail=15. Also update any fallback defaults in unused wrapper components (AppLayout.tsx, Sidebar.tsx, MainContent.tsx, DetailPanel.tsx) for consistency.",
+      "verification": [
+        "layoutStore.ts DEFAULT_SIZES has sidebar: 15, main: 70, detail: 15",
+        "pnpm typecheck passes from root",
+        "All hardcoded panel size defaults across layout components are consistent at 15/70/15"
+      ]
+    }
+  ],
+  "createdAt": "2026-02-06T14:12:00.000Z"
+}

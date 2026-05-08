@@ -1,0 +1,21 @@
+{
+  "issue": {
+    "number": 74,
+    "title": "Create Issue Increment",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/74"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Auto-increment release version in ReleaseDialog",
+      "content": "1. In ReleasesSection.tsx, compute the next patch version from the mergedReleases list and pass it to ReleaseDialog as a suggestedVersion prop. 2. In ReleaseDialog.tsx, accept the suggestedVersion prop and use it as the default version when creating a new release (not editing). 3. Add a getNextVersion utility that properly parses semver, finds the highest version, and increments the patch number.",
+      "verification": [
+        "When opening the release dialog to create a new release, the version field is pre-filled with the next patch version",
+        "When editing an existing release, the version field still shows the existing version",
+        "If no releases exist, a default like v0.1.0 is shown",
+        "pnpm typecheck passes from root"
+      ]
+    }
+  ],
+  "createdAt": "2026-02-06T14:25:00.000Z"
+}

@@ -1,0 +1,40 @@
+{
+  "issueNumber": 56,
+  "title": "Test Issue 5",
+  "description": "No-code test issue with 4 phases to validate kanban board column transitions",
+  "createdAt": "2026-02-05T15:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Verify repository structure",
+      "description": "Confirm the monorepo structure is intact by checking that all three packages exist: packages/shared, packages/framework, and apps/desktop.",
+      "status": "completed",
+      "verification": "All three directories exist and contain package.json files",
+      "files": []
+    },
+    {
+      "id": 2,
+      "title": "Verify Tiki state system",
+      "description": "Confirm the .tiki directory structure is correct by checking that state.json exists and is valid JSON, and that the plans directory exists.",
+      "status": "completed",
+      "verification": ".tiki/state.json is valid JSON and .tiki/plans/ directory exists",
+      "files": []
+    },
+    {
+      "id": 3,
+      "title": "Verify shared package types",
+      "description": "Confirm that the @tiki/shared package contains the expected type definitions including WorkStatus and PhaseStatus types.",
+      "status": "completed",
+      "verification": "WorkStatus and PhaseStatus types are defined in the shared package",
+      "files": []
+    },
+    {
+      "id": 4,
+      "title": "Verify framework commands",
+      "description": "Confirm that all 7 core framework commands exist: get, review, plan, audit, execute, ship, and yolo.",
+      "status": "completed",
+      "verification": "All 7 command files exist in packages/framework/commands/",
+      "files": []
+    }
+  ]
+}

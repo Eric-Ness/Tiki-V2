@@ -1,0 +1,22 @@
+{
+  "version": "v0.2.14",
+  "status": "completed",
+  "completedAt": "2026-02-20T18:30:00.000Z",
+  "tag": "v0.2.14",
+  "issues": [
+    {
+      "number": 121,
+      "title": "Terminals open in background"
+    },
+    {
+      "number": 122,
+      "title": "Terminal voice to text"
+    },
+    {
+      "number": 123,
+      "title": "Tiki Desktop Slow"
+    }
+  ],
+  "createdAt": "2026-02-20T12:00:00.000Z",
+  "description": "Terminals open in background, terminal voice to text, and Tiki Desktop performance improvements"
+}

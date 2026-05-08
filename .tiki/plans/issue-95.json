@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 95,
+    "title": "Issue search and text filtering",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/95"
+  },
+  "createdAt": "2026-02-09T12:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "A search text input appears at the top of IssuesSection, below the filter/actions row" },
+    { "id": "SC2", "category": "Functional", "criterion": "Typing in the search input filters issues by title, body text, and label names (case-insensitive)" },
+    { "id": "SC3", "category": "Functional", "criterion": "Search is debounced at 300ms to avoid excessive re-renders" },
+    { "id": "SC4", "category": "Functional", "criterion": "A clear button (x) appears when the search input has text, and clicking it resets the search" },
+    { "id": "SC5", "category": "Functional", "criterion": "A match count is shown (e.g., '5 of 12') when a search query is active" },
+    { "id": "SC6", "category": "Functional", "criterion": "The same search filter is applied to KanbanBoard cards across all columns" },
+    { "id": "SC7", "category": "UX", "criterion": "Search input styling matches the existing dark theme (consistent with filter dropdown and other inputs)" },
+    { "id": "SC8", "category": "Build", "criterion": "pnpm typecheck passes with no errors" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add search state to issuesStore and implement search UI in IssuesSection",
+      "status": "pending",
+      "content": "Add search/filter state to the Zustand issuesStore and build the search input UI in IssuesSection with debounced filtering.\n\n## Store Changes (apps/desktop/src/stores/issuesStore.ts)\n\n1. Add new state fields to `IssuesState`:\n   - `searchQuery: string` (default: `''`) -- the debounced/committed search text used for filtering\n\n2. Add new actions to `IssuesActions`:\n   - `setSearchQuery: (query: string) => void` -- sets the search query\n\n3. Add a **derived selector function** (exported, not in the store) that filters issues:\n   ```typescript\n   export function filterIssuesBySearch(issues: GitHubIssue[], query: string): GitHubIssue[] {\n     if (!query.trim()) return issues;\n     const lowerQuery = query.toLowerCase();\n     return issues.filter((issue) => {\n       const titleMatch = issue.title.toLowerCase().includes(lowerQuery);\n       const bodyMatch = issue.body?.toLowerCase().includes(lowerQuery) ?? false;\n       const labelMatch = issue.labels.some((label) =>\n         label.name.toLowerCase().includes(lowerQuery)\n       );\n       return titleMatch || bodyMatch || labelMatch;\n     });\n   }\n   ```\n\n4. Update the initial state to include `searchQuery: ''`.\n\n5. Update `apps/desktop/src/stores/index.ts` to also export `filterIssuesBySearch`.\n\n## IssuesSection Component Changes (apps/desktop/src/components/sidebar/IssuesSection.tsx)\n\n1. Add local state for the **immediate** input value: `const [searchInput, setSearchInput] = useState('')`\n\n2. Read the committed search query from the store: `const searchQuery = useIssuesStore((s) => s.searchQuery)`\n   Read the setter: `const setSearchQuery = useIssuesStore((s) => s.setSearchQuery)`\n\n3. Import `filterIssuesBySearch` from the store.\n\n4. Add a debounce effect that syncs `searchInput` to the store after 300ms:\n   ```typescript\n   useEffect(() => {\n     const timer = setTimeout(() => {\n       setSearchQuery(searchInput);\n     }, 300);\n     return () => clearTimeout(timer);\n   }, [searchInput, setSearchQuery]);\n   ```\n\n5. Compute filtered issues using useMemo:\n   ```typescript\n   const filteredIssues = useMemo(\n     () => filterIssuesBySearch(issues, searchQuery),\n     [issues, searchQuery]\n   );\n   ```\n\n6. Add the search input row in the JSX, immediately after the `{headerActions}` block and before the error/loading/empty states. The search input row includes:\n   - A text input with placeholder \"Search issues...\" and value bound to `searchInput`\n   - A clear button (x) that is only visible when `searchInput` is non-empty. Clicking it sets `searchInput` to `''` and also immediately calls `setSearchQuery('')` to bypass the debounce for instant clear.\n   - A match count span displayed when `searchQuery` is non-empty, showing e.g. \"5 of 12\" (filteredIssues.length of issues.length)\n\n   Structure:\n   ```tsx\n   <div className=\"issues-section-search\">\n     <input\n       type=\"text\"\n       className=\"issues-section-search-input\"\n       placeholder=\"Search issues...\"\n       value={searchInput}\n       onChange={(e) => setSearchInput(e.target.value)}\n       disabled={!hasProject}\n     />\n     {searchInput && (\n       <button\n         className=\"issues-section-search-clear\"\n         onClick={() => { setSearchInput(''); setSearchQuery(''); }}\n         type=\"button\"\n         aria-label=\"Clear search\"\n       >\n         &times;\n       </button>\n     )}\n     {searchQuery && (\n       <span className=\"issues-section-search-count\">\n         {filteredIssues.length} of {issues.length}\n       </span>\n     )}\n   </div>\n   ```\n\n7. Replace all references to `issues` in the rendering section with `filteredIssues`:\n   - The `.issues-section-list` map: `filteredIssues.map((issue) => ...)`\n   - The empty state condition: update to check `filteredIssues.length === 0` but also handle the case where there ARE issues but the search filtered them all out (show \"No matching issues\" instead of \"No issues found\")\n   - The badge count on CollapsibleSection: keep using `issues.length` for the total badge, so users always see the total count\n\n8. Update the empty state logic to distinguish between \"no issues at all\" and \"no search results\":\n   ```tsx\n   {hasProject && !isLoading && !error && issues.length > 0 && filteredIssues.length === 0 && searchQuery && (\n     <div className=\"issues-section-empty\">\n       No issues matching \"{searchQuery}\"\n     </div>\n   )}\n   \n   {hasProject && !isLoading && !error && issues.length === 0 && (\n     <div className=\"issues-section-empty\">\n       No {filter === \"all\" ? \"\" : filter} issues found\n     </div>\n   )}\n   ```\n\n## CSS Changes (apps/desktop/src/components/sidebar/IssuesSection.css)\n\nAdd styles for the search row, matching the existing dark theme patterns:\n\n```css\n.issues-section-search {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 0 2px;\n  position: relative;\n}\n\n.issues-section-search-input {\n  flex: 1;\n  padding: 4px 8px;\n  padding-right: 24px; /* space for clear button */\n  font-size: 11px;\n  background-color: var(--bg-secondary, #1e1e1e);\n  border: 1px solid var(--border-color, #3c3c3c);\n  border-radius: 4px;\n  color: var(--text-primary, #cccccc);\n  transition: border-color 0.15s ease;\n  outline: none;\n}\n\n.issues-section-search-input::placeholder {\n  color: var(--text-secondary, #858585);\n}\n\n.issues-section-search-input:hover:not(:disabled) {\n  border-color: var(--accent-color, #007acc);\n}\n\n.issues-section-search-input:focus {\n  border-color: var(--accent-color, #007acc);\n}\n\n.issues-section-search-input:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n\n.issues-section-search-clear {\n  position: absolute;\n  right: 8px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 16px;\n  height: 16px;\n  border: none;\n  background: transparent;\n  color: var(--text-secondary, #858585);\n  font-size: 14px;\n  line-height: 1;\n  cursor: pointer;\n  opacity: 0.7;\n  transition: opacity 0.15s ease;\n  padding: 0;\n}\n\n.issues-section-search-clear:hover {\n  opacity: 1;\n  color: var(--text-primary, #cccccc);\n}\n\n.issues-section-search-count {\n  font-size: 10px;\n  color: var(--text-secondary, #858585);\n  white-space: nowrap;\n  flex-shrink: 0;\n}\n```\n\nUse the same CSS variable patterns (--bg-secondary, --border-color, --text-primary, --text-secondary, --accent-color) that the existing `.issues-section-filter` select uses. The search input should look visually consistent with the state filter dropdown.",
+      "verification": [
+        "Search input appears in IssuesSection below the filter/actions row",
+        "Typing filters issues by title, body, and label name (case-insensitive)",
+        "Filtering is debounced at 300ms (typing rapidly does not cause per-keystroke updates)",
+        "Clear button appears when input has text and resets the search immediately",
+        "Match count (e.g., '5 of 12') appears when search query is active",
+        "Empty state message changes to 'No issues matching ...' when search has no results but issues exist",
+        "CollapsibleSection badge still shows total issue count (not filtered count)",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/stores/issuesStore.ts",
+        "apps/desktop/src/stores/index.ts",
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx",
+        "apps/desktop/src/components/sidebar/IssuesSection.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Apply search filter to KanbanBoard columns",
+      "status": "pending",
+      "content": "Integrate the same search filter from issuesStore into the KanbanBoard so that kanban cards are also filtered by the search query.\n\n## KanbanBoard Changes (apps/desktop/src/components/kanban/KanbanBoard.tsx)\n\n1. Import `filterIssuesBySearch` from `../../stores/issuesStore` (or from `../../stores` if re-exported).\n\n2. Read the search query from the issues store:\n   ```typescript\n   const searchQuery = useIssuesStore((s) => s.searchQuery);\n   ```\n\n3. In the existing `filteredIssues` useMemo, apply the search filter AFTER the release filter. Update the memo to chain both filters:\n   ```typescript\n   const filteredIssues = useMemo(() => {\n     let result = issues;\n     \n     // Apply release filter\n     if (releaseFilter) {\n       if (releaseFilter === 'unassigned') {\n         result = result.filter((issue) => !assignedIssueNumbers.has(issue.number));\n       } else {\n         const release = tikiReleases.find((r) => r.version === releaseFilter);\n         if (release) {\n           const releaseIssueNumbers = new Set(release.issues.map((i) => i.number));\n           result = result.filter((issue) => releaseIssueNumbers.has(issue.number));\n         }\n       }\n     }\n     \n     // Apply text search filter\n     result = filterIssuesBySearch(result, searchQuery);\n     \n     return result;\n   }, [issues, releaseFilter, tikiReleases, assignedIssueNumbers, searchQuery]);\n   ```\n\n4. Add `searchQuery` to the dependency array of the `filteredIssues` useMemo.\n\n5. Consider the completed column: the completed column uses `recentIssues` from tikiStateStore, NOT from the filtered issues list. The search filter should also be applied to completed items. In the `columns` useMemo, when building the completed column, filter the synthetic `completedIssues` array through the same search:\n   ```typescript\n   if (col.id === 'completed') {\n     let completedIssues = [...recentIssues]\n       .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())\n       .slice(0, 8)\n       .map((recent) => ({ ... }));\n     \n     // Apply search filter to completed issues too\n     completedIssues = filterIssuesBySearch(completedIssues, searchQuery);\n     \n     return { ...col, issues: completedIssues };\n   }\n   ```\n   Add `searchQuery` to the `columns` useMemo dependency array.\n\n6. Optionally, update the \"No issues loaded\" hint to also account for the case where issues exist but all are filtered out by search. This is a minor UX improvement -- if `issues.length > 0` but all columns are empty due to search, you could show a message. However, since each column already shows its own empty state, this is not strictly necessary.\n\nNo CSS changes are needed for this phase since the KanbanBoard already handles empty columns gracefully with the `.kanban-column-empty` style.\n\n## Important Notes\n- The search query is shared between IssuesSection and KanbanBoard via the issuesStore. When the user types in the IssuesSection search input, both views filter simultaneously.\n- The debouncing happens at the input level (in IssuesSection), so the store value `searchQuery` is already debounced by the time KanbanBoard reads it.\n- The release filter and search filter are independent and compose together (AND logic).",
+      "verification": [
+        "Typing in the IssuesSection search input also filters kanban board cards",
+        "Search filter composes with the release filter (both active simultaneously)",
+        "Completed column items are also filtered by search",
+        "Clearing the search shows all issues again in both views",
+        "Column counts update to reflect filtered results",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC6", "SC8"],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [2],
+    "SC7": [1],
+    "SC8": [1, 2]
+  }
+}

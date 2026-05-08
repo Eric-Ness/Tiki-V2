@@ -1,0 +1,26 @@
+{
+  "issue": {
+    "number": 70,
+    "title": "terminal features",
+    "labels": ["enhancement"]
+  },
+  "successCriteria": [
+    "Users can copy selected text from terminal using Ctrl+Shift+C",
+    "Users can paste text into terminal using Ctrl+Shift+V",
+    "Existing keyboard shortcuts are not broken",
+    "Copy/paste works with system clipboard"
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add clipboard copy/paste to Terminal component",
+      "content": "Modify Terminal.tsx to add a custom key event handler on xterm.js that intercepts Ctrl+Shift+C (copy) and Ctrl+Shift+V (paste). Use navigator.clipboard API for clipboard access. For copy: get selection via xterm.getSelection() and write to clipboard. For paste: read from clipboard and call xterm.paste(). Also change the existing Ctrl+Shift+V shortcut for split vertical in TerminalPane.tsx to use Ctrl+Shift+\\ instead to avoid conflict.",
+      "verification": [
+        "Ctrl+Shift+C copies selected terminal text to clipboard",
+        "Ctrl+Shift+V pastes clipboard content into terminal",
+        "Split vertical shortcut changed to Ctrl+Shift+\\",
+        "TypeScript compiles without errors"
+      ]
+    }
+  ]
+}

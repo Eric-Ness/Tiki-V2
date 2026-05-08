@@ -1,0 +1,40 @@
+{
+  "issueNumber": 58,
+  "title": "Test Issue 6",
+  "description": "No-code test issue with 4 phases to validate kanban board and active work tracking",
+  "createdAt": "2026-02-05T20:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Verify desktop app components",
+      "description": "Confirm the desktop app has all expected component directories: layout, sidebar, terminal, detail, kanban, and work.",
+      "status": "completed",
+      "verification": "All component directories exist under apps/desktop/src/components/",
+      "files": []
+    },
+    {
+      "id": 2,
+      "title": "Verify Zustand stores",
+      "description": "Confirm that the Zustand store files exist in apps/desktop/src/stores/ including tikiStateStore and any kanban-related stores.",
+      "status": "completed",
+      "verification": "Store files exist in the stores directory",
+      "files": []
+    },
+    {
+      "id": 3,
+      "title": "Verify Tauri backend modules",
+      "description": "Confirm the Rust backend has the expected modules: commands.rs, watcher.rs, and state.rs in apps/desktop/src-tauri/src/.",
+      "status": "completed",
+      "verification": "All three Rust module files exist",
+      "files": []
+    },
+    {
+      "id": 4,
+      "title": "Verify state schema",
+      "description": "Confirm that the state schema JSON file exists and contains the expected top-level properties: schemaVersion, activeWork, and history.",
+      "status": "completed",
+      "verification": "state.schema.json contains all expected top-level properties",
+      "files": []
+    }
+  ]
+}

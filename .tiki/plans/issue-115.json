@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 115,
+    "title": "Markdown rendering in issue body and comments",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/115"
+  },
+  "createdAt": "2026-02-09T12:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "Functional", "criterion": "Issue body in IssueDetail renders as GitHub Flavored Markdown (headings, bold, italic, lists, task lists, tables, strikethrough, autolinks)" },
+    { "id": "SC2", "category": "Functional", "criterion": "Code blocks in both issue body and comments have syntax highlighting with a dark theme" },
+    { "id": "SC3", "category": "Functional", "criterion": "Clickable links in rendered markdown open in the user's default browser (not inside the Tauri webview)" },
+    { "id": "SC4", "category": "Functional", "criterion": "Inline images from GitHub render correctly with max-width constraint" },
+    { "id": "SC5", "category": "Security", "criterion": "Raw HTML in markdown is not rendered (react-markdown default behavior), preventing XSS" },
+    { "id": "SC6", "category": "UX", "criterion": "Markdown styles for issue body visually match the existing comment body markdown styles" },
+    { "id": "SC7", "category": "Build", "criterion": "pnpm typecheck passes with no errors" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add markdown rendering to issue body and shared markdown CSS",
+      "status": "pending",
+      "content": "Replace the plain-text issue body rendering with react-markdown, reuse the same pattern already used in IssueComments, and extract shared markdown CSS so both the issue body and comments share consistent styling.\n\nSteps:\n\n1. **Update `apps/desktop/src/components/detail/IssueDetail.tsx`:**\n   - Add imports: `import Markdown from 'react-markdown';` and `import remarkGfm from 'remark-gfm';`\n   - Replace line 199:\n     ```tsx\n     <div className=\"detail-body\">{issue.body}</div>\n     ```\n     with:\n     ```tsx\n     <div className=\"detail-body markdown-body\">\n       <Markdown remarkPlugins={[remarkGfm]}>{issue.body}</Markdown>\n     </div>\n     ```\n   - The `markdown-body` class will be the shared class for all markdown-rendered content.\n\n2. **Update `apps/desktop/src/components/detail/DetailPanel.css`:**\n   - In the `.detail-body` rule, **remove** `white-space: pre-wrap;` -- this conflicts with markdown rendering (it would prevent proper paragraph/list layout). The markdown renderer handles whitespace via its own block elements.\n   - Keep all other `.detail-body` styles (padding, background, border, font-size, line-height, color, word-break, max-height, overflow-y).\n\n3. **Create `apps/desktop/src/components/detail/markdown.css`:**\n   - Define shared markdown styles under the `.markdown-body` class:\n     ```css\n     .markdown-body p { margin: 0 0 8px 0; }\n     .markdown-body p:last-child { margin-bottom: 0; }\n     .markdown-body code { background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 3px; font-size: 0.9em; font-family: 'Consolas', 'Courier New', monospace; }\n     .markdown-body pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow-x: auto; margin: 8px 0; }\n     .markdown-body pre code { background: none; padding: 0; }\n     .markdown-body a { color: #58a6ff; text-decoration: none; }\n     .markdown-body a:hover { text-decoration: underline; }\n     .markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 20px; }\n     .markdown-body blockquote { border-left: 3px solid rgba(255,255,255,0.15); margin: 8px 0; padding-left: 12px; color: rgba(255,255,255,0.5); }\n     .markdown-body img { max-width: 100%; border-radius: 4px; }\n     .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { margin: 12px 0 6px 0; color: rgba(255,255,255,0.85); }\n     .markdown-body h1 { font-size: 1.2em; }\n     .markdown-body h2 { font-size: 1.1em; }\n     .markdown-body h3 { font-size: 1em; }\n     ```\n   - Add GFM-specific styles:\n     ```css\n     /* Tables */\n     .markdown-body table { border-collapse: collapse; width: 100%; margin: 8px 0; }\n     .markdown-body th, .markdown-body td { border: 1px solid rgba(255,255,255,0.15); padding: 6px 10px; font-size: 12px; text-align: left; }\n     .markdown-body th { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); font-weight: 600; }\n     .markdown-body td { color: rgba(255,255,255,0.7); }\n     /* Strikethrough */\n     .markdown-body del { color: rgba(255,255,255,0.4); }\n     /* Task lists */\n     .markdown-body input[type='checkbox'] { margin-right: 6px; }\n     .markdown-body li { margin: 2px 0; }\n     /* Horizontal rules */\n     .markdown-body hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 12px 0; }\n     ```\n\n4. **Update `apps/desktop/src/components/detail/IssueComments.tsx`:**\n   - Add import: `import './markdown.css';`\n   - Update the comment body div (line 129) to include the shared class:\n     ```tsx\n     <div className=\"comment-body markdown-body\">\n     ```\n\n5. **Update `apps/desktop/src/components/detail/IssueComments.css`:**\n   - Remove ALL the `.comment-body` markdown element styles (lines 51-117: p, code, pre, a, ul/ol, blockquote, img, h1-h3) since they are now covered by `markdown.css` under `.markdown-body`.\n   - Keep the `.comment-body` base styles (color, line-height, font-size on lines 45-49) since those set the comment-specific base font.\n\n6. **Import `markdown.css` in `IssueDetail.tsx`:**\n   - Add `import './markdown.css';` at the top of IssueDetail.tsx.\n\nThis phase makes markdown render in both the issue body and comments with consistent styling, using GFM for tables, task lists, strikethrough, and autolinks. XSS is handled by react-markdown's default behavior of not rendering raw HTML.",
+      "verification": [
+        "Issue body renders markdown (headings, lists, bold, code blocks, links, images)",
+        "Comments still render markdown correctly with the shared styles",
+        "GFM features work: tables render with borders, task lists show checkboxes, strikethrough renders, URLs auto-link",
+        "No duplicate CSS styles between IssueComments.css and markdown.css",
+        "white-space: pre-wrap is removed from .detail-body so markdown paragraphs render properly",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC1", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/detail/DetailPanel.css",
+        "apps/desktop/src/components/detail/markdown.css",
+        "apps/desktop/src/components/detail/IssueComments.tsx",
+        "apps/desktop/src/components/detail/IssueComments.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add syntax highlighting for code blocks",
+      "status": "pending",
+      "content": "Install and configure a lightweight syntax highlighter for fenced code blocks in markdown-rendered content.\n\nSteps:\n\n1. **Install rehype-highlight and highlight.js:**\n   - Run from `apps/desktop`: `pnpm add rehype-highlight highlight.js`\n   - `rehype-highlight` is a rehype plugin that integrates with react-markdown via the `rehypePlugins` prop. It uses highlight.js under the hood for language detection and tokenization.\n   - This is lighter than react-syntax-highlighter and integrates directly with the react-markdown plugin pipeline.\n\n2. **Create a shared MarkdownRenderer component at `apps/desktop/src/components/detail/MarkdownRenderer.tsx`:**\n   - This component encapsulates the Markdown + plugins configuration so it is consistent everywhere:\n     ```tsx\n     import Markdown from 'react-markdown';\n     import remarkGfm from 'remark-gfm';\n     import rehypeHighlight from 'rehype-highlight';\n     import 'highlight.js/styles/github-dark.css';\n     \n     interface MarkdownRendererProps {\n       children: string;\n     }\n     \n     export function MarkdownRenderer({ children }: MarkdownRendererProps) {\n       return (\n         <Markdown\n           remarkPlugins={[remarkGfm]}\n           rehypePlugins={[rehypeHighlight]}\n         >\n           {children}\n         </Markdown>\n       );\n     }\n     ```\n   - Import the `github-dark` highlight.js theme CSS, which looks good in a dark UI. If it clashes, alternatives include `github-dark-dimmed`, `atom-one-dark`, or `vs2015`.\n\n3. **Update `apps/desktop/src/components/detail/IssueDetail.tsx`:**\n   - Replace `import Markdown from 'react-markdown';` and `import remarkGfm from 'remark-gfm';` with `import { MarkdownRenderer } from './MarkdownRenderer';`\n   - Replace the `<Markdown remarkPlugins={[remarkGfm]}>` usage with `<MarkdownRenderer>`:\n     ```tsx\n     <div className=\"detail-body markdown-body\">\n       <MarkdownRenderer>{issue.body}</MarkdownRenderer>\n     </div>\n     ```\n\n4. **Update `apps/desktop/src/components/detail/IssueComments.tsx`:**\n   - Replace `import Markdown from 'react-markdown';` and `import remarkGfm from 'remark-gfm';` with `import { MarkdownRenderer } from './MarkdownRenderer';`\n   - Replace the `<Markdown remarkPlugins={[remarkGfm]}>` usage with `<MarkdownRenderer>`:\n     ```tsx\n     <div className=\"comment-body markdown-body\">\n       <MarkdownRenderer>{comment.body}</MarkdownRenderer>\n     </div>\n     ```\n\n5. **Verify the highlight.js CSS does not conflict with existing styles:**\n   - The `github-dark.css` theme applies styles to `.hljs` classes inside `<code>` elements. Since our `.markdown-body pre code` resets background to `none`, we may need to ensure the hljs background takes precedence. Add to `markdown.css` if needed:\n     ```css\n     .markdown-body pre code.hljs { background: transparent; }\n     ```\n\nThis approach keeps syntax highlighting lightweight (only imports the CSS theme + auto-detection, no per-language bundles by default) and centralizes the markdown configuration in one component.",
+      "verification": [
+        "Fenced code blocks with language tags (```js, ```rust, ```python, etc.) display with syntax coloring",
+        "Code blocks without language tags still render correctly (auto-detection or plain text fallback)",
+        "The highlight theme looks appropriate in the dark UI (no white backgrounds, readable colors)",
+        "Both issue body and comments use the shared MarkdownRenderer component",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC2", "SC7"],
+      "files": [
+        "apps/desktop/src/components/detail/MarkdownRenderer.tsx",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "apps/desktop/src/components/detail/IssueComments.tsx",
+        "apps/desktop/src/components/detail/markdown.css"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Handle external link clicks to open in default browser",
+      "status": "pending",
+      "content": "Ensure all clickable links in rendered markdown open in the user's default OS browser rather than navigating the Tauri webview.\n\nSteps:\n\n1. **Update `apps/desktop/src/components/detail/MarkdownRenderer.tsx`:**\n   - Add a custom `components` prop to the `<Markdown>` element to override the default `<a>` tag behavior:\n     ```tsx\n     import { open } from '@tauri-apps/plugin-shell';\n     // OR if plugin-shell is not available, use window.__TAURI__\n     \n     const components = {\n       a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (\n         <a\n           {...props}\n           href={href}\n           onClick={(e) => {\n             e.preventDefault();\n             if (href) {\n               window.open(href, '_blank');\n             }\n           }}\n         >\n           {children}\n         </a>\n       ),\n     };\n     ```\n   - Pass `components={components}` to the `<Markdown>` element.\n   - Note: The app already uses `window.open(url, '_blank')` in IssueDetail.tsx (line 49) and ReleaseDetail.tsx (line 26) for opening GitHub URLs. This is the established pattern in the codebase. If Tauri blocks `window.open`, the fallback is to use the Tauri shell plugin (`@tauri-apps/plugin-shell`'s `open()` function), but that plugin is NOT currently in the npm dependencies. Since `window.open` is already used and presumably working, use that pattern first.\n   - If `window.open` does not work for in-content links (Tauri may treat them differently than programmatic calls), install the shell plugin:\n     - Add `@tauri-apps/plugin-shell` to devDependencies in `apps/desktop/package.json`\n     - Add `tauri-plugin-shell` to `apps/desktop/src-tauri/Cargo.toml` dependencies\n     - Register in `apps/desktop/src-tauri/src/lib.rs` plugin builder\n     - Use `import { open } from '@tauri-apps/plugin-shell'; open(href);`\n\n2. **Also add `target=\"_blank\"` and `rel=\"noopener noreferrer\"` to links** as a safety fallback in the custom `a` component.\n\n3. **Verify image rendering:**\n   - GitHub issue images are typically hosted at `https://user-images.githubusercontent.com/...` or `https://github.com/user-attachments/...`\n   - react-markdown renders `<img>` tags by default, and the `.markdown-body img { max-width: 100% }` CSS handles sizing.\n   - Tauri's webview should load external images by default (CSP is set to `null` in tauri.conf.json, meaning no restrictions).\n   - No additional work is needed for images unless CSP issues arise.\n\nThis phase ensures that clicking any link in the markdown-rendered issue body or comments opens the URL externally, which is the expected behavior for a desktop app.",
+      "verification": [
+        "Clicking a link in the issue body markdown opens the URL in the OS default browser",
+        "Clicking a link in a comment markdown opens the URL in the OS default browser",
+        "Links have visual hover state (underline) from the markdown.css styles",
+        "Images from GitHub render inline within the markdown content",
+        "The Tauri webview does not navigate away when a link is clicked",
+        "pnpm typecheck passes"
+      ],
+      "addressesCriteria": ["SC3", "SC4", "SC7"],
+      "files": [
+        "apps/desktop/src/components/detail/MarkdownRenderer.tsx"
+      ],
+      "dependencies": [2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [3],
+    "SC4": [1, 3],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1, 2, 3]
+  }
+}

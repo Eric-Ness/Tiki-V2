@@ -1,0 +1,21 @@
+{
+  "issue": {
+    "number": 73,
+    "title": "Project Title",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/73"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add project name to center of top header bar",
+      "content": "In App.tsx, add the active project name to the <header> element. The project name should display centered in the header bar. Update App.css to support a three-section header layout: left (Tiki branding), center (project name), right (spacer for balance). Use activeProject.name which is already available in the component. When no project is active, show nothing in the center.",
+      "verification": [
+        "Active project name is visible in the top header bar",
+        "Header layout has Tiki branding on left, project name centered",
+        "When no project is active, the center area is empty",
+        "pnpm typecheck passes from root"
+      ]
+    }
+  ],
+  "createdAt": "2026-02-06T14:20:00.000Z"
+}

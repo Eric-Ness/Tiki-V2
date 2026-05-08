@@ -26,3 +26,7 @@ apps/desktop/src-tauri/target/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

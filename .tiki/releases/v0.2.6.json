@@ -1,6 +1,7 @@
 {
   "version": "v0.2.6",
-  "status": "pending",
+  "status": "completed",
+  "completedAt": "2026-02-08T17:00:00.000Z",
   "issues": [
     {
       "number": 89,

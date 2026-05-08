@@ -1,0 +1,16 @@
+{
+  "issue": 79,
+  "title": "Sort completed kanban items",
+  "totalPhases": 1,
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Sort completed items by completedAt descending",
+      "description": "In KanbanBoard.tsx, add a .sort() call on recentIssues before .slice(0, 8) to sort completed items by completedAt in descending order (most recently completed first).",
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "verification": "Build the project with pnpm typecheck to verify no type errors. Visually confirm the sort logic sorts descending by completedAt."
+    }
+  ]
+}
