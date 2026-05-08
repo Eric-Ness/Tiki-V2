@@ -187,7 +187,7 @@ export function ReleasesSection() {
   // Load Tiki releases from disk on mount
   const loadTikiReleases = useCallback(async () => {
     try {
-      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      const tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
       const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath });
       setTikiReleases(loadedReleases);
     } catch (err) {
@@ -198,7 +198,7 @@ export function ReleasesSection() {
   // Save release to disk
   const saveTikiRelease = useCallback(async (release: TikiRelease) => {
     try {
-      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      const tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
       await invoke("save_tiki_release", { release, tikiPath });
     } catch (err) {
       console.error("Failed to save Tiki release:", err);
@@ -315,7 +315,7 @@ export function ReleasesSection() {
 
   const handleDeleteRelease = useCallback(async (version: string) => {
     try {
-      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      const tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
       await invoke("delete_tiki_release", { version, tikiPath });
       useTikiReleasesStore.getState().deleteRelease(version);
     } catch (err) {

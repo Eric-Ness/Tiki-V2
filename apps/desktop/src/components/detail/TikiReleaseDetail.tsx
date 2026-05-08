@@ -69,7 +69,7 @@ export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
     if (!confirmed) return;
 
     try {
-      const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+      const tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
       await invoke("delete_tiki_release", { version: release.version, tikiPath });
       deleteRelease(release.version);
       clearSelection();

@@ -211,7 +211,7 @@ function App() {
       }
 
       // Use the active project's .tiki path
-      const projectTikiPath = `${activeProject.path}\\.tiki`;
+      const projectTikiPath = `${activeProject.path}/.tiki`;
       setTikiPath(projectTikiPath);
       console.log("Tiki path (project):", projectTikiPath);
 
@@ -243,7 +243,7 @@ function App() {
       console.log("File changed:", event.payload);
       if (event.payload.type === "stateChanged") {
         try {
-          const projectTikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
           const currentState = await invoke<TikiState | null>("get_state", {
             tikiPath: projectTikiPath,
           });
@@ -265,7 +265,7 @@ function App() {
         }
       } else if (event.payload.type === "releaseChanged") {
         try {
-          const projectTikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
           const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath: projectTikiPath });
           useTikiReleasesStore.getState().setReleases(loadedReleases);
         } catch (e) {

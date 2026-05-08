@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 125,
+    "title": "Hardcoded backslash in `.tiki` path construction breaks macOS/Linux",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/125"
+  },
+  "createdAt": "2026-05-08T20:08:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "All 7 hardcoded `\\.tiki` path constructions are replaced with cross-platform separators"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Project switching works on macOS and Linux as well as Windows"
+    },
+    {
+      "id": "SC3",
+      "category": "reliability",
+      "description": "Build passes (pnpm build) with no type errors after the change"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Replace hardcoded backslash separators with forward-slash in path construction",
+      "status": "pending",
+      "content": "Update all 7 `${activeProject(.|?).path}\\.tiki` constructions to use `/.tiki`. Forward-slash works on all platforms because Windows `PathBuf::from` and `std::fs` both accept either separator, while POSIX requires forward-slash. This matches the already-correct pattern in [IssueDetail.tsx:126](apps/desktop/src/components/detail/IssueDetail.tsx#L126) and [WorkProgressCard.tsx:77](apps/desktop/src/components/sidebar/WorkProgressCard.tsx#L77).\n\nSites to update:\n- [App.tsx:214](apps/desktop/src/App.tsx#L214)\n- [App.tsx:246](apps/desktop/src/App.tsx#L246)\n- [App.tsx:268](apps/desktop/src/App.tsx#L268)\n- [TikiReleaseDetail.tsx:72](apps/desktop/src/components/detail/TikiReleaseDetail.tsx#L72)\n- [ReleasesSection.tsx:190](apps/desktop/src/components/sidebar/ReleasesSection.tsx#L190)\n- [ReleasesSection.tsx:201](apps/desktop/src/components/sidebar/ReleasesSection.tsx#L201)\n- [ReleasesSection.tsx:318](apps/desktop/src/components/sidebar/ReleasesSection.tsx#L318)\n\nApproach: per-file `replace_all` of the literal substring `\\.tiki` with `/.tiki`. The substring is unique to path-construction code in each file.",
+      "verification": [
+        "grep for `\\\\.tiki` returns no matches in apps/desktop/src",
+        "grep for `/.tiki` shows 9 occurrences (7 fixed + 2 already-correct)",
+        "pnpm build succeeds"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1]
+  }
+}
