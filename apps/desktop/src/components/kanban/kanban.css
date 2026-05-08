@@ -247,17 +247,23 @@
 }
 
 .kanban-card-badge {
-  font-size: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   line-height: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
 }
 
 .kanban-card-badge--paused {
+  background: rgba(245, 158, 11, 0.18);
   color: #f59e0b;
 }
 
 .kanban-card-badge--failed {
+  background: rgba(239, 68, 68, 0.18);
   color: #ef4444;
-  font-weight: bold;
 }
 
 .kanban-card-title {

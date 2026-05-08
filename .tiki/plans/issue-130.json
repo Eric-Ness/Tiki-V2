@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 130,
+    "title": "Failed/paused issues indistinguishable from review-pending in kanban; review→execute drag always replays /tiki:yolo",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/130"
+  },
+  "createdAt": "2026-05-08T20:23:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "Dragging a card whose underlying work status is 'paused' from Review to Execute invokes `/tiki:execute {N} --continue` (resumes from the current phase) instead of `/tiki:yolo`"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Dragging a card whose underlying work status is 'failed' from Review to Execute invokes `/tiki:execute {N} --continue` (retry from the failed phase) instead of `/tiki:yolo`"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Dragging a card whose underlying work status is 'reviewing' or 'pending' from Review to Execute still invokes `/tiki:yolo {N}` (no behavior change)"
+    },
+    {
+      "id": "SC4",
+      "category": "ux",
+      "description": "Cards in the Review column whose underlying work status is 'failed' or 'paused' are visually differentiated from pending/reviewing cards via a status badge or color modifier"
+    },
+    {
+      "id": "SC5",
+      "category": "functionality",
+      "description": "pnpm build from the repo root passes cleanly (`tsc -b` strict mode)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Branch review→execute command on underlying work status",
+      "status": "pending",
+      "content": "Update `apps/desktop/src/components/kanban/KanbanBoard.tsx` so the review→execute drag dispatches the right command based on the issue's Tiki work status.\n\nDesign:\n1. Update `getExecuteCommand(issueNumber, fromColumn, status?)` to accept an optional underlying work status. When `fromColumn === 'review'` and `status === 'paused' || status === 'failed'`, return `/tiki:execute {N} --continue`. When `fromColumn === 'review'` and the status is `reviewing` / `pending` / undefined, keep the existing `/tiki:yolo {N}` behavior. When `fromColumn === 'open'`, keep `/tiki:yolo`. For any other column (plan etc.) keep the bare `/tiki:execute {N}` behavior.\n2. Update `triggerExecution(issueNumber, fromColumn)` to look up `activeWork[\\`issue:${issueNumber}\\`]?.status` (narrowed to `IssueWork`) and pass it through to `getExecuteCommand`. Use the existing `activeWork` selector that is already in scope at the top of the component.\n3. The `handleDragEnd` review→execute branch already calls `triggerExecution`, so no signature change is needed at the call site.\n\nRationale: paused/failed work has plan + partial phase progress in `.tiki/state.json`. Re-running `/tiki:yolo` would re-fetch, re-review, re-plan and overwrite that state. `/tiki:execute --continue` is the correct resume entry point.",
+      "verification": [
+        "getExecuteCommand returns `/tiki:execute {N} --continue` when fromColumn is 'review' and status is 'paused'",
+        "getExecuteCommand returns `/tiki:execute {N} --continue` when fromColumn is 'review' and status is 'failed'",
+        "getExecuteCommand returns `/tiki:yolo {N}` when fromColumn is 'review' and status is 'reviewing' / 'pending' / undefined",
+        "triggerExecution reads activeWork[`issue:${N}`]?.status and threads it into getExecuteCommand",
+        "pnpm build from root passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC5"],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Visual differentiation for failed/paused cards in the Review column",
+      "status": "pending",
+      "content": "Confirm and harden the visual treatment of paused/failed cards.\n\n`apps/desktop/src/components/kanban/KanbanCard.tsx` already renders a corner badge (`.kanban-card-badge--paused` ⏸ / `.kanban-card-badge--failed` !) and applies `kanban-card--paused` / `kanban-card--failed` modifiers when `workItem.status` matches. `apps/desktop/src/components/kanban/kanban.css` already declares the modifiers and badge color rules. The reason failed/paused cards in the Review column appear identical to pending cards in practice is that the badge color alone (single character, transparent background) is too subtle to read at a glance.\n\nDesign:\n1. In `kanban.css`, upgrade `.kanban-card-badge--paused` and `.kanban-card-badge--failed` from bare-color text to small pill badges that match the WorkProgressCard pattern (`background` + `color` pair with translucent fill, `padding: 1px 5px`, `border-radius: 3px`, uppercase 9px text). Use the same color palette already in use: amber `#f59e0b` for paused, red `#ef4444` for failed.\n2. Update the badge content in `KanbanCard.tsx` from the single character glyphs to short uppercase text labels (`PAUSED`, `FAILED`) so they are immediately readable. Keep the existing `kanban-card--paused` / `kanban-card--failed` left-border modifier — the combination of border + pill is the visible differentiator.\n3. No new components, no animations.\n\nRationale: matches the existing WorkProgressCard status-pill pattern (`.work-progress-status.failed` etc.) so users see the same status vocabulary across the sidebar and the kanban.",
+      "verification": [
+        "kanban.css `.kanban-card-badge--paused` and `--failed` have background + color + padding + border-radius (pill shape)",
+        "KanbanCard.tsx renders 'PAUSED' / 'FAILED' text in the badge instead of the single-character glyph",
+        "Visual: in the Review column a failed card has a red pill + red left border; a paused card has an amber pill + amber left border; a pending/reviewing card has neither",
+        "pnpm build from root passes"
+      ],
+      "addressesCriteria": ["SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanCard.tsx",
+        "apps/desktop/src/components/kanban/kanban.css"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [2],
+    "SC5": [1, 2]
+  }
+}

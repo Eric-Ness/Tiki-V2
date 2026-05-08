@@ -89,19 +89,30 @@ export function KanbanBoard() {
     }
   }, [getActiveTerminalId]);
 
-  // Determine the appropriate command based on source column
-  const getExecuteCommand = (issueNumber: number, fromColumn: string): string => {
-    // If coming from Open or Review (no plan yet), run full yolo
-    if (fromColumn === 'open' || fromColumn === 'review') {
+  // Determine the appropriate command based on source column and underlying work status.
+  // For Review→Execute drags, paused/failed work has an existing plan + partial phase
+  // progress; resume with `/tiki:execute --continue` rather than replaying the full
+  // pipeline (which would overwrite plan state).
+  const getExecuteCommand = (issueNumber: number, fromColumn: string, status?: string): string => {
+    if (fromColumn === 'review') {
+      if (status === 'paused' || status === 'failed') {
+        return `/tiki:execute ${issueNumber} --continue`;
+      }
+      // reviewing / pending / undefined → full pipeline
       return `/tiki:yolo ${issueNumber}`;
     }
-    // If coming from Plan (has plan) or resuming, just execute
+    if (fromColumn === 'open') {
+      return `/tiki:yolo ${issueNumber}`;
+    }
+    // Plan column or resume from elsewhere — has a plan, just execute.
     return `/tiki:execute ${issueNumber}`;
   };
 
   // Trigger execution for an issue
   const triggerExecution = useCallback(async (issueNumber: number, fromColumn: string) => {
-    const command = getExecuteCommand(issueNumber, fromColumn);
+    const work = activeWork[`issue:${issueNumber}`];
+    const status = work && work.type === 'issue' ? work.status : undefined;
+    const command = getExecuteCommand(issueNumber, fromColumn, status);
 
     // Switch to terminal view
     setActiveView('terminal');
@@ -111,7 +122,7 @@ export function KanbanBoard() {
     if (success) {
       console.log(`Started execution: ${command}`);
     }
-  }, [setActiveView, executeInTerminal]);
+  }, [activeWork, setActiveView, executeInTerminal]);
 
   // Show ship confirmation dialog
   const requestShipConfirmation = useCallback((issueNumber: number) => {

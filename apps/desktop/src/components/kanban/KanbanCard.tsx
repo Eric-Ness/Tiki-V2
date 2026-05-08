@@ -120,8 +120,8 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
         <div className="kanban-card-header">
           <span className="kanban-card-number">#{issue.number}</span>
           <div className="kanban-card-actions">
-            {isPaused && <span className="kanban-card-badge kanban-card-badge--paused">&#9208;</span>}
-            {isFailed && <span className="kanban-card-badge kanban-card-badge--failed">!</span>}
+            {isPaused && <span className="kanban-card-badge kanban-card-badge--paused">PAUSED</span>}
+            {isFailed && <span className="kanban-card-badge kanban-card-badge--failed">FAILED</span>}
             {canExecute && (
               <button
                 className="kanban-card-play"
