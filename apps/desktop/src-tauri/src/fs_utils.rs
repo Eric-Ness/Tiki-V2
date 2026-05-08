@@ -234,7 +234,7 @@ pub fn cleanup_stale_tmp_files(tiki_path: &Path) {
             if path.is_dir() {
                 // Recurse into subdirectories (plans/, releases/, backups/)
                 cleanup_stale_tmp_files(&path);
-            } else if path.extension().map_or(false, |ext| ext == "tmp") {
+            } else if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.ends_with(".tmp")) {
                 log::info!("Removing stale temp file: {:?}", path);
                 let _ = std::fs::remove_file(&path);
             }

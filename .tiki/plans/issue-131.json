@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 131,
+    "title": "cleanup_stale_tmp_files never matches its own output (.json.tmp files accumulate)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/131"
+  },
+  "createdAt": "2026-05-08T20:23:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "cleanup_stale_tmp_files matches files like state.json.tmp written by atomic_write, so stale temp files no longer accumulate after a crash mid-write"
+    },
+    {
+      "id": "SC2",
+      "category": "consistency",
+      "description": "The .tmp matcher in fs_utils.rs uses the same suffix-on-filename approach as the watcher filter at watcher.rs:172 (name.ends_with(\".tmp\"))"
+    },
+    {
+      "id": "SC3",
+      "category": "build",
+      "description": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml passes with no new warnings or errors"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Fix cleanup_stale_tmp_files to match .tmp files by filename suffix",
+      "status": "pending",
+      "content": "In `apps/desktop/src-tauri/src/fs_utils.rs`, the `cleanup_stale_tmp_files` function currently matches stale temp files using `path.extension().map_or(false, |ext| ext == \"tmp\")`. However, `atomic_write` writes to paths created via `path.with_extension(\"json.tmp\")`, producing filenames like `state.json.tmp`. `Path::extension()` on `state.json.tmp` returns `\"json.tmp\"` (not `\"tmp\"`), so the cleanup never matches the files it was written to clean. After a crash mid-write, `state.json.tmp` accumulates indefinitely.\n\nFix: replace the extension-based check on line 237 with a suffix-on-filename check, mirroring the watcher's filter at `watcher.rs:172` which uses `name.ends_with(\".tmp\")`:\n\n```rust\n} else if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.ends_with(\".tmp\")) {\n```\n\nThis is the only code change. The `atomic_write` `with_extension(\"json.tmp\")` call is intentionally left alone — the filename pattern stays the same; only the cleanup matcher is fixed.",
+      "verification": [
+        "fs_utils.rs:237 uses path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n.ends_with(\".tmp\"))",
+        "atomic_write still uses path.with_extension(\"json.tmp\") (unchanged)",
+        "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml succeeds",
+        "Suffix matching is consistent with watcher.rs:172 filter"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3"],
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1]
+  }
+}
