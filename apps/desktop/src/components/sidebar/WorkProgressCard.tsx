@@ -26,6 +26,8 @@ const STEP_DISPLAY_LABELS: Record<PipelineStep, string> = {
 
 interface WorkProgressCardProps {
   work: WorkContext;
+  workId: string;
+  isStale: boolean;
 }
 
 /**
@@ -49,14 +51,28 @@ function getPhaseSegmentStatus(
   }
 }
 
-export function WorkProgressCard({ work }: WorkProgressCardProps) {
+export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProps) {
   const isIssue = work.type === "issue";
   const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
+  const [showConfirmRemove, setShowConfirmRemove] = useState(false);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
 
   // Extract issue-specific fields with proper type narrowing
   const issueNumber = work.type === "issue" ? work.issue.number : undefined;
   const issueTitle = work.type === "issue" ? work.issue.title : undefined;
+
+  // Stale work timestamp - use direct ternary to preserve discriminated union narrowing
+  const activityTimestamp = work.type === 'issue' ? (work.lastActivity ?? work.createdAt) : work.createdAt;
+  const staleHours = Math.floor((Date.now() - new Date(activityTimestamp).getTime()) / 3_600_000);
+
+  async function handleAction(action: 'pause' | 'reset' | 'remove') {
+    const tikiPath = activeProject?.path ? `${activeProject.path}/.tiki` : undefined;
+    try {
+      await invoke('update_work_status', { workId, action, tikiPath });
+    } catch (e) {
+      console.error('update_work_status failed:', e);
+    }
+  }
 
   // Get pipeline step and display label
   const pipelineStep = work.pipelineStep;
@@ -86,13 +102,22 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
   const totalDuration = planPhases.length > 0 ? calculateTotalDuration(planPhases) : 0;
 
   return (
-    <div className={`work-progress-card status-${work.status}`}>
+    <div className={`work-progress-card status-${work.status}${isStale ? ' stale' : ''}`}>
       <div className="work-progress-header">
         <span className="work-progress-type">{isIssue ? "Issue" : "Release"}</span>
+        {isStale && (
+          <span className="work-progress-stale-icon" title="Stale: no recent activity">
+            &#9888;
+          </span>
+        )}
         <span className={`work-progress-status ${work.status}`}>
           {pipelineLabel || work.status}
         </span>
       </div>
+
+      {isStale && (
+        <div className="work-progress-stale-timestamp">last activity {staleHours}h ago</div>
+      )}
 
       <div className="work-progress-title">
         {isIssue ? (
@@ -146,6 +171,64 @@ export function WorkProgressCard({ work }: WorkProgressCardProps) {
               Working on #{work.release.currentIssue}
             </span>
           )}
+        </div>
+      )}
+
+      {isIssue && !showConfirmRemove && (
+        <div className="work-progress-actions">
+          <button
+            className="work-action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction('pause');
+            }}
+            title="Pause this work item"
+          >
+            Pause
+          </button>
+          <button
+            className="work-action-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction('reset');
+            }}
+            title="Reset to pending"
+          >
+            Reset
+          </button>
+          <button
+            className="work-action-btn work-action-btn--danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowConfirmRemove(true);
+            }}
+            title="Remove this work item"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+
+      {showConfirmRemove && (
+        <div className="work-progress-confirm-remove">
+          <span>Remove this item?</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction('remove');
+              setShowConfirmRemove(false);
+            }}
+          >
+            Confirm
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowConfirmRemove(false);
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
     </div>

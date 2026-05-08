@@ -5,9 +5,10 @@ import "./StateSection.css";
 
 interface StateSectionProps {
   activeWork: Record<string, WorkContext>;
+  staleFlags?: Record<string, boolean>;
 }
 
-export function StateSection({ activeWork }: StateSectionProps) {
+export function StateSection({ activeWork, staleFlags }: StateSectionProps) {
   const workEntries = Object.entries(activeWork);
   const activeCount = workEntries.length;
 
@@ -42,7 +43,12 @@ export function StateSection({ activeWork }: StateSectionProps) {
         ) : (
           <div className="state-section-list">
             {workEntries.map(([key, work]) => (
-              <WorkProgressCard key={key} work={work} />
+              <WorkProgressCard
+                key={key}
+                workId={key}
+                work={work}
+                isStale={staleFlags?.[key] ?? false}
+              />
             ))}
           </div>
         )}

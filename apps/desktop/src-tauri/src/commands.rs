@@ -1,9 +1,68 @@
 use crate::fs_utils::{self, BackupInfo};
-use crate::state::{TikiPlan, TikiRelease, TikiState};
+use crate::state::{TikiPlan, TikiRelease, TikiState, WorkContext, WorkStatus};
 use crate::watcher;
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::path::PathBuf;
 use tauri_plugin_dialog::DialogExt;
+
+/// Action to apply to a work item via `update_work_status`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkAction {
+    Pause,
+    Reset,
+    Remove,
+}
+
+/// Mutate state.json for a single work entry: pause it, reset it to pending,
+/// or remove it from `activeWork`. Used by sidebar quick actions on stale items.
+#[tauri::command]
+pub fn update_work_status(
+    work_id: String,
+    action: WorkAction,
+    tiki_path: Option<String>,
+) -> Result<(), String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    let state_file = path.join("state.json");
+
+    let mut state = fs_utils::read_json_resilient::<TikiState>(&state_file)?
+        .ok_or_else(|| "state.json not found".to_string())?;
+
+    match action {
+        WorkAction::Remove => {
+            state.active_work.remove(&work_id);
+        }
+        WorkAction::Pause | WorkAction::Reset => {
+            let entry = state
+                .active_work
+                .get_mut(&work_id)
+                .ok_or_else(|| "work item not found".to_string())?;
+            match entry {
+                WorkContext::Issue(ctx) => {
+                    match action {
+                        WorkAction::Pause => {
+                            ctx.status = WorkStatus::Paused;
+                        }
+                        WorkAction::Reset => {
+                            ctx.status = WorkStatus::Pending;
+                            ctx.phase = None;
+                        }
+                        WorkAction::Remove => unreachable!(),
+                    }
+                    ctx.last_activity = Some(chrono::Utc::now().to_rfc3339());
+                }
+                WorkContext::Release(_) => {
+                    return Err("cannot pause or reset a release entry".to_string());
+                }
+            }
+        }
+    }
+
+    let content = serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?;
+    fs_utils::atomic_write(&state_file, &content)?;
+    Ok(())
+}
 
 /// Compare two version strings by semver segments numerically.
 fn cmp_semver(a: &str, b: &str) -> Ordering {

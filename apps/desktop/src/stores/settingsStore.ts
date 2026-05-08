@@ -34,12 +34,14 @@ export interface WorkflowSettings {
   defaultBranchStrategy: 'current' | 'auto' | 'custom';
   defaultModel: 'sonnet' | 'opus' | 'haiku';
   defaultPlanningType: 'skip' | 'lite' | 'spec' | 'full';
+  stalenessThresholdHours: number;
 }
 
 export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = {
   defaultBranchStrategy: 'current',
   defaultModel: 'sonnet',
   defaultPlanningType: 'full',
+  stalenessThresholdHours: 24,
 };
 
 // --- GitHub Settings ---

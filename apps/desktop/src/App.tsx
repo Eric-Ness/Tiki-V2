@@ -18,7 +18,7 @@ import { DependencyGraph } from "./components/dependencies/DependencyGraph";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
-import { useCommandActions } from "./hooks";
+import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useSettingsStore } from "./stores";
 import type { GitHubIssue, TikiRelease } from "./stores";
@@ -111,6 +111,10 @@ function App() {
 
   // Apply theme from settings
   const theme = useSettingsStore((s) => s.appearance.theme);
+  const stalenessThresholdHours = useSettingsStore((s) => s.workflow.stalenessThresholdHours);
+
+  // Stale work detection: flags issues whose last activity exceeds the threshold
+  const staleFlags = useStaleWorkDetection(state?.activeWork ?? {}, stalenessThresholdHours);
   useEffect(() => {
     const applyTheme = (resolved: 'dark' | 'light') => {
       document.documentElement.setAttribute('data-theme', resolved);
@@ -351,7 +355,7 @@ function App() {
             <div className="sidebar-sections">
               {/* Active Work at the top for visibility */}
               {state && (
-                <StateSection activeWork={state.activeWork} />
+                <StateSection activeWork={state.activeWork} staleFlags={staleFlags} />
               )}
 
               {error && <div className="error">{error}</div>}

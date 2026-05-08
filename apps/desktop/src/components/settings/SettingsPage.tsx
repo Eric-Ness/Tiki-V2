@@ -224,6 +224,12 @@ export function SettingsPage() {
               <option value="skip">Skip</option>
             </select>
           </div>
+
+          <div className="settings-row">
+            <label htmlFor="settings-staleness">Staleness Threshold</label>
+            <input id="settings-staleness" type="number" className="settings-input settings-input-narrow" value={workflow.stalenessThresholdHours} onChange={(e) => updateWorkflow({ stalenessThresholdHours: Number(e.target.value) })} min={1} max={720} step={1} />
+          </div>
+          <p className="settings-hint">Work items with no activity for this many hours are flagged as stale.</p>
         </div>
 
         {/* GitHub */}

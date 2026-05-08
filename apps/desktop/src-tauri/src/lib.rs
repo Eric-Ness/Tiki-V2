@@ -53,6 +53,7 @@ pub fn run() {
             commands::backup_state,
             commands::list_backups,
             commands::restore_backup,
+            commands::update_work_status,
             github::check_claude_cli,
             github::check_gh_auth,
             github::fetch_github_issues,

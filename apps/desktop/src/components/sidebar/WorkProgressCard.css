@@ -202,3 +202,18 @@
   font-size: 11px;
   color: var(--text-tertiary, #666666);
 }
+
+/* Stale work visual treatment */
+.work-progress-card.stale { opacity: 0.65; }
+.work-progress-stale-icon { color: #f59e0b; font-size: 12px; margin: 0 4px; }
+.work-progress-stale-timestamp { font-size: 10px; color: #f59e0b; margin-bottom: 6px; opacity: 0.85; }
+
+/* Quick action buttons (Pause / Reset / Remove) */
+.work-progress-actions { display: none; gap: 4px; margin-top: 8px; justify-content: flex-end; }
+.work-progress-card:hover .work-progress-actions { display: flex; }
+.work-action-btn { font-size: 10px; padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: var(--text-secondary, #858585); cursor: pointer; }
+.work-action-btn:hover { background: rgba(255,255,255,0.15); color: var(--text-primary, #cccccc); }
+.work-action-btn--danger:hover { background: rgba(239,68,68,0.2); color: #f87171; border-color: rgba(239,68,68,0.3); }
+.work-progress-confirm-remove { margin-top: 8px; font-size: 11px; color: var(--text-secondary, #858585); display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.work-progress-confirm-remove button { font-size: 10px; padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.08); color: var(--text-secondary, #858585); cursor: pointer; }
+.work-progress-confirm-remove button:hover { background: rgba(255,255,255,0.15); color: var(--text-primary, #cccccc); }
