@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 132,
+    "title": "test issue",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/132"
+  },
+  "createdAt": "2026-05-08T21:00:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "smoke-test",
+      "description": "Pipeline traverses GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP without manual intervention"
+    },
+    {
+      "id": "SC2",
+      "category": "smoke-test",
+      "description": ".tiki/smoke-test.log is created (or appended) with a single ISO-timestamped line referencing issue #132"
+    },
+    {
+      "id": "SC3",
+      "category": "smoke-test",
+      "description": "Commit is created on main, pushed to origin, and issue #132 is closed via gh CLI"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Append timestamped marker line to .tiki/smoke-test.log",
+      "status": "pending",
+      "content": "Append a single bullet line to .tiki/smoke-test.md of the form:\n\n`- 2026-05-08T21:01:00Z — yolo smoke test #132`\n\nIf the file does not yet exist, create it with a brief header. Note: `.tiki/smoke-test.log` (the issue body's suggested name) is gitignored by the repo's `*.log` rule, so we use `.md` instead to keep the smoke-test artifact tracked.\n\nThis is a no-op smoke test issue.",
+      "verification": [
+        ".tiki/smoke-test.md exists",
+        "The file ends with a single new line referencing issue #132 and an ISO-8601 timestamp",
+        "No other files in the repo were modified"
+      ],
+      "addressesCriteria": ["SC2"],
+      "files": [".tiki/smoke-test.md"],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [],
+    "SC2": [1],
+    "SC3": []
+  }
+}
