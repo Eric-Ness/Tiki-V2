@@ -6,7 +6,7 @@ interface ReleaseDetailProps {
 }
 
 const statusBadgeStyles: Record<string, string> = {
-  published: "release-status-published",
+  completed: "release-status-completed",
   draft: "release-status-draft",
   prerelease: "release-status-prerelease",
 };
@@ -14,12 +14,12 @@ const statusBadgeStyles: Record<string, string> = {
 function getReleaseStatus(release: GitHubRelease): string {
   if (release.isDraft) return "draft";
   if (release.isPrerelease) return "prerelease";
-  return "published";
+  return "completed";
 }
 
 export function ReleaseDetail({ release }: ReleaseDetailProps) {
   const status = getReleaseStatus(release);
-  const badgeClass = statusBadgeStyles[status] || statusBadgeStyles.published;
+  const badgeClass = statusBadgeStyles[status] || statusBadgeStyles.completed;
 
   const handleOpenInGitHub = () => {
     if (release.url) {
@@ -48,8 +48,8 @@ export function ReleaseDetail({ release }: ReleaseDetailProps) {
             <path d="M2 4L8 7L14 4" stroke="currentColor" strokeWidth="1.2" />
           </svg>
           <span className={`detail-state-badge ${badgeClass}`}>
-            {status === "published"
-              ? "Published"
+            {status === "completed"
+              ? "Completed"
               : status === "draft"
                 ? "Draft"
                 : "Pre-release"}

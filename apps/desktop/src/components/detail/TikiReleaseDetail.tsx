@@ -10,14 +10,14 @@ interface TikiReleaseDetailProps {
 const statusBadgeStyles: Record<string, string> = {
   active: "release-status-active",
   completed: "release-status-completed",
-  shipped: "release-status-published",
+  shipped: "release-status-completed",
   not_planned: "release-status-draft",
 };
 
 const statusLabels: Record<string, string> = {
   active: "Active",
   completed: "Completed",
-  shipped: "Shipped",
+  shipped: "Completed",
   not_planned: "Not Planned",
 };
 

@@ -30,6 +30,8 @@ interface MergedRelease {
   version: string;
   name?: string;
   status?: TikiReleaseStatus;
+  /** Badge text rendered in the sidebar; collapses 'shipped' and GitHub-published to 'completed'. */
+  displayStatus?: "active" | "completed" | "not_planned";
   issueCount?: number;
   isDraft?: boolean;
   isPrerelease?: boolean;
@@ -126,9 +128,9 @@ function ReleaseCardWithMenu({
         <div className="releases-section-tiki-header">
           <span className="releases-section-tiki-version">{release.version}</span>
           <div className="releases-section-badges">
-            {release.status && (
-              <span className={`releases-section-tiki-status ${release.status}`}>
-                {release.status}
+            {release.displayStatus && (
+              <span className={`releases-section-tiki-status ${release.displayStatus}`}>
+                {release.displayStatus}
               </span>
             )}
             {release.isDraft && (
@@ -260,11 +262,16 @@ export function ReleasesSection() {
   const mergedReleases = useMemo(() => {
     const map = new Map<string, MergedRelease>();
 
-    // Add GitHub releases first
+    // Add GitHub releases first. A GitHub release that's neither draft nor
+    // pre-release is effectively "completed" from the user's perspective —
+    // the local Tiki record may have been archived (#142) so we synthesize
+    // the badge here so the sidebar stays consistent.
     for (const gh of releases) {
+      const isGhPublished = !gh.isDraft && !gh.isPrerelease;
       map.set(gh.tagName, {
         version: gh.tagName,
         name: gh.name,
+        displayStatus: isGhPublished ? "completed" : undefined,
         isDraft: gh.isDraft,
         isPrerelease: gh.isPrerelease,
         publishedAt: gh.publishedAt,
@@ -274,11 +281,15 @@ export function ReleasesSection() {
       });
     }
 
-    // Overlay tiki data (or add tiki-only releases)
+    // Overlay tiki data (or add tiki-only releases). 'shipped' collapses to
+    // 'completed' for display so legacy data renders consistently.
     for (const tiki of tikiReleases) {
+      const tikiDisplay: MergedRelease["displayStatus"] =
+        tiki.status === "shipped" ? "completed" : tiki.status;
       const existing = map.get(tiki.version);
       if (existing) {
         existing.status = tiki.status;
+        existing.displayStatus = tikiDisplay;
         existing.issueCount = tiki.issues.length;
         existing.hasTiki = true;
       } else {
@@ -286,6 +297,7 @@ export function ReleasesSection() {
           version: tiki.version,
           name: tiki.name,
           status: tiki.status,
+          displayStatus: tikiDisplay,
           issueCount: tiki.issues.length,
           hasGitHub: false,
           hasTiki: true,

@@ -1,6 +1,20 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.2.19": {
+      "type": "release",
+      "release": {
+        "version": "v0.2.19",
+        "issues": [143],
+        "currentIssue": 143,
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-09T05:00:00.000Z",
+      "lastActivity": "2026-05-09T05:00:00.000Z"
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 141,
