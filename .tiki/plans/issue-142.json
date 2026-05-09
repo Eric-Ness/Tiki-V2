@@ -1,0 +1,18 @@
+{
+  "issue": { "number": 142, "title": "fix: shipped releases still appear in sidebar — load_tiki_releases reads from archive/" },
+  "createdAt": "2026-05-09T03:33:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Remove archive scan from load_tiki_releases",
+      "content": "Modify `apps/desktop/src-tauri/src/commands.rs` `load_tiki_releases` (lines 223-249): remove the `dirs_to_scan` Vec/archive-detection block (lines 225-230) and inline a single read of `releases_dir`. The function should only return releases from the top-level `.tiki/releases/` directory; archived releases stay in `archive/` and are no longer surfaced. The frontend already renders `history.recentReleases` from state.json for any historical view.",
+      "verification": [
+        "cargo check (in apps/desktop/src-tauri) passes",
+        "pnpm build from root passes",
+        "Manually inspecting the diff shows the archive subdirectory is no longer scanned",
+        "No other call sites of load_tiki_releases need to change"
+      ],
+      "status": "pending"
+    }
+  ]
+}
