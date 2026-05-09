@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 101,
+    "title": "Auto-healing for failed phases",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/101"
+  },
+  "createdAt": "2026-05-08T00:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "config", "description": "Auto-heal is opt-in via .tiki/config.json with workflow.autoHeal.{enabled,maxAttempts,categories}; absent file disables auto-heal by default" },
+    { "id": "SC2", "category": "behavior", "description": "When verification fails and auto-heal is enabled, execute.md instructs Claude to capture error output, categorize it, and attempt a targeted fix" },
+    { "id": "SC3", "category": "behavior", "description": "Auto-heal attempts are capped at config.workflow.autoHeal.maxAttempts (default 3); on exhaustion, Claude falls back to manual <next-actions> recovery" },
+    { "id": "SC4", "category": "transparency", "description": "Each heal attempt is logged as a HealAttempt record in .tiki/state.json under the phase's healAttempts array; the manual fallback summarizes all attempts" },
+    { "id": "SC5", "category": "categorization", "description": "Errors are categorized into build-error, type-error, test-failure, lint-error, or other, with brief healing-strategy guidance per category" },
+    { "id": "SC6", "category": "consistency", "description": "Source execute.md (packages/framework/commands/execute.md) and mirror (packages/framework/.claude/commands/tiki/execute.md) are byte-for-byte identical" },
+    { "id": "SC7", "category": "regression", "description": "pnpm build from repo root passes with no TypeScript errors" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add <auto-heal> block to execute.md (source + mirror)",
+      "status": "pending",
+      "content": "Modify `packages/framework/commands/execute.md` to add a new `<auto-heal>` XML block describing the opt-in heal loop. Place it AFTER the existing `<errors>` section and BEFORE `<next-actions>`.\n\nThe `<auto-heal>` block must cover:\n1. **Opt-in check** — read `.tiki/config.json`, look for `workflow.autoHeal.enabled === true`. Treat missing file as disabled.\n2. **Heal loop** — when verification fails AND auto-heal is enabled:\n   a. Capture error output verbatim (preserve filenames, line numbers, diagnostic messages)\n   b. Categorize the error: `build-error` / `type-error` / `test-failure` / `lint-error` / `other`\n   c. Read prior attempts from `.tiki/state.json` at `activeWork[\"issue:{N}\"].phase.healAttempts`\n   d. Stop conditions: attempts >= maxAttempts (default 3), category not in allow-list, or repeating same error\n   e. Attempt a targeted fix and re-run verification\n   f. Append a `HealAttempt` record `{ attempt, timestamp, errorCategory, errorSummary, fixApplied, outcome }` to `phase.healAttempts` regardless of outcome\n3. **Healing strategies** per category (brief guidance, not prescription):\n   - build-error: smallest mechanical fix (imports, signatures, missing serde defaults)\n   - type-error: re-read types; prefer ternary over intermediate booleans for discriminated-union narrowing\n   - test-failure: decide whether test or implementation diverges from phase goal\n   - lint-error: apply suggested fix\n   - other: fall through to manual recovery\n4. **Fallback** — when exhausted, present manual `<next-actions>` \"After failure\" flow with a summary of all heal attempts so the user knows what was tried.\n\nAlso update `<instructions>`: change the verification-failure step to reference `<auto-heal>`. Specifically replace `If verification fails, offer recovery options` with `If verification fails, follow <auto-heal> (when enabled in .tiki/config.json) before offering manual recovery options`.\n\nAfter editing the source, copy it byte-for-byte to `packages/framework/.claude/commands/tiki/execute.md`. Verify with `Get-FileHash` that the hashes match.",
+      "verification": [
+        "packages/framework/commands/execute.md contains an <auto-heal> block placed between <errors> and <next-actions>",
+        "<auto-heal> covers: opt-in check, 8-step heal loop, per-category healing strategies, manual fallback with attempts summary",
+        "<instructions> step about verification failure references <auto-heal>",
+        "packages/framework/.claude/commands/tiki/execute.md is byte-for-byte identical to the source (Get-FileHash matches)",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC2", "SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "packages/framework/commands/execute.md",
+        "packages/framework/.claude/commands/tiki/execute.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Create .tiki/config.json with default auto-heal schema",
+      "status": "pending",
+      "content": "Create `.tiki/config.json` with the default auto-heal configuration:\n\n```json\n{\n  \"workflow\": {\n    \"autoHeal\": {\n      \"enabled\": false,\n      \"maxAttempts\": 3,\n      \"categories\": [\"build-error\", \"type-error\", \"test-failure\", \"lint-error\"]\n    }\n  }\n}\n```\n\nKey decisions:\n- `enabled: false` by default — auto-heal is opt-in. Users flip this to `true` to activate the loop.\n- `maxAttempts: 3` — reasonable cap matching the issue's \"max 2-3 retries\" requirement.\n- `categories` enumerates all heal-eligible error types. Removing one disables auto-heal for that category.\n- The file is optional; absence is equivalent to `enabled: false`. The Rust state machine does not read this file — it is purely a Claude-driven configuration consumed at execute-time.\n\nDo not add JSON comments (not valid in JSON). The schema is self-documenting via execute.md's `<auto-heal>` block.",
+      "verification": [
+        ".tiki/config.json exists with the documented schema",
+        "workflow.autoHeal.enabled is false by default",
+        "workflow.autoHeal.maxAttempts is 3",
+        "workflow.autoHeal.categories includes build-error, type-error, test-failure, lint-error",
+        "File is valid JSON (parses without error)"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": [".tiki/config.json"],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1]
+  }
+}

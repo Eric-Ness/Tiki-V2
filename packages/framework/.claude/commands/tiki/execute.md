@@ -22,7 +22,7 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
     5. Update phase status and save state
   </step>
   <step>If verification passes, advance to next phase or complete</step>
-  <step>If verification fails, offer recovery options</step>
+  <step>If verification fails, follow `<auto-heal>` (when enabled in `.tiki/config.json`) before offering manual recovery options</step>
 </instructions>
 
 <research-retrieval>
@@ -263,6 +263,96 @@ During execution, update `.tiki/state.json`:
     - Pause execution
   </error>
 </errors>
+
+<auto-heal>
+## Auto-Heal: Automatic Recovery on Verification Failure
+
+When a phase's verification step fails, Tiki can attempt to repair the failure automatically before falling back to the manual recovery options in `<next-actions>`. Auto-heal is **opt-in** and is driven entirely by these instructions — there is no Rust code that runs the heal loop.
+
+### Opt-in check
+
+Before attempting auto-heal, read `.tiki/config.json` (it may not exist).
+
+```json
+{
+  "workflow": {
+    "autoHeal": {
+      "enabled": false,
+      "maxAttempts": 3,
+      "categories": ["build-error", "type-error", "test-failure", "lint-error"]
+    }
+  }
+}
+```
+
+- If the file is missing, treat `enabled` as `false` and skip auto-heal entirely (use the manual `<next-actions>` failure flow).
+- If `workflow.autoHeal.enabled !== true`, skip auto-heal.
+- `maxAttempts` defaults to `3` when missing.
+- `categories` is the allow-list of error categories you may attempt to heal. If the categorized error is not in this list, skip auto-heal and fall through to manual recovery.
+
+### Heal loop
+
+When verification fails AND auto-heal is enabled:
+
+1. **Capture the error output** verbatim (build stderr, failing test names, type errors, lint diagnostics, etc.). Trim aggressively but preserve filenames, line numbers, and the diagnostic message.
+2. **Categorize the error** using the heuristics below. Pick exactly one category:
+   - `build-error` — TypeScript `tsc -b` / `pnpm build` compilation failures, Rust `cargo check` / `cargo build` failures (non-type)
+   - `type-error` — TS-only type narrowing, missing properties on types, discriminated-union narrowing issues
+   - `test-failure` — vitest, jest, or `cargo test` failed assertions or runtime errors during tests
+   - `lint-error` — ESLint, clippy diagnostics
+   - `other` — anything else (e.g., missing file, permission error, network failure)
+3. **Read prior attempts** for this phase from `.tiki/state.json`. Look at `activeWork["issue:{N}"].phase.healAttempts` (treat as `[]` if missing). Let `attempts = healAttempts.length`.
+4. **Stop conditions** — fall through to manual `<next-actions>` recovery if any of these are true:
+   - `attempts >= config.workflow.autoHeal.maxAttempts`
+   - The categorized error is not in `config.workflow.autoHeal.categories`
+   - The same error has already been seen on the previous attempt with no progress (heal is looping)
+5. **Otherwise, attempt a targeted fix** based on category (see "Healing strategies" below). Apply the fix as a normal edit, then **re-run the same verification command** that originally failed.
+6. **Append a `HealAttempt` record** to `phase.healAttempts` in `.tiki/state.json` regardless of outcome:
+   ```json
+   {
+     "attempt": {1-indexed},
+     "timestamp": "{ISO timestamp}",
+     "errorCategory": "type-error",
+     "errorSummary": "{one-line summary, ~120 chars}",
+     "fixApplied": "{one-line description of the change}",
+     "outcome": "success" | "failure"
+   }
+   ```
+7. **On success**, clear the failure state and continue to the next phase normally. Include the heal attempts in the phase summary so they are visible.
+8. **On failure**, loop back to step 1 with the new error output. The next iteration's `attempt` count increments naturally because the prior record was appended.
+
+### Healing strategies (per category)
+
+These are guidance, not prescriptions — judge each error on its merits.
+
+- **build-error** — Read the offending file at the reported line. If the failure references a missing import/export, fix the import path. If a function signature mismatch, align the call site or the declaration based on which is canonical (prefer matching the type definition). For Rust, common fixes are missing `use` statements, missing `#[serde(default)]` on optional fields, or trait bound issues — try the smallest mechanical fix first.
+- **type-error** — Re-read the type definitions involved. For TS discriminated-union narrowing, prefer extracting fields via direct ternary (per project memory: `const x = work.type === "issue" ? work.issue.number : undefined;`) rather than intermediate booleans. Add explicit type assertions only as a last resort.
+- **test-failure** — Read the failing test, then re-read the implementation. Decide whether the test's expectation or the implementation is correct. Fix the side that diverges from the phase's stated goal. If the failing assertion is unrelated to this phase's changes, flag as `other` and bail to manual recovery.
+- **lint-error** — Apply the lint rule's suggested fix. For ESLint, prefer auto-fixable rules (`pnpm lint --fix` if available); for clippy, apply the suggested replacement.
+- **other** — Do not attempt auto-heal. Fall through to manual recovery and let the user decide.
+
+### Falling back to manual recovery
+
+When auto-heal exhausts its attempts (or refuses to start), present the manual `<next-actions>` failure flow with one important addition: **include a summary of all heal attempts** so the user knows what was tried. Format:
+
+```
+Auto-heal attempted {N} fixes for Phase {N} but verification still fails.
+
+Attempts:
+1. [type-error] Fixed discriminated-union narrowing in WorkCard.tsx → still failing (different error)
+2. [type-error] Added explicit type assertion → still failing (same error)
+3. [build-error] Reverted assertion, fixed import path → still failing
+
+Latest error:
+{error output}
+```
+
+Then fire the existing `AskUserQuestion` from `<next-actions>` "After failure".
+
+### Where to record attempts
+
+`HealAttempt` records live in `.tiki/state.json` under the active work item's `phase.healAttempts` array. The Rust state schema treats this loosely (no validation), so you can write the array directly. Do not create a separate file.
+</auto-heal>
 
 <next-actions>
 **After successful phase:**

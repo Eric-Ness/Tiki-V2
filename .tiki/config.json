@@ -1,0 +1,9 @@
+{
+  "workflow": {
+    "autoHeal": {
+      "enabled": false,
+      "maxAttempts": 3,
+      "categories": ["build-error", "type-error", "test-failure", "lint-error"]
+    }
+  }
+}
