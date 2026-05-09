@@ -1,0 +1,15 @@
+{
+  "version": "v0.2.16",
+  "status": "completed",
+  "shipped": true,
+  "completedAt": "2026-05-08T21:55:00.000Z",
+  "tag": "v0.2.16",
+  "issues": [
+    {
+      "number": 116,
+      "title": "Inline plan editor in desktop app"
+    }
+  ],
+  "createdAt": "2026-05-08T21:25:00.000Z",
+  "description": "Inline plan editor in the desktop app: drag-and-drop phase reordering, full field editing, validation, JSON diff, and atomic save."
+}
