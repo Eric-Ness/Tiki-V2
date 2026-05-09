@@ -10,6 +10,7 @@ tools: Read, Glob, Grep, AskUserQuestion
 Validate a plan before execution to catch issues early. This step checks for completeness, feasibility, and potential problems.
 
 <instructions>
+  <step>**Immediately** update `.tiki/state.json` to set `status: "planning"` and `pipelineStep: "AUDIT"` so the issue appears in the Audit step on the kanban right away (see early-state-update below)</step>
   <step>Load the plan from `.tiki/plans/issue-{number}.json`</step>
   <step>Run all audit checks from the checklist below</step>
   <step>Report any warnings or failures</step>
@@ -89,11 +90,54 @@ Validate a plan before execution to catch issues early. This step checks for com
 {If failures exist: list them with required fixes}
 </output>
 
+<early-state-update>
+**Before running any audit checks**, update `.tiki/state.json` so the issue appears in the Audit step immediately. Without this write, the kanban card stays in the Plan state for the entire duration of audit validation, making AUDIT invisible to the user.
+
+1. Read the current `.tiki/state.json`
+2. Update the `issue:{number}` entry in `activeWork` to set `status: "planning"` and `pipelineStep: "AUDIT"`:
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "issue": { "number": {number}, "title": "{title}" },
+      "status": "planning",
+      "pipelineStep": "AUDIT",
+      "phase": { "current": 1, "total": {total phases}, "status": "pending" },
+      "createdAt": "{existing createdAt}",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+This ensures the desktop app shows the issue in the Audit step as soon as validation begins, not after it completes.
+</early-state-update>
+
 <state-management>
 After audit:
-- If PASS: Update state status to `executing`, ready for execute
-- If WARN: Keep status as `planning`, note warnings in state
-- If FAIL: Keep status as `planning`, execution blocked until fixed
+- Keep `pipelineStep` as `"AUDIT"` and `status` as `"planning"` regardless of outcome
+- If PASS: add `"auditPassed": true` to the issue's work entry. Do NOT set `status: "executing"` here — that transition is owned by `tiki:execute`, which writes its own state before each phase. Setting `executing` from audit causes the kanban card to jump to the Execute column before any phase has actually started, hiding the AUDIT step from the user.
+- If WARN: add `"auditPassed": true` and record warnings in state (e.g., as a `auditWarnings` array)
+- If FAIL: add `"auditPassed": false`, execution blocked until fixed
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "issue": { "number": {number}, "title": "{title}" },
+      "status": "planning",
+      "pipelineStep": "AUDIT",
+      "phase": { "current": 1, "total": {total phases}, "status": "pending" },
+      "auditPassed": true,
+      "createdAt": "{existing createdAt}",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
 </state-management>
 
 <errors>

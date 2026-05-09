@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 134,
+    "title": "Status Check",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/134"
+  },
+  "createdAt": "2026-05-08T21:14:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "bug-fix",
+      "description": "review.md instructs Claude to write reviewing/REVIEW state BEFORE analysis work begins (mirroring plan.md's <early-state-update> pattern)"
+    },
+    {
+      "id": "SC2",
+      "category": "bug-fix",
+      "description": "audit.md instructs Claude to write planning/AUDIT state BEFORE audit work begins"
+    },
+    {
+      "id": "SC3",
+      "category": "bug-fix",
+      "description": "audit.md post-audit PASS state remains status: \"planning\", pipelineStep: \"AUDIT\" — does NOT set status: \"executing\". The transition to executing/EXECUTE is delegated to execute.md."
+    },
+    {
+      "id": "SC4",
+      "category": "regression",
+      "description": "All other tiki command templates (get, plan, execute, ship, yolo, release) remain unchanged from the user's working-tree edits. pnpm build still passes (templates do not affect build but sanity check)."
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add early-state-update blocks to review.md and audit.md; fix audit PASS state",
+      "status": "pending",
+      "content": "**Root cause** (from issue #134 diagnosis):\n\nThe Kanban board's apparent state-skipping is caused by two template bugs:\n\n1. `review.md` and `audit.md` both write state.json AFTER doing their work. So during REVIEW analysis, the card still shows GET state, and during AUDIT validation, the card still shows PLAN state. The user perceives this as \"skipping\" REVIEW and AUDIT entirely.\n2. `audit.md`'s post-audit PASS state sets `status: \"executing\"` (line 95 of working tree) — this immediately moves the card to the Execute column even though the executor hasn't run. Combined with bug #1, the card visually jumps from PLAN column → Execute column with no AUDIT visible.\n\n**Fix** — mirror the `<early-state-update>` pattern that `plan.md` already uses (current working-tree lines 117-147).\n\n### Edit `.claude/commands/tiki/review.md`\n\nReplace the existing `<state-management>` block (current working-tree lines 113-131) with two blocks: an `<early-state-update>` (before review work) and a streamlined `<state-management>` (after review work, only updates lastActivity).\n\nThe `<early-state-update>` block should instruct Claude to write `status: \"reviewing\"`, `pipelineStep: \"REVIEW\"` to `.tiki/state.json` BEFORE any codebase exploration begins. Use the JSON example from `plan.md` as the template, substituting REVIEW values.\n\nAlso add an `<instructions>` step near the top that says: \"**Immediately** update `.tiki/state.json` to set `status: \"reviewing\"` and `pipelineStep: \"REVIEW\"` so the issue appears in Active Work right away (see early-state-update below)\" — mirroring the equivalent line in `plan.md`'s `<instructions>`.\n\n### Edit `.claude/commands/tiki/audit.md`\n\nReplace the existing `<state-management>` block (current working-tree lines 91-110) with:\n\n1. An `<early-state-update>` block that instructs Claude to write `status: \"planning\"`, `pipelineStep: \"AUDIT\"` BEFORE running audit checks. Use the same pattern as `plan.md`.\n2. A `<state-management>` block describing post-audit behavior. CRITICAL FIX: on PASS, the state should remain `status: \"planning\"`, `pipelineStep: \"AUDIT\"` — NOT `status: \"executing\"`. The post-audit JSON example must reflect this. Add a comment explaining: \"The transition to status: \"executing\" / pipelineStep: \"EXECUTE\" is the responsibility of execute.md, which writes its own state before each phase.\"\n\nAlso add an `<instructions>` step near the top: \"**Immediately** update `.tiki/state.json` to set `status: \"planning\"` and `pipelineStep: \"AUDIT\"` so the issue appears in the Audit step right away (see early-state-update below)\".\n\n### Reference pattern (already in plan.md, working tree)\n\n```\n<early-state-update>\n**Before doing any planning work**, update `.tiki/state.json` so the issue appears in Active Work immediately:\n\n1. Read the current `.tiki/state.json` (create it if it doesn't exist with `schemaVersion: 1, activeWork: {}, history: {}`)\n2. Add or update the `issue:{number}` entry in `activeWork`:\n\n```json\n{ ... }\n```\n\nThis ensures the desktop app shows the issue in the Active Work panel as soon as planning begins.\n</early-state-update>\n```\n\nMirror this verbatim for review (with REVIEW values) and audit (with AUDIT values, status remaining \"planning\").\n\n### Out of scope for this issue\n\n- Adding a dedicated AUDIT column to KanbanBoard.tsx (architectural change requiring a new WorkStatus enum value).\n- Adding sub-step progress indicators to SHIP (the long lingering during shipping is real work, not a bug — would need a separate UX improvement).\n- Reducing the watcher debounce window (currently 50ms in watcher.rs:128 — already at the minimum safe value per the source comment).",
+      "verification": [
+        "review.md has an <early-state-update> block (before <state-management>) that writes status: \"reviewing\", pipelineStep: \"REVIEW\"",
+        "review.md <instructions> include a step telling Claude to write state immediately before review work",
+        "audit.md has an <early-state-update> block that writes status: \"planning\", pipelineStep: \"AUDIT\"",
+        "audit.md post-audit PASS state in <state-management> uses status: \"planning\", NOT status: \"executing\"",
+        "audit.md <instructions> include a step telling Claude to write state immediately before audit work",
+        "pnpm build passes (sanity check; templates don't affect build directly)",
+        "git diff shows changes only to .claude/commands/tiki/review.md and .claude/commands/tiki/audit.md (plus pre-existing template edits being committed together)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        ".claude/commands/tiki/review.md",
+        ".claude/commands/tiki/audit.md"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}

@@ -14,6 +14,7 @@ Analyze a GitHub issue to understand its requirements, complexity, and what need
     - Check `.tiki/state.json` for `issue:{number}`
     - If not found, run the equivalent of `tiki:get {number}` first
   </step>
+  <step>**Immediately** update `.tiki/state.json` to set `status: "reviewing"` and `pipelineStep: "REVIEW"` so the issue appears in the Review step on the kanban right away (see early-state-update below)</step>
   <step>Analyze the issue description to identify:
     - **Core requirements**: What must be built or changed
     - **Success criteria**: What needs to be true when done (backward planning)
@@ -110,10 +111,34 @@ Prefix each with an ID: SC1, SC2, SC3, etc.
 *Review complete. Ready to plan.*
 </output>
 
+<early-state-update>
+**Before doing any review work**, update `.tiki/state.json` so the issue appears in the Review step immediately. Without this write, the kanban card stays in the GET state for the entire duration of review analysis, making REVIEW invisible to the user.
+
+1. Read the current `.tiki/state.json`
+2. Update the `issue:{number}` entry in `activeWork` to set `status: "reviewing"` and `pipelineStep: "REVIEW"`:
+
+```json
+{
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "issue": { "number": {number}, "title": "{title}" },
+      "status": "reviewing",
+      "pipelineStep": "REVIEW",
+      "createdAt": "{existing createdAt}",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+This ensures the desktop app shows the issue in the Review step as soon as analysis begins, not after it completes.
+</early-state-update>
+
 <state-management>
-Update `.tiki/state.json` after review:
-- Change status from `pending` to `planning`
-- Update `lastActivity` timestamp
+After review completes, update `.tiki/state.json` once more:
+- Keep `status: "reviewing"` and `pipelineStep: "REVIEW"` (the next step, `tiki:plan`, will transition to planning)
+- Update `lastActivity` to the current timestamp
 </state-management>
 
 <errors>

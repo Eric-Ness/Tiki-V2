@@ -21,7 +21,14 @@ Finalize an issue by committing changes, pushing to remote, and closing the GitH
   <step>Stage and commit changes with a descriptive message</step>
   <step>Push to remote</step>
   <step>Close the GitHub issue with a summary comment</step>
-  <step>Update state to mark issue as completed</step>
+  <step>**Back up state before destructive changes:** Before modifying `activeWork`, create a timestamped backup of `state.json`:
+    ```bash
+    mkdir -p .tiki/backups
+    cp .tiki/state.json ".tiki/backups/state.$(date -u +%Y-%m-%dT%H-%M-%S).json"
+    ```
+    This ensures state can be recovered if the ship operation corrupts data. Keep the last 10 backups and delete older ones.
+  </step>
+  <step>Update `activeWork` in `.tiki/state.json` (see state-management section). If the issue has a `parentRelease` field, keep it in `activeWork` with `status: "completed"`. Otherwise, remove it from `activeWork`. In both cases, add to `history`.</step>
   <step>Archive the plan file</step>
 </instructions>
 
@@ -144,29 +151,98 @@ All success criteria verified:
 </output>
 
 <state-management>
-After shipping:
-
-1. Update `.tiki/state.json`:
-   - Remove issue from `activeWork`
-   - Add to `history.lastCompletedIssue`
-   - Add to `history.recentIssues` array
-
-2. Archive plan file:
-   - Move `.tiki/plans/issue-{number}.json` to `.tiki/plans/archive/`
-   - Or add `completedAt` timestamp and `shipped: true` flag
+When starting shipping, update `.tiki/state.json`:
+- Set `pipelineStep` to `"SHIP"`
+- Set `status` to `"shipping"`
 
 ```json
 {
+  "activeWork": {
+    "issue:{number}": {
+      "type": "issue",
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "lastActivity": "{ISO timestamp}"
+    }
+  }
+}
+```
+
+After shipping completes, you MUST perform these steps in order:
+
+1. **Check for `parentRelease`** — Read the issue's current entry in `activeWork`. If it has a `parentRelease` field, this issue is part of an active release.
+
+2. **If `parentRelease` IS set (child of a release):**
+   - Do NOT delete from `activeWork`. Instead, set `status` to `"completed"` and keep `pipelineStep` as `"SHIP"`.
+   - Preserve the `parentRelease` field.
+   - Add to `history` as normal (both `lastCompletedIssue` and `recentIssues`).
+   - Archive the plan file.
+   - The parent release's ship step will clean up all child `issue:N` entries when the release completes.
+
+3. **If `parentRelease` is NOT set (standalone issue):**
+   - **DELETE the issue key from `activeWork`** — Remove the entire `"issue:{number}"` entry. Shipped standalone items must NOT remain in `activeWork`.
+   - Add to `history` as normal.
+   - Archive the plan file.
+
+**Example: Standalone issue (no parentRelease) — Before:**
+```json
+{
+  "activeWork": {
+    "issue:42": { "type": "issue", "status": "shipping", ... },
+    "issue:50": { "type": "issue", "status": "executing", ... }
+  },
+  "history": { "recentIssues": [...] }
+}
+```
+
+**After shipping standalone issue #42 (REMOVED from activeWork):**
+```json
+{
+  "activeWork": {
+    "issue:50": { "type": "issue", "status": "executing", ... }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": {number},
+      "number": 42,
       "title": "{title}",
       "completedAt": "{ISO timestamp}"
     },
     "recentIssues": [
-      { "number": {number}, "title": "{title}", "completedAt": "{timestamp}" },
+      { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" },
       ...
     ]
+  }
+}
+```
+
+**Example: Release child issue (has parentRelease) — Before:**
+```json
+{
+  "activeWork": {
+    "release:v1.2": { "type": "release", "release": { "version": "v1.2", "issues": [41, 42, 43], "currentIssue": 42, "completedIssues": [41] }, "status": "executing", ... },
+    "issue:42": { "type": "issue", "status": "shipping", "parentRelease": "v1.2", ... }
+  }
+}
+```
+
+**After shipping release child issue #42 (KEPT in activeWork as completed):**
+```json
+{
+  "activeWork": {
+    "release:v1.2": { "type": "release", "release": { "version": "v1.2", "issues": [41, 42, 43], "currentIssue": null, "completedIssues": [41, 42] }, "status": "executing", ... },
+    "issue:42": {
+      "type": "issue",
+      "issue": { "number": 42, "title": "{title}" },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "parentRelease": "v1.2",
+      "createdAt": "...",
+      "lastActivity": "{ISO timestamp}"
+    }
+  },
+  "history": {
+    "lastCompletedIssue": { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" },
+    "recentIssues": [ { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" }, ... ]
   }
 }
 ```
