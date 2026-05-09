@@ -534,6 +534,7 @@ export function ReleasesSection() {
         onSave={handleDialogSave}
         editingRelease={editingRelease}
         suggestedVersion={suggestedVersion}
+        projectPath={activeProject?.path}
       />
     </>
   );

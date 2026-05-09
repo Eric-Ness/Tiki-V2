@@ -9,6 +9,7 @@ export interface ReleaseDialogProps {
   onSave: (release: Omit<TikiRelease, "createdAt" | "updatedAt">) => void;
   editingRelease?: TikiRelease;
   suggestedVersion?: string;
+  projectPath?: string;
 }
 
 export function ReleaseDialog({
@@ -17,6 +18,7 @@ export function ReleaseDialog({
   onSave,
   editingRelease,
   suggestedVersion,
+  projectPath,
 }: ReleaseDialogProps) {
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function ReleaseDialog({
       const fetchedIssues = await invoke<GitHubIssue[]>("fetch_github_issues", {
         state: "open",
         limit: 50,
+        projectPath,
       });
       setOpenIssues(fetchedIssues);
     } catch (err) {
@@ -50,7 +53,7 @@ export function ReleaseDialog({
     } finally {
       setIssuesLoading(false);
     }
-  }, []);
+  }, [projectPath]);
 
   // Get available issues (open issues not already selected)
   const availableIssues = useMemo(() => {

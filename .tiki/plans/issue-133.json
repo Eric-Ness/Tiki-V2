@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 133,
+    "title": "Create Release Issue",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/133"
+  },
+  "createdAt": "2026-05-08T21:06:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "bug-fix",
+      "description": "Open issues appear in the Create Release dialog's available-issues list when the dialog is opened"
+    },
+    {
+      "id": "SC2",
+      "category": "bug-fix",
+      "description": "fetch_github_issues IPC is called with projectPath set to the active project's path"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pass projectPath through ReleaseDialog so gh issue list runs in the project repo",
+      "status": "pending",
+      "content": "The Create Release dialog calls `fetch_github_issues` without `projectPath`, so the Rust handler falls back to `std::env::current_dir()` (the Tauri app's install directory, not the user's repo). `gh issue list` then runs in a directory with no git remote, errors out, and the empty result is silently caught — leaving the dialog's issue list blank.\n\n**Fix (2-line change):**\n\n1. `apps/desktop/src/components/releases/ReleaseDialog.tsx`:\n   - Add `projectPath?: string` to `ReleaseDialogProps` (after `suggestedVersion?`).\n   - Destructure it in the component signature.\n   - Add `projectPath` to the dependency array of the `useCallback` for `fetchOpenIssues`.\n   - Pass `projectPath` into the `invoke('fetch_github_issues', { state: 'open', limit: 50, projectPath })` call.\n\n2. `apps/desktop/src/components/sidebar/ReleasesSection.tsx`:\n   - At the `<ReleaseDialog ... />` JSX (line 531), add `projectPath={activeProject?.path}`.\n\nThe `activeProject` selector is already in scope at line 177 of ReleasesSection.tsx, so no new store reads are needed.\n\nThe `IssuesSection` component (which works correctly today) is the reference pattern — it passes `projectPath: activeProject.path` in the same IPC call.",
+      "verification": [
+        "ReleaseDialogProps includes projectPath?: string",
+        "fetchOpenIssues passes projectPath to the invoke call",
+        "ReleasesSection passes projectPath={activeProject?.path} to the dialog",
+        "pnpm build from repo root passes",
+        "Manual: open the desktop app, click + on Releases, the issue list shows open issues from the active project"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "apps/desktop/src/components/releases/ReleaseDialog.tsx",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1]
+  }
+}
