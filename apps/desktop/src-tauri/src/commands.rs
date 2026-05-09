@@ -1,10 +1,18 @@
 use crate::fs_utils::{self, BackupInfo};
 use crate::state::{TikiPlan, TikiRelease, TikiState, WorkContext, WorkStatus};
 use crate::watcher;
+use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::PathBuf;
+use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
+
+/// Framework command files embedded at compile time. The bundled framework
+/// version always matches the desktop binary (kept in sync by version-bump.mjs),
+/// so a single binary contains everything needed to install or refresh a
+/// project's `.claude/commands/tiki/` directory offline.
+static FRAMEWORK_COMMANDS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../../packages/framework/commands");
 
 /// Action to apply to a work item via `update_work_status`.
 #[derive(Debug, Deserialize)]
@@ -496,4 +504,56 @@ fn resolve_tiki_path(tiki_path: Option<String>) -> Result<PathBuf, String> {
             Ok(cwd.join(".tiki"))
         }
     }
+}
+
+/// Install or refresh the embedded Tiki framework commands into a project's
+/// `.claude/commands/tiki/` directory and stamp `<project>/.tiki/.framework-version`
+/// with the desktop binary's version.
+#[tauri::command]
+pub fn install_framework(app: AppHandle, project_path: String) -> Result<String, String> {
+    let project = PathBuf::from(&project_path);
+    if !project.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let commands_dir = project.join(".claude").join("commands").join("tiki");
+    std::fs::create_dir_all(&commands_dir).map_err(|e| e.to_string())?;
+
+    let mut installed = 0;
+    for file in FRAMEWORK_COMMANDS.files() {
+        let name = file
+            .path()
+            .file_name()
+            .ok_or_else(|| "embedded framework file missing name".to_string())?;
+        let target = commands_dir.join(name);
+        std::fs::write(&target, file.contents()).map_err(|e| e.to_string())?;
+        installed += 1;
+    }
+
+    let version = app.package_info().version.to_string();
+    let tiki_dir = project.join(".tiki");
+    std::fs::create_dir_all(&tiki_dir).map_err(|e| e.to_string())?;
+    std::fs::write(tiki_dir.join(".framework-version"), &version).map_err(|e| e.to_string())?;
+
+    log::info!(
+        "Installed {} framework commands to {:?} (version {})",
+        installed,
+        commands_dir,
+        version
+    );
+    Ok(version)
+}
+
+/// Read the installed framework version from `<project>/.tiki/.framework-version`,
+/// or `None` if the file does not exist (i.e., the project pre-dates version stamping).
+#[tauri::command]
+pub fn read_framework_version(project_path: String) -> Result<Option<String>, String> {
+    let path = PathBuf::from(project_path)
+        .join(".tiki")
+        .join(".framework-version");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    Ok(Some(contents.trim().to_string()))
 }

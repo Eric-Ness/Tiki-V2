@@ -5,7 +5,7 @@
  * Copies Tiki commands to .claude/commands/tiki/ in the target project
  */
 
-import { existsSync, mkdirSync, cpSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,6 +14,9 @@ const __dirname = dirname(__filename);
 
 const SOURCE_DIR = join(__dirname, 'commands');
 const TARGET_DIR = join(process.cwd(), '.claude', 'commands', 'tiki');
+const TIKI_DIR = join(process.cwd(), '.tiki');
+const VERSION_FILE = join(TIKI_DIR, '.framework-version');
+const PLUGIN_JSON = join(__dirname, '.claude-plugin', 'plugin.json');
 
 function install() {
   console.log('Installing Tiki commands...\n');
@@ -38,6 +41,17 @@ function install() {
     const target = join(TARGET_DIR, cmd);
     cpSync(source, target);
     console.log(`  Installed: tiki:${cmd.replace('.md', '')}`);
+  }
+
+  // Stamp the installed framework version so consumers (desktop app,
+  // /tiki:version) can detect when commands are out of date.
+  if (existsSync(PLUGIN_JSON)) {
+    const { version } = JSON.parse(readFileSync(PLUGIN_JSON, 'utf8'));
+    if (!existsSync(TIKI_DIR)) {
+      mkdirSync(TIKI_DIR, { recursive: true });
+    }
+    writeFileSync(VERSION_FILE, version);
+    console.log(`  Stamped: .tiki/.framework-version (${version})`);
   }
 
   console.log(`\nInstalled ${commands.length} commands.`);

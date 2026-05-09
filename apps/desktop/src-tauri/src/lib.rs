@@ -57,6 +57,8 @@ pub fn run() {
             commands::save_plan,
             commands::list_research_docs,
             commands::read_research_doc,
+            commands::install_framework,
+            commands::read_framework_version,
             github::check_claude_cli,
             github::check_gh_auth,
             github::fetch_github_issues,

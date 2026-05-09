@@ -1,0 +1,45 @@
+{
+  "issue": { "number": 141, "title": "feat: in-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click" },
+  "createdAt": "2026-05-09T03:46:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Backend: stamp version, embed commands, IPC commands",
+      "content": "Update packages/framework/install.js to write `<cwd>/.tiki/.framework-version` after copying commands (read version from packages/framework/.claude-plugin/plugin.json). Add `include_dir = \"0.7\"` to apps/desktop/src-tauri/Cargo.toml. Use `include_dir!(\"../../../packages/framework/commands\")` in commands.rs to embed framework command files at compile time (offline + dev/prod parity). Add two new Tauri IPC commands: `install_framework(app, project_path)` iterates the embedded dir, writes each .md file to `<project>/.claude/commands/tiki/`, then writes `app.package_info().version` to `<project>/.tiki/.framework-version`; `read_framework_version(project_path)` returns the contents of `.tiki/.framework-version` or None. Register both in lib.rs invoke_handler.",
+      "verification": [
+        "cargo check passes",
+        "pnpm build passes",
+        "install.js writes .framework-version to .tiki/",
+        "include_dir crate added to Cargo.toml",
+        "install_framework and read_framework_version are registered in lib.rs",
+        "install_framework takes (project_path: String) and returns Result<String, String> with the installed version"
+      ],
+      "status": "pending"
+    },
+    {
+      "number": 2,
+      "title": "Frontend: detection, toast, badge",
+      "content": "Add optional `frameworkVersion: string | null` field to Project type in projectsStore.ts. Update useProjectsStore to support setProjectFrameworkVersion(id, version). In ProjectsSection.tsx (or App.tsx alongside the existing project-switch effect), call `read_framework_version` on every project switch, compare to `getVersion()` from @tauri-apps/api/app. When mismatched or null, dispatch an info toast with text \"Framework outdated for {project.name} — click to update\" — but since the existing toast system has no actions, use a plain info toast plus a clickable badge on ProjectCard.tsx. Add a small \"Update available\" badge to ProjectCard that, when clicked, calls `install_framework(project.path)` then refreshes frameworkVersion. Use existing project-card styling conventions.",
+      "verification": [
+        "pnpm build passes",
+        "Project type has frameworkVersion field (optional)",
+        "On project switch, read_framework_version is called and result stored",
+        "ProjectCard shows update badge when frameworkVersion is null or older than app version",
+        "Clicking the badge calls install_framework and clears the stale state"
+      ],
+      "status": "pending"
+    },
+    {
+      "number": 3,
+      "title": "version.md update + final verification",
+      "content": "Update packages/framework/commands/version.md to read installed framework version from `<project>/.tiki/.framework-version` (preferred) with fallback to `packages/framework/.claude-plugin/plugin.json`. This makes /tiki:version consistent with the desktop app's view. Run final pnpm build + cargo check. Sync the installed copy at .claude/commands/tiki/version.md with the source.",
+      "verification": [
+        "version.md reads from .framework-version first, plugin.json as fallback",
+        ".claude/commands/tiki/version.md matches packages/framework/commands/version.md",
+        "pnpm build passes",
+        "cargo check passes"
+      ],
+      "status": "pending"
+    }
+  ]
+}

@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { Project } from "../../stores";
+import { useProjectsStore, useToastStore } from "../../stores";
 import "./ProjectCard.css";
 
 export interface ProjectCardProps {
@@ -14,6 +17,31 @@ export function ProjectCard({
   onSelect,
   onRemove,
 }: ProjectCardProps) {
+  const setProjectFrameworkVersion = useProjectsStore(
+    (s) => s.setProjectFrameworkVersion
+  );
+  const [isInstalling, setIsInstalling] = useState(false);
+
+  const handleInstallFramework = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (isInstalling) return;
+    setIsInstalling(true);
+    try {
+      const installed = await invoke<string>("install_framework", {
+        projectPath: project.path,
+      });
+      setProjectFrameworkVersion(project.id, installed, false);
+      useToastStore
+        .getState()
+        .addToast(`Framework updated to v${installed}`, "success", 4000);
+    } catch (err) {
+      useToastStore
+        .getState()
+        .addToast(`Framework update failed: ${err}`, "error", 8000);
+    } finally {
+      setIsInstalling(false);
+    }
+  };
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -47,6 +75,18 @@ export function ProjectCard({
           {truncatePath(project.path)}
         </div>
       </div>
+      {project.frameworkOutdated && (
+        <button
+          className="project-card-update"
+          onClick={handleInstallFramework}
+          disabled={isInstalling}
+          aria-label={`Update Tiki framework for ${project.name}`}
+          title="Update Tiki framework files for this project"
+          type="button"
+        >
+          {isInstalling ? "..." : "Update"}
+        </button>
+      )}
       <button
         className="project-card-remove"
         onClick={handleRemoveClick}

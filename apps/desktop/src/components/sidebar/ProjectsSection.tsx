@@ -1,8 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { ProjectCard } from "./ProjectCard";
-import { useProjectsStore, useTerminalStore, useDetailStore, useKanbanStore } from "../../stores";
+import {
+  useProjectsStore,
+  useTerminalStore,
+  useDetailStore,
+  useKanbanStore,
+  useToastStore,
+} from "../../stores";
 import "./ProjectsSection.css";
 
 export function ProjectsSection() {
@@ -12,12 +19,15 @@ export function ProjectsSection() {
   const removeProject = useProjectsStore((state) => state.removeProject);
   const setActiveProject = useProjectsStore((state) => state.setActiveProject);
   const getActiveProject = useProjectsStore((state) => state.getActiveProject);
+  const setProjectFrameworkVersion = useProjectsStore(
+    (state) => state.setProjectFrameworkVersion
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const previousActiveIdRef = useRef<string | null>(null);
 
-  // Switch file watcher when active project changes
+  // Switch file watcher and refresh framework version when active project changes
   useEffect(() => {
     const switchWatcher = async () => {
       // Skip on initial mount or if no change
@@ -38,10 +48,35 @@ export function ProjectsSection() {
         console.error("Failed to switch project watcher:", err);
         // Don't show error to user - watcher issues shouldn't block UI
       }
+
+      // Read installed framework version and warn if outdated.
+      // The bundled framework version equals the desktop binary version
+      // (kept in lockstep by version-bump.mjs), so getVersion() is the truth.
+      try {
+        const [installed, bundled] = await Promise.all([
+          invoke<string | null>("read_framework_version", {
+            projectPath: activeProject.path,
+          }),
+          getVersion(),
+        ]);
+        const outdated = installed !== bundled;
+        setProjectFrameworkVersion(activeProject.id, installed, outdated);
+        if (outdated) {
+          useToastStore
+            .getState()
+            .addToast(
+              `Tiki framework outdated for ${activeProject.name} — click the badge in the sidebar to update`,
+              "warning",
+              8000
+            );
+        }
+      } catch (err) {
+        console.error("Failed to read framework version:", err);
+      }
     };
 
     switchWatcher();
-  }, [activeProjectId, getActiveProject]);
+  }, [activeProjectId, getActiveProject, setProjectFrameworkVersion]);
 
   const handleAddProject = async () => {
     setError(null);

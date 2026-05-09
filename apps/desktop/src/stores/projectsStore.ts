@@ -6,6 +6,18 @@ export interface Project {
   name: string;
   path: string;
   addedAt: string;
+  /**
+   * Installed Tiki framework version for this project, read from
+   * `<path>/.tiki/.framework-version`. `null` means the project was
+   * installed before version stamping and should be treated as outdated.
+   * Refreshed from disk on every project switch.
+   */
+  frameworkVersion?: string | null;
+  /**
+   * Derived from comparing frameworkVersion to the desktop binary's version.
+   * Set by ProjectsSection on every project switch.
+   */
+  frameworkOutdated?: boolean;
 }
 
 interface ProjectsState {
@@ -18,6 +30,11 @@ interface ProjectsActions {
   removeProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
   getActiveProject: () => Project | undefined;
+  setProjectFrameworkVersion: (
+    id: string,
+    version: string | null,
+    outdated: boolean
+  ) => void;
 }
 
 type ProjectsStore = ProjectsState & ProjectsActions;
@@ -71,6 +88,15 @@ export const useProjectsStore = create<ProjectsStore>()(
         const state = get();
         return state.projects.find((p) => p.id === state.activeProjectId);
       },
+
+      setProjectFrameworkVersion: (id, version, outdated) =>
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id
+              ? { ...p, frameworkVersion: version, frameworkOutdated: outdated }
+              : p
+          ),
+        })),
     }),
     {
       name: 'tiki-projects',
