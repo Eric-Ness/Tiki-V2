@@ -75,6 +75,142 @@ This is not optional. The desktop app and other tooling rely on the `phase` obje
 ```
 </state-update-requirement>
 
+<parallel-execution>
+## Parallel Phase Execution
+
+Phases that have no shared file conflicts and whose dependencies are already satisfied can run concurrently in separate sub-agents. This section is the authoritative algorithm — follow it deterministically.
+
+### When to parallelize
+
+- **Default: ON.** Always attempt to parallelize independent phases.
+- **Opt-out hook:** Read `.tiki/config.json`. If `workflow.parallel.enabled === false`, fall back to fully sequential execution. If the file or key is missing, treat it as `true`.
+- **Edge case:** If a single-phase group emerges, run it as a single (non-parallel) phase using the existing single-phase code path. Do NOT set `parallelExecution`.
+
+### Step 1 — Build the dependency graph
+
+For each phase in the plan:
+- `node = phase.number`
+- `incoming edges = phase.dependencies` (numbers of phases that must complete first)
+- `files = phase.files || []`
+
+### Step 2 — Compute topological levels (Kahn's by levels)
+
+```
+remaining = set of all phase numbers
+levels = []
+while remaining is non-empty:
+    ready = [p for p in remaining if all of p.dependencies are NOT in remaining]
+    if ready is empty: ERROR — cycle in dependencies. Abort and surface.
+    levels.append(ready)
+    remaining -= ready
+```
+
+After this loop:
+- `levels[0]` = phases with no unsatisfied deps
+- `levels[i]` = phases whose deps are all in `levels[0..i-1]`
+- Levels run **sequentially**: do not start level `i+1` until every phase in level `i` is `completed`.
+
+### Step 3 — Within each level, split into file-conflict-free groups (greedy)
+
+Within a single level, two phases can run in the same parallel group iff their `files` arrays have an empty intersection (set difference). Use this greedy algorithm:
+
+```
+groups = []
+remaining_at_level = list of phases at this level (preserve plan order)
+while remaining_at_level is non-empty:
+    seed = remaining_at_level.pop_front()
+    group = [seed]
+    group_files = set(seed.files)
+    leftover = []
+    for p in remaining_at_level:
+        if set(p.files).intersection(group_files) is empty:
+            group.append(p)
+            group_files = group_files.union(p.files)
+        else:
+            leftover.append(p)
+    groups.append(group)
+    remaining_at_level = leftover
+```
+
+Conservative rules:
+- If `phase.files` is missing, empty, or null, treat the phase as conflicting with everything (assume worst case: it touches anything). Place it in its own group.
+- **Groups within a level run sequentially.** Levels run sequentially.
+- **Phases within a group run in parallel.**
+
+### Step 4 — Dispatch the group
+
+This is the parallelism mechanism. The Anthropic Agent (Task) tool runs concurrently when **multiple Task calls are emitted in a single assistant message**.
+
+- **Group size 1:** Run as a normal single phase (existing single-phase code path). Do NOT set `parallelExecution`.
+- **Group size N >= 2:** In ONE assistant message, emit N `Task` tool calls (one per phase in the group). Each Task uses `subagent_type: "general-purpose"` and the prompt template from `<sub-agent-protocol>` below. Each prompt MUST include the phase's files list and verification criteria so the sub-agent stays scoped to its files.
+
+### Step 5 — State updates (`.tiki/state.json`)
+
+**When starting a parallel group (size >= 2):** before dispatching the Task calls, write:
+
+```json
+"phase": {
+  "current": <max(phase.number for phase in group)>,
+  "total": <total phases in plan>,
+  "status": "executing"
+},
+"parallelExecution": {
+  "phases": [<all phase numbers in group, ascending>],
+  "completedInGroup": [],
+  "totalInGroup": <group size>,
+  "startedAt": "<current ISO timestamp>"
+}
+```
+
+`phase.current = max(...)` so old desktop clients that only read `phase` see a sensible "Phase X of Y" display while the group is in flight.
+
+**As each phase in the group returns:**
+- Append its number to `parallelExecution.completedInGroup` (or move to `failed` tracking if it failed).
+- Update the per-phase status in `.tiki/plans/issue-N.json` immediately (don't batch — the file watcher relies on this).
+- Do NOT advance `phase.current` while siblings are still running.
+
+**When all phases in the group have returned:**
+- Remove the `parallelExecution` field entirely (omit on serialize, or set to `null`).
+- If any phase failed, see Failure Handling below.
+- Otherwise, advance to the next group/level. If the next batch is also a parallel group of size >= 2, repeat from Step 4. If it's size 1, run sequentially without `parallelExecution`.
+
+**When the entire plan is done:** set work `status` to `"shipping"` and clear `phase.status` to `"completed"`.
+
+### Step 6 — Failure handling
+
+When at least one sub-agent in a parallel group fails:
+
+- **Do NOT cancel sibling sub-agents.** They are already in flight; cancellation is unsupported by the Agent tool and would only waste work. Let them run to completion.
+- **Wait for all sub-agents to return.** Collect every result.
+- **Surface all failures together.** Update the plan file: each failed phase gets `status: "failed"` with its error message. Successful siblings get `status: "completed"`.
+- **Pause for manual recovery.** Set work `status` to `"failed"`, clear `parallelExecution`, and present the recovery options from `<next-actions>` (fix and retry, skip, pause, heal). Do NOT auto-advance to the next level.
+
+### Step 7 — Backward compatibility
+
+- A single-phase level emits a single Task call (or runs inline) and DOES NOT set `parallelExecution`. Old clients see the familiar `phase: { current, total, status }` and behave identically.
+- Old state.json files lacking `parallelExecution` deserialize cleanly (the field is `Option<…>` with `#[serde(default)]` on the Rust side and optional in TypeScript).
+- The whole feature degrades gracefully: if every level happens to contain phases that all conflict on files, the algorithm collapses to one phase per group, which is byte-identical to sequential execution.
+
+### Worked example
+
+Plan with 5 phases:
+- P1: deps=[],     files=["a.rs"]
+- P2: deps=[],     files=["b.ts"]
+- P3: deps=[],     files=["a.rs"]   <-- conflicts with P1
+- P4: deps=[1,2],  files=["c.css"]
+- P5: deps=[3],    files=["a.rs"]
+
+Levels:
+- L0 = [P1, P2, P3]   (no deps)
+- L1 = [P4, P5]       (deps satisfied by L0)
+
+Groups:
+- L0 split: seed P1 (files=a.rs). P2 (b.ts) joins (no overlap) → group=[P1,P2]. P3 (a.rs) conflicts with P1 → next group=[P3]. So L0 runs as: parallel{P1,P2} → then P3.
+- L1 split: seed P4 (c.css). P5 (a.rs) has no overlap → group=[P4,P5]. So L1 runs as: parallel{P4,P5}.
+
+Final execution order: parallel{P1,P2} → P3 → parallel{P4,P5}.
+</parallel-execution>
+
 <phase-execution>
 **Before starting a phase:**
 1. Read the phase content from the plan

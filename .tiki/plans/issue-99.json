@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 99,
+    "title": "Parallel phase execution",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/99"
+  },
+  "createdAt": "2026-05-08T00:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "framework", "description": "execute.md describes a deterministic algorithm for grouping phases into parallelizable batches using Kahn's algorithm by levels and file-conflict-free greedy splits" },
+    { "id": "SC2", "category": "framework", "description": "execute.md instructs Claude to dispatch parallel phases via multiple Agent (Task) tool calls in a single assistant message" },
+    { "id": "SC3", "category": "framework", "description": "execute.md specifies state.json updates: setting parallelExecution when starting a group, appending to completedInGroup as phases finish, clearing it when the group completes" },
+    { "id": "SC4", "category": "framework", "description": "execute.md describes failure handling: in-flight sub-agents are not cancelled; failures are surfaced together once all return" },
+    { "id": "SC5", "category": "framework", "description": "execute.md preserves backward compatibility: a single phase at a level runs without parallelExecution being set" },
+    { "id": "SC6", "category": "schema", "description": "Rust IssueContext exposes an optional parallelExecution field with phases, completedInGroup, totalInGroup, startedAt that round-trips through serde with backward-compat (#[serde(default)])" },
+    { "id": "SC7", "category": "ui", "description": "Desktop app shows a 'parallel: N' badge near the phase progress indicator when parallelExecution.phases.length > 1" },
+    { "id": "SC8", "category": "ui", "description": "Desktop TypeScript types (IssueContext in WorkCard.tsx and any mirroring locations) include the optional parallelExecution field" },
+    { "id": "SC9", "category": "build", "description": "pnpm build and cargo check (in apps/desktop/src-tauri) both pass cleanly after all changes" },
+    { "id": "SC10", "category": "framework", "description": "execute.md mirror file at packages/framework/.claude/commands/tiki/execute.md is byte-for-byte identical to the source" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add <parallel-execution> block to execute.md (source + mirror)",
+      "status": "pending",
+      "content": "Add a new <parallel-execution> XML block to packages/framework/commands/execute.md, placed immediately after the <state-update-requirement> block and before <phase-execution>. Then byte-for-byte copy the result to packages/framework/.claude/commands/tiki/execute.md.\n\nThe block MUST cover:\n\n1. **When to parallelize**: Always, by default. Mention .tiki/config.json `workflow.parallel.enabled` (default true) as an opt-out hook.\n\n2. **Grouping algorithm** (deterministic):\n   a. Build adjacency from each phase's `dependencies: number[]`.\n   b. Compute topological levels: level 0 = phases whose dependencies are all in earlier (lower-index) levels or empty. Iterate until all phases assigned.\n   c. Within each level, partition phases into file-conflict-free groups using a greedy split:\n      - Start a new group with the first remaining phase.\n      - For each other remaining phase in the level, add it to the current group ONLY IF its `files` array has no overlap (set intersection) with any existing group member's `files` array.\n      - Phases that conflict become seeds of subsequent groups within the same level.\n   d. Each GROUP runs in parallel; groups within a level run sequentially; levels run sequentially.\n   e. If a phase has `files: []` (or missing), treat it as conflicting with everything (be conservative — run alone).\n\n3. **Dispatch mechanism**: When a parallel group has 2+ phases, Claude dispatches them in a SINGLE assistant message containing multiple Task tool calls (one per phase). The Anthropic Agent tool runs these concurrently when invoked together. When a group has only 1 phase, dispatch it as a single Task call (or run inline as today).\n\n4. **State updates**:\n   - Starting a parallel group (size >= 2):\n     ```json\n     \"phase\": { \"current\": <max phase# in group>, \"total\": <total phases>, \"status\": \"executing\" },\n     \"parallelExecution\": {\n       \"phases\": [<phase numbers in group>],\n       \"completedInGroup\": [],\n       \"totalInGroup\": <group size>,\n       \"startedAt\": \"<ISO timestamp>\"\n     }\n     ```\n   - As each phase in the group completes, append its number to `completedInGroup`.\n   - When all phases in the group are done, CLEAR `parallelExecution` (omit or set to null) and advance.\n   - For single-phase levels/groups, do NOT set `parallelExecution` — only update `phase` (backward compatible).\n\n5. **Failure handling**: If a sub-agent fails while siblings are still running, do NOT attempt to cancel siblings — they're in flight. Wait for all to return. Then surface ALL failures together. Mark each failed phase status individually in the plan file. Trigger manual recovery (audit, retry, skip) once all sub-agents return.\n\n6. **Backward compatibility**: When the next level has only one phase, run sequentially (no parallelExecution). Old desktop clients reading state.json will see `phase` populated as before; the optional `parallelExecution` is ignored if unrecognized.\n\nVERIFY identical: `diff -q packages/framework/commands/execute.md packages/framework/.claude/commands/tiki/execute.md` returns no output.",
+      "verification": [
+        "<parallel-execution> block exists in packages/framework/commands/execute.md immediately before <phase-execution>",
+        "Block describes Kahn's-by-levels + file-conflict greedy split algorithm explicitly",
+        "Block describes single-message multi-Task dispatch as the parallelism mechanism",
+        "Block specifies parallelExecution state shape with phases, completedInGroup, totalInGroup, startedAt",
+        "Block describes failure handling (no cancellation, surface failures together)",
+        "Mirror file is byte-for-byte identical: diff -q against source returns no output"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC10"],
+      "files": [
+        "packages/framework/commands/execute.md",
+        "packages/framework/.claude/commands/tiki/execute.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add ParallelExecution struct to Rust state.rs",
+      "status": "pending",
+      "content": "Extend apps/desktop/src-tauri/src/state.rs to support the optional parallelExecution field on IssueContext.\n\n### Add a new struct\n\n```rust\n/// Parallel execution tracking (optional, present only during parallel phase groups)\n#[derive(Debug, Clone, Serialize, Deserialize)]\n#[serde(rename_all = \"camelCase\")]\npub struct ParallelExecution {\n    /// Phase numbers currently running in parallel\n    pub phases: Vec<u32>,\n    /// Phase numbers in this group that have already completed\n    #[serde(default)]\n    pub completed_in_group: Vec<u32>,\n    /// Total phases in this parallel group (for progress display)\n    pub total_in_group: u32,\n    /// ISO timestamp when the group started\n    pub started_at: String,\n}\n```\n\nPlace it near `PhaseProgress` (line ~330).\n\n### Wire into IssueContext\n\nIn `IssueContext` (around line 36), add:\n\n```rust\n#[serde(default, skip_serializing_if = \"Option::is_none\")]\npub parallel_execution: Option<ParallelExecution>,\n```\n\nPlace it adjacent to `phase`.\n\n### Update RawIssueContext\n\nAdd matching field to the deserializer helper (around line 62):\n\n```rust\n#[serde(default)]\nparallel_execution: Option<ParallelExecution>,\n```\n\n### Update the IssueContext::deserialize impl\n\nIn the final `Ok(IssueContext { ... })` block (around line 279), pass the field through:\n\n```rust\nparallel_execution: raw.parallel_execution,\n```\n\nThe `#[serde(default)]` on the raw field ensures missing/old state.json files still parse cleanly.\n\n### Verify\n\n```powershell\ncd C:\\Users\\ericn\\Documents\\Github\\Tiki-V2\\apps\\desktop\\src-tauri; cargo check\n```",
+      "verification": [
+        "ParallelExecution struct exists in state.rs with phases, completed_in_group, total_in_group, started_at fields",
+        "ParallelExecution serde renames match camelCase JSON contract (completedInGroup, totalInGroup, startedAt)",
+        "IssueContext has parallel_execution: Option<ParallelExecution> with #[serde(default, skip_serializing_if = \"Option::is_none\")]",
+        "RawIssueContext has matching #[serde(default)] field and the deserialize impl threads it through",
+        "cargo check in apps/desktop/src-tauri passes with no errors"
+      ],
+      "addressesCriteria": ["SC6"],
+      "files": ["apps/desktop/src-tauri/src/state.rs"],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Update desktop TS types and add ParallelBadge UI",
+      "status": "pending",
+      "content": "Update the desktop frontend so it can render parallel phase indicators.\n\n### TypeScript type changes\n\n**apps/desktop/src/components/work/WorkCard.tsx** (canonical IssueContext for the desktop app):\n\n1. Add an interface near `PhaseInfo`:\n\n```ts\nexport interface ParallelExecutionInfo {\n  phases: number[];\n  completedInGroup: number[];\n  totalInGroup: number;\n  startedAt: string;\n}\n```\n\n2. Add to `IssueContext`:\n\n```ts\nparallelExecution?: ParallelExecutionInfo;\n```\n\n3. In the existing `WorkCard` body, wherever the `phase.current / phase.total` text is rendered, add an inline parallel badge when `work.parallelExecution && work.parallelExecution.phases.length > 1`. Render it next to the existing 'Phase X of Y' text:\n\n```tsx\n{work.parallelExecution && work.parallelExecution.phases.length > 1 && (\n  <span className=\"parallel-badge\" title={`Phases ${work.parallelExecution.phases.join(', ')} running in parallel`}>\n    parallel: {work.parallelExecution.phases.length}\n  </span>\n)}\n```\n\n**apps/desktop/src/components/sidebar/WorkProgressCard.tsx**: this component already imports `WorkContext` from `WorkCard`, so the type flows automatically. Render the same `parallel-badge` next to `Phase {currentPhase}/{totalPhases}` inside `<span className=\"work-progress-text\">`. Read via `isIssue ? work.parallelExecution : undefined`.\n\n**apps/desktop/src/components/detail/IssueDetail.tsx**: the local `WorkContext` interface (lines ~14-24) is hand-rolled. Add to it:\n\n```ts\nparallelExecution?: {\n  phases: number[];\n  completedInGroup?: number[];\n  totalInGroup?: number;\n  startedAt?: string;\n};\n```\n\nNo UI rendering required in IssueDetail beyond keeping the type valid.\n\n**apps/desktop/src/stores/tikiStateStore.ts**: imports WorkContext from `../components/work` — no change needed.\n\n**apps/desktop/src/App.tsx**: uses WorkContext from work components — no change to TikiState needed.\n\n**apps/desktop/src/components/kanban/KanbanBoard.tsx**: uses an inline `{ phase?: ... }` cast — no change needed since it doesn't read parallelExecution.\n\n**apps/desktop/src/components/sidebar/IssuesSection.tsx**: same — inline cast, no change needed.\n\n### CSS\n\nAppend a `.parallel-badge` rule to **apps/desktop/src/components/sidebar/WorkProgressCard.css** (and a matching one near the existing `.work-card` styles in App.css if `WorkCard` uses App.css). Reuse existing color vars:\n\n```css\n.parallel-badge {\n  display: inline-block;\n  margin-left: 8px;\n  padding: 1px 6px;\n  border-radius: 8px;\n  background: rgba(96, 165, 250, 0.18);\n  color: #60a5fa;\n  font-size: 10px;\n  font-weight: 600;\n  font-family: var(--font-mono, monospace);\n  letter-spacing: 0.02em;\n  vertical-align: middle;\n}\n```\n\n### Update shared types (defensive)\n\nFor symmetry with Rust and to avoid drift, also extend **packages/shared/src/types/state.ts**:\n\n```ts\n/** Parallel execution tracking (optional, present only during parallel phase groups) */\nexport interface ParallelExecution {\n  phases: number[];\n  completedInGroup: number[];\n  totalInGroup: number;\n  startedAt: Timestamp;\n}\n```\n\nAdd to `IssueWork` and `ReleaseWork`:\n\n```ts\n/** Parallel execution group tracking (set only when phases > 1 are running concurrently) */\nparallelExecution?: ParallelExecution;\n```\n\nAlso add the field to **packages/shared/schemas/state.schema.json** under `issueWork.properties` and `releaseWork.properties`:\n\n```json\n\"parallelExecution\": {\n  \"type\": \"object\",\n  \"description\": \"Parallel execution tracking (set only during multi-phase parallel groups)\",\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"phases\": { \"type\": \"array\", \"items\": { \"type\": \"integer\", \"minimum\": 1 } },\n    \"completedInGroup\": { \"type\": \"array\", \"items\": { \"type\": \"integer\", \"minimum\": 1 } },\n    \"totalInGroup\": { \"type\": \"integer\", \"minimum\": 1 },\n    \"startedAt\": { \"$ref\": \"#/$defs/timestamp\" }\n  },\n  \"required\": [\"phases\", \"totalInGroup\", \"startedAt\"]\n}\n```",
+      "verification": [
+        "WorkCard.tsx exports ParallelExecutionInfo and IssueContext.parallelExecution is optional",
+        "WorkCard renders a .parallel-badge when parallelExecution.phases.length > 1",
+        "WorkProgressCard.tsx renders .parallel-badge inside .work-progress-text when applicable",
+        "IssueDetail.tsx local WorkContext includes optional parallelExecution",
+        ".parallel-badge CSS rule exists in WorkProgressCard.css",
+        "packages/shared/src/types/state.ts exports ParallelExecution and adds optional parallelExecution to IssueWork and ReleaseWork",
+        "packages/shared/schemas/state.schema.json includes parallelExecution under issueWork properties",
+        "pnpm build from repo root passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC7", "SC8"],
+      "files": [
+        "apps/desktop/src/components/work/WorkCard.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.css",
+        "apps/desktop/src/components/detail/IssueDetail.tsx",
+        "packages/shared/src/types/state.ts",
+        "packages/shared/schemas/state.schema.json"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Build verification and final integration check",
+      "status": "pending",
+      "content": "Final verification gate. Run both build chains end-to-end and capture failures.\n\n```powershell\ncd C:\\Users\\ericn\\Documents\\Github\\Tiki-V2; pnpm build 2>&1 | Select-Object -Last 20\ncd C:\\Users\\ericn\\Documents\\Github\\Tiki-V2\\apps\\desktop\\src-tauri; cargo check 2>&1 | Select-Object -Last 20\n```\n\nBoth must succeed. If `pnpm build` fails, look at WorkCard.tsx, WorkProgressCard.tsx, IssueDetail.tsx, and packages/shared/src/types/state.ts for type mismatches. If `cargo check` fails, look at state.rs serde derives and field placement.\n\nAlso verify the mirror file is byte-identical:\n\n```powershell\ndiff -q packages/framework/commands/execute.md packages/framework/.claude/commands/tiki/execute.md\n```\n\nIf there are differences, re-copy the source over the mirror.",
+      "verification": [
+        "pnpm build from repo root completes with exit code 0",
+        "cargo check in apps/desktop/src-tauri completes with exit code 0",
+        "diff between source and mirror execute.md returns no output (byte-identical)"
+      ],
+      "addressesCriteria": ["SC9", "SC10"],
+      "files": [],
+      "dependencies": [1, 2, 3]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [2],
+    "SC7": [3],
+    "SC8": [3],
+    "SC9": [4],
+    "SC10": [1, 4]
+  }
+}

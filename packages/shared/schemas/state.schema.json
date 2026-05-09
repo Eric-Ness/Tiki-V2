@@ -158,6 +158,33 @@
             }
           }
         },
+        "parallelExecution": {
+          "type": "object",
+          "description": "Parallel execution group tracking — set only while multiple phases are running concurrently in separate sub-agents",
+          "additionalProperties": false,
+          "required": ["phases", "totalInGroup", "startedAt"],
+          "properties": {
+            "phases": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 },
+              "description": "Phase numbers currently running in parallel"
+            },
+            "completedInGroup": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 },
+              "description": "Phase numbers in this group that have already completed"
+            },
+            "totalInGroup": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Total phases in this parallel group (for progress display)"
+            },
+            "startedAt": {
+              "$ref": "#/$defs/timestamp",
+              "description": "ISO 8601 timestamp when the group started"
+            }
+          }
+        },
         "createdAt": {
           "$ref": "#/$defs/timestamp"
         },
@@ -268,6 +295,29 @@
             },
             "status": {
               "$ref": "#/$defs/phaseStatus"
+            }
+          }
+        },
+        "parallelExecution": {
+          "type": "object",
+          "description": "Parallel execution group tracking for the current issue — set only while multiple phases are running concurrently",
+          "additionalProperties": false,
+          "required": ["phases", "totalInGroup", "startedAt"],
+          "properties": {
+            "phases": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 }
+            },
+            "completedInGroup": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 }
+            },
+            "totalInGroup": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "startedAt": {
+              "$ref": "#/$defs/timestamp"
             }
           }
         },

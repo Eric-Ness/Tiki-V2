@@ -88,6 +88,22 @@ export interface PhaseProgress {
   status: PhaseStatus;
 }
 
+/**
+ * Parallel execution tracking — present only when multiple phases are running concurrently
+ * in separate sub-agents. When the group completes, this field is cleared and execution
+ * advances to the next group/level. Single-phase groups DO NOT set this field.
+ */
+export interface ParallelExecution {
+  /** Phase numbers currently running in parallel */
+  phases: number[];
+  /** Phase numbers in this group that have already completed */
+  completedInGroup: number[];
+  /** Total phases in this parallel group (for progress display) */
+  totalInGroup: number;
+  /** ISO 8601 timestamp when the group started */
+  startedAt: Timestamp;
+}
+
 /** Error details for failed work */
 export interface WorkError {
   message: string;
@@ -108,6 +124,8 @@ export interface IssueWork {
   /** History of pipeline step transitions with timing */
   pipelineHistory?: PipelineStepRecord[];
   phase?: PhaseProgress;
+  /** Parallel execution group tracking (set only while multiple phases are running concurrently) */
+  parallelExecution?: ParallelExecution;
   createdAt: Timestamp;
   lastActivity: Timestamp;
   error?: WorkError;
@@ -138,6 +156,8 @@ export interface ReleaseWork {
   pipelineStep?: PipelineStep;
   /** Current phase of current issue */
   phase?: PhaseProgress;
+  /** Parallel execution group tracking for the current issue (set only while multiple phases run concurrently) */
+  parallelExecution?: ParallelExecution;
   createdAt: Timestamp;
   lastActivity: Timestamp;
   error?: WorkError;

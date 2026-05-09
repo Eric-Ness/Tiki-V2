@@ -10,6 +10,7 @@ export type {
   Timestamp,
   IssueInfo,
   PhaseProgress,
+  ParallelExecution,
   WorkError,
   IssueWork,
   ReleaseInfo,

@@ -6,6 +6,7 @@ export type {
   WorkStatus,
   PhaseStatus,
   PhaseInfo,
+  ParallelExecutionInfo,
   PipelineStep,
   PipelineStepRecord
 } from "./WorkCard";
