@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 102,
+    "title": "Research command and knowledge capture",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/102"
+  },
+  "createdAt": "2026-05-09T02:05:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "functionality", "description": "Running /tiki:research <topic> captures a well-formed .tiki/research/<topic>.md file with YAML front-matter and markdown body" },
+    { "id": "SC2", "category": "functionality", "description": "Front-matter schema (topic, tags, issues, created) is defined and written correctly by the research command; issues field is auto-tagged with the current issue number when provided" },
+    { "id": "SC3", "category": "functionality", "description": "review.md auto-captures domain findings to .tiki/research/ as a side-effect of the REVIEW step" },
+    { "id": "SC4", "category": "functionality", "description": "plan.md auto-captures planning-relevant domain knowledge to .tiki/research/ as a side-effect of the PLAN step" },
+    { "id": "SC5", "category": "functionality", "description": "plan.md reads existing .tiki/research/ docs before phase design and surfaces relevant content to the planner" },
+    { "id": "SC6", "category": "functionality", "description": "execute.md reads relevant .tiki/research/ docs before each phase and passes content to sub-agents via the phase context" },
+    { "id": "SC7", "category": "functionality", "description": "list_research_docs and read_research_doc Rust IPC commands exist, are registered in lib.rs, and return correct data" },
+    { "id": "SC8", "category": "functionality", "description": "The file watcher emits a ResearchChanged event (with filename) when any .tiki/research/*.md file is created, modified, or deleted" },
+    { "id": "SC9", "category": "ux", "description": "The desktop sidebar shows a ResearchSection listing all research docs with topic and tags; the list updates live when files change" },
+    { "id": "SC10", "category": "ux", "description": "Selecting a research doc in the sidebar renders its Markdown body (front-matter stripped) in the detail panel via the existing MarkdownRenderer component" },
+    { "id": "SC11", "category": "functionality", "description": "Framework command mirrors in packages/framework/.claude/commands/tiki/ are updated to match their source files, and pnpm build passes from repo root with no TypeScript or Rust errors" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Manual research command and front-matter schema",
+      "status": "pending",
+      "content": "Create packages/framework/commands/research.md defining the /tiki:research <topic> manual capture command. The command must: (1) parse the topic argument and optional --issue flag; (2) prompt the user for the knowledge to capture if not piped; (3) write .tiki/research/<topic>.md with YAML front-matter (topic, tags, issues, created) followed by the markdown body.\n\nAlso create .tiki/research/example-research.md as a seed document to validate the format and give sub-agents a reference. The example should use a realistic topic (e.g. 'github-api') and include all front-matter fields.\n\nThe command file follows the same hybrid Markdown+XML format as packages/framework/commands/get.md: YAML front-matter header (name, description, argument, tools), then #-heading sections, then XML <instructions>, <output>, and <errors> blocks.\n\nThe schema for every research doc is:\n---\ntopic: <slug>\ntags: [tag1, tag2]\nissues: [42, 87]\ncreated: <ISO 8601 timestamp>\n---\n(markdown body)",
+      "verification": [
+        "packages/framework/commands/research.md exists with correct YAML front-matter (name: research, argument: <topic>)",
+        "research.md <instructions> block describes writing .tiki/research/<topic>.md with the defined front-matter schema",
+        ".tiki/research/example-research.md exists with all four front-matter fields populated",
+        "No build or typecheck step needed for this phase (pure markdown); manual review of both files suffices"
+      ],
+      "addressesCriteria": ["SC1", "SC2"],
+      "files": [
+        "packages/framework/commands/research.md",
+        ".tiki/research/example-research.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Auto-capture wiring in review.md and plan.md",
+      "status": "pending",
+      "content": "Edit packages/framework/commands/review.md and packages/framework/commands/plan.md to instruct Claude to write research docs as a side-effect.\n\nIn review.md: add a <research-capture> XML section (after the existing <output> block) that instructs Claude to — if any notable domain knowledge was discovered during codebase exploration (architecture patterns, auth flows, data models, external API usage, etc.) — write one or more .tiki/research/<topic>.md files using the schema from phase 1. The section should specify: use a kebab-case topic slug; set tags to the relevant categories; set issues to [<current issue number>]; set created to now. Claude should only write a file if there is meaningful non-trivial knowledge to capture; skip if the issue is purely a bug fix with no domain learning.\n\nIn plan.md: add the same <research-capture> XML section instructing Claude to capture planning-relevant knowledge (e.g. 'discovered that auth uses JWT with RS256 key rotation') discovered while exploring the codebase during planning.",
+      "verification": [
+        "packages/framework/commands/review.md contains a <research-capture> section explaining when and how to write .tiki/research/*.md files",
+        "packages/framework/commands/plan.md contains an equivalent <research-capture> section",
+        "Both sections reference the YAML front-matter schema (topic, tags, issues, created)",
+        "No build step needed; manual review of both files suffices"
+      ],
+      "addressesCriteria": ["SC3", "SC4"],
+      "files": [
+        "packages/framework/commands/review.md",
+        "packages/framework/commands/plan.md"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Auto-retrieval wiring in plan.md and execute.md",
+      "status": "pending",
+      "content": "Edit packages/framework/commands/plan.md and packages/framework/commands/execute.md to instruct Claude to read existing research docs before doing its main work.\n\nIn plan.md: add a <research-retrieval> XML section as an early step (before phase design begins) that instructs Claude to: (1) list files in .tiki/research/; (2) for each file, read its front-matter to check if tags or issues are relevant to the current issue; (3) read the full body of relevant docs; (4) summarize what was found in a 'Research Context' block before proceeding to phase design. If no research docs exist, skip silently.\n\nIn execute.md: add the same <research-retrieval> section as an early step (before sub-agent task dispatch) instructing Claude to read relevant research docs and include their content in the context passed to each Task sub-agent. The execute command should pass research content in the task prompt under a ## Research Context heading.",
+      "verification": [
+        "packages/framework/commands/plan.md contains a <research-retrieval> section as a step before phase design",
+        "packages/framework/commands/execute.md contains a <research-retrieval> section before Task dispatch",
+        "Both sections describe checking .tiki/research/ for relevant docs by matching tags or issue numbers",
+        "No build step needed; manual review of both files suffices"
+      ],
+      "addressesCriteria": ["SC5", "SC6"],
+      "files": [
+        "packages/framework/commands/plan.md",
+        "packages/framework/commands/execute.md"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 4,
+      "title": "Rust IPC commands and watcher ResearchChanged event",
+      "status": "pending",
+      "content": "Three changes to the Rust backend:\n\n1. commands.rs: Add list_research_docs(tiki_path: Option<String>) -> Result<Vec<ResearchDocMeta>, String>. ResearchDocMeta is a #[derive(Serialize)] struct with fields: filename: String, topic: String, tags: Vec<String>, issues: Vec<u32>, created: String. The command reads .tiki/research/*.md, parses YAML front-matter for each file (use a simple line-by-line parser — just read lines between the --- delimiters and split on ': '), and returns the metadata array sorted by created descending. Files with missing or malformed front-matter are skipped with a warn! log.\n\n2. commands.rs: Add read_research_doc(filename: String, tiki_path: Option<String>) -> Result<String, String>. Returns the full raw file contents (including front-matter). Filename must have .md extension (validate to prevent path traversal). Use resolve_tiki_path and read from the research/ subdirectory.\n\n3. watcher.rs: Add ResearchChanged { filename: String } variant to TikiFileEvent. In process_event, add an arm that checks if the path is inside the research/ directory (add is_in_research_dir helper mirroring is_in_releases_dir). If so, return ResearchChanged { filename: name.to_string() }. In debounce_key, add the arm: TikiFileEvent::ResearchChanged { filename } => format!(\"research-{}\", filename).\n\nRegister both new commands in lib.rs invoke_handler.\n\ncargo check in apps/desktop/src-tauri must pass.",
+      "verification": [
+        "cargo check in apps/desktop/src-tauri passes with no errors",
+        "ResearchDocMeta struct is defined with filename, topic, tags, issues, created fields",
+        "list_research_docs is registered in tauri::generate_handler! in lib.rs",
+        "read_research_doc is registered in tauri::generate_handler! in lib.rs",
+        "ResearchChanged { filename } variant exists in TikiFileEvent enum",
+        "process_event returns ResearchChanged for files in .tiki/research/",
+        "debounce_key handles ResearchChanged with key research-{filename}"
+      ],
+      "addressesCriteria": ["SC7", "SC8"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src-tauri/src/watcher.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 5,
+      "title": "Frontend research store and sidebar ResearchSection",
+      "status": "pending",
+      "content": "Two new frontend files:\n\n1. apps/desktop/src/stores/researchStore.ts: Create a Zustand store (no persist — reloaded from disk on demand) following the tikiReleasesStore.ts pattern. State: docs: ResearchDocMeta[], isLoading: boolean, error: string | null. Actions: setDocs, setLoading, setError, clearError. Export ResearchDocMeta interface (filename, topic, tags, issues, created — mirrors the Rust struct).\n\n2. apps/desktop/src/components/sidebar/ResearchSection.tsx + ResearchSection.css: Follow the ReleasesSection.tsx pattern. On mount (and when activeProject changes), call invoke<ResearchDocMeta[]>('list_research_docs', { tikiPath }) and populate the store. Render a CollapsibleSection with title 'Research' and a book/document SVG icon. Each doc renders as a card showing topic (bold) and tags as small badges. Clicking a card calls setSelectedResearchDoc(doc.filename) from detailStore. Show an empty state message if no docs exist. The ResearchChanged file event (wired in phase 7 via App.tsx) will re-invoke list_research_docs to refresh.\n\nCSS: .research-section-card, .research-section-card.selected, .research-section-topic, .research-section-tags, .research-section-tag, .research-section-empty, .research-section-loading.",
+      "verification": [
+        "apps/desktop/src/stores/researchStore.ts exists and exports useResearchStore and ResearchDocMeta",
+        "apps/desktop/src/components/sidebar/ResearchSection.tsx exists and renders a CollapsibleSection",
+        "ResearchSection.css exists and is imported by ResearchSection.tsx",
+        "ResearchSection calls list_research_docs on mount and populates researchStore",
+        "pnpm typecheck from repo root passes (ResearchSection not yet mounted in App.tsx — that is phase 7)"
+      ],
+      "addressesCriteria": ["SC9"],
+      "files": [
+        "apps/desktop/src/stores/researchStore.ts",
+        "apps/desktop/src/components/sidebar/ResearchSection.tsx",
+        "apps/desktop/src/components/sidebar/ResearchSection.css"
+      ],
+      "dependencies": [4]
+    },
+    {
+      "number": 6,
+      "title": "Frontend detail panel for research docs",
+      "status": "pending",
+      "content": "Three changes:\n\n1. apps/desktop/src/stores/detailStore.ts: Add selectedResearchDoc: string | null to ProjectSelection (default null). Add setSelectedResearchDoc(filename: string | null) action. The setter must null out all other selection fields (selectedIssue, selectedRelease, selectedTikiRelease, selectedPr) so the detail panel shows only research. Add to emptySelection. The persist store name stays 'tiki-detail'.\n\n2. apps/desktop/src/components/detail/ResearchDetail.tsx: Component that receives filename: string and activeProject path. On mount it calls invoke<string>('read_research_doc', { filename, tikiPath }) to load raw content. Strip YAML front-matter (everything between the first two '---' delimiters) to get the markdown body. Pass body to the existing <MarkdownRenderer> component. Show a loading spinner while fetching and an error message on failure. Display topic and tags from the front-matter as a header above the markdown body.\n\n3. apps/desktop/src/components/detail/ResearchDetail.css: .research-detail-header, .research-detail-topic, .research-detail-tags, .research-detail-tag, .research-detail-body, .research-detail-loading, .research-detail-error.\n\n4. apps/desktop/src/components/detail/index.ts: Add export for ResearchDetail.\n\npnpm build from repo root must pass.",
+      "verification": [
+        "detailStore.ts ProjectSelection includes selectedResearchDoc: string | null",
+        "setSelectedResearchDoc action nulls out all other selection fields",
+        "ResearchDetail.tsx exists, imports MarkdownRenderer, strips front-matter before rendering",
+        "ResearchDetail.css exists and is imported by ResearchDetail.tsx",
+        "apps/desktop/src/components/detail/index.ts exports ResearchDetail",
+        "pnpm build from repo root passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC10"],
+      "files": [
+        "apps/desktop/src/stores/detailStore.ts",
+        "apps/desktop/src/components/detail/ResearchDetail.tsx",
+        "apps/desktop/src/components/detail/ResearchDetail.css",
+        "apps/desktop/src/components/detail/index.ts"
+      ],
+      "dependencies": [5]
+    },
+    {
+      "number": 7,
+      "title": "App wiring, mirror sync, and final build",
+      "status": "pending",
+      "content": "Wire everything together and synchronize mirrors:\n\n1. apps/desktop/src/App.tsx: (a) Import ResearchSection and mount it in the sidebar after ReleasesSection. (b) Import ResearchDetail. (c) Read selectedResearchDoc from detailStore. (d) Add 'researchChanged' to the FileEvent type union and add a handler arm in the tiki-file-changed listener that calls invoke('list_research_docs', ...) and updates researchStore. (e) Add ResearchDetail to the detail panel chain: when selectedResearchDoc is non-null, render <ResearchDetail filename={selectedResearchDoc} projectPath={activeProject?.path} />.\n\n2. apps/desktop/src/stores/index.ts: Export useResearchStore and ResearchDocMeta from researchStore.\n\n3. Mirror sync: Copy updated framework command files to their mirror locations in packages/framework/.claude/commands/tiki/: research.md (new), review.md, plan.md, execute.md. The mirrors are byte-for-byte copies. Investigate install.js to see if it auto-syncs; if not, copy manually.\n\n4. Final verification: pnpm build from repo root (uses tsc -b, stricter than tsc --noEmit). cargo check in apps/desktop/src-tauri. Manual smoke test if Tauri dev environment is available: create a .tiki/research/test-topic.md with valid front-matter, confirm ResearchSection shows it, confirm clicking it opens ResearchDetail with rendered markdown.",
+      "verification": [
+        "App.tsx imports and mounts ResearchSection in the sidebar",
+        "App.tsx handles researchChanged file event by refreshing researchStore",
+        "App.tsx renders ResearchDetail in the detail panel when selectedResearchDoc is non-null",
+        "stores/index.ts exports useResearchStore and ResearchDocMeta",
+        "packages/framework/.claude/commands/tiki/research.md exists and matches packages/framework/commands/research.md",
+        "packages/framework/.claude/commands/tiki/review.md, plan.md, execute.md match their source files",
+        "pnpm build from repo root passes with no TypeScript or compilation errors",
+        "cargo check in apps/desktop/src-tauri passes"
+      ],
+      "addressesCriteria": ["SC11"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/stores/index.ts",
+        "packages/framework/.claude/commands/tiki/research.md",
+        "packages/framework/.claude/commands/tiki/review.md",
+        "packages/framework/.claude/commands/tiki/plan.md",
+        "packages/framework/.claude/commands/tiki/execute.md"
+      ],
+      "dependencies": [6]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [2],
+    "SC5": [3],
+    "SC6": [3],
+    "SC7": [4],
+    "SC8": [4],
+    "SC9": [5],
+    "SC10": [6],
+    "SC11": [7]
+  }
+}

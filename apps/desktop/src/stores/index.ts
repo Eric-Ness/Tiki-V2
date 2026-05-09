@@ -37,6 +37,11 @@ export {
 export { useDetailStore } from './detailStore';
 
 export {
+  useResearchStore,
+  type ResearchDocMeta,
+} from './researchStore';
+
+export {
   useTikiReleasesStore,
   type TikiRelease,
   type TikiReleaseIssue,

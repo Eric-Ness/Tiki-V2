@@ -17,6 +17,7 @@ Break a GitHub issue into a sequence of executable phases. Each phase should be 
     - If no review exists, perform a quick analysis first
   </step>
   <step>**Immediately** update `.tiki/state.json` to set `status: "planning"` and `pipelineStep: "PLAN"` so the issue appears in Active Work right away (see early-state-update below)</step>
+  <step>**Retrieve relevant research** from `.tiki/research/` before designing phases (see `<research-retrieval>` below). Surface findings under a `## Research Context` heading in the planning output.</step>
   <step>Design phases following the planning principles below</step>
   <step>For each phase, define:
     - Clear title and description
@@ -29,6 +30,25 @@ Break a GitHub issue into a sequence of executable phases. Each phase should be 
   <step>Write the plan to `.tiki/plans/issue-{number}.json`</step>
   <step>Present the plan summary and ask for approval</step>
 </instructions>
+
+<research-retrieval>
+**Before designing phases, check `.tiki/research/` for relevant prior findings.** This step grounds planning in knowledge captured by earlier `/tiki:review`, `/tiki:plan`, and `/tiki:research` runs.
+
+Procedure:
+
+1. **List** files matching `.tiki/research/*.md` using the Glob tool. If the directory does not exist or is empty, **skip silently** — no error, no output.
+2. **Read the front-matter** of each file (just the YAML lines between the first two `---` delimiters — you do not need the body yet). Extract `topic`, `tags`, and `issues`.
+3. **Determine relevance** for the current issue. A doc is relevant if any of these are true:
+   - The doc's `issues` array contains the current issue number `{number}`.
+   - The doc's `issues` array contains an issue number that is referenced in this issue's body or labels (e.g. "depends on #87").
+   - One or more of the doc's `tags` matches a label, file path, technology, or domain term from the issue.
+   - The `topic` slug clearly relates to the issue's subject matter.
+4. **Read the full body** of each relevant doc.
+5. **Surface findings** in a `## Research Context` block in the planning output, before phase design begins. List each relevant doc by topic with a 1-2 sentence takeaway, and quote any constraint that should shape phase boundaries.
+6. **Use the findings** when defining phases — especially to avoid re-discovering known constraints, to honor existing patterns, and to set realistic verification criteria.
+
+If no relevant docs are found, proceed without a Research Context block (do not output an empty heading).
+</research-retrieval>
 
 <planning-principles>
 **Phase Size:**
@@ -113,6 +133,32 @@ For each phase, capture:
 
 *Plan written to `.tiki/plans/issue-{number}.json`*
 </output>
+
+<research-capture>
+**As a side-effect of PLAN, capture planning-relevant constraints discovered while designing phases.**
+
+While exploring the codebase to design phase boundaries, you likely uncovered constraints that future plans (or future runs of this same plan) will benefit from — phase ordering rules, build-step dependencies, schema migration gotchas, framework command mirror requirements, "this must happen before that" knowledge, etc. Persist these by writing one or more research docs to `.tiki/research/<topic>.md`.
+
+Each research doc uses this YAML front-matter schema, then a free-form markdown body:
+
+```yaml
+---
+topic: <kebab-case-slug>
+tags: [tag1, tag2, tag3]
+issues: [{number}]
+created: <ISO 8601 timestamp>
+---
+```
+
+Rules:
+1. **Topic slug** is kebab-case derived from the constraint or pattern (e.g. `mirror-sync`, `phase-ordering`, `cargo-check-windows`).
+2. **Tags** are 2-5 short lowercase strings reflecting the categorization (planning, build, schema, etc.).
+3. **Issues** array includes the current issue number `[{number}]`.
+4. **Created** is the current ISO 8601 timestamp.
+5. **Skip** writing if the plan was straightforward and surfaced no constraints worth preserving — a trivial 2-phase plan that just edits one component does not need a research doc. Quality > quantity.
+6. **Append, do not overwrite.** If `.tiki/research/<topic>.md` already exists, read it and append a new section under a `## YYYY-MM-DD findings` heading rather than replacing the file. Extend the front-matter `issues` array if the current issue is not already listed.
+7. Focus on **planning-relevant** knowledge here — REVIEW captures domain understanding, PLAN captures the constraints that shaped phase boundaries.
+</research-capture>
 
 <early-state-update>
 **Before doing any planning work**, update `.tiki/state.json` so the issue appears in Active Work immediately:

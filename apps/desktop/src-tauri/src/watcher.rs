@@ -56,6 +56,7 @@ pub enum TikiFileEvent {
     StateChanged,
     PlanChanged { issue_number: u32 },
     ReleaseChanged { version: String },
+    ResearchChanged { filename: String },
 }
 
 /// Start watching the .tiki directory for changes (initial startup)
@@ -172,6 +173,7 @@ fn debounce_key(file_event: &TikiFileEvent) -> String {
         TikiFileEvent::StateChanged => "state".to_string(),
         TikiFileEvent::PlanChanged { issue_number } => format!("plan-{}", issue_number),
         TikiFileEvent::ReleaseChanged { version } => format!("release-{}", version),
+        TikiFileEvent::ResearchChanged { filename } => format!("research-{}", filename),
     }
 }
 
@@ -240,6 +242,13 @@ fn process_event(event: &Event) -> Option<TikiFileEvent> {
                     });
                 }
             }
+
+            // Check for research docs (.tiki/research/*.md)
+            if let Some(research_filename) = is_in_research_dir(path) {
+                return Some(TikiFileEvent::ResearchChanged {
+                    filename: research_filename.to_string(),
+                });
+            }
         }
     }
 
@@ -249,6 +258,21 @@ fn process_event(event: &Event) -> Option<TikiFileEvent> {
 /// Check if a path is inside the releases directory
 fn is_in_releases_dir(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "releases")
+}
+
+/// Check if a path is inside the research directory and is a markdown file.
+/// Returns the filename (e.g. "auth-flow.md") if so, otherwise None.
+fn is_in_research_dir(path: &Path) -> Option<&str> {
+    let in_research = path.components().any(|c| c.as_os_str() == "research");
+    if !in_research {
+        return None;
+    }
+    let name = path.file_name()?.to_str()?;
+    if name.ends_with(".md") {
+        Some(name)
+    } else {
+        None
+    }
 }
 
 /// Check if a path is inside the backups directory
