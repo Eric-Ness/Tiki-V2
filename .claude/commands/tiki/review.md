@@ -14,7 +14,6 @@ Analyze a GitHub issue to understand its requirements, complexity, and what need
     - Check `.tiki/state.json` for `issue:{number}`
     - If not found, run the equivalent of `tiki:get {number}` first
   </step>
-  <step>**Immediately** update `.tiki/state.json` to set `status: "reviewing"` and `pipelineStep: "REVIEW"` so the issue appears in the Review step on the kanban right away (see early-state-update below)</step>
   <step>Analyze the issue description to identify:
     - **Core requirements**: What must be built or changed
     - **Success criteria**: What needs to be true when done (backward planning)
@@ -111,34 +110,50 @@ Prefix each with an ID: SC1, SC2, SC3, etc.
 *Review complete. Ready to plan.*
 </output>
 
-<early-state-update>
-**Before doing any review work**, update `.tiki/state.json` so the issue appears in the Review step immediately. Without this write, the kanban card stays in the GET state for the entire duration of review analysis, making REVIEW invisible to the user.
+<research-capture>
+**As a side-effect of REVIEW, capture domain understanding from codebase exploration.**
 
-1. Read the current `.tiki/state.json`
-2. Update the `issue:{number}` entry in `activeWork` to set `status: "reviewing"` and `pipelineStep: "REVIEW"`:
+While analyzing the codebase to understand this issue, you likely uncovered non-trivial knowledge — architecture patterns, API conventions, hidden constraints, data models, important file conventions, auth flows, IPC contracts, etc. Persist anything that future planning or execution might need by writing one or more research docs to `.tiki/research/<topic>.md`.
+
+Each research doc uses this YAML front-matter schema, then a free-form markdown body:
+
+```yaml
+---
+topic: <kebab-case-slug>
+tags: [tag1, tag2, tag3]
+issues: [{number}]
+created: <ISO 8601 timestamp>
+---
+```
+
+Rules:
+1. **Topic slug** is kebab-case derived from the subject (e.g. `auth-flow`, `tauri-watcher`, `state-schema`).
+2. **Tags** are 2-5 short lowercase strings reflecting the categorization.
+3. **Issues** array includes the current issue number `[{number}]`.
+4. **Created** is the current ISO 8601 timestamp.
+5. **Skip** writing if the issue is purely a one-line bug fix or has no meaningful domain learning. Quality > quantity — do not pad output with shallow notes.
+6. **Append, do not overwrite.** If `.tiki/research/<topic>.md` already exists, read it and append a new section under a `## YYYY-MM-DD findings` heading rather than replacing the file. Extend the front-matter `issues` array if the current issue is not already listed.
+7. Multiple research docs are fine if findings span distinct topics — write one file per coherent topic rather than a single grab-bag.
+</research-capture>
+
+<state-management>
+Update `.tiki/state.json` after review:
+- Change status from `pending` to `reviewing`
+- Set `pipelineStep` to `"REVIEW"`
+- Update `lastActivity` timestamp
 
 ```json
 {
   "activeWork": {
     "issue:{number}": {
       "type": "issue",
-      "issue": { "number": {number}, "title": "{title}" },
       "status": "reviewing",
       "pipelineStep": "REVIEW",
-      "createdAt": "{existing createdAt}",
       "lastActivity": "{ISO timestamp}"
     }
   }
 }
 ```
-
-This ensures the desktop app shows the issue in the Review step as soon as analysis begins, not after it completes.
-</early-state-update>
-
-<state-management>
-After review completes, update `.tiki/state.json` once more:
-- Keep `status: "reviewing"` and `pipelineStep: "REVIEW"` (the next step, `tiki:plan`, will transition to planning)
-- Update `lastActivity` to the current timestamp
 </state-management>
 
 <errors>
