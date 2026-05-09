@@ -1,0 +1,31 @@
+{
+  "issue": { "number": 140, "title": "fix: in-app update install path is unreachable — dialog plugin missing capability permission" },
+  "createdAt": "2026-05-09T03:36:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Grant dialog capability and surface updater errors",
+      "content": "Add `dialog:default` to apps/desktop/src-tauri/capabilities/default.json permissions array. In apps/desktop/src/utils/updater.ts, replace the silent `console.error` in the catch block with a user-facing error toast: `useToastStore.getState().addToast(\"Update failed: ${error}\", 'error', 8000)`. Keep the console.error for DevTools debugging.",
+      "verification": [
+        "cargo check passes",
+        "pnpm build passes",
+        "default.json includes dialog:default in permissions",
+        "catch block calls addToast with type 'error'"
+      ],
+      "status": "pending"
+    },
+    {
+      "number": 2,
+      "title": "Add progress feedback for download/install",
+      "content": "Extend toastStore with an `updateToast(id, message)` action that mutates an existing toast's message in place (no flicker). In updater.ts, before `update.downloadAndInstall()`: show a 'Downloading update v{version}...' toast with a long duration. Wire the downloadAndInstall onEvent callback (Started / Progress / Finished) to update the same toast with percentage when contentLength is known. After download, show 'Installing update...' before relaunch.",
+      "verification": [
+        "pnpm build passes",
+        "toastStore exports updateToast",
+        "updater.ts shows downloading toast before downloadAndInstall",
+        "updater.ts shows installing toast before relaunch",
+        "onEvent callback computes percentage from contentLength + accumulated chunks"
+      ],
+      "status": "pending"
+    }
+  ]
+}

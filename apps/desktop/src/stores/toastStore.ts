@@ -17,6 +17,7 @@ interface ToastState {
 
 interface ToastActions {
   addToast: (message: string, type: ToastType, duration?: number) => string;
+  updateToast: (id: string, message: string) => void;
   removeToast: (id: string) => void;
   clearAll: () => void;
 }
@@ -72,6 +73,12 @@ export const useToastStore = create<ToastStore>()((set) => ({
 
     toastTimers.set(id, timer);
     return id;
+  },
+
+  updateToast: (id, message) => {
+    set((state) => ({
+      toasts: state.toasts.map((t) => (t.id === id ? { ...t, message } : t)),
+    }));
   },
 
   removeToast: (id) => {

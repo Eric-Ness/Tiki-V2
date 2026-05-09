@@ -30,10 +30,38 @@ export async function checkForAppUpdates(showNoUpdateMessage: boolean) {
     );
 
     if (shouldUpdate) {
-      await update.downloadAndInstall();
+      const toasts = useToastStore.getState();
+      const progressToastId = toasts.addToast(
+        `Downloading update v${update.version}...`,
+        'info',
+        60000
+      );
+
+      let totalBytes = 0;
+      let receivedBytes = 0;
+
+      await update.downloadAndInstall((event) => {
+        if (event.event === 'Started') {
+          totalBytes = event.data.contentLength ?? 0;
+        } else if (event.event === 'Progress') {
+          receivedBytes += event.data.chunkLength;
+          if (totalBytes > 0) {
+            const percent = Math.floor((receivedBytes / totalBytes) * 100);
+            useToastStore
+              .getState()
+              .updateToast(progressToastId, `Downloading update v${update.version}... ${percent}%`);
+          }
+        } else if (event.event === 'Finished') {
+          useToastStore
+            .getState()
+            .updateToast(progressToastId, `Installing update v${update.version}...`);
+        }
+      });
+
       await relaunch();
     }
   } catch (error) {
     console.error("Update check failed:", error);
+    useToastStore.getState().addToast(`Update failed: ${error}`, 'error', 8000);
   }
 }
