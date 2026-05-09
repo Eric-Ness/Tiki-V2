@@ -17,11 +17,12 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
     1. Display phase details (title, files, verification criteria)
     2. Execute the phase content (the actual work)
     3. Run verification checks
-    4. Generate a summary of what was accomplished
-    5. Update phase status and save state
+    4. Run test integration (see `<test-integration>` block) before declaring verification passed
+    5. Generate a summary of what was accomplished (include `testResults` if tests ran)
+    6. Update phase status and save state
   </step>
   <step>If verification passes, advance to next phase or complete</step>
-  <step>If verification fails, offer recovery options</step>
+  <step>If verification fails (including test failures), surface details and offer recovery options</step>
 </instructions>
 
 <state-update-requirement>
@@ -242,6 +243,94 @@ During execution, update `.tiki/state.json`:
     - Pause execution
   </error>
 </errors>
+
+<test-integration>
+## Test Framework Integration
+
+After phase work completes, run the project's test suite as part of verification. Test results are surfaced in the phase summary as `testResults`.
+
+> Hook-based override is out of scope for v1; use `.tiki/config.json`.
+
+### 1. Read configuration
+
+Read `.tiki/config.json` and look for `workflow.tests`. Defaults if file/section is absent:
+
+```json
+{
+  "enabled": true,
+  "command": null,
+  "runOnEachPhase": false,
+  "runBeforeShip": true,
+  "timeoutSeconds": 300
+}
+```
+
+If `workflow.tests.enabled` is `false`, skip this block entirely (record `{ status: "skipped", reason: "tests disabled in config" }`).
+
+### 2. Decide whether to run
+
+Run tests for this phase only if **either** is true:
+- `workflow.tests.runOnEachPhase` is `true`, OR
+- The current phase's `verification` array explicitly mentions a test step — any entry whose lowercased text contains one of: `vitest`, `jest`, `pnpm test`, `npm test`, `cargo test`, `go test`, `pytest`, or the bare token `test` (word boundary).
+
+Otherwise, skip with `{ status: "skipped", reason: "phase verification does not require tests" }`.
+
+### 3. Resolve the test command
+
+If `workflow.tests.command` is set (non-null string), use it directly — this overrides detection.
+
+Otherwise, auto-detect by checking project files in this priority order:
+
+1. **`package.json` with `scripts.test`** → use `pnpm test` if `pnpm-lock.yaml` exists, else `npm test`
+2. **`package.json` with `vitest` in deps/devDeps** → `pnpm vitest run` (or `npx vitest run` if no pnpm lockfile)
+3. **`package.json` with `jest` in deps/devDeps** → `pnpm jest` (or `npx jest`)
+4. **`Cargo.toml` present** → `cargo test`
+5. **`go.mod` present** → `go test ./...`
+6. **`pytest.ini` OR `pyproject.toml` containing `[tool.pytest]` OR a `tests/` directory containing `.py` files** → `pytest`
+
+If none match, record `{ status: "skipped", reason: "no framework detected" }` and continue.
+
+### 4. Run
+
+Run the resolved command from the project root with a timeout of `workflow.tests.timeoutSeconds` (default 300). Capture stdout, stderr, exit code, and elapsed time.
+
+### 5. Parse output
+
+Best-effort grep the combined stdout/stderr for these patterns. Always set `framework` to the detected/configured framework name (`vitest`, `jest`, `pytest`, `cargo`, `go`, `npm`, `unknown`).
+
+- **vitest:** `Test Files  N passed`, `Tests  N passed` (also `failed`, `skipped`)
+- **jest:** `Tests:  N passed, N total` (also `failed`, `skipped`)
+- **pytest:** `N passed in N.NNs` (also `N failed`, `N skipped`)
+- **cargo:** `test result: ok. N passed; N failed` (also `N ignored`)
+- **go:** `PASS\nok ...` per package; `--json` output gives structured pass/fail counts (optional)
+
+If parsing fails, fall back to exit code: `0 → status: "passed"` with counts unknown, non-zero → `status: "failed"`.
+
+### 6. Surface in phase summary
+
+Add a `testResults` field to the phase summary:
+
+```typescript
+testResults: {
+  framework: string;       // "vitest" | "jest" | "pytest" | "cargo" | "go" | "npm" | "unknown"
+  command: string;         // the command actually run
+  passed: number;          // 0 if unknown
+  failed: number;
+  skipped: number;
+  durationMs: number;
+  status: "passed" | "failed" | "skipped";
+}
+```
+
+### 7. On test failure
+
+If `testResults.status === "failed"`:
+1. Mark phase verification as failed.
+2. Include the failing test output (last ~50 lines of stdout/stderr) in the phase error output BEFORE falling through to the standard `verification-failed` recovery flow.
+3. Do not advance to the next phase.
+
+The recovery options under `<next-actions>` (Fix and retry / Skip / Pause / Heal) apply normally — auto-heal hooks (if installed by a future issue) can pick up `testResults` to drive repair.
+</test-integration>
 
 <next-actions>
 **After successful phase:**
