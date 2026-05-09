@@ -1,31 +1,18 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "release:v0.2.19": {
-      "type": "release",
-      "release": {
-        "version": "v0.2.19",
-        "issues": [143],
-        "currentIssue": 143,
-        "completedIssues": []
-      },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "createdAt": "2026-05-09T05:00:00.000Z",
-      "lastActivity": "2026-05-09T05:00:00.000Z"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 141,
-      "title": "feat: in-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click",
-      "completedAt": "2026-05-09T03:55:00.000Z"
+      "number": 143,
+      "title": "fix: archived/shipped releases display inconsistently in sidebar and detail (Published vs Completed vs blank)",
+      "completedAt": "2026-05-09T05:15:00.000Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.2.18",
-      "completedAt": "2026-05-09T04:00:00.000Z"
+      "version": "v0.2.19",
+      "completedAt": "2026-05-09T05:15:00.000Z"
     },
     "recentIssues": [
+      { "number": 143, "title": "fix: archived/shipped releases display inconsistently in sidebar and detail (Published vs Completed vs blank)", "completedAt": "2026-05-09T05:15:00.000Z" },
       { "number": 141, "title": "feat: in-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click", "completedAt": "2026-05-09T03:55:00.000Z" },
       { "number": 139, "title": "Update default panel sizes to 15/65/20 (sidebar/main/detail)", "completedAt": "2026-05-09T03:44:00.000Z" },
       { "number": 140, "title": "fix: in-app update install path is unreachable — dialog plugin missing capability permission", "completedAt": "2026-05-09T03:42:00.000Z" },
@@ -72,6 +59,7 @@
       { "number": 79, "title": "Sort completed kanban items", "completedAt": "2026-02-06T20:15:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.2.19", "issues": [143], "completedAt": "2026-05-09T05:15:00.000Z", "tag": "v0.2.19" },
       { "version": "v0.2.18", "issues": [142, 140, 139, 141], "completedAt": "2026-05-09T04:00:00.000Z", "tag": "v0.2.18" },
       { "version": "v0.2.17", "issues": [102, 101, 100, 99], "completedAt": "2026-05-09T03:15:00.000Z", "tag": "v0.2.17" },
       { "version": "v0.2.16", "issues": [116], "completedAt": "2026-05-08T21:55:00.000Z", "tag": "v0.2.16" },

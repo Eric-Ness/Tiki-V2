@@ -1,6 +1,7 @@
 {
   "version": "v0.2.19",
-  "status": "active",
+  "status": "completed",
+  "shipped": true,
   "issues": [
     {
       "number": 143,
@@ -8,5 +9,7 @@
     }
   ],
   "createdAt": "2026-05-09T05:00:00.000Z",
+  "completedAt": "2026-05-09T05:15:00.000Z",
+  "tag": "v0.2.19",
   "description": "UI consistency: collapse 'Published' (GitHub-only) and 'Shipped' (Tiki) labels to a single 'Completed' display state across the sidebar badge and detail panels. Restores the Completed badge on archived releases (v0.2.16-v0.2.18) without undoing #142."
 }
