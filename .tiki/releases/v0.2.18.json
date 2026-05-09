@@ -1,0 +1,23 @@
+{
+  "version": "v0.2.18",
+  "status": "active",
+  "issues": [
+    {
+      "number": 142,
+      "title": "Shipped releases still appear in sidebar — load_tiki_releases reads from archive/"
+    },
+    {
+      "number": 140,
+      "title": "In-app update install path is unreachable — dialog plugin missing capability permission"
+    },
+    {
+      "number": 139,
+      "title": "Update default panel sizes to 15/65/20 (sidebar/main/detail)"
+    },
+    {
+      "number": 141,
+      "title": "In-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click"
+    }
+  ],
+  "createdAt": "2026-05-09T03:30:00.000Z"
+}
