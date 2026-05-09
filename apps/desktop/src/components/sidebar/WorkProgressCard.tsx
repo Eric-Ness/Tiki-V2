@@ -84,6 +84,10 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
   const currentPhase = phase?.current || 0;
   const phaseStatus = phase?.status || "pending";
 
+  // Parallel execution info — present only when a multi-phase group is in flight
+  const parallelExecution = isIssue ? work.parallelExecution : undefined;
+  const isParallel = !!parallelExecution && parallelExecution.phases.length > 1;
+
   // Show phase progress when we have phases (during EXECUTE or any phase-based work)
   const showPhaseProgress = phase && totalPhases > 0;
 
@@ -153,6 +157,14 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
           </div>
           <span className="work-progress-text">
             Phase {currentPhase}/{totalPhases}
+            {isParallel && parallelExecution && (
+              <span
+                className="parallel-badge"
+                title={`Phases ${parallelExecution.phases.join(", ")} running in parallel`}
+              >
+                parallel: {parallelExecution.phases.length}
+              </span>
+            )}
             {liveTimer && <span className="work-progress-timer"> {liveTimer}</span>}
             {!liveTimer && totalDuration > 0 && (
               <span className="work-progress-total-duration"> ({formatDuration(totalDuration)})</span>

@@ -8,6 +8,22 @@ export interface PhaseInfo {
   status: PhaseStatus;
 }
 
+/**
+ * Parallel execution tracking — present only when multiple phases are running concurrently.
+ * When set, sub-agents are dispatched for each phase in `phases`; once all return, the
+ * parent clears this field and advances to the next group.
+ */
+export interface ParallelExecutionInfo {
+  /** Phase numbers currently running in parallel */
+  phases: number[];
+  /** Phase numbers in this group that have already completed */
+  completedInGroup: number[];
+  /** Total phases in this parallel group (for progress display) */
+  totalInGroup: number;
+  /** ISO timestamp when the group started */
+  startedAt: string;
+}
+
 export interface PipelineStepRecord {
   step: PipelineStep;
   startedAt: string;
@@ -25,6 +41,8 @@ export interface IssueContext {
   pipelineStep?: PipelineStep;
   pipelineHistory?: PipelineStepRecord[];
   phase?: PhaseInfo;
+  /** Set only while a multi-phase parallel group is in flight; cleared when group completes */
+  parallelExecution?: ParallelExecutionInfo;
   createdAt: string;
   lastActivity?: string;
   auditPassed?: boolean;
@@ -85,6 +103,14 @@ export function WorkCard({ work }: WorkCardProps) {
           </div>
           <span className="progress-text">
             Phase {work.phase.current} of {work.phase.total}
+            {work.parallelExecution && work.parallelExecution.phases.length > 1 && (
+              <span
+                className="parallel-badge"
+                title={`Phases ${work.parallelExecution.phases.join(", ")} running in parallel`}
+              >
+                parallel: {work.parallelExecution.phases.length}
+              </span>
+            )}
           </span>
         </div>
       )}

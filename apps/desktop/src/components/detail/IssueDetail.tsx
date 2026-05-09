@@ -19,6 +19,12 @@ interface WorkContext {
     total?: number;
     status?: string;
   };
+  parallelExecution?: {
+    phases: number[];
+    completedInGroup?: number[];
+    totalInGroup?: number;
+    startedAt?: string;
+  };
   createdAt?: string;
   lastActivity?: string;
 }

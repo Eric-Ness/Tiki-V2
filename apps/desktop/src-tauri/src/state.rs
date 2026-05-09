@@ -42,6 +42,8 @@ pub struct IssueContext {
     pub pipeline_history: Option<Vec<PipelineStepRecord>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<PhaseProgress>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parallel_execution: Option<ParallelExecution>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_activity: Option<String>,
@@ -78,6 +80,9 @@ struct RawIssueContext {
     // New format: flat phase progress (lenient: skip if unparseable)
     #[serde(default, deserialize_with = "deserialize_lenient_phase")]
     phase: Option<PhaseProgress>,
+    // Parallel phase execution group (optional, only set during multi-phase parallel groups)
+    #[serde(default)]
+    parallel_execution: Option<ParallelExecution>,
     // Old/array format: phases as object or array (lenient: skip if unparseable)
     #[serde(default, deserialize_with = "deserialize_lenient_phases")]
     phases: Option<RawPhasesVariant>,
@@ -282,6 +287,7 @@ impl<'de> Deserialize<'de> for IssueContext {
             pipeline_step: raw.pipeline_step,
             pipeline_history: raw.pipeline_history,
             phase,
+            parallel_execution: raw.parallel_execution,
             created_at,
             last_activity: raw.last_activity,
             audit_passed: raw.audit_passed,
@@ -333,6 +339,24 @@ pub struct PhaseProgress {
     pub total: u32,
     pub current: u32,
     pub status: PhaseProgressStatus,
+}
+
+/// Parallel execution tracking (optional, present only during multi-phase parallel groups).
+/// When this field is set on an IssueContext, multiple phases are running concurrently
+/// in separate sub-agents. When all phases in the group complete, this field is cleared
+/// and execution advances to the next group/level.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParallelExecution {
+    /// Phase numbers currently running in parallel
+    pub phases: Vec<u32>,
+    /// Phase numbers in this group that have already completed
+    #[serde(default)]
+    pub completed_in_group: Vec<u32>,
+    /// Total phases in this parallel group (for progress display)
+    pub total_in_group: u32,
+    /// ISO timestamp when the group started
+    pub started_at: String,
 }
 
 /// Status of the current phase
