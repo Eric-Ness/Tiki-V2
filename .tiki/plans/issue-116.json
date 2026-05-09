@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 116,
+    "title": "Inline plan editor in desktop app",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/116"
+  },
+  "createdAt": "2026-05-08T21:33:30.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "ux", "description": "Edit Plan button appears in IssueDetail.tsx when plan !== null and work status is NOT executing" },
+    { "id": "SC2", "category": "functionality", "description": "Editor lets the user edit phase title, content (markdown), verification items (string array), files list, and addressesCriteria list" },
+    { "id": "SC3", "category": "functionality", "description": "Phases are reorderable via @dnd-kit/sortable drag-and-drop; no new npm dependencies added" },
+    { "id": "SC4", "category": "functionality", "description": "Phases can be added (empty template with auto-incremented number) and removed (with inline confirmation)" },
+    { "id": "SC5", "category": "functionality", "description": "Success criteria can be edited: add/remove/modify id, category, and description fields" },
+    { "id": "SC6", "category": "functionality", "description": "coverageMatrix is recomputed automatically on the frontend whenever phases or criteria change" },
+    { "id": "SC7", "category": "ux", "description": "A diff summary (before/after JSON in collapsible pre blocks) is shown before the save is confirmed" },
+    { "id": "SC8", "category": "functionality", "description": "Save calls a new save_plan Tauri IPC that atomic-writes to .tiki/plans/issue-N.json; the detail panel reloads automatically via the existing file watcher" },
+    { "id": "SC9", "category": "functionality", "description": "Lightweight client-side validation blocks save: no duplicate phase numbers, dependencies must reference existing phase numbers, no empty phase titles, all addressesCriteria values must reference known SC ids" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Rust save_plan IPC command",
+      "status": "pending",
+      "content": "Add `save_plan` Tauri command in `apps/desktop/src-tauri/src/commands.rs` and register it in `lib.rs`.\n\nThe command accepts `(issue_number: u32, plan: serde_json::Value, tiki_path: Option<String>)` and atomic-writes to `.tiki/plans/issue-N.json`. Using `serde_json::Value` keeps the IPC simple — frontend sends camelCase JSON, command writes it as-is via `serde_json::to_string_pretty` + `fs_utils::atomic_write`. Validation and coverage recompute live in the frontend.\n\nUse `resolve_tiki_path` (already in commands.rs) and `fs_utils::atomic_write` (already in fs_utils.rs). Create the plans directory if missing via `std::fs::create_dir_all`.\n\nRegister in `lib.rs` invoke_handler list after `commands::update_work_status`.",
+      "verification": [
+        "cargo check in apps/desktop/src-tauri passes with no errors",
+        "save_plan accepts (issue_number: u32, plan: serde_json::Value, tiki_path: Option<String>)",
+        "save_plan is registered in tauri::generate_handler! in lib.rs",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC8"],
+      "files": ["apps/desktop/src-tauri/src/commands.rs", "apps/desktop/src-tauri/src/lib.rs"],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "PlanEditor.tsx skeleton with richer local types",
+      "status": "pending",
+      "content": "Create `apps/desktop/src/components/detail/PlanEditor.tsx` with read-only rendering using a richer local type set. This phase validates the type plumbing before adding interactions.\n\n### Local types (define at top of PlanEditor.tsx — do NOT import from @tiki/shared per MEMORY.md):\n\n```ts\nexport interface EditorSuccessCriterion { id: string; category: string; description: string; }\nexport interface EditorPhase {\n  number: number; title: string; status: string;\n  content: string; verification: string[]; files: string[];\n  addressesCriteria: string[]; dependencies: number[];\n  startedAt?: string | null; completedAt?: string | null; summary?: string | null;\n}\nexport interface EditorPlan {\n  schemaVersion: number;\n  issue: { number: number; title?: string; url?: string };\n  createdAt: string;\n  successCriteria: EditorSuccessCriterion[];\n  phases: EditorPhase[];\n  coverageMatrix: Record<string, number[]>;\n}\n```\n\n### Component\n\n```ts\ninterface PlanEditorProps { plan: EditorPlan; issueNumber: number; onClose: () => void; }\nexport function PlanEditor({ plan, issueNumber, onClose }: PlanEditorProps) {\n  const [draft, setDraft] = useState<EditorPlan>(() => structuredClone(plan));\n  // render read-only UI in this phase\n}\n```\n\nRender a `<div className=\"plan-editor\">` with header (title + Close button), an SC list section, and a phases section. All read-only.\n\n### Wire into IssueDetail.tsx\n\n1. Expand local `TikiPlan` interface to optionally include `schemaVersion`, `issue`, `createdAt`, `successCriteria`, `coverageMatrix` (all optional so old plan files still parse).\n2. Add `const [showEditor, setShowEditor] = useState(false);`.\n3. Render `<PlanEditor>` conditionally on `showEditor && plan` with a mapping from the existing local `PlanPhase` to `EditorPhase` (use defaults for missing fields — Phase 6 will populate fully).\n4. Do NOT add the trigger button yet (Phase 6).\n\n### CSS stub\n\nCreate `PlanEditor.css` with structural rules only (.plan-editor, .plan-editor-header, .plan-editor-close-btn, .plan-editor-section-title). Import at top of PlanEditor.tsx.",
+      "verification": [
+        "PlanEditor.tsx exists and exports EditorPlan/EditorPhase/EditorSuccessCriterion interfaces",
+        "IssueDetail.tsx local TikiPlan interface includes optional successCriteria and coverageMatrix",
+        "PlanEditor.css exists and is imported by PlanEditor.tsx",
+        "pnpm build from repo root passes with no TypeScript errors"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": ["apps/desktop/src/components/detail/PlanEditor.tsx", "apps/desktop/src/components/detail/PlanEditor.css", "apps/desktop/src/components/detail/IssueDetail.tsx"],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Full field editing: phases, success criteria, add/remove",
+      "status": "pending",
+      "content": "Turn the read-only PlanEditor into an interactive form. All edits mutate `draft` via `setDraft` using immutable update patterns. Phase `status` remains a read-only badge (per OQ5).\n\n### Phase fields\n\nEach phase becomes an editable card with:\n- **Title**: text input\n- **Content**: textarea (rows={6})\n- **Verification**: string array editor (rows of `<input>` + Remove button + `+ Add` at end)\n- **Files**: same string array editor pattern\n- **addressesCriteria**: render each known SC.id as a checkbox; toggling adds/removes from `phase.addressesCriteria`\n- **Dependencies**: number array editor (parse `Number(value)` on change)\n- **Phase number**: read-only display\n\nUse the immutable update pattern: `setDraft(d => ({ ...d, phases: d.phases.map((p, i) => i === idx ? { ...p, field: newValue } : p) }))`.\n\n### Add Phase\n\nButton at bottom of phase list: `{ number: max(phases.number) + 1, title: '', status: 'pending', content: '', verification: [], files: [], addressesCriteria: [], dependencies: [] }` appended to draft.phases.\n\n### Remove Phase (inline confirm)\n\nLocal state `confirmRemovePhase: number | null`. Remove button sets it to phase.number; while set, render \"Remove this phase? Confirm / Cancel\" inline. Confirm filters draft.phases. **Do NOT auto-renumber remaining phases** — that breaks `dependencies` references.\n\n### Success criteria editing\n\nIn the SC list section: each row has editable id (small width), category (medium), description (wide). Per-row Remove with inline confirm. `+ Add Criterion` button appends `{ id: 'SC' + (draft.successCriteria.length + 1), category: '', description: '' }`.\n\n### CSS additions to PlanEditor.css\n\n.plan-editor-phase-card, .plan-editor-phase-header, .plan-editor-phase-number, .plan-editor-status-badge, .plan-editor-input, .plan-editor-textarea, .plan-editor-array-row, .plan-editor-add-btn, .plan-editor-remove-btn, .plan-editor-confirm-remove, .plan-editor-field-label, .plan-editor-sc-row (with id/cat/desc input variants), .plan-editor-criteria-checkbox-row.",
+      "verification": [
+        "Each phase card has editable inputs for title, content, verification, files, addressesCriteria, dependencies",
+        "Phase status renders as a read-only badge with no input",
+        "Add Phase button appends a new phase with auto-incremented number",
+        "Remove phase shows inline confirmation before mutating draft",
+        "SC section supports editing id/category/description per row, add new SC, and remove with confirmation",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC2", "SC4", "SC5"],
+      "files": ["apps/desktop/src/components/detail/PlanEditor.tsx", "apps/desktop/src/components/detail/PlanEditor.css"],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Phase reordering with @dnd-kit/sortable",
+      "status": "pending",
+      "content": "Wrap the phase list in `SortableContext` and make each card draggable via `useSortable`. No new dependencies — `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` are already in `apps/desktop/package.json`. Reference: `KanbanBoard.tsx` already uses DndContext.\n\n### Imports\n\n```ts\nimport { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';\nimport { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';\nimport { CSS } from '@dnd-kit/utilities';\n```\n\n### Extract SortablePhaseCard\n\nMove the per-phase card UI (from Phase 3) into a `SortablePhaseCard` sub-component that calls `useSortable({ id: phase.number })`. Apply `transform`/`transition`/`opacity` styles. Render a drag handle div with `{...attributes} {...listeners}` (use a unicode dot icon like `⋮⋮`).\n\n### Wire DndContext\n\n```ts\nconst sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));\nfunction handleDragEnd(event: DragEndEvent) {\n  const { active, over } = event;\n  if (over && active.id !== over.id) {\n    setDraft(d => {\n      const oldIdx = d.phases.findIndex(p => p.number === active.id);\n      const newIdx = d.phases.findIndex(p => p.number === over.id);\n      return { ...d, phases: arrayMove(d.phases, oldIdx, newIdx) };\n    });\n  }\n}\n```\n\nWrap phase list in `<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={draft.phases.map(p => p.number)} strategy={verticalListSortingStrategy}>...</SortableContext></DndContext>`.\n\n### CSS\n\n.plan-editor-phase-drag-handle with cursor: grab; cursor: grabbing on :active; user-select: none.",
+      "verification": [
+        "Phase cards render a drag handle and are wrapped in DndContext + SortableContext",
+        "Dragging a phase reorders draft.phases via arrayMove",
+        "No new entries in apps/desktop/package.json",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC3"],
+      "files": ["apps/desktop/src/components/detail/PlanEditor.tsx", "apps/desktop/src/components/detail/PlanEditor.css"],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Coverage matrix recompute and structural validation",
+      "status": "pending",
+      "content": "Pure derivation logic + lightweight validation surfacing inline.\n\n### Coverage matrix\n\n```ts\nfunction recomputeCoverageMatrix(phases: EditorPhase[], criteria: EditorSuccessCriterion[]): Record<string, number[]> {\n  const matrix: Record<string, number[]> = {};\n  for (const sc of criteria) matrix[sc.id] = [];\n  for (const phase of phases) {\n    for (const scId of phase.addressesCriteria) {\n      if (matrix[scId] !== undefined) matrix[scId].push(phase.number);\n    }\n  }\n  return matrix;\n}\n```\n\nDerive in `useMemo`: `const coverageMatrix = useMemo(() => recomputeCoverageMatrix(draft.phases, draft.successCriteria), [draft.phases, draft.successCriteria]);`\n\n### Validation\n\n```ts\ninterface ValidationError { field: string; message: string; }\nfunction validateDraft(draft: EditorPlan): ValidationError[] {\n  const errors: ValidationError[] = [];\n  const phaseNumbers = new Set<number>();\n  const knownScIds = new Set(draft.successCriteria.map(sc => sc.id));\n  for (const phase of draft.phases) {\n    if (!phase.title.trim()) errors.push({ field: `phase-${phase.number}-title`, message: 'Title is required' });\n    if (phaseNumbers.has(phase.number)) errors.push({ field: `phase-${phase.number}-number`, message: `Duplicate phase number ${phase.number}` });\n    phaseNumbers.add(phase.number);\n  }\n  for (const phase of draft.phases) {\n    for (const dep of phase.dependencies) {\n      if (!phaseNumbers.has(dep)) errors.push({ field: `phase-${phase.number}-deps`, message: `Dependency ${dep} does not reference a known phase` });\n    }\n    for (const scId of phase.addressesCriteria) {\n      if (!knownScIds.has(scId)) errors.push({ field: `phase-${phase.number}-criteria`, message: `Criterion '${scId}' does not exist` });\n    }\n  }\n  return errors;\n}\nconst errors = useMemo(() => validateDraft(draft), [draft]);\n```\n\n### Inline error display\n\nPass `errors` down to `SortablePhaseCard`. Each input shows its matching error inline. Top-of-editor banner when `errors.length > 0`.\n\n### CSS\n\n.plan-editor-error-banner, .plan-editor-field-error.",
+      "verification": [
+        "recomputeCoverageMatrix returns Record<string, number[]> keyed by SC ids",
+        "validateDraft catches: empty title, duplicate phase number, dep referencing missing phase, addressesCriteria referencing missing SC",
+        "Errors display inline next to offending fields and as a top banner",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC6", "SC9"],
+      "files": ["apps/desktop/src/components/detail/PlanEditor.tsx", "apps/desktop/src/components/detail/PlanEditor.css"],
+      "dependencies": [4]
+    },
+    {
+      "number": 6,
+      "title": "Diff view, save flow, and Edit Plan trigger button",
+      "status": "pending",
+      "content": "Wire the save IPC and add the trigger button.\n\n### Expand IssueDetail.tsx local PlanPhase\n\nAdd optional fields so the editor receives full plan data: `content?: string | null; verification?: string[] | null; files?: string[] | null; addressesCriteria?: string[] | null; dependencies?: number[] | null;`. The Rust `get_plan` already returns these — just unmasked on the TS side.\n\nUpdate the EditorPhase mapping in IssueDetail.tsx's `<PlanEditor plan={...}/>` JSX to use these fields directly (replace `summary ?? ''` placeholders).\n\n### Diff view\n\nAdd `const [showDiff, setShowDiff] = useState(false);`. A `Review Changes` button (disabled when `errors.length > 0`) sets `showDiff = true`. When showDiff:\n\n```tsx\n<div className=\"plan-editor-diff\">\n  <details open><summary className=\"plan-editor-diff-summary\">Original</summary><pre className=\"plan-editor-diff-pre\">{JSON.stringify(plan, null, 2)}</pre></details>\n  <details open><summary className=\"plan-editor-diff-summary\">Edited</summary><pre className=\"plan-editor-diff-pre\">{JSON.stringify({ ...draft, coverageMatrix }, null, 2)}</pre></details>\n  <div className=\"plan-editor-save-row\">\n    <button onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Plan'}</button>\n    <button onClick={() => setShowDiff(false)}>Back to Edit</button>\n    {saveError && <span className=\"plan-editor-field-error\">{saveError}</span>}\n  </div>\n</div>\n```\n\n### Save handler\n\n```ts\nasync function handleSave() {\n  if (errors.length > 0) return;\n  setIsSaving(true);\n  setSaveError(null);\n  try {\n    const payload = { ...draft, coverageMatrix };\n    await invoke('save_plan', {\n      issueNumber,\n      plan: payload,\n      tikiPath: activeProject?.path ? `${activeProject.path}/.tiki` : undefined,\n    });\n    onClose(); // file watcher reloads plan\n  } catch (e) {\n    setSaveError(String(e));\n  } finally { setIsSaving(false); }\n}\n```\n\nImport `invoke` from `@tauri-apps/api/core` and `useProjectsStore` (or whatever exposes `activeProject`).\n\n### Edit Plan button in IssueDetail.tsx\n\nIn the existing detail-actions div:\n```tsx\n{plan !== null && work?.status !== 'executing' && (\n  <button className=\"detail-action-btn\" onClick={() => setShowEditor(true)}>Edit Plan</button>\n)}\n```\n\n### CSS\n\n.plan-editor-diff, .plan-editor-diff-summary, .plan-editor-diff-pre, .plan-editor-save-row, .plan-editor-save-btn, .plan-editor-back-btn, .plan-editor-review-btn (with :disabled style).",
+      "verification": [
+        "Edit Plan button visible in IssueDetail when plan !== null && work?.status !== 'executing'",
+        "Clicking Edit Plan shows the editor inline; clicking Close hides it",
+        "Review Changes button is disabled when errors.length > 0",
+        "Diff view shows before/after JSON in two collapsible <details><pre> blocks",
+        "Save Plan calls invoke('save_plan', { issueNumber, plan: { ...draft, coverageMatrix }, tikiPath })",
+        "After successful save, onClose() runs and the file watcher reloads the plan",
+        "Save errors surface inline; isSaving disables the button",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC1", "SC7", "SC8"],
+      "files": ["apps/desktop/src/components/detail/PlanEditor.tsx", "apps/desktop/src/components/detail/PlanEditor.css", "apps/desktop/src/components/detail/IssueDetail.tsx"],
+      "dependencies": [1, 5]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [2, 6],
+    "SC2": [3],
+    "SC3": [4],
+    "SC4": [3],
+    "SC5": [3],
+    "SC6": [5],
+    "SC7": [6],
+    "SC8": [1, 6],
+    "SC9": [5]
+  }
+}

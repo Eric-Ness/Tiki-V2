@@ -130,6 +130,28 @@ pub fn get_plan(issue_number: u32, tiki_path: Option<String>) -> Result<Option<T
     fs_utils::read_json_resilient::<TikiPlan>(&plan_file)
 }
 
+/// Save a plan to `.tiki/plans/issue-N.json` via atomic write.
+///
+/// Accepts the plan as `serde_json::Value` rather than the typed `TikiPlan`
+/// struct because the frontend sends camelCase JSON and we just want to
+/// pass it through. This avoids type-name mismatch issues with the lenient
+/// serde deserializers used on the read side.
+#[tauri::command]
+pub fn save_plan(
+    issue_number: u32,
+    plan: serde_json::Value,
+    tiki_path: Option<String>,
+) -> Result<(), String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    let plans_dir = path.join("plans");
+    std::fs::create_dir_all(&plans_dir)
+        .map_err(|e| format!("Failed to create plans directory: {}", e))?;
+    let plan_file = plans_dir.join(format!("issue-{}.json", issue_number));
+    let content = serde_json::to_string_pretty(&plan)
+        .map_err(|e| format!("Failed to serialize plan: {}", e))?;
+    fs_utils::atomic_write(&plan_file, &content)
+}
+
 /// Open a native folder picker dialog and return the selected path
 #[tauri::command]
 pub fn select_project_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {

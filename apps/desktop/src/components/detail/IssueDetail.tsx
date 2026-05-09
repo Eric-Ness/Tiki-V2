@@ -6,6 +6,7 @@ import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
+import { PlanEditor, type EditorPlan } from "./PlanEditor";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./DetailPanel.css";
@@ -29,10 +30,26 @@ interface PlanPhase {
   startedAt?: string | null;
   completedAt?: string | null;
   summary?: string | null;
+  content?: string | null;
+  verification?: string[] | null;
+  files?: string[] | null;
+  addressesCriteria?: string[] | null;
+  dependencies?: number[] | null;
+}
+
+interface PlanSuccessCriterion {
+  id: string;
+  category?: string;
+  description: string;
 }
 
 interface TikiPlan {
   phases: PlanPhase[];
+  schemaVersion?: number;
+  issue?: { number: number; title?: string; url?: string };
+  createdAt?: string;
+  successCriteria?: PlanSuccessCriterion[];
+  coverageMatrix?: Record<string, number[]>;
 }
 
 interface IssueDetailProps {
@@ -116,6 +133,7 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const prs = usePullRequestsStore((state) => state.prs);
   const setSelectedPr = useDetailStore((state) => state.setSelectedPr);
   const [plan, setPlan] = useState<TikiPlan | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   // Load plan data for phase duration display
   useEffect(() => {
@@ -209,6 +227,14 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           </svg>
           Open in GitHub
         </button>
+        {plan !== null && work?.status !== "executing" && (
+          <button
+            className="detail-action-btn"
+            onClick={() => setShowEditor(true)}
+          >
+            Edit Plan
+          </button>
+        )}
         {!isClosed && (
           <>
             {showConfirm ? (
@@ -338,6 +364,40 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           )}
         </div>
       )}
+
+      {showEditor && plan && (() => {
+        const editorPlan: EditorPlan = {
+          schemaVersion: plan.schemaVersion ?? 1,
+          issue: plan.issue ?? { number: issue.number, title: issue.title },
+          createdAt: plan.createdAt ?? new Date().toISOString(),
+          successCriteria: (plan.successCriteria ?? []).map((sc) => ({
+            id: sc.id,
+            category: sc.category ?? "",
+            description: sc.description,
+          })),
+          phases: plan.phases.map((p) => ({
+            number: p.number,
+            title: p.title,
+            status: p.status,
+            content: p.content ?? p.summary ?? "",
+            verification: p.verification ?? [],
+            files: p.files ?? [],
+            addressesCriteria: p.addressesCriteria ?? [],
+            dependencies: p.dependencies ?? [],
+            startedAt: p.startedAt,
+            completedAt: p.completedAt,
+            summary: p.summary,
+          })),
+          coverageMatrix: plan.coverageMatrix ?? {},
+        };
+        return (
+          <PlanEditor
+            plan={editorPlan}
+            issueNumber={issue.number}
+            onClose={() => setShowEditor(false)}
+          />
+        );
+      })()}
 
       {issue.body && (
         <div className="detail-section detail-body-section">
