@@ -7,6 +7,7 @@ interface ProjectSelection {
   selectedRelease: string | null;
   selectedTikiRelease: string | null;
   selectedPr: number | null;
+  selectedResearchDoc: string | null;
 }
 
 interface DetailState {
@@ -18,6 +19,7 @@ interface DetailActions {
   setSelectedRelease: (tagName: string | null) => void;
   setSelectedTikiRelease: (version: string | null) => void;
   setSelectedPr: (prNumber: number | null) => void;
+  setSelectedResearchDoc: (filename: string | null) => void;
   clearSelection: () => void;
   cleanupProject: (projectId: string) => void;
 }
@@ -33,6 +35,7 @@ const emptySelection: ProjectSelection = {
   selectedRelease: null,
   selectedTikiRelease: null,
   selectedPr: null,
+  selectedResearchDoc: null,
 };
 
 const initialState: DetailState = {
@@ -54,6 +57,7 @@ export const useDetailStore = create<DetailStore>()(
               selectedRelease: null,
               selectedTikiRelease: null,
               selectedPr: null,
+              selectedResearchDoc: null,
             },
           },
         }));
@@ -69,6 +73,7 @@ export const useDetailStore = create<DetailStore>()(
               selectedIssue: null,
               selectedTikiRelease: null,
               selectedPr: null,
+              selectedResearchDoc: null,
             },
           },
         }));
@@ -84,6 +89,7 @@ export const useDetailStore = create<DetailStore>()(
               selectedIssue: null,
               selectedRelease: null,
               selectedPr: null,
+              selectedResearchDoc: null,
             },
           },
         }));
@@ -99,6 +105,23 @@ export const useDetailStore = create<DetailStore>()(
               selectedIssue: null,
               selectedRelease: null,
               selectedTikiRelease: null,
+              selectedResearchDoc: null,
+            },
+          },
+        }));
+      },
+
+      setSelectedResearchDoc: (filename) => {
+        const projectId = getProjectId();
+        set((state) => ({
+          selectionByProject: {
+            ...state.selectionByProject,
+            [projectId]: {
+              selectedResearchDoc: filename,
+              selectedIssue: null,
+              selectedRelease: null,
+              selectedTikiRelease: null,
+              selectedPr: null,
             },
           },
         }));

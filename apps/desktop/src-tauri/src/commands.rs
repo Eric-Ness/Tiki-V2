@@ -1,7 +1,7 @@
 use crate::fs_utils::{self, BackupInfo};
 use crate::state::{TikiPlan, TikiRelease, TikiState, WorkContext, WorkStatus};
 use crate::watcher;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::PathBuf;
 use tauri_plugin_dialog::DialogExt;
@@ -13,6 +13,16 @@ pub enum WorkAction {
     Pause,
     Reset,
     Remove,
+}
+
+/// Metadata for a research doc parsed from its YAML front-matter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchDocMeta {
+    pub filename: String,
+    pub topic: String,
+    pub tags: Vec<String>,
+    pub issues: Vec<u32>,
+    pub created: String,
 }
 
 /// Mutate state.json for a single work entry: pause it, reset it to pending,
@@ -294,6 +304,174 @@ pub fn delete_tiki_release(version: String, tiki_path: Option<String>) -> Result
     }
 
     Ok(())
+}
+
+/// List all research docs in `.tiki/research/` with metadata parsed from their
+/// YAML front-matter. Returns an empty Vec if the directory doesn't exist —
+/// research is an optional Tiki feature.
+///
+/// Uses a simple line-based YAML parser rather than pulling in `serde_yaml`
+/// because the front-matter shape is fixed and tiny.
+#[tauri::command]
+pub fn list_research_docs(tiki_path: Option<String>) -> Result<Vec<ResearchDocMeta>, String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    let research_dir = path.join("research");
+
+    if !research_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut docs = Vec::new();
+    let entries = std::fs::read_dir(&research_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let file_path = entry.path();
+
+        if !file_path.extension().map_or(false, |ext| ext == "md") {
+            continue;
+        }
+
+        let filename = match file_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Failed to read research doc {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        match parse_research_front_matter(&filename, &content) {
+            Some(meta) => docs.push(meta),
+            None => {
+                log::warn!("Skipping research doc with no front-matter: {}", filename);
+            }
+        }
+    }
+
+    // Sort by created descending (ISO 8601 strings sort chronologically).
+    docs.sort_by(|a, b| b.created.cmp(&a.created));
+
+    Ok(docs)
+}
+
+/// Read the raw contents of a single research doc.
+///
+/// Validates the filename to prevent path traversal: must end in `.md` and
+/// must not contain path separators or parent-dir components.
+#[tauri::command]
+pub fn read_research_doc(
+    filename: String,
+    tiki_path: Option<String>,
+) -> Result<String, String> {
+    if !filename.ends_with(".md")
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.contains("..")
+    {
+        return Err("invalid filename".to_string());
+    }
+
+    let path = resolve_tiki_path(tiki_path)?;
+    let file_path = path.join("research").join(&filename);
+
+    if !file_path.exists() {
+        return Err("file not found".to_string());
+    }
+
+    std::fs::read_to_string(&file_path).map_err(|e| e.to_string())
+}
+
+/// Parse the YAML front-matter from a research doc. Returns None if the file
+/// has no front-matter block. Missing fields are filled with sensible defaults
+/// and a warning is logged.
+fn parse_research_front_matter(filename: &str, content: &str) -> Option<ResearchDocMeta> {
+    let mut lines = content.lines();
+
+    // First non-empty content must be the opening `---`.
+    let opener = lines.next()?;
+    if opener.trim() != "---" {
+        return None;
+    }
+
+    let mut topic: Option<String> = None;
+    let mut created: Option<String> = None;
+    let mut tags: Vec<String> = Vec::new();
+    let mut issues: Vec<u32> = Vec::new();
+    let mut found_close = false;
+
+    for line in lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            found_close = true;
+            break;
+        }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        let (key, value) = match trimmed.split_once(':') {
+            Some((k, v)) => (k.trim(), v.trim()),
+            None => continue,
+        };
+
+        match key {
+            "topic" => topic = Some(value.trim_matches('"').trim_matches('\'').to_string()),
+            "created" => created = Some(value.trim_matches('"').trim_matches('\'').to_string()),
+            "tags" => {
+                tags = parse_yaml_list(value);
+            }
+            "issues" => {
+                issues = parse_yaml_list(value)
+                    .into_iter()
+                    .filter_map(|s| s.parse::<u32>().ok())
+                    .collect();
+            }
+            _ => {}
+        }
+    }
+
+    if !found_close {
+        return None;
+    }
+
+    let topic = topic.unwrap_or_else(|| {
+        log::warn!("Research doc {} missing 'topic' front-matter", filename);
+        filename.strip_suffix(".md").unwrap_or(filename).to_string()
+    });
+    let created = created.unwrap_or_else(|| {
+        log::warn!("Research doc {} missing 'created' front-matter", filename);
+        String::new()
+    });
+
+    Some(ResearchDocMeta {
+        filename: filename.to_string(),
+        topic,
+        tags,
+        issues,
+        created,
+    })
+}
+
+/// Parse a YAML inline list `[a, b, c]` into trimmed string items. Returns an
+/// empty Vec if the value isn't a bracketed list (we don't support block-form
+/// lists since the front-matter spec uses inline form).
+fn parse_yaml_list(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    let inner = match trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
+
+    inner
+        .split(',')
+        .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 /// Back up state.json before a destructive operation

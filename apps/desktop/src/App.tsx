@@ -8,10 +8,11 @@ import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
 import { PullRequestsSection } from "./components/sidebar/PullRequestsSection";
 import { ReleasesSection } from "./components/sidebar/ReleasesSection";
+import { ResearchSection } from "./components/sidebar/ResearchSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { ClaudeUsageSection } from "./components/sidebar/ClaudeUsageSection";
 import { TerminalPane } from "./components/terminal";
-import { IssueDetail, PullRequestDetail, ReleaseDetail, TikiReleaseDetail } from "./components/detail";
+import { IssueDetail, PullRequestDetail, ReleaseDetail, ResearchDetail, TikiReleaseDetail } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { DependencyGraph } from "./components/dependencies/DependencyGraph";
@@ -20,8 +21,8 @@ import { ToastContainer } from "./components/ui/ToastContainer";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useSettingsStore } from "./stores";
-import type { GitHubIssue, TikiRelease } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore } from "./stores";
+import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import "./App.css";
 import "./components/layout/layout.css";
@@ -39,9 +40,10 @@ interface TikiState {
 }
 
 interface FileEvent {
-  type: "stateChanged" | "planChanged" | "releaseChanged";
+  type: "stateChanged" | "planChanged" | "releaseChanged" | "researchChanged";
   issueNumber?: number;
   version?: string;
+  filename?: string;
 }
 
 function detectStateChanges(
@@ -141,6 +143,7 @@ function App() {
   const selectedRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedRelease ?? null);
   const selectedTikiRelease = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedTikiRelease ?? null);
   const selectedPr = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedPr ?? null);
+  const selectedResearchDoc = useDetailStore((s) => s.selectionByProject[activeProjectId]?.selectedResearchDoc ?? null);
   const issues = useIssuesStore((s) => s.issues);
   const releases = useReleasesStore((s) => s.releases);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
@@ -275,6 +278,14 @@ function App() {
         } catch (e) {
           console.error("Failed to reload releases:", e);
         }
+      } else if (event.payload.type === "researchChanged") {
+        try {
+          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
+          const loadedDocs = await invoke<ResearchDocMeta[]>("list_research_docs", { tikiPath: projectTikiPath });
+          useResearchStore.getState().setDocs(loadedDocs);
+        } catch (e) {
+          console.error("Failed to reload research docs:", e);
+        }
       }
     });
 
@@ -374,6 +385,7 @@ function App() {
               <IssuesSection />
               <PullRequestsSection />
               <ReleasesSection />
+              <ResearchSection />
               <ClaudeUsageSection />
             </div>
             <div className="sidebar-footer">
@@ -471,6 +483,8 @@ function App() {
               <ReleaseDetail release={selectedReleaseData} />
             ) : selectedTikiReleaseData ? (
               <TikiReleaseDetail release={selectedTikiReleaseData} />
+            ) : selectedResearchDoc ? (
+              <ResearchDetail filename={selectedResearchDoc} projectPath={activeProject?.path} />
             ) : (
               <>
                 <h3>Detail</h3>

@@ -1,0 +1,104 @@
+.research-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+}
+
+.research-detail-topic {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+  word-break: break-word;
+}
+
+.research-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.research-detail-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: rgba(128, 128, 128, 0.2);
+  color: var(--text-secondary, #858585);
+}
+
+.research-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.research-detail-date {
+  font-size: 12px;
+  color: var(--text-secondary, #858585);
+}
+
+.research-detail-issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.research-detail-issue {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: rgba(0, 122, 204, 0.15);
+  color: #58a6ff;
+  font-family: var(--font-mono, monospace);
+}
+
+.research-detail-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary, #cccccc);
+}
+
+.research-detail-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--text-secondary, #858585);
+  font-size: 13px;
+}
+
+@keyframes research-detail-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.research-detail-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color, #3c3c3c);
+  border-top-color: var(--accent-color, #007acc);
+  border-radius: 50%;
+  animation: research-detail-spin 0.8s linear infinite;
+}
+
+.research-detail-error {
+  margin: 16px;
+  padding: 12px 14px;
+  background-color: var(--error-bg, #5a1d1d);
+  border: 1px solid var(--error-border, #be1100);
+  border-radius: 6px;
+  color: var(--error-text, #f48771);
+  font-size: 13px;
+  line-height: 1.4;
+}

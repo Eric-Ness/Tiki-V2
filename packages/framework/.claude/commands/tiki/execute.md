@@ -12,6 +12,7 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
 <instructions>
   <step>Load the plan from `.tiki/plans/issue-{number}.json`</step>
   <step>Load current state from `.tiki/state.json` to find current phase</step>
+  <step>**Retrieve relevant research** from `.tiki/research/` before dispatching any sub-agent (see `<research-retrieval>` below). Research content must be included in every sub-agent prompt under a `## Research Context` heading.</step>
   <step>**CRITICAL: Update state.json with phase info BEFORE starting work** (see state-update-requirement below)</step>
   <step>For the current phase:
     1. Display phase details (title, files, verification criteria)
@@ -23,6 +24,23 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
   <step>If verification passes, advance to next phase or complete</step>
   <step>If verification fails, offer recovery options</step>
 </instructions>
+
+<research-retrieval>
+**Before dispatching any sub-agent task, check `.tiki/research/` for relevant prior findings.** Sub-agents start with fresh context and rely on the parent prompt for any domain knowledge — research docs are the channel that carries hard-won learnings from REVIEW and PLAN into EXECUTE.
+
+Procedure:
+
+1. **List** files matching `.tiki/research/*.md` using the Glob tool. If the directory does not exist or is empty, **skip silently** — no error, no output.
+2. **Read the front-matter** of each file (just the YAML lines between the first two `---` delimiters). Extract `topic`, `tags`, and `issues`.
+3. **Determine relevance** for the current issue and phase. A doc is relevant if any of these are true:
+   - The doc's `issues` array contains the current issue number `{number}`.
+   - One or more of the doc's `tags` matches a label, file path, technology, or domain term from the issue or the current phase content.
+   - The `topic` slug clearly relates to the files this phase will touch.
+4. **Read the full body** of each relevant doc.
+5. **Surface findings** in a `## Research Context` section in the parent execute output before sub-agent dispatch.
+6. **Pass research content into every sub-agent prompt.** When constructing the Task prompt (see `<sub-agent-protocol>`), include a `## Research Context` heading near the top with the body of each relevant research doc (front-matter stripped). Sub-agents have no other way to see this content — if you do not pass it through, the knowledge is lost.
+7. If no relevant docs are found, omit the `## Research Context` section entirely (do not include an empty heading in the sub-agent prompt).
+</research-retrieval>
 
 <state-update-requirement>
 ## CRITICAL: Phase State Updates
@@ -115,6 +133,9 @@ Task tool parameters:
 - description: "Execute phase {N}: {title}"
 - prompt: |
     You are executing Phase {N} of Issue #{number}: {issue title}
+
+    ## Research Context
+    {bodies of relevant .tiki/research/*.md docs, front-matter stripped — omit this entire section if no relevant docs were found in <research-retrieval>}
 
     ## Previous Phase Summaries
     {summaries from phases 1 to N-1}
