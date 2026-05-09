@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 100,
+    "title": "Automated test framework integration",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/100"
+  },
+  "createdAt": "2026-05-08T00:00:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "functionality", "description": "Test framework auto-detection algorithm documented in execute.md (vitest/jest/pytest/cargo/go in priority order)" },
+    { "id": "SC2", "category": "functionality", "description": "Test run is integrated into per-phase verification, gated by config and the phase's verification array" },
+    { "id": "SC3", "category": "functionality", "description": "Test output parsing patterns documented for each supported framework, with exit-code fallback" },
+    { "id": "SC4", "category": "functionality", "description": "testResults block (framework, command, passed/failed/skipped, durationMs, status) is surfaced in the phase summary" },
+    { "id": "SC5", "category": "functionality", "description": "Full test suite runs before SHIP commit; failure halts ship and prompts user via AskUserQuestion (Pause / Skip / Abort)" },
+    { "id": "SC6", "category": "config", "description": ".tiki/config.json supports workflow.tests with enabled, command override, runOnEachPhase, runBeforeShip, timeoutSeconds" },
+    { "id": "SC7", "category": "ux", "description": "Test failure details (last ~50 lines of output) are surfaced in phase error output before recovery flow" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add <test-integration> block to execute.md",
+      "status": "pending",
+      "content": "Add a new `<test-integration>` XML block to `packages/framework/commands/execute.md` (and the byte-for-byte mirror at `packages/framework/.claude/commands/tiki/execute.md`).\n\nThe block must describe:\n\n1. **Configuration read** — load `.tiki/config.json`, find `workflow.tests`, with defaults `{ enabled: true, command: null, runOnEachPhase: false, runBeforeShip: true, timeoutSeconds: 300 }` if the file or section is missing. If `enabled: false`, record `{ status: \"skipped\", reason: \"tests disabled in config\" }` and exit the block.\n\n2. **Run gate** — only run tests when `runOnEachPhase: true` OR when the current phase's `verification` array contains an entry whose lowercased text matches `vitest`, `jest`, `pnpm test`, `npm test`, `cargo test`, `go test`, `pytest`, or the bare token `test`.\n\n3. **Command resolution** — if `workflow.tests.command` is set, use it directly. Otherwise auto-detect by file presence in priority order: `package.json scripts.test` → vitest dep → jest dep → `Cargo.toml` → `go.mod` → pytest (`pytest.ini`, `[tool.pytest]` in pyproject, or `tests/` with `.py`). If none match, record `{ status: \"skipped\", reason: \"no framework detected\" }`.\n\n4. **Run** — execute resolved command from project root with timeout `workflow.tests.timeoutSeconds`. Capture stdout, stderr, exit code, elapsed time.\n\n5. **Parsing patterns** — best-effort grep for vitest (`Test Files  N passed`), jest (`Tests:  N passed, N total`), pytest (`N passed in N.NNs`), cargo (`test result: ok. N passed; N failed`), go (PASS lines per package; `--json` optional). Fall back to exit code on parse failure.\n\n6. **Surface in summary** — add a `testResults` field with shape `{ framework, command, passed, failed, skipped, durationMs, status }` to the phase summary.\n\n7. **On failure** — include last ~50 lines of test output in phase error output before falling through to standard verification-failed recovery.\n\nAlso include a single line: \"Hook-based override is out of scope for v1; use `.tiki/config.json`.\"\n\nUpdate `<instructions>` to add a sub-step \"Run test integration before declaring verification passed\" and reference `testResults` in the summary step.\n\nInsert the new `<test-integration>` block immediately before `<next-actions>`.\n\nApply identical changes to the mirror at `packages/framework/.claude/commands/tiki/execute.md`.",
+      "verification": [
+        "execute.md contains a <test-integration> block placed before <next-actions>",
+        "execute.md <instructions> references the new test integration step",
+        "Mirror at packages/framework/.claude/commands/tiki/execute.md is byte-for-byte identical for the inserted block",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC7"],
+      "files": [
+        "packages/framework/commands/execute.md",
+        "packages/framework/.claude/commands/tiki/execute.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Add <pre-ship-tests> block to ship.md",
+      "status": "pending",
+      "content": "Add a new `<pre-ship-tests>` XML block to `packages/framework/commands/ship.md` (and the byte-for-byte mirror at `packages/framework/.claude/commands/tiki/ship.md`).\n\nThe block must describe:\n\n1. **Configuration read** — load `.tiki/config.json` `workflow.tests`. Defaults `{ enabled: true, command: null, runBeforeShip: true, timeoutSeconds: 300 }`. Skip if `enabled: false` OR `runBeforeShip: false` (record skipped reason and continue ship).\n\n2. **Command resolution** — same priority-order auto-detection as `<test-integration>` in execute.md. If `command` is set, use it.\n\n3. **Run full suite** — no phase filters. Timeout = `workflow.tests.timeoutSeconds`.\n\n4. **Parse and report** — same patterns; produce a `testResults` block in the ship report.\n\n5. **On failure** — DO NOT commit. Surface last ~50 lines of test output. Present an `AskUserQuestion` with three options:\n   - \"Pause to fix tests (Recommended)\" → set work status to `paused`, leave pipelineStep as `SHIP`, exit\n   - \"Skip tests and ship anyway\" → continue commit, note override in commit body and GitHub close comment\n   - \"Abort ship\" → set work status back to `executing`, exit without committing\n\nUpdate `<instructions>` to add a step \"Run the full test suite (see `<pre-ship-tests>` block) before committing. Halt and prompt the user if tests fail.\" between the existing run-final-verification step and the stage/commit step.\n\nInsert `<pre-ship-tests>` immediately after `</pre-ship-verification>` and before `<commit-format>`.\n\nApply identical changes to the mirror at `packages/framework/.claude/commands/tiki/ship.md`.",
+      "verification": [
+        "ship.md contains a <pre-ship-tests> block placed between </pre-ship-verification> and <commit-format>",
+        "ship.md <instructions> references the new pre-ship test step",
+        "Mirror at packages/framework/.claude/commands/tiki/ship.md is byte-for-byte identical for the inserted block",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC5"],
+      "files": [
+        "packages/framework/commands/ship.md",
+        "packages/framework/.claude/commands/tiki/ship.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Create .tiki/config.json with workflow.tests section",
+      "status": "pending",
+      "content": "Create `.tiki/config.json` with the `workflow.tests` configuration section so the markdown commands have a real config to read.\n\nFile contents:\n\n```json\n{\n  \"workflow\": {\n    \"tests\": {\n      \"enabled\": true,\n      \"command\": null,\n      \"runOnEachPhase\": false,\n      \"runBeforeShip\": true,\n      \"timeoutSeconds\": 300\n    }\n  }\n}\n```\n\nNote: PR #101 (auto-healing, sibling branch) creates the same file with a `workflow.autoHeal` section. When both PRs land, a merge conflict on `.tiki/config.json` is expected — resolution combines both sections under the shared `workflow` key.",
+      "verification": [
+        ".tiki/config.json exists at repo root",
+        "File parses as valid JSON",
+        "workflow.tests.enabled === true",
+        "workflow.tests.runBeforeShip === true",
+        "workflow.tests.runOnEachPhase === false",
+        "workflow.tests.timeoutSeconds === 300",
+        "workflow.tests.command === null",
+        "pnpm build from repo root passes"
+      ],
+      "addressesCriteria": ["SC6"],
+      "files": [".tiki/config.json"],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [2],
+    "SC6": [3],
+    "SC7": [1]
+  }
+}

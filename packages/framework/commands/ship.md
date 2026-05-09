@@ -18,6 +18,7 @@ Finalize an issue by committing changes, pushing to remote, and closing the GitH
     - Build succeeds
     - No uncommitted changes from unrelated work
   </step>
+  <step>Run the full test suite (see `<pre-ship-tests>` block) before committing. Halt and prompt the user if tests fail.</step>
   <step>Stage and commit changes with a descriptive message</step>
   <step>Push to remote</step>
   <step>Close the GitHub issue with a summary comment</step>
@@ -54,6 +55,72 @@ Before shipping, verify:
 - [ ] No unrelated changes mixed in
 - [ ] Working directory is clean after commit
 </pre-ship-verification>
+
+<pre-ship-tests>
+## Pre-Ship Test Run
+
+Before staging and committing, run the full project test suite. This catches regressions that phase-level verification may have missed.
+
+### 1. Read configuration
+
+Read `.tiki/config.json` and look for `workflow.tests`. Defaults if file/section is absent:
+
+```json
+{
+  "enabled": true,
+  "command": null,
+  "runBeforeShip": true,
+  "timeoutSeconds": 300
+}
+```
+
+If `workflow.tests.enabled` is `false` OR `workflow.tests.runBeforeShip` is `false`, skip this block (record `{ status: "skipped", reason: "pre-ship tests disabled" }` in the ship report and continue).
+
+### 2. Resolve the test command
+
+Same logic as `execute.md`'s `<test-integration>` block:
+
+- If `workflow.tests.command` is set, use it directly.
+- Otherwise auto-detect in priority order: `package.json scripts.test` → vitest → jest → `Cargo.toml` → `go.mod` → pytest. If none match, record `{ status: "skipped", reason: "no framework detected" }` and continue (do not block ship).
+
+### 3. Run the full suite
+
+Run the resolved command from the project root with timeout `workflow.tests.timeoutSeconds` (default 300). Unlike phase tests, this is the **full** suite — do not pass any phase-scoped filters.
+
+### 4. Parse and report
+
+Parse output using the same patterns described in `<test-integration>`. Surface a `testResults` block in the ship report:
+
+```typescript
+testResults: {
+  framework: string;
+  command: string;
+  passed: number;
+  failed: number;
+  skipped: number;
+  durationMs: number;
+  status: "passed" | "failed" | "skipped";
+}
+```
+
+### 5. On test failure — halt and prompt
+
+If `testResults.status === "failed"`, **do not commit**. Surface the failing test output (last ~50 lines) and present an `AskUserQuestion`:
+
+- question: "Pre-ship tests failed. How would you like to proceed?"
+- options:
+  - label: "Pause to fix tests (Recommended)"
+    description: "Stop the ship and fix the failing tests before committing"
+  - label: "Skip tests and ship anyway"
+    description: "Proceed with commit despite failing tests (risky)"
+  - label: "Abort ship"
+    description: "Cancel the ship operation entirely"
+
+Behavior by choice:
+- **Pause**: Set work `status` to `"paused"`, leave `pipelineStep` as `"SHIP"`, and exit. User fixes tests and re-runs `/tiki:ship`.
+- **Skip and ship anyway**: Continue to commit. Note the override in the commit body and the GitHub close comment.
+- **Abort**: Set work `status` back to `"executing"` and exit without committing.
+</pre-ship-tests>
 
 <commit-format>
 Generate a commit message following this format:

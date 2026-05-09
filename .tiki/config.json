@@ -1,5 +1,12 @@
 {
   "workflow": {
+    "tests": {
+      "enabled": true,
+      "command": null,
+      "runOnEachPhase": false,
+      "runBeforeShip": true,
+      "timeoutSeconds": 300
+    },
     "autoHeal": {
       "enabled": false,
       "maxAttempts": 3,
