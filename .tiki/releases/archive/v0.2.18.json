@@ -1,6 +1,7 @@
 {
   "version": "v0.2.18",
-  "status": "active",
+  "status": "shipped",
+  "shipped": true,
   "issues": [
     {
       "number": 142,
@@ -19,5 +20,7 @@
       "title": "In-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click"
     }
   ],
-  "createdAt": "2026-05-09T03:30:00.000Z"
+  "createdAt": "2026-05-09T03:30:00.000Z",
+  "completedAt": "2026-05-09T04:00:00.000Z",
+  "tag": "v0.2.18"
 }

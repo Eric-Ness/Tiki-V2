@@ -3,15 +3,19 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 99,
-      "title": "Parallel phase execution",
-      "completedAt": "2026-05-09T03:00:00.000Z"
+      "number": 141,
+      "title": "feat: in-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click",
+      "completedAt": "2026-05-09T03:55:00.000Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.2.17",
-      "completedAt": "2026-05-09T03:15:00.000Z"
+      "version": "v0.2.18",
+      "completedAt": "2026-05-09T04:00:00.000Z"
     },
     "recentIssues": [
+      { "number": 141, "title": "feat: in-app framework update — detect outdated .claude/commands/tiki/ and reinstall with one click", "completedAt": "2026-05-09T03:55:00.000Z" },
+      { "number": 139, "title": "Update default panel sizes to 15/65/20 (sidebar/main/detail)", "completedAt": "2026-05-09T03:44:00.000Z" },
+      { "number": 140, "title": "fix: in-app update install path is unreachable — dialog plugin missing capability permission", "completedAt": "2026-05-09T03:42:00.000Z" },
+      { "number": 142, "title": "fix: shipped releases still appear in sidebar — load_tiki_releases reads from archive/", "completedAt": "2026-05-09T03:36:00.000Z" },
       { "number": 99, "title": "Parallel phase execution", "completedAt": "2026-05-09T03:00:00.000Z" },
       { "number": 100, "title": "Automated test framework integration", "completedAt": "2026-05-09T02:40:00.000Z" },
       { "number": 101, "title": "Auto-healing for failed phases", "completedAt": "2026-05-09T02:32:00.000Z" },
@@ -54,6 +58,7 @@
       { "number": 79, "title": "Sort completed kanban items", "completedAt": "2026-02-06T20:15:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.2.18", "issues": [142, 140, 139, 141], "completedAt": "2026-05-09T04:00:00.000Z", "tag": "v0.2.18" },
       { "version": "v0.2.17", "issues": [102, 101, 100, 99], "completedAt": "2026-05-09T03:15:00.000Z", "tag": "v0.2.17" },
       { "version": "v0.2.16", "issues": [116], "completedAt": "2026-05-08T21:55:00.000Z", "tag": "v0.2.16" },
       { "version": "v0.2.15", "issues": [129, 130, 131], "completedAt": "2026-05-08T20:36:00.000Z", "tag": "v0.2.15" },
