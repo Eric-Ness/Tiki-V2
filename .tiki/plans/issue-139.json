@@ -1,0 +1,16 @@
+{
+  "issue": { "number": 139, "title": "Update default panel sizes to 15/65/20 (sidebar/main/detail)" },
+  "createdAt": "2026-05-09T03:42:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Update DEFAULT_SIZES constant",
+      "content": "Change apps/desktop/src/stores/layoutStore.ts DEFAULT_SIZES from `{ sidebar: 15, main: 70, detail: 15 }` to `{ sidebar: 15, main: 65, detail: 20 }`. Per issue body, do NOT bump the persist version — existing users keep their tuned layouts; new installs and Reset Layout clicks pick up the new defaults.",
+      "verification": [
+        "pnpm build passes",
+        "DEFAULT_SIZES is { sidebar: 15, main: 65, detail: 20 }"
+      ],
+      "status": "pending"
+    }
+  ]
+}
