@@ -1,0 +1,26 @@
+{
+  "version": "v0.2.17",
+  "status": "shipped",
+  "shipped": true,
+  "issues": [
+    {
+      "number": 102,
+      "title": "Research command and knowledge capture"
+    },
+    {
+      "number": 101,
+      "title": "Auto-healing for failed phases"
+    },
+    {
+      "number": 100,
+      "title": "Automated test framework integration"
+    },
+    {
+      "number": 99,
+      "title": "Parallel phase execution"
+    }
+  ],
+  "createdAt": "2026-05-09T01:57:06.397Z",
+  "completedAt": "2026-05-09T03:15:00.000Z",
+  "tag": "v0.2.17"
+}

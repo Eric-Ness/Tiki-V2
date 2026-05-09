@@ -3,15 +3,24 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 129,
-      "title": "Persisted terminal tabs reference dead PTY sessions on app restart",
-      "completedAt": "2026-05-08T20:34:00.000Z"
+      "number": 99,
+      "title": "Parallel phase execution",
+      "completedAt": "2026-05-09T03:00:00.000Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.2.15",
-      "completedAt": "2026-05-08T20:36:00.000Z"
+      "version": "v0.2.17",
+      "completedAt": "2026-05-09T03:15:00.000Z"
     },
     "recentIssues": [
+      { "number": 99, "title": "Parallel phase execution", "completedAt": "2026-05-09T03:00:00.000Z" },
+      { "number": 100, "title": "Automated test framework integration", "completedAt": "2026-05-09T02:40:00.000Z" },
+      { "number": 101, "title": "Auto-healing for failed phases", "completedAt": "2026-05-09T02:32:00.000Z" },
+      { "number": 102, "title": "Research command and knowledge capture", "completedAt": "2026-05-09T02:25:00.000Z" },
+      { "number": 116, "title": "Inline plan editor in desktop app", "completedAt": "2026-05-08T21:54:00.000Z" },
+      { "number": 134, "title": "Status Check", "completedAt": "2026-05-08T21:19:00.000Z" },
+      { "number": 133, "title": "Create Release Issue", "completedAt": "2026-05-08T21:09:00.000Z" },
+      { "number": 132, "title": "test issue", "completedAt": "2026-05-08T21:02:00.000Z" },
+      { "number": 118, "title": "Stale work detection and cleanup", "completedAt": "2026-05-08T20:57:00.000Z" },
       { "number": 129, "title": "Persisted terminal tabs reference dead PTY sessions on app restart", "completedAt": "2026-05-08T20:34:00.000Z" },
       { "number": 131, "title": "`cleanup_stale_tmp_files` never cleans `state.json.tmp` — extension mismatch", "completedAt": "2026-05-08T20:33:00.000Z" },
       { "number": 130, "title": "Kanban routes `failed` and `paused` to Review column — drag-back triggers full yolo", "completedAt": "2026-05-08T20:32:00.000Z" },
@@ -45,6 +54,8 @@
       { "number": 79, "title": "Sort completed kanban items", "completedAt": "2026-02-06T20:15:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.2.17", "issues": [102, 101, 100, 99], "completedAt": "2026-05-09T03:15:00.000Z", "tag": "v0.2.17" },
+      { "version": "v0.2.16", "issues": [116], "completedAt": "2026-05-08T21:55:00.000Z", "tag": "v0.2.16" },
       { "version": "v0.2.15", "issues": [129, 130, 131], "completedAt": "2026-05-08T20:36:00.000Z", "tag": "v0.2.15" },
       { "version": "v0.2.14", "issues": [121, 122, 123], "completedAt": "2026-02-20T18:30:00.000Z", "tag": "v0.2.14" },
       { "version": "v0.2.12", "issues": [120, 111], "completedAt": "2026-02-20T00:00:00.000Z", "tag": "v0.2.12" },
