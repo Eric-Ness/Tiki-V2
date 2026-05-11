@@ -218,101 +218,17 @@ All success criteria verified:
 </output>
 
 <state-management>
-When starting shipping, update `.tiki/state.json`:
-- Set `pipelineStep` to `"SHIP"`
-- Set `status` to `"shipping"`
+Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the canonical shape and the parent-release contract.
 
-```json
-{
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "status": "shipping",
-      "pipelineStep": "SHIP",
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
+```bash
+# 1. Mark shipping:
+node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
+# 2a. Release child (entry stays in activeWork; parentRelease preserved):
+node packages/framework/scripts/state.mjs transition issue:{number} --to-status completed --to-step SHIP
+# 2b. Standalone: delete the issue:{number} key from activeWork (direct JSON; shim does not expose deletion yet).
 ```
 
-After shipping completes, you MUST perform these steps in order:
-
-1. **Check for `parentRelease`** — Read the issue's current entry in `activeWork`. If it has a `parentRelease` field, this issue is part of an active release.
-
-2. **If `parentRelease` IS set (child of a release):**
-   - Do NOT delete from `activeWork`. Instead, set `status` to `"completed"` and keep `pipelineStep` as `"SHIP"`.
-   - Preserve the `parentRelease` field.
-   - Add to `history` as normal (both `lastCompletedIssue` and `recentIssues`).
-   - Archive the plan file.
-   - The parent release's ship step will clean up all child `issue:N` entries when the release completes.
-
-3. **If `parentRelease` is NOT set (standalone issue):**
-   - **DELETE the issue key from `activeWork`** — Remove the entire `"issue:{number}"` entry. Shipped standalone items must NOT remain in `activeWork`.
-   - Add to `history` as normal.
-   - Archive the plan file.
-
-**Example: Standalone issue (no parentRelease) — Before:**
-```json
-{
-  "activeWork": {
-    "issue:42": { "type": "issue", "status": "shipping", ... },
-    "issue:50": { "type": "issue", "status": "executing", ... }
-  },
-  "history": { "recentIssues": [...] }
-}
-```
-
-**After shipping standalone issue #42 (REMOVED from activeWork):**
-```json
-{
-  "activeWork": {
-    "issue:50": { "type": "issue", "status": "executing", ... }
-  },
-  "history": {
-    "lastCompletedIssue": {
-      "number": 42,
-      "title": "{title}",
-      "completedAt": "{ISO timestamp}"
-    },
-    "recentIssues": [
-      { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" },
-      ...
-    ]
-  }
-}
-```
-
-**Example: Release child issue (has parentRelease) — Before:**
-```json
-{
-  "activeWork": {
-    "release:v1.2": { "type": "release", "release": { "version": "v1.2", "issues": [41, 42, 43], "currentIssue": 42, "completedIssues": [41] }, "status": "executing", ... },
-    "issue:42": { "type": "issue", "status": "shipping", "parentRelease": "v1.2", ... }
-  }
-}
-```
-
-**After shipping release child issue #42 (KEPT in activeWork as completed):**
-```json
-{
-  "activeWork": {
-    "release:v1.2": { "type": "release", "release": { "version": "v1.2", "issues": [41, 42, 43], "currentIssue": null, "completedIssues": [41, 42] }, "status": "executing", ... },
-    "issue:42": {
-      "type": "issue",
-      "issue": { "number": 42, "title": "{title}" },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "parentRelease": "v1.2",
-      "createdAt": "...",
-      "lastActivity": "{ISO timestamp}"
-    }
-  },
-  "history": {
-    "lastCompletedIssue": { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" },
-    "recentIssues": [ { "number": 42, "title": "{title}", "completedAt": "{ISO timestamp}" }, ... ]
-  }
-}
-```
+In **both cases**, also append to `history.recentIssues`, update `history.lastCompletedIssue`, and archive the plan file — these mutations are direct JSON writes (not in the shim).
 </state-management>
 
 <errors>

@@ -23,42 +23,14 @@ Fetch a GitHub issue and display it in a readable format. This is typically the 
 </instructions>
 
 <state-management>
-When getting an issue, update `.tiki/state.json`:
+Create the `issue:{number}` entry with `status: "pending"`, `pipelineStep: "GET"`. Canonical shape and parent-release detection: see `yolo.md` `<state-management>`.
 
-1. If the file doesn't exist, create it with the initial schema
-2. Add or update the work entry with key `issue:{number}`
-3. Set status to `pending` (issue fetched but not yet being worked on)
-4. **Store full GitHub metadata** for offline access and consolidated data flow
-
-```json
-{
-  "schemaVersion": 1,
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "issue": {
-        "number": {number},
-        "title": "{title}",
-        "body": "{body}",
-        "state": "{state}",
-        "url": "{url}",
-        "labels": ["{label1}", "{label2}"],
-        "labelDetails": [
-          {"id": "{id}", "name": "{name}", "color": "{hex}", "description": "{desc}"}
-        ],
-        "createdAt": "{GitHub created timestamp}",
-        "updatedAt": "{GitHub updated timestamp}"
-      },
-      "status": "pending",
-      "pipelineStep": "GET",
-      "createdAt": "{ISO timestamp}",
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status pending --to-step GET --issue-number {number} --issue-title "{title}"
 ```
 
-**Note:** Store both `labels` (string array for backward compatibility) and `labelDetails` (full objects with color/description for rich display).
+The shim stores `number`/`title` only. Add richer GitHub metadata (`body`, `labels`, `labelDetails`, `state`, `url`, `createdAt`, `updatedAt`) with a follow-up direct JSON write — the desktop app needs these for the issue panel.
 </state-management>
 
 <output>
