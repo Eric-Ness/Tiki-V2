@@ -83,7 +83,9 @@ pub struct TransitionInput {
 /// `Completed` item back to `Executing`). It allows the recovery paths used
 /// by `<auto-heal>` and the manual pause/resume flows.
 ///
-/// See `.tiki/research/state-transition-ipc.md` for the full table.
+/// Canonical table: `packages/shared/src/types/transitions.ts`. This file
+/// mirrors that table and must be kept in sync with the JS shim at
+/// `packages/framework/scripts/state.mjs`.
 pub fn is_legal_transition(from: &WorkStatus, to: &WorkStatus) -> bool {
     use WorkStatus::*;
 
@@ -106,8 +108,10 @@ pub fn is_legal_transition(from: &WorkStatus, to: &WorkStatus) -> bool {
         // From planning: into execution or pause/fail.
         (Planning, Executing) | (Planning, Paused) | (Planning, Failed) => true,
 
-        // From executing: forward to shipping, or pause/fail/retry.
-        (Executing, Shipping) | (Executing, Paused) | (Executing, Failed) => true,
+        // From executing: forward to shipping, or pause/fail/retry. The
+        // (Executing, Completed) arm is the short-circuit path that bypasses
+        // the SHIP pipeline step.
+        (Executing, Shipping) | (Executing, Paused) | (Executing, Failed) | (Executing, Completed) => true,
 
         // From shipping: terminal or fail.
         (Shipping, Completed) | (Shipping, Failed) => true,
@@ -120,7 +124,7 @@ pub fn is_legal_transition(from: &WorkStatus, to: &WorkStatus) -> bool {
         // From failed: any recovery path. <auto-heal> and the manual recovery
         // options need this to be open.
         (Failed, Pending) | (Failed, Reviewing) | (Failed, Planning)
-        | (Failed, Executing) | (Failed, Shipping) => true,
+        | (Failed, Executing) => true,
 
         // Completed is terminal. Nothing escapes it.
         (Completed, _) => false,
@@ -413,10 +417,18 @@ mod tests {
     #[test]
     fn test_failed_recovery() {
         // Failed -> Executing is the retry path. Failed -> Pending is the
-        // "start over" path. Both must be legal.
+        // "start over" path. Both must be legal. Failed -> Shipping is now
+        // an illegal path per the canonical table in
+        // packages/shared/src/types/transitions.ts.
         assert!(is_legal_transition(&WorkStatus::Failed, &WorkStatus::Executing));
         assert!(is_legal_transition(&WorkStatus::Failed, &WorkStatus::Pending));
-        assert!(is_legal_transition(&WorkStatus::Failed, &WorkStatus::Shipping));
+        assert!(!is_legal_transition(&WorkStatus::Failed, &WorkStatus::Shipping));
+    }
+
+    #[test]
+    fn test_executing_to_completed() {
+        // Short-circuit path that bypasses the SHIP pipeline step.
+        assert!(is_legal_transition(&WorkStatus::Executing, &WorkStatus::Completed));
     }
 
     #[test]

@@ -137,22 +137,11 @@ Rules:
 </research-capture>
 
 <state-management>
-Update `.tiki/state.json` after review:
-- Change status from `pending` to `reviewing`
-- Set `pipelineStep` to `"REVIEW"`
-- Update `lastActivity` timestamp
+Record the `pending → reviewing` transition through the validated shim. The shim creates the `issue:{number}` entry if missing, updates status/`pipelineStep`/`lastActivity`, and preserves `parentRelease` automatically.
 
-```json
-{
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "status": "reviewing",
-      "pipelineStep": "REVIEW",
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status reviewing --to-step REVIEW --issue-number {number} --issue-title "{title}"
 ```
 </state-management>
 

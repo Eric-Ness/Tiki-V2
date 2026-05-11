@@ -55,6 +55,7 @@
   },
   "$defs": {
     "workStatus": {
+      "$comment": "Canonical transition table: packages/shared/src/types/transitions.ts (VALID_TRANSITIONS, canTransition, assertTransition). Rust mirror: apps/desktop/src-tauri/src/state_transition.rs. JS shim mirror: packages/framework/scripts/state.mjs.",
       "type": "string",
       "enum": ["pending", "reviewing", "planning", "executing", "paused", "shipping", "completed", "failed"],
       "description": "Status of a work item"

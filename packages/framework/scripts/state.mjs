@@ -48,8 +48,10 @@ import path from "node:path";
 import process from "node:process";
 
 // ---------------------------------------------------------------------------
-// Legal transition table (mirrors apps/desktop/src-tauri/src/state_transition.rs
-// — keep these in sync).
+// Legal transition table. The canonical table lives at
+// packages/shared/src/types/transitions.ts. This file mirrors it, as does
+// apps/desktop/src-tauri/src/state_transition.rs. All three must be kept in
+// sync.
 //
 // Format: from-status -> Set of allowed to-statuses. Same-status transitions
 // (e.g. executing -> executing) are always allowed and not enumerated.
@@ -59,10 +61,10 @@ const LEGAL = {
   pending: new Set(["reviewing", "planning", "executing", "paused", "failed"]),
   reviewing: new Set(["planning", "executing", "paused", "failed"]),
   planning: new Set(["executing", "paused", "failed"]),
-  executing: new Set(["shipping", "paused", "failed"]),
+  executing: new Set(["shipping", "paused", "failed", "completed"]),
   shipping: new Set(["completed", "failed"]),
   paused: new Set(["pending", "reviewing", "planning", "executing", "shipping"]),
-  failed: new Set(["pending", "reviewing", "planning", "executing", "shipping"]),
+  failed: new Set(["pending", "reviewing", "planning", "executing"]),
   completed: new Set(), // terminal
 };
 

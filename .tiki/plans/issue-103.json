@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 103,
+    "title": "State machine transition validation",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/103"
+  },
+  "createdAt": "2026-05-11T19:00:00.000Z",
+  "description": "Establishes a single canonical WorkStatus transition table in @tiki/shared with canTransition and assertTransition helpers, correcting two divergences from the issue spec: removing the illegal failed→shipping pair and adding the missing executing→completed pair. Syncs the Rust is_legal_transition function and JS shim LEGAL constant to match the new canonical table, updating affected inline tests. Closes the only known enforcement gap by replacing the direct-JSON state write in both copies of review.md with a validated state.mjs shim call.",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "shared",
+      "description": "VALID_TRANSITIONS constant exported from packages/shared/src/types/transitions.ts encodes the canonical table (current permissive set minus failed→shipping plus executing→completed)."
+    },
+    {
+      "id": "SC2",
+      "category": "shared",
+      "description": "canTransition(from, to): boolean exported — returns true for same-status and all canonical table pairs, false for everything else."
+    },
+    {
+      "id": "SC3",
+      "category": "shared",
+      "description": "assertTransition(from, to): void exported — throws Error with both statuses in the message on illegal pairs; is silent on legal pairs and same-status."
+    },
+    {
+      "id": "SC4",
+      "category": "rust",
+      "description": "apps/desktop/src-tauri/src/state_transition.rs is_legal_transition matches the canonical table: (Failed, Shipping) arm removed, (Executing, Completed) arm added; all cargo tests pass including updated test_failed_recovery and new test_executing_to_completed."
+    },
+    {
+      "id": "SC5",
+      "category": "framework",
+      "description": "packages/framework/scripts/state.mjs LEGAL constant matches canonical table: 'shipping' removed from failed set, 'completed' added to executing set; comment updated to reference @tiki/shared as canonical source."
+    },
+    {
+      "id": "SC6",
+      "category": "framework",
+      "description": "Both packages/framework/commands/review.md and .claude/commands/tiki/review.md <state-management> blocks route the pending→reviewing transition through the state.mjs shim, not a direct JSON write."
+    },
+    {
+      "id": "SC7",
+      "category": "shared",
+      "description": "packages/shared/schemas/state.schema.json $defs.workStatus has a $comment pointing to packages/shared/src/types/transitions.ts as the canonical transition authority (informational, non-breaking)."
+    },
+    {
+      "id": "SC8",
+      "category": "tests",
+      "description": "packages/shared/src/__tests__/transitions.test.ts exercises canTransition and assertTransition across all 8 from-statuses, all legal targets, and representative illegal targets; pnpm --filter @tiki/shared test passes."
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase 1 — @tiki/shared: canonical table, helpers, vitest infrastructure, and tests",
+      "status": "pending",
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC7", "SC8"],
+      "content": "Create the canonical transition infrastructure in @tiki/shared. New file packages/shared/src/types/transitions.ts exports: VALID_TRANSITIONS as a Record<WorkStatus, ReadonlySet<WorkStatus>> encoding the chosen table (current permissive set minus failed→shipping, plus executing→completed); canTransition(from: WorkStatus, to: WorkStatus): boolean that returns true for same-status or table-listed pairs and false otherwise; assertTransition(from: WorkStatus, to: WorkStatus): void that calls canTransition and throws new Error(`Illegal transition: ${from} → ${to}`) on false. Keep state.ts unchanged — transitions.ts imports WorkStatus from state.ts, not the reverse. Re-export VALID_TRANSITIONS, canTransition, and assertTransition from packages/shared/src/types/index.ts.\n\nSet up vitest for @tiki/shared from scratch. Add vitest to devDependencies in packages/shared/package.json matching the version in apps/desktop (^4.1.6); add a 'test' script set to 'vitest run'. Create packages/shared/vitest.config.ts configured with test.environment: 'node' and include: ['src/__tests__/**']. Critically, update packages/shared/tsconfig.json to add 'src/**/__tests__/**' to the exclude array — without this, tsc compiles test files under noUnusedLocals: true and fails on vitest globals. Run pnpm install from the repo root to update pnpm-lock.yaml.\n\nWrite packages/shared/src/__tests__/transitions.test.ts. Cover: (a) every legal from→to pair returns true — all 8 from-statuses exercised including the newly canonical executing→completed; (b) all 8 same-status pairs return true via canTransition; (c) representative illegal pairs return false — failed→shipping (removed pair), completed→executing, completed→pending, shipping→pending, shipping→reviewing; (d) assertTransition throws an Error on illegal pair whose message contains both the from and to status strings; (e) assertTransition does not throw on a legal pair (e.g. pending→reviewing) and does not throw on same-status (e.g. executing→executing).\n\nOptionally update packages/shared/schemas/state.schema.json to add a $comment at the $defs.workStatus level noting packages/shared/src/types/transitions.ts as the canonical transition authority.",
+      "files": [
+        "packages/shared/src/types/transitions.ts",
+        "packages/shared/src/types/index.ts",
+        "packages/shared/src/__tests__/transitions.test.ts",
+        "packages/shared/package.json",
+        "packages/shared/tsconfig.json",
+        "packages/shared/vitest.config.ts",
+        "packages/shared/schemas/state.schema.json"
+      ],
+      "tasks": [
+        "Create packages/shared/src/types/transitions.ts with VALID_TRANSITIONS constant encoding the canonical table (current permissive set minus failed→shipping, plus executing→completed), canTransition(from, to) helper, and assertTransition(from, to) helper",
+        "Update packages/shared/src/types/index.ts to re-export VALID_TRANSITIONS, canTransition, and assertTransition from './transitions.js'",
+        "Add vitest ^4.1.6 to devDependencies and 'test': 'vitest run' to scripts in packages/shared/package.json",
+        "Create packages/shared/vitest.config.ts with test.environment: 'node'",
+        "Update packages/shared/tsconfig.json: add 'src/**/__tests__/**' to the exclude array to prevent tsc from compiling test files",
+        "Create packages/shared/src/__tests__/transitions.test.ts covering all legal pairs, all same-status pairs, representative illegal pairs, and assertTransition throw/no-throw",
+        "Add $comment to packages/shared/schemas/state.schema.json $defs.workStatus referencing transitions.ts as canonical source",
+        "Run pnpm install from repo root to update pnpm-lock.yaml with vitest devDependency",
+        "Run pnpm --filter @tiki/shared test and verify all tests pass",
+        "Run pnpm typecheck to verify tsc --noEmit passes",
+        "Run pnpm build to verify tsc -b strict compile passes and test files are excluded from dist/"
+      ],
+      "verification": [
+        "pnpm --filter @tiki/shared test passes with all test groups green: legal pairs, same-status, illegal pairs (failed→shipping returns false), assertTransition throw/no-throw",
+        "pnpm typecheck passes (no tsc errors in packages/shared/src/)",
+        "pnpm build passes with tsc -b strict; dist/types/transitions.js and transitions.d.ts exist; no test files appear in dist/",
+        "VALID_TRANSITIONS, canTransition, and assertTransition are importable from '@tiki/shared' (verify via import in a scratch node --input-type=module invocation or inspect dist/index.js exports)"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Phase 2 — Sync Rust state_transition.rs and JS shim LEGAL constant to canonical table",
+      "status": "pending",
+      "addressesCriteria": ["SC4", "SC5"],
+      "content": "Update the two downstream implementations of the transition table to match the canonical source established in Phase 1. Both changes must land in the same phase so that cargo test and state.mjs smoke test can be verified together.\n\nIn apps/desktop/src-tauri/src/state_transition.rs: (1) In the is_legal_transition match block, remove (Failed, Shipping) from the failed-from recovery group (currently the last arm in that group, around line 123). (2) Add (Executing, Completed) to the executing-from group (currently line ~110), making the arm read: (Executing, Shipping) | (Executing, Paused) | (Executing, Failed) | (Executing, Completed) => true. (3) Update the doc comment above is_legal_transition (line 86) to say 'See packages/shared/src/types/transitions.ts for the canonical table' in place of the current research doc reference. (4) In test_failed_recovery (line 414), change the assertion at line 419 from assert!(is_legal_transition(&WorkStatus::Failed, &WorkStatus::Shipping)) to assert!(!is_legal_transition(&WorkStatus::Failed, &WorkStatus::Shipping)); update the comment in that test to note Failed→Shipping is now an illegal path per the canonical table. Keep the Failed→Executing and Failed→Pending assertions as legal. (5) Add a new test function test_executing_to_completed containing a single assert!(is_legal_transition(&WorkStatus::Executing, &WorkStatus::Completed)) with a comment noting this is the short-circuit path that bypasses the SHIP pipeline step.\n\nIn packages/framework/scripts/state.mjs: (1) On the executing row of LEGAL (line ~62), add 'completed' to the Set so it reads: new Set(['shipping', 'paused', 'failed', 'completed']). (2) On the failed row (line ~65), remove 'shipping' so it reads: new Set(['pending', 'reviewing', 'planning', 'executing']). (3) Rewrite the comment block at lines 51–55 to say the table mirrors packages/shared/src/types/transitions.ts (canonical) and apps/desktop/src-tauri/src/state_transition.rs, both of which should be kept in sync with it.\n\nSmoke test the shim change: add a temporary issue:99999 entry at failed status, then attempt a failed→shipping transition via the shim. Verify exit code is 1 and an error message is printed. Clean up the issue:99999 entry from .tiki/state.json after the test.",
+      "files": [
+        "apps/desktop/src-tauri/src/state_transition.rs",
+        "packages/framework/scripts/state.mjs"
+      ],
+      "tasks": [
+        "In state_transition.rs is_legal_transition: remove (Failed, Shipping) arm from the failed-from group",
+        "In state_transition.rs is_legal_transition: add (Executing, Completed) to the executing-from group",
+        "Update state_transition.rs is_legal_transition doc comment to reference packages/shared/src/types/transitions.ts as canonical source",
+        "In state_transition.rs test_failed_recovery: flip assertion at line 419 from assert!(true) to assert!(false) for Failed→Shipping, update comment to reflect it is now illegal",
+        "Add new Rust test fn test_executing_to_completed asserting is_legal_transition(&WorkStatus::Executing, &WorkStatus::Completed) returns true",
+        "In state.mjs LEGAL.executing: add 'completed' to the Set",
+        "In state.mjs LEGAL.failed: remove 'shipping' from the Set",
+        "Update state.mjs comment (lines 51-55) to reference packages/shared/src/types/transitions.ts as canonical source",
+        "Run cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml and verify all tests pass",
+        "Run cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings and verify no new warnings",
+        "Smoke test: create issue:99999 entry at failed status with node packages/framework/scripts/state.mjs transition issue:99999 --to-status failed --to-step EXECUTE --issue-number 99999 --issue-title smoke; then run the same command with --to-status shipping; verify exit code 1; delete issue:99999 from .tiki/state.json"
+      ],
+      "verification": [
+        "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml passes: test_failed_recovery passes (Failed→Shipping now asserts false), test_executing_to_completed passes (asserts true), all other existing tests unchanged",
+        "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings passes with no new warnings",
+        "state.mjs LEGAL.executing Set contains 'completed'; LEGAL.failed Set does not contain 'shipping' (inspect with node -e 'import(\"./state.mjs\")'  or read the file)",
+        "Smoke test: node state.mjs attempt of failed→shipping returns exit code 1 with an error message; .tiki/state.json does not retain the issue:99999 entry after cleanup"
+      ],
+      "dependencies": [1]
+    },
+    {
+      "number": 3,
+      "title": "Phase 3 — Close review.md enforcement gap: replace direct-JSON state write with shim call",
+      "status": "pending",
+      "addressesCriteria": ["SC6"],
+      "content": "Close the only known gap where a status transition (pending→reviewing) bypasses the validated shim. Both packages/framework/commands/review.md and .claude/commands/tiki/review.md contain a <state-management> block at lines 139–157 that instructs the agent to write the transition via a direct JSON code block specifying status: 'reviewing', pipelineStep: 'REVIEW', and lastActivity timestamp. This bypasses the LEGAL table check established in Phases 1 and 2.\n\nReplace the <state-management> block content in both files with the shim-call pattern used by get.md (the closest analogue — also a single-transition command). The new block should contain: a brief prose instruction to run the shim to record the reviewing transition, followed by a bash invocation: node packages/framework/scripts/state.mjs transition issue:{number} --to-status reviewing --to-step REVIEW --issue-number {number} --issue-title \"{title}\". The JSON code block must be removed entirely — the shim handles status, pipelineStep, and lastActivity internally. If the entry does not exist in state.json, the shim creates it.\n\nBoth files must be updated identically in the same phase: .claude/commands/tiki/review.md is the active runtime file (what Claude reads when executing the review command); packages/framework/commands/review.md is the distribution source. They must not diverge.\n\nAfter updating, verify no other direct status-transition JSON writes exist in the command files beyond the previously-known legitimate exceptions: execute.md's parallelExecution field (a non-status-transition direct write, out of scope for this issue) and ship.md's history append and entry deletion (neither is a status transition). Any newly found direct status writes should be flagged as follow-up issues, not fixed here."
+,
+      "files": [
+        "packages/framework/commands/review.md",
+        ".claude/commands/tiki/review.md"
+      ],
+      "tasks": [
+        "In packages/framework/commands/review.md, replace the <state-management> block JSON code block with a state.mjs shim bash invocation matching the get.md pattern",
+        "Apply the identical change to .claude/commands/tiki/review.md",
+        "Verify the two files are identical in the <state-management> section by diffing them",
+        "Run grep -rn 'activeWork' packages/framework/commands/ .claude/commands/tiki/ to identify all remaining direct JSON state writes; confirm only execute.md (parallelExecution) and ship.md (history append, deletion) remain as known exceptions",
+        "Confirm no direct 'status.*reviewing' or 'pipelineStep.*REVIEW' JSON patterns remain in the command files"
+      ],
+      "verification": [
+        "git diff packages/framework/commands/review.md shows the <state-management> block now contains a 'node packages/framework/scripts/state.mjs transition' bash line and no JSON code block",
+        "git diff .claude/commands/tiki/review.md shows the identical change",
+        "diff packages/framework/commands/review.md .claude/commands/tiki/review.md shows no difference (or only expected header differences if any)",
+        "grep across all commands in both directories confirms no unaccounted direct status-transition JSON writes beyond the known execute.md and ship.md exceptions"
+      ],
+      "dependencies": []
+    }
+  ]
+}

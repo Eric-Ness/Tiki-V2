@@ -59,3 +59,6 @@ export {
   buildCoverageMatrix,
   getPlanPath,
 } from './plan.js';
+
+// Transition table & helpers
+export * from './transitions.js';
