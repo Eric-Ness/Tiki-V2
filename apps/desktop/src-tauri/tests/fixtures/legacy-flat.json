@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:42": {
+      "type": "issue",
+      "issueNumber": 42,
+      "title": "Legacy flat-format issue",
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "startedAt": "2025-12-01T10:00:00.000Z",
+      "lastActivity": "2025-12-01T10:30:00.000Z"
+    }
+  }
+}

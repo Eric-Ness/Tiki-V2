@@ -144,6 +144,32 @@ pnpm lint
 pnpm version-bump 0.3.0
 ```
 
+### Running tests
+
+The repository ships a TypeScript test suite (vitest) for the desktop frontend and an integration test suite (cargo test) for the Tauri Rust backend. Both run on every pull request via `.github/workflows/pr.yml`.
+
+```bash
+# Run the full suite (TypeScript + Rust) from the repo root
+pnpm test
+
+# TypeScript only — vitest for apps/desktop stores, helpers, kanban routing
+pnpm test:ts
+
+# Rust only — state.rs serde shim fixtures + state_transition unit tests
+pnpm test:rust
+
+# Watch mode (TypeScript)
+pnpm -C apps/desktop test:watch
+```
+
+What's covered today:
+
+- **Rust (`apps/desktop/src-tauri/tests/state_format_compat.rs`)** — Six fixture JSON files under `tests/fixtures/` pin every historical and current shape of `state.json` so the legacy serde compatibility shims in `state.rs` cannot regress. See [`apps/desktop/src-tauri/tests/README.md`](apps/desktop/src-tauri/tests/README.md) for how to add a fixture when the schema changes.
+- **Rust (`state_transition::tests`)** — Unit tests for the typed state-machine IPC introduced in issue #144.
+- **TypeScript (vitest)** — Split-tree helpers (`splitTree.ts`), `tikiStateStore.getIssueWorkStatus`, command palette `fuzzyMatch` + `filterAndSortActions`, and kanban `getExecuteCommand` routing.
+
+If you add a new module to `apps/desktop/src/stores/` or `apps/desktop/src/components/`, drop a `*.test.ts` file next to it (vitest's `include` glob is `src/**/*.test.{ts,tsx}`).
+
 ## CI/CD and Releases
 
 Releases are triggered by pushing a tag matching `v*` or manually via GitHub Actions workflow dispatch:

@@ -2,7 +2,7 @@ mod claude_usage;
 mod commands;
 mod fs_utils;
 mod github;
-mod state;
+pub mod state;
 mod state_transition;
 mod terminal;
 mod watcher;

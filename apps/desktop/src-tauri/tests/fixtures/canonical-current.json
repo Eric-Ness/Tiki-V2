@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:100": {
+      "type": "issue",
+      "issue": {
+        "number": 100,
+        "title": "Canonical current-format issue",
+        "state": "OPEN",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/100"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "phase": { "current": 2, "total": 4, "status": "executing" },
+      "createdAt": "2026-05-01T08:00:00.000Z",
+      "lastActivity": "2026-05-01T09:00:00.000Z",
+      "auditPassed": true
+    }
+  },
+  "history": {
+    "lastCompletedIssue": {
+      "number": 99,
+      "title": "Previous issue",
+      "completedAt": "2026-04-30T15:00:00.000Z"
+    },
+    "recentIssues": [
+      { "number": 99, "title": "Previous issue", "completedAt": "2026-04-30T15:00:00.000Z" }
+    ]
+  }
+}

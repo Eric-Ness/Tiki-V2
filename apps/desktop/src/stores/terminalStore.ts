@@ -1,26 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useProjectsStore } from './projectsStore';
+import {
+  createLeaf,
+  firstLeafId,
+  getTerminalIds,
+  regenerateLeafIds,
+  removeFromTree,
+  replaceInTree,
+  type SplitDirection,
+  type SplitNode,
+  type SplitTreeNode,
+  type TerminalLeaf,
+} from './splitTree';
 
 export type TerminalStatus = 'starting' | 'ready' | 'busy' | 'idle' | 'exited';
 
-// Split tree types
-export type SplitDirection = 'horizontal' | 'vertical';
-
-export interface TerminalLeaf {
-  type: 'terminal';
-  terminalId: string;
-}
-
-export interface SplitNode {
-  type: 'split';
-  id: string;
-  direction: SplitDirection;
-  children: SplitTreeNode[];
-  sizes: number[];
-}
-
-export type SplitTreeNode = TerminalLeaf | SplitNode;
+// Re-export split-tree types for legacy consumers.
+export type { SplitDirection, TerminalLeaf, SplitNode, SplitTreeNode };
 
 export interface TerminalTab {
   id: string;
@@ -73,107 +70,6 @@ const generateSplitId = (): string => {
 
 const generateTitle = (): string => {
   return `Terminal ${tabCounter++}`;
-};
-
-// Helper to create a leaf node
-const createLeaf = (terminalId: string): TerminalLeaf => ({
-  type: 'terminal',
-  terminalId,
-});
-
-// Helper to find and replace a node in the tree
-const replaceInTree = (
-  node: SplitTreeNode,
-  targetId: string,
-  replacement: SplitTreeNode
-): SplitTreeNode => {
-  if (node.type === 'terminal') {
-    return node.terminalId === targetId ? replacement : node;
-  }
-
-  return {
-    ...node,
-    children: node.children.map((child) =>
-      replaceInTree(child, targetId, replacement)
-    ),
-  };
-};
-
-// Helper to remove a terminal from the tree and promote sibling
-const removeFromTree = (
-  node: SplitTreeNode,
-  targetId: string
-): SplitTreeNode | null => {
-  if (node.type === 'terminal') {
-    return node.terminalId === targetId ? null : node;
-  }
-
-  const newChildren: SplitTreeNode[] = [];
-  const newSizes: number[] = [];
-  let removedIndex = -1;
-
-  for (let i = 0; i < node.children.length; i++) {
-    const child = node.children[i];
-    const result = removeFromTree(child, targetId);
-
-    if (result === null) {
-      // This child was removed
-      removedIndex = i;
-    } else {
-      newChildren.push(result);
-      newSizes.push(node.sizes[i]);
-    }
-  }
-
-  // If nothing was removed, return unchanged
-  if (removedIndex === -1) {
-    return node;
-  }
-
-  // If only one child left, promote it
-  if (newChildren.length === 1) {
-    return newChildren[0];
-  }
-
-  // Redistribute sizes proportionally
-  const totalSize = newSizes.reduce((a, b) => a + b, 0);
-  const normalizedSizes = newSizes.map((s) => (s / totalSize) * 100);
-
-  return {
-    ...node,
-    children: newChildren,
-    sizes: normalizedSizes,
-  };
-};
-
-// Helper to find all terminal IDs in a tree
-const getTerminalIds = (node: SplitTreeNode): string[] => {
-  if (node.type === 'terminal') {
-    return [node.terminalId];
-  }
-  return node.children.flatMap(getTerminalIds);
-};
-
-// Helper to deep-clone a split tree, replacing every leaf's terminalId with a
-// fresh ID. Used in `partialize` so persisted PTY session IDs don't survive a
-// process restart (the Rust TerminalManager's PTY sessions don't survive, so
-// reusing the old IDs leaves the Terminal component stuck on "Connecting...").
-const regenerateLeafIds = (node: SplitTreeNode): SplitTreeNode => {
-  if (node.type === 'terminal') {
-    return { type: 'terminal', terminalId: generateId() };
-  }
-  return {
-    ...node,
-    children: node.children.map(regenerateLeafIds),
-  };
-};
-
-// Helper to return the terminalId of the first leaf in a depth-first walk.
-const firstLeafId = (node: SplitTreeNode): string => {
-  if (node.type === 'terminal') {
-    return node.terminalId;
-  }
-  return firstLeafId(node.children[0]);
 };
 
 // Terminal focus function registry (not persisted, not reactive)
@@ -504,7 +400,7 @@ export const useTerminalStore = create<TerminalStore>()(
         const serialized: Record<string, TerminalTab[]> = {};
         for (const [projectId, tabs] of Object.entries(state.tabsByProject)) {
           serialized[projectId] = tabs.map((t) => {
-            const splitRoot = regenerateLeafIds(t.splitRoot);
+            const splitRoot = regenerateLeafIds(t.splitRoot, generateId);
             return {
               ...t,
               splitRoot,

@@ -6,13 +6,29 @@
       "release": {
         "version": "v0.3.0",
         "issues": [144, 145, 146],
-        "currentIssue": null,
+        "currentIssue": 145,
         "completedIssues": [144]
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-11T00:00:00.000Z",
-      "lastActivity": "2026-05-11T02:10:00.000Z"
+      "lastActivity": "2026-05-11T15:00:00.000Z"
+    },
+    "issue:145": {
+      "type": "issue",
+      "issue": {
+        "number": 145,
+        "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers",
+        "state": "OPEN",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/145"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "phase": { "current": 5, "total": 5, "status": "completed" },
+      "auditPassed": true,
+      "parentRelease": "v0.3.0",
+      "createdAt": "2026-05-11T14:50:00.000Z",
+      "lastActivity": "2026-05-11T16:00:00.000Z"
     },
     "issue:144": {
       "type": "issue",

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:55": {
+      "type": "issue",
+      "issue": {
+        "number": 55,
+        "title": "Legacy phases-object issue"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "phases": {
+        "total": 4,
+        "completed": 2,
+        "current": {
+          "number": 3,
+          "title": "Wire up the IPC handler",
+          "status": "executing"
+        }
+      },
+      "createdAt": "2025-12-15T08:00:00.000Z",
+      "lastActivity": "2025-12-15T09:45:00.000Z"
+    }
+  }
+}

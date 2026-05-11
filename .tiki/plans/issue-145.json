@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 145,
+    "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/145"
+  },
+  "createdAt": "2026-05-11T15:05:00.000Z",
+  "description": "Three independent test investments (Rust fixtures, vitest stores, PR CI workflow) plus root pnpm test glue and docs. Pins the existing state.rs serde shims so they're safe to refactor later.",
+  "successCriteria": [
+    { "id": "SC1", "category": "rust", "description": "At least 6 fixture JSON files under apps/desktop/src-tauri/tests/fixtures/ plus an integration test (state_format_compat.rs) that loads each and round-trips through TikiState deserialize/serialize. cargo test passes." },
+    { "id": "SC2", "category": "vitest", "description": "Vitest configured for apps/desktop with at least 15 passing tests across terminalStore split-tree helpers, tikiStateStore.getIssueWorkStatus, commandPaletteStore (fuzzyMatch + filterAndSortActions), and kanban getExecuteCommand." },
+    { "id": "SC3", "category": "ci", "description": ".github/workflows/pr.yml runs on pull_request and executes typecheck + build + cargo test + cargo clippy + vitest." },
+    { "id": "SC4", "category": "tooling", "description": "pnpm test works from repo root and runs both TS (vitest) and Rust (cargo test) suites." },
+    { "id": "SC5", "category": "docs", "description": "README updated with a 'Running tests' section; apps/desktop/src-tauri/tests/README.md documents the fixture maintenance workflow." }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase A — Rust state-deserialization fixtures + integration test",
+      "status": "completed",
+      "addressesCriteria": ["SC1"],
+      "content": "Create apps/desktop/src-tauri/tests/fixtures/ with 6 JSON files representing every historical and current state shape: legacy-flat.json, legacy-phases-object.json, legacy-phases-array.json, canonical-current.json, with-parallel-execution.json, with-parent-release.json. Each fixture is a full TikiState (activeWork map). Then create apps/desktop/src-tauri/tests/state_format_compat.rs as an integration test that loads each fixture from disk, deserializes through tiki_desktop_lib::state::TikiState, serializes back to JSON, and asserts canonical fields (issue.number, status, phase.total when applicable, parent_release when applicable, parallel_execution when applicable). Do NOT modify any shim in state.rs — the goal is to lock down current behavior.",
+      "files": [
+        "apps/desktop/src-tauri/tests/fixtures/legacy-flat.json",
+        "apps/desktop/src-tauri/tests/fixtures/legacy-phases-object.json",
+        "apps/desktop/src-tauri/tests/fixtures/legacy-phases-array.json",
+        "apps/desktop/src-tauri/tests/fixtures/canonical-current.json",
+        "apps/desktop/src-tauri/tests/fixtures/with-parallel-execution.json",
+        "apps/desktop/src-tauri/tests/fixtures/with-parent-release.json",
+        "apps/desktop/src-tauri/tests/state_format_compat.rs"
+      ],
+      "tasks": [
+        "Build legacy-flat.json with issueNumber + title at top level and startedAt timestamp",
+        "Build legacy-phases-object.json with phases:{total,completed,current:{number,title,status}}",
+        "Build legacy-phases-array.json with phases as array of {id,title,status} plus flat currentPhase/totalPhases",
+        "Build canonical-current.json mirroring the current state.json shape (nested issue object, flat PhaseProgress, history block)",
+        "Build with-parallel-execution.json with parallelExecution: {phases, completedInGroup, totalInGroup, startedAt}",
+        "Build with-parent-release.json with parentRelease: 'v0.3.0' set on the issue context",
+        "Write state_format_compat.rs as an integration test that uses include_str! or fs::read_to_string for each fixture, serde_json::from_str::<TikiState>, then serde_json::to_string, then re-parse and assert canonical fields",
+        "Run cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml and verify all tests pass"
+      ],
+      "verification": [
+        "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml passes",
+        "At least 6 fixture files exist under apps/desktop/src-tauri/tests/fixtures/",
+        "state_format_compat.rs has at least 6 #[test] functions, one per fixture, all passing"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Phase B-prep — Extract testable helpers (splitTree + getExecuteCommand)",
+      "status": "completed",
+      "addressesCriteria": ["SC2"],
+      "content": "Refactor two pieces of code so they're testable without rendering React or instantiating Zustand-with-persist: (a) extract the split-tree helpers (replaceInTree, removeFromTree, regenerateLeafIds, getTerminalIds, firstLeafId) out of terminalStore.ts into a new file apps/desktop/src/stores/splitTree.ts that exports them, then re-import them from terminalStore.ts. (b) extract getExecuteCommand from KanbanBoard.tsx into apps/desktop/src/components/kanban/executeCommand.ts as a pure function, then import it from KanbanBoard.tsx. Verify pnpm build still passes (tsc -b).",
+      "files": [
+        "apps/desktop/src/stores/splitTree.ts",
+        "apps/desktop/src/stores/terminalStore.ts",
+        "apps/desktop/src/components/kanban/executeCommand.ts",
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "tasks": [
+        "Create splitTree.ts exporting: SplitTreeNode/SplitNode/TerminalLeaf type re-exports, replaceInTree, removeFromTree, regenerateLeafIds, getTerminalIds, firstLeafId. The generateId function used by regenerateLeafIds should be injected as a parameter so tests can pass a deterministic generator.",
+        "Update terminalStore.ts to import from ./splitTree (removing the inline copies), and pass its existing generateId when calling regenerateLeafIds",
+        "Create executeCommand.ts exporting `getExecuteCommand(issueNumber: number, fromColumn: string, status?: string): string` with the exact logic from KanbanBoard.tsx:96-109",
+        "Update KanbanBoard.tsx to import getExecuteCommand from ./executeCommand and delete the local function",
+        "Run pnpm -C apps/desktop build (or pnpm build from root) and ensure it passes with no TS errors"
+      ],
+      "verification": [
+        "pnpm build passes with no TS errors (uses tsc -b)",
+        "splitTree.ts exports replaceInTree, removeFromTree, regenerateLeafIds, getTerminalIds, firstLeafId",
+        "executeCommand.ts exports getExecuteCommand as a pure function",
+        "No behavioral changes to terminalStore or KanbanBoard"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Phase B — Vitest setup + 15+ store tests",
+      "status": "completed",
+      "addressesCriteria": ["SC2"],
+      "content": "Add vitest to apps/desktop as a devDependency. Create vitest.config.ts at apps/desktop/vitest.config.ts with environment: 'node' (we only test pure logic, no DOM). Add a `test` script to apps/desktop/package.json running `vitest run`. Write tests under apps/desktop/src/stores/__tests__/ and apps/desktop/src/components/kanban/__tests__/: (1) splitTree.test.ts with tests for replaceInTree (leaf replacement, deep nested), removeFromTree (remove with promotion of single sibling, size redistribution, no-op when target absent), regenerateLeafIds (deterministic generator yields fresh IDs at every leaf), getTerminalIds, firstLeafId. (2) commandPaletteStore.test.ts with fuzzyMatch (empty query, no match, basic match, scoring of consecutive matches, word boundary bonus) and filterAndSortActions (empty query returns recents first, query matches title/subtitle/keywords, recent bonus). (3) tikiStateStore.test.ts for getIssueWorkStatus (returns status when present, null when absent, null when wrong key). (4) executeCommand.test.ts for getExecuteCommand (review+paused, review+failed, review+reviewing, open, plan). Total: aim for >=20 tests for slack. Run vitest and ensure all pass.",
+      "files": [
+        "apps/desktop/package.json",
+        "apps/desktop/vitest.config.ts",
+        "apps/desktop/src/stores/__tests__/splitTree.test.ts",
+        "apps/desktop/src/stores/__tests__/commandPaletteStore.test.ts",
+        "apps/desktop/src/stores/__tests__/tikiStateStore.test.ts",
+        "apps/desktop/src/components/kanban/__tests__/executeCommand.test.ts"
+      ],
+      "tasks": [
+        "Install vitest as devDependency in apps/desktop (pnpm -C apps/desktop add -D vitest)",
+        "Add `test`: `vitest run` to apps/desktop/package.json scripts",
+        "Create apps/desktop/vitest.config.ts with test.environment: 'node' and globals: false, include: ['src/**/*.test.ts', 'src/**/*.test.tsx']",
+        "Write splitTree.test.ts with at least 7 tests across the helpers",
+        "Write commandPaletteStore.test.ts with at least 6 tests across fuzzyMatch and filterAndSortActions",
+        "Write tikiStateStore.test.ts with at least 3 tests for getIssueWorkStatus",
+        "Write executeCommand.test.ts with at least 5 tests covering paused/failed/reviewing/open/plan branches",
+        "Run pnpm -C apps/desktop test and verify all tests pass with >=15 total"
+      ],
+      "verification": [
+        "pnpm -C apps/desktop test passes",
+        ">=15 tests pass across the four test files",
+        "Tests cover terminalStore split-tree helpers, tikiStateStore.getIssueWorkStatus, commandPaletteStore.fuzzyMatch + filterAndSortActions, kanban getExecuteCommand"
+      ],
+      "dependencies": [2]
+    },
+    {
+      "number": 4,
+      "title": "Phase C — PR CI workflow + root `pnpm test`",
+      "status": "completed",
+      "addressesCriteria": ["SC3", "SC4"],
+      "content": "Create .github/workflows/pr.yml that runs on pull_request to main and executes typecheck + build + cargo test + cargo clippy + vitest on a single ubuntu-22.04 runner. Add `test` script to the root package.json that runs vitest in apps/desktop AND cargo test in the Rust crate.",
+      "files": [
+        ".github/workflows/pr.yml",
+        "package.json",
+        "apps/desktop/package.json"
+      ],
+      "tasks": [
+        "Create .github/workflows/pr.yml triggered on pull_request to main with concurrency cancel-in-progress and a single ubuntu-22.04 job",
+        "Job steps: actions/checkout, setup-node lts/*, install pnpm@9 via pnpm/action-setup, dtolnay/rust-toolchain stable with clippy component, install libwebkit2gtk-4.1-dev (Tauri needs it), pnpm install --frozen-lockfile, pnpm typecheck, pnpm build, pnpm -C apps/desktop test, cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml, cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- --deny warnings",
+        "Add cache for pnpm and cargo to speed up CI",
+        "Add `test` script to root package.json: `pnpm -r --if-present --filter './apps/desktop' test && cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml`",
+        "Optionally add `test:rust` and `test:ts` sub-scripts for granular control"
+      ],
+      "verification": [
+        ".github/workflows/pr.yml exists and is valid YAML",
+        "Workflow runs on pull_request, executes all five checks (typecheck, build, vitest, cargo test, cargo clippy)",
+        "pnpm test from repo root runs both vitest and cargo test"
+      ],
+      "dependencies": [1, 3]
+    },
+    {
+      "number": 5,
+      "title": "Documentation — README 'Running tests' + tests/README.md",
+      "status": "completed",
+      "addressesCriteria": ["SC5"],
+      "content": "Add a 'Running tests' section to the root README.md showing how to run the full suite (pnpm test from root), TS-only (pnpm -C apps/desktop test), Rust-only (cargo test in apps/desktop/src-tauri/), and how the PR workflow validates these. Add apps/desktop/src-tauri/tests/README.md documenting the fixture maintenance workflow: what each fixture exercises, how to add a new one when the schema changes, what shims in state.rs are pinned by these tests.",
+      "files": [
+        "README.md",
+        "apps/desktop/src-tauri/tests/README.md"
+      ],
+      "tasks": [
+        "Insert a 'Running tests' section into README.md after the existing workflow command list",
+        "Document: full suite (pnpm test), TS-only (pnpm -C apps/desktop test), Rust-only (cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml), and how to add tests",
+        "Create apps/desktop/src-tauri/tests/README.md with: purpose of fixtures (pin format-compat shims), description of each existing fixture and which shim it exercises, step-by-step recipe for adding a new fixture when state.rs schema changes"
+      ],
+      "verification": [
+        "README.md has a 'Running tests' section with at least the three commands documented",
+        "apps/desktop/src-tauri/tests/README.md exists and documents the fixture maintenance workflow"
+      ],
+      "dependencies": [4]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2, 3],
+    "SC3": [4],
+    "SC4": [4],
+    "SC5": [5]
+  }
+}

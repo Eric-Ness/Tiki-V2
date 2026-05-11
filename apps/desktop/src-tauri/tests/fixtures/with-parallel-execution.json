@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:110": {
+      "type": "issue",
+      "issue": {
+        "number": 110,
+        "title": "Issue running phases in parallel"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "phase": { "current": 1, "total": 5, "status": "executing" },
+      "parallelExecution": {
+        "phases": [1, 2, 3],
+        "completedInGroup": [1],
+        "totalInGroup": 3,
+        "startedAt": "2026-05-05T14:00:00.000Z"
+      },
+      "createdAt": "2026-05-05T13:00:00.000Z",
+      "lastActivity": "2026-05-05T14:30:00.000Z"
+    }
+  }
+}

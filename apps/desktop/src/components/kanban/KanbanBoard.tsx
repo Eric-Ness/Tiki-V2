@@ -16,6 +16,7 @@ import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard, type WorkItem } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
+import { getExecuteCommand } from './executeCommand';
 import './kanban.css';
 
 // Valid state transitions for drag-and-drop
@@ -88,25 +89,6 @@ export function KanbanBoard() {
       return false;
     }
   }, [getActiveTerminalId]);
-
-  // Determine the appropriate command based on source column and underlying work status.
-  // For Review→Execute drags, paused/failed work has an existing plan + partial phase
-  // progress; resume with `/tiki:execute --continue` rather than replaying the full
-  // pipeline (which would overwrite plan state).
-  const getExecuteCommand = (issueNumber: number, fromColumn: string, status?: string): string => {
-    if (fromColumn === 'review') {
-      if (status === 'paused' || status === 'failed') {
-        return `/tiki:execute ${issueNumber} --continue`;
-      }
-      // reviewing / pending / undefined → full pipeline
-      return `/tiki:yolo ${issueNumber}`;
-    }
-    if (fromColumn === 'open') {
-      return `/tiki:yolo ${issueNumber}`;
-    }
-    // Plan column or resume from elsewhere — has a plan, just execute.
-    return `/tiki:execute ${issueNumber}`;
-  };
 
   // Trigger execution for an issue
   const triggerExecution = useCallback(async (issueNumber: number, fromColumn: string) => {

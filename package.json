@@ -8,6 +8,9 @@
     "build": "pnpm -r build",
     "clean": "pnpm -r clean",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm test:ts && pnpm test:rust",
+    "test:ts": "pnpm -C apps/desktop test",
+    "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "version-bump": "node scripts/version-bump.mjs"
   },
   "engines": {

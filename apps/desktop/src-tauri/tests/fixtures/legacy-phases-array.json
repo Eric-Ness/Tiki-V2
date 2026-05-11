@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:66": {
+      "type": "issue",
+      "issue": {
+        "number": 66,
+        "title": "Legacy phases-array issue (#66 style)"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "currentPhase": 2,
+      "totalPhases": 3,
+      "phases": [
+        { "id": 1, "title": "Scaffolding", "status": "completed" },
+        { "id": 2, "title": "Wiring", "status": "executing" },
+        { "id": 3, "title": "Cleanup", "status": "pending" }
+      ],
+      "createdAt": "2026-01-10T12:00:00.000Z",
+      "lastActivity": "2026-01-10T13:15:00.000Z"
+    }
+  }
+}

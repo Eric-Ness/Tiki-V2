@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "release:v0.3.0": {
+      "type": "release",
+      "release": {
+        "version": "v0.3.0",
+        "issues": [144, 145, 146],
+        "currentIssue": 145,
+        "completedIssues": [144]
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-11T00:00:00.000Z",
+      "lastActivity": "2026-05-11T10:00:00.000Z"
+    },
+    "issue:145": {
+      "type": "issue",
+      "issue": {
+        "number": 145,
+        "title": "Child issue with parentRelease set"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "phase": { "current": 3, "total": 5, "status": "executing" },
+      "parentRelease": "v0.3.0",
+      "createdAt": "2026-05-11T05:00:00.000Z",
+      "lastActivity": "2026-05-11T10:00:00.000Z"
+    }
+  }
+}
