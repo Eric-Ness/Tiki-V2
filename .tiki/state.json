@@ -11,13 +11,14 @@
           114
         ],
         "completedIssues": [
-          103
+          103,
+          87
         ]
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-11T18:46:39.690Z",
-      "lastActivity": "2026-05-11T19:24:00.000Z"
+      "lastActivity": "2026-05-11T20:50:00.000Z"
     },
     "issue:103": {
       "type": "issue",
@@ -35,19 +36,41 @@
         "total": 3,
         "status": "executing"
       }
+    },
+    "issue:87": {
+      "type": "issue",
+      "issue": {
+        "number": 87,
+        "title": "Terminal search (find in buffer)"
+      },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-11T19:33:24.817Z",
+      "lastActivity": "2026-05-11T20:49:52.005Z",
+      "parentRelease": "v0.4.0",
+      "phase": {
+        "current": 2,
+        "total": 2,
+        "status": "executing"
+      }
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 103,
-      "title": "State machine transition validation",
-      "completedAt": "2026-05-11T19:23:13.802Z"
+      "number": 87,
+      "title": "Terminal search (find in buffer)",
+      "completedAt": "2026-05-11T20:49:52.005Z"
     },
     "lastCompletedRelease": {
       "version": "v0.3.0",
       "completedAt": "2026-05-11T17:35:00.000Z"
     },
     "recentIssues": [
+      {
+        "number": 87,
+        "title": "Terminal search (find in buffer)",
+        "completedAt": "2026-05-11T20:49:52.005Z"
+      },
       {
         "number": 103,
         "title": "State machine transition validation",
