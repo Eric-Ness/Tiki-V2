@@ -1,71 +1,6 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "release:v0.3.0": {
-      "type": "release",
-      "release": {
-        "version": "v0.3.0",
-        "issues": [144, 145, 146],
-        "currentIssue": 146,
-        "completedIssues": [144, 145, 146]
-      },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "createdAt": "2026-05-11T00:00:00.000Z",
-      "lastActivity": "2026-05-11T17:05:00.000Z"
-    },
-    "issue:146": {
-      "type": "issue",
-      "issue": {
-        "number": 146,
-        "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore",
-        "state": "OPEN",
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/146"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "phase": { "current": 6, "total": 6, "status": "completed" },
-      "auditPassed": true,
-      "commit": "8f1d713",
-      "parentRelease": "v0.3.0",
-      "createdAt": "2026-05-11T16:10:00.000Z",
-      "lastActivity": "2026-05-11T17:05:00.000Z"
-    },
-    "issue:145": {
-      "type": "issue",
-      "issue": {
-        "number": 145,
-        "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers",
-        "state": "CLOSED",
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/145"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "phase": { "current": 5, "total": 5, "status": "completed" },
-      "auditPassed": true,
-      "commit": "3155d74",
-      "parentRelease": "v0.3.0",
-      "createdAt": "2026-05-11T14:50:00.000Z",
-      "lastActivity": "2026-05-11T16:05:00.000Z"
-    },
-    "issue:144": {
-      "type": "issue",
-      "issue": {
-        "number": 144,
-        "title": "Replace prose-based state.json contracts with typed Rust state_transition IPC",
-        "state": "OPEN",
-        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/144"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "parentRelease": "v0.3.0",
-      "phase": { "current": 5, "total": 5, "status": "completed" },
-      "auditPassed": true,
-      "commit": "5102718",
-      "createdAt": "2026-05-11T00:00:00.000Z",
-      "lastActivity": "2026-05-11T02:10:00.000Z"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
       "number": 146,
@@ -73,8 +8,8 @@
       "completedAt": "2026-05-11T17:05:00.000Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.2.19",
-      "completedAt": "2026-05-09T05:15:00.000Z"
+      "version": "v0.3.0",
+      "completedAt": "2026-05-11T17:35:00.000Z"
     },
     "recentIssues": [
       { "number": 146, "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore", "completedAt": "2026-05-11T17:05:00.000Z" },
@@ -127,6 +62,7 @@
       { "number": 79, "title": "Sort completed kanban items", "completedAt": "2026-02-06T20:15:00.000Z" }
     ],
     "recentReleases": [
+      { "version": "v0.3.0", "issues": [144, 145, 146], "completedAt": "2026-05-11T17:35:00.000Z", "tag": "v0.3.0" },
       { "version": "v0.2.19", "issues": [143], "completedAt": "2026-05-09T05:15:00.000Z", "tag": "v0.2.19" },
       { "version": "v0.2.18", "issues": [142, 140, 139, 141], "completedAt": "2026-05-09T04:00:00.000Z", "tag": "v0.2.18" },
       { "version": "v0.2.17", "issues": [102, 101, 100, 99], "completedAt": "2026-05-09T03:15:00.000Z", "tag": "v0.2.17" },

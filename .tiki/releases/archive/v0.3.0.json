@@ -1,0 +1,23 @@
+{
+  "version": "v0.3.0",
+  "status": "completed",
+  "shipped": true,
+  "issues": [
+    {
+      "number": 144,
+      "title": "Replace prose-based state.json contracts with typed Rust state_transition IPC"
+    },
+    {
+      "number": 145,
+      "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers"
+    },
+    {
+      "number": 146,
+      "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore"
+    }
+  ],
+  "createdAt": "2026-05-11T00:00:00.000Z",
+  "completedAt": "2026-05-11T17:35:00.000Z",
+  "tag": "v0.3.0",
+  "description": "Foundational reliability release: replace fragile Claude-driven state.json prose contracts with a typed Rust IPC (#144), establish an automated test suite for Rust deserialization and TS stores (#145), and turn the existing-but-unwired backup primitives into a real corruption recovery UX (#146). Together: a structural fix, a safety net, and user-facing reliability."
+}
