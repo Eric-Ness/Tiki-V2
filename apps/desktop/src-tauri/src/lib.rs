@@ -3,6 +3,7 @@ mod commands;
 mod fs_utils;
 mod github;
 mod state;
+mod state_transition;
 mod terminal;
 mod watcher;
 
@@ -59,6 +60,7 @@ pub fn run() {
             commands::read_research_doc,
             commands::install_framework,
             commands::read_framework_version,
+            state_transition::state_transition,
             github::check_claude_cli,
             github::check_gh_auth,
             github::fetch_github_issues,

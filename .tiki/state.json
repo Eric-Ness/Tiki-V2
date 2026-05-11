@@ -1,6 +1,36 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.3.0": {
+      "type": "release",
+      "release": {
+        "version": "v0.3.0",
+        "issues": [144, 145, 146],
+        "currentIssue": 144,
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-11T00:00:00.000Z",
+      "lastActivity": "2026-05-11T00:00:00.000Z"
+    },
+    "issue:144": {
+      "type": "issue",
+      "issue": {
+        "number": 144,
+        "title": "Replace prose-based state.json contracts with typed Rust state_transition IPC",
+        "state": "OPEN",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/144"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "parentRelease": "v0.3.0",
+      "phase": { "current": 5, "total": 5, "status": "completed" },
+      "auditPassed": true,
+      "createdAt": "2026-05-11T00:00:00.000Z",
+      "lastActivity": "2026-05-11T02:05:00.000Z"
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 143,

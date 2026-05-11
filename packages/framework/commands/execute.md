@@ -46,51 +46,14 @@ Procedure:
 <state-update-requirement>
 ## CRITICAL: Phase State Updates
 
-**You MUST update `.tiki/state.json` BEFORE starting work on each phase.**
+Update `.tiki/state.json` BEFORE each phase. On failure, set `phase.status: "failed"` and do NOT advance `current`. When all phases finish, transition to `shipping`. (Canonical shape: see `yolo.md`.)
 
-This is not optional. The desktop app and other tooling rely on the `phase` object being kept current.
-
-**BEFORE starting each phase, update state.json with:**
-```json
-{
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "issue": { "number": {N}, "title": "..." },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "phase": {
-        "current": {phase number, 1-indexed},
-        "total": {total phases from plan},
-        "status": "executing"
-      },
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
-```
-
-**AFTER completing each phase, update:**
-- Set `phase.status` to `"completed"` or `"failed"`
-- If advancing to next phase, increment `phase.current` and set `phase.status` to `"pending"`
-- If all phases complete, set work `status` to `"shipping"`
-
-**Example - Starting Phase 2 of 3:**
-```json
-"phase": {
-  "current": 2,
-  "total": 3,
-  "status": "executing"
-}
-```
-
-**Example - After completing Phase 2, ready for Phase 3:**
-```json
-"phase": {
-  "current": 3,
-  "total": 3,
-  "status": "pending"
-}
+```bash
+# Before phase N:
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status executing --to-step EXECUTE --phase-current {N} --phase-total {T} --phase-status executing
+# All phases done:
+node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
 ```
 </state-update-requirement>
 
@@ -344,31 +307,7 @@ The sub-agent's response becomes the phase summary.
 </output>
 
 <state-management>
-During execution, update `.tiki/state.json`:
-
-**Starting a phase:**
-```json
-{
-  "phase": {
-    "current": {N},
-    "total": {total},
-    "status": "executing"
-  },
-  "status": "executing",
-  "pipelineStep": "EXECUTE",
-  "lastActivity": "{ISO timestamp}"
-}
-```
-
-**Completing a phase:**
-- Update plan file: set phase status to "completed", add completedAt and summary
-- Update state: increment current phase or set status to "shipping" if done
-- Write phase summary for handoff to next phase
-
-**On failure:**
-- Update plan file: set phase status to "failed", add error details
-- Update state: set phase.status to "failed", keep current phase number
-- Do not advance to next phase
+See `<state-update-requirement>` for state.json. For the plan file: when a phase completes, set its `status: "completed"` with `completedAt` + `summary` in `.tiki/plans/issue-{number}.json`; on failure use `status: "failed"` + error details. For parallel groups, write `parallelExecution` directly in JSON (shim does not expose this yet — see `<parallel-execution>`).
 </state-management>
 
 <errors>

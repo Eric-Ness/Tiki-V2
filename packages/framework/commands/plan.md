@@ -161,35 +161,12 @@ Rules:
 </research-capture>
 
 <early-state-update>
-**Before doing any planning work**, update `.tiki/state.json` so the issue appears in Active Work immediately:
+Before planning, set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` (shim; see `yolo.md` for the legacy direct-write shape):
 
-1. Read the current `.tiki/state.json` (create it if it doesn't exist with `schemaVersion: 1, activeWork: {}, history: {}`)
-2. Add or update the `issue:{number}` entry in `activeWork`:
-
-```json
-{
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "issue": {
-        "number": {number},
-        "title": "{title}",
-        "url": "{url}",
-        "state": "{state}",
-        "labels": [{labels}],
-        "createdAt": "{issue createdAt}",
-        "updatedAt": "{issue updatedAt}"
-      },
-      "status": "planning",
-      "pipelineStep": "PLAN",
-      "createdAt": "{existing createdAt or new ISO timestamp}",
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status planning --to-step PLAN --issue-number {number} --issue-title "{title}"
 ```
-
-This ensures the desktop app shows the issue in the Active Work panel as soon as planning begins.
 </early-state-update>
 
 <plan-file-format>
@@ -241,32 +218,11 @@ This ensures the desktop app shows the issue in the Active Work panel as soon as
 </plan-file-format>
 
 <state-management>
-After the plan is fully written:
+After writing the plan, set phase progress (`current: 1`, `total: N`, `status: "pending"`). Keep work `status: "planning"` until audit passes.
 
-1. Write plan file to `.tiki/plans/issue-{number}.json` following the exact format in `<plan-file-format>` above.
-
-2. Update `.tiki/state.json` again with phase info:
-- Set `phase.total` to the number of phases
-- Set `phase.current` to 1
-- Set `phase.status` to `pending`
-- Keep `status` as `planning` until audit passes
-
-```json
-{
-  "activeWork": {
-    "issue:{number}": {
-      "type": "issue",
-      "status": "planning",
-      "pipelineStep": "PLAN",
-      "phase": {
-        "current": 1,
-        "total": {total phases},
-        "status": "pending"
-      },
-      "lastActivity": "{ISO timestamp}"
-    }
-  }
-}
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status planning --to-step PLAN --phase-current 1 --phase-total {total} --phase-status pending
 ```
 </state-management>
 

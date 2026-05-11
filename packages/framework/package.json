@@ -5,14 +5,17 @@
   "type": "module",
   "main": "./install.js",
   "bin": {
-    "tiki-install": "./install.js"
+    "tiki-install": "./install.js",
+    "tiki-state": "./scripts/state.mjs"
   },
   "files": [
     "commands",
-    "install.js"
+    "install.js",
+    "scripts"
   ],
   "scripts": {
-    "install-commands": "node install.js"
+    "install-commands": "node install.js",
+    "state": "node ./scripts/state.mjs"
   },
   "dependencies": {
     "@tiki/shared": "workspace:*"
