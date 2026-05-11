@@ -14,6 +14,21 @@
       "createdAt": "2026-05-11T00:00:00.000Z",
       "lastActivity": "2026-05-11T16:05:00.000Z"
     },
+    "issue:146": {
+      "type": "issue",
+      "issue": {
+        "number": 146,
+        "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore",
+        "state": "OPEN",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/146"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "phase": { "current": 6, "total": 6, "status": "completed" },
+      "parentRelease": "v0.3.0",
+      "createdAt": "2026-05-11T16:10:00.000Z",
+      "lastActivity": "2026-05-11T17:00:00.000Z"
+    },
     "issue:145": {
       "type": "issue",
       "issue": {

@@ -20,6 +20,7 @@ import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
+import { StateRecoveryDialog } from "./components/recovery";
 import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore } from "./stores";
 import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
@@ -99,6 +100,12 @@ function App() {
   const [state, setState] = useState<TikiState | null>(null);
   const [tikiPath, setTikiPath] = useState<string>("");
   const [error, setError] = useState<string>("");
+  // Surfaces when `get_state` returns a terminal parse error (after
+  // `read_json_resilient`'s 3 retries). Triggers the StateRecoveryDialog
+  // so the user can pick a backup, edit manually, or start fresh — see
+  // issue #146. Distinct from `error`: the sidebar `error` is the
+  // historical fallback, the dialog is the new recovery UX.
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>("");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const openShortcuts = useCallback(() => setShowShortcuts(true), []);
@@ -190,45 +197,21 @@ function App() {
     ? state.activeWork[`issue:${selectedIssue}`]
     : null;
 
-  // Load initial state when active project changes
-  useEffect(() => {
-    async function loadState() {
-      if (!activeProject) {
-        // No active project, use default cwd-based path
-        try {
-          const path = await invoke<string>("get_tiki_path");
-          setTikiPath(path);
-          console.log("Tiki path (default):", path);
-
-          const currentState = await invoke<TikiState | null>("get_state", {});
-          console.log("State loaded:", currentState);
-          prevStateRef.current = currentState;
-          setState(currentState);
-          // Sync to tikiStateStore for Kanban
-          if (currentState?.activeWork) {
-            useTikiStateStore.getState().setActiveWork(currentState.activeWork);
-          }
-          // Sync recentIssues for Completed column
-          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
-        } catch (e) {
-          console.error("Error loading state:", e);
-          setError(String(e));
-        }
-        return;
-      }
-
-      // Use the active project's .tiki path
-      const projectTikiPath = `${activeProject.path}/.tiki`;
-      setTikiPath(projectTikiPath);
-      console.log("Tiki path (project):", projectTikiPath);
-
+  // Hoisted into useCallback so the recovery dialog's `onRecovered` handler
+  // can re-trigger it after a successful restore/start-fresh action.
+  const loadState = useCallback(async () => {
+    if (!activeProject) {
+      // No active project, use default cwd-based path
       try {
-        const currentState = await invoke<TikiState | null>("get_state", {
-          tikiPath: projectTikiPath,
-        });
+        const path = await invoke<string>("get_tiki_path");
+        setTikiPath(path);
+        console.log("Tiki path (default):", path);
+
+        const currentState = await invoke<TikiState | null>("get_state", {});
         console.log("State loaded:", currentState);
         prevStateRef.current = currentState;
         setState(currentState);
+        setRecoveryError(null);
         // Sync to tikiStateStore for Kanban
         if (currentState?.activeWork) {
           useTikiStateStore.getState().setActiveWork(currentState.activeWork);
@@ -238,11 +221,41 @@ function App() {
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
+        setRecoveryError(String(e));
       }
+      return;
     }
 
-    loadState();
+    // Use the active project's .tiki path
+    const projectTikiPath = `${activeProject.path}/.tiki`;
+    setTikiPath(projectTikiPath);
+    console.log("Tiki path (project):", projectTikiPath);
+
+    try {
+      const currentState = await invoke<TikiState | null>("get_state", {
+        tikiPath: projectTikiPath,
+      });
+      console.log("State loaded:", currentState);
+      prevStateRef.current = currentState;
+      setState(currentState);
+      setRecoveryError(null);
+      // Sync to tikiStateStore for Kanban
+      if (currentState?.activeWork) {
+        useTikiStateStore.getState().setActiveWork(currentState.activeWork);
+      }
+      // Sync recentIssues for Completed column
+      useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
+    } catch (e) {
+      console.error("Error loading state:", e);
+      setError(String(e));
+      setRecoveryError(String(e));
+    }
   }, [activeProject]);
+
+  // Load initial state when active project changes
+  useEffect(() => {
+    void loadState();
+  }, [loadState]);
 
   // Listen for file changes
   useEffect(() => {
@@ -519,6 +532,19 @@ function App() {
       <ToastContainer />
       <CommandPalette actions={actions} />
       <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+
+      {recoveryError && (
+        <StateRecoveryDialog
+          error={recoveryError}
+          tikiPath={tikiPath}
+          onRecovered={() => {
+            setRecoveryError(null);
+            setError("");
+            void loadState();
+          }}
+          onDismiss={() => setRecoveryError(null)}
+        />
+      )}
     </div>
   );
 }

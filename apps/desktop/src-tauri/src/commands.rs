@@ -495,6 +495,40 @@ pub fn restore_backup(backup_filename: String, tiki_path: Option<String>) -> Res
     fs_utils::restore_from_backup(&path, &backup_filename)
 }
 
+/// Restore state.json from a backup, with a pre-flight `.broken.json` safety
+/// snapshot when the current state is unparseable. Used by the State
+/// Recovery dialog so corrupt state is never silently overwritten.
+#[tauri::command]
+pub fn restore_backup_safe(
+    backup_filename: String,
+    tiki_path: Option<String>,
+) -> Result<(), String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    fs_utils::restore_from_backup_safe(&path, &backup_filename)
+}
+
+/// Read raw text content of a backup file in `.tiki/backups/`. The frontend
+/// recovery dialog uses this to preview a backup and validate parseability
+/// before offering Restore.
+#[tauri::command]
+pub fn read_backup_content(
+    backup_filename: String,
+    tiki_path: Option<String>,
+) -> Result<String, String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    fs_utils::read_backup_content(&path, &backup_filename)
+}
+
+/// Atomically write a fresh canonical state.json (`{schemaVersion: 1,
+/// activeWork: {}}`). Pre-flight: snapshots the current file as
+/// `state.{ts}.broken.json` if unparseable, or as a normal numbered backup
+/// otherwise. Used by the Start Fresh action in the recovery dialog.
+#[tauri::command]
+pub fn write_fresh_state(tiki_path: Option<String>) -> Result<(), String> {
+    let path = resolve_tiki_path(tiki_path)?;
+    fs_utils::write_fresh_state(&path)
+}
+
 /// Helper to resolve the .tiki path from an optional parameter
 fn resolve_tiki_path(tiki_path: Option<String>) -> Result<PathBuf, String> {
     match tiki_path {

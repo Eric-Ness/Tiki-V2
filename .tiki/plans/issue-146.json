@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 146,
+    "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/146"
+  },
+  "createdAt": "2026-05-11T16:15:00.000Z",
+  "description": "Build a StateRecoveryDialog that surfaces when get_state returns Err and offers backup listing, validation, preview, restore (with .broken.json safety copy), system-editor open, and reset-fresh flows. Extracts pure helpers for testing, adds Rust unit tests for the safety-backup logic, and wires tauri-plugin-shell for opening files in the system editor.",
+  "successCriteria": [
+    { "id": "SC1", "category": "frontend", "description": "New StateRecoveryDialog component under apps/desktop/src/components/recovery/ renders when get_state returns an error." },
+    { "id": "SC2", "category": "frontend", "description": "Dialog lists backups via list_backups IPC, sorted newest-first, with timestamps and sizes; invalid backups are grayed out." },
+    { "id": "SC3", "category": "frontend", "description": "Restore action calls restore_backup_safe, re-invokes get_state, and dismisses on success; stays open with new error on failure." },
+    { "id": "SC4", "category": "tauri", "description": "Edit Manually opens the file in the system editor via tauri-plugin-shell." },
+    { "id": "SC5", "category": "frontend", "description": "Start Fresh requires the user to type the word `reset` into a confirmation input before the destructive write fires." },
+    { "id": "SC6", "category": "rust", "description": "Pre-flight: every restore creates a state.{ts}.broken.json safety copy first when the current state is unparseable. New Rust helper restore_from_backup_safe encapsulates this." },
+    { "id": "SC7", "category": "rust", "description": "Rust unit tests verify restore (a) succeeds, (b) leaves a .broken.json safety copy when source was unparseable, (c) atomically writes the new state." }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase 1 — Rust safety-backup helper + unit tests",
+      "status": "pending",
+      "addressesCriteria": ["SC6", "SC7"],
+      "content": "Extend apps/desktop/src-tauri/src/fs_utils.rs with a new helper restore_from_backup_safe(tiki_path, backup_filename) that: (1) reads current state.json if it exists, (2) attempts to parse it as JSON, (3) if parse fails, copies the current file to backups/state.{ts}.broken.json (NOT a normal numbered backup — the .broken suffix excludes it from the cleanup_old_backups pruning logic), (4) if parse succeeds, calls the existing backup_state for a normal safety backup, (5) reads backup_filename, validates JSON, atomic-writes as state.json. Update cleanup_old_backups so it ONLY matches state.YYYY-MM-DDTHH-MM-SS.json (timestamp-only pattern) and does NOT match .broken.json files — the broken copies should persist for the user to inspect. Add Rust #[cfg(test)] unit tests covering: (a) restore succeeds when both files parseable, (b) restore leaves a .broken.json when current state is unparseable, (c) atomic write — verify state.json.tmp is gone after success, (d) cleanup_old_backups does NOT prune .broken.json files. Tests use tempfile crate or std::env::temp_dir.",
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs",
+        "apps/desktop/src-tauri/Cargo.toml"
+      ],
+      "tasks": [
+        "Add restore_from_backup_safe() to fs_utils.rs that conditionally backs up current state with a .broken.json suffix when unparseable",
+        "Refactor cleanup_old_backups to match only the timestamped pattern (regex-free filter: must end with .json and NOT contain .broken)",
+        "Add tempfile = \"3\" to [dev-dependencies] in Cargo.toml",
+        "Add #[cfg(test)] mod tests with 4+ unit tests covering the success path, the .broken.json safety path, the atomic write check, and cleanup_old_backups skipping .broken files",
+        "Run cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml and verify all tests pass",
+        "Run cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings and verify no new warnings"
+      ],
+      "verification": [
+        "cargo test passes including the 4+ new unit tests",
+        "cargo clippy --all-targets -- -D warnings passes with no new warnings",
+        "restore_from_backup_safe leaves a backups/state.{ts}.broken.json file when current state is unparseable",
+        "cleanup_old_backups does not prune .broken.json files"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Phase 2 — Frontend pure recovery-flow helper + vitest tests",
+      "status": "pending",
+      "addressesCriteria": ["SC2"],
+      "content": "Create apps/desktop/src/components/recovery/recoveryFlow.ts with pure helper functions: parseBackupTimestamp(timestamp: string): Date | null which parses the 'YYYY-MM-DDTHH-MM-SS' format from BackupInfo.timestamp; formatRelativeAge(date: Date, now: Date): string returning 'just now', 'N minutes ago', 'N hours ago', 'N days ago'; formatBytes(bytes: number): string returning '123 B', '1.2 KB', '4.5 MB'; validateBackupShape(json: string): { ok: boolean; error?: string } which parses JSON and verifies it has schemaVersion (number) and activeWork (object). Add vitest tests at apps/desktop/src/components/recovery/__tests__/recoveryFlow.test.ts covering edge cases for each helper. Run pnpm test to verify.",
+      "files": [
+        "apps/desktop/src/components/recovery/recoveryFlow.ts",
+        "apps/desktop/src/components/recovery/__tests__/recoveryFlow.test.ts"
+      ],
+      "tasks": [
+        "Create apps/desktop/src/components/recovery/ directory",
+        "Write recoveryFlow.ts with parseBackupTimestamp, formatRelativeAge, formatBytes, validateBackupShape",
+        "Write recoveryFlow.test.ts with at least 12 test cases across the 4 helpers",
+        "Run pnpm --filter @tiki/desktop test and verify all new tests pass alongside existing ones",
+        "Run pnpm build to verify tsc -b passes"
+      ],
+      "verification": [
+        "pnpm --filter @tiki/desktop test passes with new tests included",
+        "pnpm build passes (tsc -b strict)",
+        "recoveryFlow.ts exports the 4 pure helpers and has no external dependencies"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Phase 3 — tauri-plugin-shell integration",
+      "status": "pending",
+      "addressesCriteria": ["SC4"],
+      "content": "Add tauri-plugin-shell so the dialog can open the broken state.json in the user's system editor. Steps: (1) apps/desktop/src-tauri/Cargo.toml — add `tauri-plugin-shell = \"2\"` to [dependencies]. (2) apps/desktop/src-tauri/src/lib.rs — register plugin via `app.handle().plugin(tauri_plugin_shell::init())?;` in the setup block alongside the existing updater plugin registration. (3) apps/desktop/src-tauri/capabilities/default.json — add `\"shell:allow-open\"` to the permissions array. (4) apps/desktop/package.json — add `@tauri-apps/plugin-shell: ^2` to devDependencies. Run pnpm install from root to update lockfile. Run cargo check to verify Rust compiles. Run pnpm build to verify TS still compiles.",
+      "files": [
+        "apps/desktop/src-tauri/Cargo.toml",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src-tauri/capabilities/default.json",
+        "apps/desktop/package.json",
+        "pnpm-lock.yaml"
+      ],
+      "tasks": [
+        "Add tauri-plugin-shell = \"2\" to apps/desktop/src-tauri/Cargo.toml [dependencies]",
+        "Register the plugin in apps/desktop/src-tauri/src/lib.rs setup block",
+        "Add \"shell:allow-open\" permission to apps/desktop/src-tauri/capabilities/default.json",
+        "Add @tauri-apps/plugin-shell: ^2 to apps/desktop/package.json devDependencies",
+        "Run pnpm install from repo root to update pnpm-lock.yaml",
+        "Run cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml to confirm Rust compiles",
+        "Run pnpm build to confirm TS still compiles"
+      ],
+      "verification": [
+        "cargo check passes",
+        "pnpm build passes",
+        "tauri-plugin-shell is listed in Cargo.toml and @tauri-apps/plugin-shell is in package.json"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 4,
+      "title": "Phase 4 — New Tauri IPC commands for recovery flow",
+      "status": "pending",
+      "addressesCriteria": ["SC3", "SC5", "SC6"],
+      "content": "Expose three new Tauri commands in apps/desktop/src-tauri/src/commands.rs and register them in lib.rs invoke_handler: (1) restore_backup_safe(backup_filename: String, tiki_path: Option<String>) -> Result<(), String> that calls the new fs_utils::restore_from_backup_safe helper. (2) read_backup_content(backup_filename: String, tiki_path: Option<String>) -> Result<String, String> that reads the file at <tiki>/backups/<backup_filename> and returns its raw text (for preview + validation in the UI). (3) write_fresh_state(tiki_path: Option<String>) -> Result<(), String> that first creates a .broken.json safety copy of the current state (if it exists and is unparseable) then atomic-writes {\"schemaVersion\": 1, \"activeWork\": {}} to state.json. Run cargo check and cargo clippy --all-targets -- -D warnings.",
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs",
+        "apps/desktop/src-tauri/src/fs_utils.rs"
+      ],
+      "tasks": [
+        "Add restore_backup_safe, read_backup_content, write_fresh_state to commands.rs",
+        "Add a helper in fs_utils.rs (or extend the new one) to write_fresh_state safely with .broken.json backup",
+        "Register all three commands in the lib.rs tauri::generate_handler! macro",
+        "Run cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+        "Run cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "verification": [
+        "cargo check passes",
+        "cargo clippy --all-targets -- -D warnings passes with no new warnings",
+        "Three new commands appear in the invoke_handler list in lib.rs"
+      ],
+      "dependencies": [1, 3]
+    },
+    {
+      "number": 5,
+      "title": "Phase 5 — StateRecoveryDialog component + CSS",
+      "status": "pending",
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5"],
+      "content": "Build apps/desktop/src/components/recovery/StateRecoveryDialog.tsx as a controlled modal-style component with props: { error: string; tikiPath?: string; onRecovered: () => void; onDismiss: () => void }. On mount, invoke list_backups, then for each backup invoke read_backup_content and validateBackupShape; stash {info, valid, content} per backup in state. Render: (a) header with the parse error and full path to state.json, (b) backups list sorted newest-first showing timestamp + relative age + size with Preview and Restore buttons (Restore disabled for invalid), (c) Other Actions: Edit Manually button (uses `import { open } from '@tauri-apps/plugin-shell'`), Start Fresh button that toggles an inline 'type reset to confirm' input. Preview opens an inner modal showing the backup JSON. Restore handler: invoke restore_backup_safe, then invoke get_state; on success call onRecovered(), on failure setInlineError. Create StateRecoveryDialog.css matching the IssueFormModal.css pattern (overlay + modal + buttons). Create apps/desktop/src/components/recovery/index.ts re-exporting StateRecoveryDialog and the recoveryFlow helpers.",
+      "files": [
+        "apps/desktop/src/components/recovery/StateRecoveryDialog.tsx",
+        "apps/desktop/src/components/recovery/StateRecoveryDialog.css",
+        "apps/desktop/src/components/recovery/index.ts"
+      ],
+      "tasks": [
+        "Write StateRecoveryDialog.tsx with backup list, Preview modal, Restore action, Edit Manually action, Start Fresh action with typed confirmation",
+        "Write StateRecoveryDialog.css matching the existing modal style (issue-form-modal pattern)",
+        "Create index.ts re-exporting StateRecoveryDialog plus the helpers from recoveryFlow.ts",
+        "Run pnpm build to verify TS strict compile passes",
+        "Run pnpm --filter @tiki/desktop test to verify existing tests still pass"
+      ],
+      "verification": [
+        "pnpm build passes (tsc -b strict)",
+        "pnpm test passes",
+        "Component file exists at apps/desktop/src/components/recovery/StateRecoveryDialog.tsx",
+        "CSS file exists at apps/desktop/src/components/recovery/StateRecoveryDialog.css"
+      ],
+      "dependencies": [2, 3, 4]
+    },
+    {
+      "number": 6,
+      "title": "Phase 6 — Wire dialog into App.tsx error path",
+      "status": "pending",
+      "addressesCriteria": ["SC1", "SC3"],
+      "content": "Modify apps/desktop/src/App.tsx so that when loadState() catches an error from get_state, it sets a new recoveryError state instead of just setError. Render <StateRecoveryDialog error={recoveryError} tikiPath={tikiPath} onRecovered={() => { setRecoveryError(null); loadState(); }} onDismiss={() => setRecoveryError(null)} /> conditionally above the main layout. Lift loadState into a useCallback so onRecovered can call it again. Keep the existing setError(String(e)) call as a fallback so the sidebar still shows context if the dialog is dismissed without recovery. Run pnpm build + pnpm test.",
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "tasks": [
+        "Add recoveryError state and reloadState callback in App.tsx",
+        "Set recoveryError in the catch blocks of loadState()",
+        "Render StateRecoveryDialog conditionally when recoveryError is non-null",
+        "Run pnpm build to verify TS strict compile passes",
+        "Run pnpm --filter @tiki/desktop test"
+      ],
+      "verification": [
+        "pnpm build passes",
+        "pnpm test passes",
+        "StateRecoveryDialog is imported and rendered in App.tsx"
+      ],
+      "dependencies": [5]
+    }
+  ]
+}

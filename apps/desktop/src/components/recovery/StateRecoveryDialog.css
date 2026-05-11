@@ -1,0 +1,347 @@
+/* State Recovery Dialog — modeled on IssueFormModal.css patterns. */
+
+.recovery-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+  z-index: 2000;
+}
+
+.recovery-dialog {
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100vh - 48px);
+  margin: 24px;
+  background: var(--bg-secondary, #252526);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 8px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.recovery-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+  background: var(--bg-primary, #1e1e1e);
+}
+
+.recovery-dialog-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+}
+
+.recovery-dialog-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.recovery-dialog-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #cccccc);
+}
+
+.recovery-dialog-close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.recovery-error-summary,
+.recovery-backups,
+.recovery-other-actions {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+  overflow-y: auto;
+}
+
+.recovery-other-actions {
+  border-bottom: none;
+}
+
+.recovery-backups h3,
+.recovery-other-actions h3 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recovery-error-label {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--error-color, #f48771);
+}
+
+.recovery-error-message {
+  margin: 0 0 8px 0;
+  padding: 10px 12px;
+  background: rgba(244, 135, 113, 0.1);
+  border: 1px solid rgba(244, 135, 113, 0.3);
+  border-radius: 4px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--text-primary, #cccccc);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.recovery-file-path {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #858585);
+}
+
+.recovery-file-path-label {
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+}
+
+.recovery-file-path code {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.recovery-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #858585);
+  font-style: italic;
+}
+
+.recovery-hint-inline {
+  font-size: 12px;
+  color: var(--text-secondary, #858585);
+}
+
+.recovery-hint-inline code {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin: 0 2px;
+}
+
+.recovery-backup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recovery-backup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.recovery-backup-row.is-invalid {
+  opacity: 0.55;
+}
+
+.recovery-backup-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.recovery-backup-filename {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--text-primary, #cccccc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recovery-backup-details {
+  font-size: 11px;
+  color: var(--text-secondary, #858585);
+}
+
+.recovery-backup-invalid-tag {
+  color: var(--error-color, #f48771);
+}
+
+.recovery-backup-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.recovery-btn {
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary, #cccccc);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.recovery-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.recovery-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.recovery-btn-primary {
+  background: var(--accent-color, #0e639c);
+  border-color: var(--accent-color, #0e639c);
+  color: #ffffff;
+}
+
+.recovery-btn-primary:hover:not(:disabled) {
+  background: var(--accent-color-hover, #1177bb);
+}
+
+.recovery-btn-danger {
+  background: rgba(244, 135, 113, 0.15);
+  border-color: rgba(244, 135, 113, 0.45);
+  color: var(--error-color, #f48771);
+}
+
+.recovery-btn-danger:hover:not(:disabled) {
+  background: rgba(244, 135, 113, 0.25);
+}
+
+.recovery-other-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.recovery-reset-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(244, 135, 113, 0.08);
+  border: 1px solid rgba(244, 135, 113, 0.25);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.recovery-reset-confirm label {
+  font-size: 12px;
+  color: var(--text-primary, #cccccc);
+}
+
+.recovery-reset-input {
+  padding: 5px 8px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  background: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #cccccc);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 3px;
+  min-width: 140px;
+}
+
+.recovery-action-error {
+  padding: 10px 20px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--error-color, #f48771);
+  background: rgba(244, 135, 113, 0.08);
+  border-top: 1px solid rgba(244, 135, 113, 0.25);
+}
+
+/* Preview modal (rendered above the dialog) */
+.recovery-preview-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2100;
+}
+
+.recovery-preview {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 80px);
+  margin: 40px;
+  background: var(--bg-secondary, #252526);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.recovery-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+  background: var(--bg-primary, #1e1e1e);
+}
+
+.recovery-preview-header h3 {
+  margin: 0;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+  word-break: break-all;
+}
+
+.recovery-preview-content {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg-primary, #1e1e1e);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--text-primary, #cccccc);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  flex: 1;
+}
