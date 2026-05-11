@@ -7,12 +7,12 @@
         "version": "v0.3.0",
         "issues": [144, 145, 146],
         "currentIssue": 146,
-        "completedIssues": [144, 145]
+        "completedIssues": [144, 145, 146]
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-11T00:00:00.000Z",
-      "lastActivity": "2026-05-11T16:05:00.000Z"
+      "lastActivity": "2026-05-11T17:05:00.000Z"
     },
     "issue:146": {
       "type": "issue",
@@ -22,12 +22,14 @@
         "state": "OPEN",
         "url": "https://github.com/Eric-Ness/Tiki-V2/issues/146"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "phase": { "current": 6, "total": 6, "status": "completed" },
+      "auditPassed": true,
+      "commit": "8f1d713",
       "parentRelease": "v0.3.0",
       "createdAt": "2026-05-11T16:10:00.000Z",
-      "lastActivity": "2026-05-11T17:00:00.000Z"
+      "lastActivity": "2026-05-11T17:05:00.000Z"
     },
     "issue:145": {
       "type": "issue",
@@ -66,15 +68,16 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 145,
-      "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers",
-      "completedAt": "2026-05-11T16:05:00.000Z"
+      "number": 146,
+      "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore",
+      "completedAt": "2026-05-11T17:05:00.000Z"
     },
     "lastCompletedRelease": {
       "version": "v0.2.19",
       "completedAt": "2026-05-09T05:15:00.000Z"
     },
     "recentIssues": [
+      { "number": 146, "title": "Corruption recovery UX — detect unparseable state.json and offer one-click backup restore", "completedAt": "2026-05-11T17:05:00.000Z" },
       { "number": 145, "title": "Add automated test suite — start with state.rs deserialization fixtures and store reducers", "completedAt": "2026-05-11T16:05:00.000Z" },
       { "number": 144, "title": "Replace prose-based state.json contracts with typed Rust state_transition IPC", "completedAt": "2026-05-11T02:10:00.000Z" },
       { "number": 143, "title": "fix: archived/shipped releases display inconsistently in sidebar and detail (Published vs Completed vs blank)", "completedAt": "2026-05-09T05:15:00.000Z" },
