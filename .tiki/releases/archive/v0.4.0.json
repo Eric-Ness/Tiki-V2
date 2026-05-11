@@ -1,0 +1,19 @@
+{
+  "version": "v0.4.0",
+  "status": "completed",
+  "shipped": true,
+  "issues": [
+    {
+      "number": 103,
+      "title": "State machine transition validation"
+    },
+    {
+      "number": 87,
+      "title": "Terminal search (find in buffer)"
+    }
+  ],
+  "createdAt": "2026-05-11T18:30:00.000Z",
+  "completedAt": "2026-05-11T21:00:00.000Z",
+  "tag": "v0.4.0",
+  "description": "Two follow-up improvements on v0.3.0's reliability foundation: a canonical WorkStatus transition table in @tiki/shared with canTransition/assertTransition helpers that the Rust IPC and JS shim now both mirror (#103), and xterm.js search wired into each terminal leaf with a Ctrl+F overlay (#87). Issue #114 (project templates) was originally scoped to this release but deferred to a future release after a local Windows env issue blocked verification mid-session."
+}
