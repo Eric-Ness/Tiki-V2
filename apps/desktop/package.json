@@ -21,6 +21,7 @@
     "@tiki/shared": "workspace:*",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/addon-search": "^0.16.0",
     "@xyflow/react": "^12.10.1",
     "dagre": "^0.8.5",
     "framer-motion": "^12.31.0",

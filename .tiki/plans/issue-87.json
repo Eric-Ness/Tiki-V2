@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 87,
+    "title": "Terminal search — find in buffer",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/87"
+  },
+  "createdAt": "2026-05-11T20:00:00.000Z",
+  "description": "Wires @xterm/addon-search into each Terminal leaf and builds a TerminalSearch overlay that opens on Ctrl+F, supports search-as-you-type with a 150ms debounce, case-insensitive default with an Aa toggle, a match indicator, and Enter/F3 navigation. Search addon ref and isSearchOpen state live inside Terminal.tsx for automatic per-pane scoping in split views; the KeyboardShortcuts panel is updated in the same issue.",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "dependency",
+      "description": "@xterm/addon-search@^0.16.0 added to apps/desktop/package.json dependencies and pnpm-lock.yaml updated via pnpm install."
+    },
+    {
+      "id": "SC2",
+      "category": "frontend",
+      "description": "Terminal.tsx imports SearchAddon from @xterm/addon-search, stores it in searchAddonRef (useRef<SearchAddon | null>(null)), instantiates it after new XTerm() and calls xterm.loadAddon(searchAddon) before xterm.open(container)."
+    },
+    {
+      "id": "SC3",
+      "category": "frontend",
+      "description": "Terminal.tsx adds isSearchOpen boolean state and extends attachCustomKeyEventHandler to intercept Ctrl+F (setIsSearchOpen(true), return false) and — when isSearchOpen is true — F3/Shift+F3 for findNext/findPrevious, each returning false."
+    },
+    {
+      "id": "SC4",
+      "category": "frontend",
+      "description": "TerminalSearch.tsx renders as an absolute-positioned overlay (top-right, z-index 20) inside .terminal-container with: controlled text input, Previous/Next arrow buttons, match indicator label, Aa case-sensitive toggle, and X close button."
+    },
+    {
+      "id": "SC5",
+      "category": "ux",
+      "description": "Search-as-you-type debounced at 150ms via useRef + setTimeout. Empty query produces no highlights. No-match state applies .terminal-search-input--no-match CSS modifier (red border). Closing calls xtermRef.current?.focus() to restore xterm focus."
+    },
+    {
+      "id": "SC6",
+      "category": "ux",
+      "description": "Each Terminal leaf owns its own SearchAddon ref and isSearchOpen state. Split panes and multiple tabs have fully independent search state with no shared global."
+    },
+    {
+      "id": "SC7",
+      "category": "frontend",
+      "description": "KeyboardShortcuts.tsx Terminal SHORTCUT_GROUPS entry gains { keys: ['Ctrl', 'F'], description: 'Find in terminal buffer' } as the final entry in its shortcuts array."
+    },
+    {
+      "id": "SC8",
+      "category": "tests",
+      "description": "apps/desktop/src/components/terminal/__tests__/terminalSearch.test.ts contains vitest tests for exported pure helpers formatMatchCount and isNoMatch; pnpm test passes with all new tests green."
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Phase 1 — Install @xterm/addon-search and wire SearchAddon into Terminal.tsx",
+      "status": "pending",
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC6"],
+      "content": "This phase installs the search addon package and integrates it into Terminal.tsx with no visible UI — just the addon wired up, state scaffolded, and the Ctrl+F / F3 key intercepts added to the custom key handler. The goal is a build-verified foundation that Phase 2 layers the TerminalSearch component on top of.\n\nAdd '@xterm/addon-search': '^0.16.0' to the dependencies section of apps/desktop/package.json, below @xterm/addon-web-links to keep the xterm addon block together. Run pnpm install from the repo root to update pnpm-lock.yaml.\n\nIn Terminal.tsx: import SearchAddon from '@xterm/addon-search'. Declare const searchAddonRef = useRef<SearchAddon | null>(null) and const searchQueryRef = useRef<string>('') alongside fitAddonRef. Declare const [isSearchOpen, setIsSearchOpen] = useState(false) near the other useState calls. Inside the init useEffect, after instantiating FitAddon and WebLinksAddon, instantiate const searchAddon = new SearchAddon() and call xterm.loadAddon(searchAddon) before xterm.open(container). After open, set searchAddonRef.current = searchAddon. In the cleanup return, set searchAddonRef.current = null.\n\nExtend attachCustomKeyEventHandler with two new intercepts before the final return true: (1) if e.type === 'keydown' && e.ctrlKey && !e.shiftKey && e.key === 'f', call setIsSearchOpen(true) and return false; (2) if e.type === 'keydown' && e.key === 'F3' && isSearchOpenRef.current is true, call searchAddonRef.current?.findNext(searchQueryRef.current, { caseSensitive: false }) on plain F3 or findPrevious on Shift+F3, and return false. Use const isSearchOpenRef = useRef(false) kept in sync via a useEffect — this avoids the stale-closure trap inside the key handler.",
+      "files": [
+        "apps/desktop/package.json",
+        "pnpm-lock.yaml",
+        "apps/desktop/src/components/terminal/Terminal.tsx"
+      ],
+      "tasks": [
+        "Add '@xterm/addon-search': '^0.16.0' to the dependencies section of apps/desktop/package.json below @xterm/addon-web-links",
+        "Run pnpm install from the repo root to resolve the new package and update pnpm-lock.yaml",
+        "In Terminal.tsx, add import { SearchAddon } from '@xterm/addon-search' to the addon imports block",
+        "Declare const searchAddonRef = useRef<SearchAddon | null>(null), const searchQueryRef = useRef<string>(''), and const isSearchOpenRef = useRef(false) alongside fitAddonRef",
+        "Declare const [isSearchOpen, setIsSearchOpen] = useState(false) and add a useEffect that syncs isSearchOpenRef.current = isSearchOpen on every change",
+        "In the init useEffect, instantiate SearchAddon, call xterm.loadAddon(searchAddon) before xterm.open(container), then set searchAddonRef.current = searchAddon; in cleanup set searchAddonRef.current = null",
+        "Extend attachCustomKeyEventHandler: intercept Ctrl+F (keydown, ctrlKey, !shiftKey, key === 'f') — call setIsSearchOpen(true), return false",
+        "Extend attachCustomKeyEventHandler: intercept F3 and Shift+F3 when isSearchOpenRef.current is true — call findNext/findPrevious with searchQueryRef.current and { caseSensitive: false }, return false",
+        "Run pnpm typecheck to verify zero TypeScript errors",
+        "Run pnpm build to verify tsc -b strict compile passes"
+      ],
+      "verification": [
+        "apps/desktop/package.json dependencies section contains '@xterm/addon-search' and pnpm-lock.yaml has been updated with the resolved package",
+        "pnpm typecheck passes with no errors introduced in Terminal.tsx",
+        "pnpm build passes (tsc -b strict) with no new type errors",
+        "searchAddonRef, searchQueryRef, isSearchOpenRef, and isSearchOpen state are all declared in Terminal.tsx; SearchAddon is imported from '@xterm/addon-search'"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Phase 2 — TerminalSearch component, CSS, Terminal.tsx render wiring, tests, and KeyboardShortcuts update",
+      "status": "pending",
+      "addressesCriteria": ["SC4", "SC5", "SC6", "SC7", "SC8"],
+      "content": "This phase delivers all visible user-facing work: the TerminalSearch overlay component, its CSS, the wiring into Terminal.tsx's JSX, vitest tests for pure helpers, and the KeyboardShortcuts panel entry.\n\nCreate apps/desktop/src/components/terminal/TerminalSearch.tsx. Export two pure helpers at the top of the file so the test file can import them: formatMatchCount(found: boolean, query: string): string returns '' when query is empty, 'No results' when query is non-empty and found is false, 'Match found' when found is true; isNoMatch(found: boolean, query: string): boolean returns true only when query.trim() is non-empty and found is false. Props interface: { searchAddon: SearchAddon; onClose: () => void; onQueryChange: (q: string) => void }. Internal state: query string, caseSensitive boolean (default false), found boolean (default true). Debounce timer via debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null). On query or caseSensitive change, clear any pending debounceRef and schedule a 150ms callback that calls searchAddon.findNext(query, { caseSensitive, incremental: false }) — store the boolean result in found state. When query is empty, call searchAddon.findNext('', {}) to clear highlights. Also call onQueryChange(query) inside the debounce callback so parent keeps searchQueryRef in sync. On mount, call inputRef.current?.focus() via a useEffect with empty deps. Key handler on the input: Escape calls onClose; Enter calls searchAddon.findNext(query, { caseSensitive }); Shift+Enter calls searchAddon.findPrevious(query, { caseSensitive }). Previous button calls findPrevious; Next button calls findNext. Aa button toggles caseSensitive. X button calls onClose. Apply className 'terminal-search-input--no-match' to the input when isNoMatch(found, query) is true.\n\nIMPORTANT API constraint: SearchAddon.findNext returns only a boolean (found / not found); the addon does NOT expose a total match count via its public API. The match indicator therefore shows 'Match found' or 'No results' rather than 'N of M'. Document this in a brief code comment on formatMatchCount.\n\nCreate apps/desktop/src/components/terminal/TerminalSearch.css. Position: absolute, top: 8px, right: 8px, z-index: 20 (above split controls at z-index 10). Use var(--bg-secondary) background, 1px solid var(--border-color) border, border-radius: 6px, box-shadow: 0 2px 8px rgba(0,0,0,0.3), display: flex, align-items: center, gap: 4px, padding: 4px 8px. Input styles: background var(--bg-tertiary), color var(--text-primary), border 1px solid var(--border-color), border-radius 4px, font-size 13px, width 180px, outline none, padding 2px 6px. .terminal-search-input--no-match modifier: border-color #ef4444. Match count span: color var(--text-secondary), font-size 11px, white-space nowrap, min-width 80px, text-align center. Buttons: 22px square, same pattern as .terminal-split-btn in Terminal.css.\n\nIn Terminal.tsx, import TerminalSearch from './TerminalSearch'. Import './TerminalSearch.css' at the top of Terminal.tsx. In the JSX return, inside .terminal-container and after the .terminal-content div, render: {isSearchOpen && searchAddonRef.current && <TerminalSearch searchAddon={searchAddonRef.current} onClose={() => { setIsSearchOpen(false); xtermRef.current?.focus(); }} onQueryChange={(q) => { searchQueryRef.current = q; }} />}.\n\nCreate apps/desktop/src/components/terminal/__tests__/terminalSearch.test.ts. Import formatMatchCount and isNoMatch from '../TerminalSearch'. Write at least 8 test cases covering: formatMatchCount returns '' for empty query, 'No results' for non-empty query with found=false, 'Match found' for found=true; isNoMatch returns false for empty query (regardless of found), false when found=true, true when query is non-empty and found=false, false for whitespace-only query (trim check).\n\nIn KeyboardShortcuts.tsx, add { keys: ['Ctrl', 'F'], description: 'Find in terminal buffer' } as the last entry in the Terminal group's shortcuts array.",
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalSearch.tsx",
+        "apps/desktop/src/components/terminal/TerminalSearch.css",
+        "apps/desktop/src/components/terminal/Terminal.tsx",
+        "apps/desktop/src/components/terminal/__tests__/terminalSearch.test.ts",
+        "apps/desktop/src/components/ui/KeyboardShortcuts.tsx"
+      ],
+      "tasks": [
+        "Create TerminalSearch.tsx exporting formatMatchCount and isNoMatch pure helpers at top of file, with props { searchAddon, onClose, onQueryChange }, 150ms debounce via useRef + setTimeout, auto-focus via useRef + useEffect, Escape/Enter/Shift+Enter key handlers on input",
+        "Implement Previous/Next buttons calling findPrevious/findNext, Aa toggle for caseSensitive, X button calling onClose, and .terminal-search-input--no-match class applied when isNoMatch(found, query) is true",
+        "Create TerminalSearch.css with position absolute top 8px right 8px z-index 20, CSS variable color references matching the existing design system, .terminal-search-input--no-match modifier, and button styles matching the .terminal-split-btn pattern",
+        "In Terminal.tsx: import TerminalSearch, import './TerminalSearch.css', and render <TerminalSearch> inside .terminal-container when isSearchOpen && searchAddonRef.current is non-null, with onClose restoring focus and onQueryChange syncing searchQueryRef",
+        "Create apps/desktop/src/components/terminal/__tests__/terminalSearch.test.ts with at least 8 test cases for formatMatchCount and isNoMatch covering empty query, whitespace, found=true, found=false",
+        "In KeyboardShortcuts.tsx Terminal group, add { keys: ['Ctrl', 'F'], description: 'Find in terminal buffer' } as the final shortcuts array entry",
+        "Run pnpm test and verify all terminalSearch tests pass alongside existing tests",
+        "Run pnpm typecheck and verify zero TypeScript errors",
+        "Run pnpm build and verify tsc -b strict compile passes"
+      ],
+      "verification": [
+        "pnpm test passes with apps/desktop/src/components/terminal/__tests__/terminalSearch.test.ts included — all formatMatchCount and isNoMatch cases green",
+        "pnpm typecheck passes with no errors across TerminalSearch.tsx, Terminal.tsx, and KeyboardShortcuts.tsx",
+        "pnpm build passes (tsc -b strict) with no new errors; TerminalSearch is rendered conditionally inside .terminal-container in Terminal.tsx",
+        "TerminalSearch.css uses z-index: 20 and references only var(--bg-secondary), var(--bg-tertiary), var(--text-primary), var(--text-secondary), var(--border-color) from the existing CSS variable set",
+        "KeyboardShortcuts.tsx Terminal group shortcuts array contains the Ctrl+F entry as its final item"
+      ],
+      "dependencies": [1]
+    }
+  ]
+}

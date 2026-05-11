@@ -42,6 +42,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["Ctrl", "Shift", "Tab"], description: "Previous terminal tab" },
       { keys: ["Ctrl", "Shift", "H"], description: "Split terminal horizontally" },
       { keys: ["Ctrl", "Shift", "\\"], description: "Split terminal vertically" },
+      { keys: ["Ctrl", "F"], description: "Find in terminal buffer" },
     ],
   },
   {

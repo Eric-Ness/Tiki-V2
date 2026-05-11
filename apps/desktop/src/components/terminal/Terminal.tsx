@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
+import { TerminalSearch } from "./TerminalSearch";
 import { useTerminal } from "./useTerminal";
 import { terminalFocusRegistry } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
@@ -84,6 +86,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const searchQueryRef = useRef<string>("");
+  const isSearchOpenRef = useRef(false);
   const isInitializedRef = useRef(false);
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -91,6 +96,14 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
 
   // Track when container becomes visible (has dimensions)
   const [isVisible, setIsVisible] = useState(false);
+
+  // Search overlay state (Phase 1: foundation only, UI lands in Phase 2)
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Keep ref in sync so the xterm key handler can read latest value without stale closure
+  useEffect(() => {
+    isSearchOpenRef.current = isSearchOpen;
+  }, [isSearchOpen]);
 
   // Callbacks for terminal output and exit
   const handleOutput = useCallback((data: string) => {
@@ -203,8 +216,10 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         // Add addons
         const fitAddon = new FitAddon();
         const webLinksAddon = new WebLinksAddon();
+        const searchAddon = new SearchAddon();
         xterm.loadAddon(fitAddon);
         xterm.loadAddon(webLinksAddon);
+        xterm.loadAddon(searchAddon);
 
         // Open terminal in container
         xterm.open(container);
@@ -219,6 +234,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         // Store refs
         xtermRef.current = xterm;
         fitAddonRef.current = fitAddon;
+        searchAddonRef.current = searchAddon;
 
         // Register focus function so other components can focus this terminal
         if (terminalId) {
@@ -254,6 +270,25 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
               }
             });
             return false; // Prevent xterm from processing
+          }
+
+          // Ctrl+F: Open search overlay (Phase 1 sets state; Phase 2 renders the UI)
+          if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && e.key === 'f') {
+            setIsSearchOpen(true);
+            return false;
+          }
+
+          // F3 / Shift+F3: Navigate matches while search is open
+          if (e.type === 'keydown' && e.key === 'F3' && isSearchOpenRef.current) {
+            const query = searchQueryRef.current;
+            if (query) {
+              if (e.shiftKey) {
+                searchAddonRef.current?.findPrevious(query, { caseSensitive: false });
+              } else {
+                searchAddonRef.current?.findNext(query, { caseSensitive: false });
+              }
+            }
+            return false;
           }
 
           return true; // Let xterm handle all other keys
@@ -300,6 +335,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         xtermRef.current = null;
       }
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
       if (idleTimeoutRef.current) {
         clearTimeout(idleTimeoutRef.current);
       }
@@ -333,6 +369,18 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   return (
     <div className={`terminal-container ${className}`.trim()}>
       <div ref={terminalRef} className="terminal-content" />
+      {isSearchOpen && searchAddonRef.current && (
+        <TerminalSearch
+          searchAddon={searchAddonRef.current}
+          onClose={() => {
+            setIsSearchOpen(false);
+            xtermRef.current?.focus();
+          }}
+          onQueryChange={(q) => {
+            searchQueryRef.current = q;
+          }}
+        />
+      )}
       {!isConnected && (
         <div className="terminal-status">Connecting...</div>
       )}
