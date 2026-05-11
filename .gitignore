@@ -30,3 +30,8 @@ pnpm-debug.log*
 # MemPalace per-project files (issue #185)
 mempalace.yaml
 entities.json
+
+# Tiki local runtime artifacts (per-machine, generated)
+.claude/worktrees/
+.tiki/backups/
+.tiki/issues/
