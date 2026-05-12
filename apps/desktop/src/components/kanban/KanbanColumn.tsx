@@ -11,6 +11,7 @@ export interface KanbanColumnProps {
   issues: GitHubIssue[];
   workItems?: Map<number, WorkItem>;
   activeId?: number | null;
+  hasFailed?: boolean;
   onExecute?: (issueNumber: number) => void;
   onShip?: (issueNumber: number) => void;
   onOpenInGitHub?: (issue: GitHubIssue) => void;
@@ -22,7 +23,7 @@ const cardVariants = {
   exit: { opacity: 0, y: -20 },
 };
 
-export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, workItems, activeId, onExecute, onShip, onOpenInGitHub }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, workItems, activeId, hasFailed, onExecute, onShip, onOpenInGitHub }: KanbanColumnProps) {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const selectedIssue = useDetailStore((s) => s.selectionByProject[projectId]?.selectedIssue ?? null);
   const { isOver, setNodeRef } = useDroppable({ id });
@@ -31,6 +32,7 @@ export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, work
     'kanban-column',
     `kanban-column--${id}`,
     isOver && 'kanban-column--drop-target',
+    hasFailed && 'kanban-column--has-failed',
   ]
     .filter(Boolean)
     .join(' ');

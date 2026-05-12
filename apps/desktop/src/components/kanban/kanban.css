@@ -160,6 +160,24 @@
   border-left: 3px solid #22c55e;
 }
 
+/* Failed-aware column highlighting — column accents the header in red when
+   any contained card has work.status === "failed". Overrides per-column
+   border-left color above, since failed signal takes precedence. */
+.kanban-column--has-failed .kanban-column-header {
+  border-left-color: #ef4444;
+  border-bottom-color: #ef4444;
+}
+
+.kanban-column--has-failed .kanban-column-title::before {
+  content: "⚠ ";
+  color: #ef4444;
+}
+
+.kanban-column--has-failed .kanban-column-count {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 /* Card Styles */
 .kanban-card {
   background: var(--bg-primary);

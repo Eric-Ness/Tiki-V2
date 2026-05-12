@@ -48,6 +48,9 @@ export function useCommandActions(options?: UseCommandActionsOptions): CommandAc
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const issues = useIssuesStore((s) => s.issues);
   const activeView = useLayoutStore((s) => s.activeView);
+  const selectedIssue = useDetailStore(
+    (s) => s.selectionByProject[activeProjectId ?? 'default']?.selectedIssue ?? null
+  );
 
   return useMemo(() => {
     const actions: CommandAction[] = [];
@@ -161,8 +164,26 @@ export function useCommandActions(options?: UseCommandActionsOptions): CommandAc
           writeToActiveTerminal(`/${cmd}\n`);
         },
       });
+
+      // Contextual variant: when an issue is selected in the detail panel,
+      // offer "Run X on #N" with the issue number pre-filled. Ranks above
+      // the bare command in fuzzy-match because the title contains the
+      // current issue number (which the user is likely searching by).
+      if (selectedIssue !== null) {
+        actions.push({
+          id: `cmd:${cmd.replace(':', '-')}:current`,
+          title: `${label} on #${selectedIssue} (current issue)`,
+          subtitle: `Write /${cmd} ${selectedIssue} to active terminal`,
+          category: 'command',
+          keywords: [...keywords, String(selectedIssue), 'current', 'selected'],
+          execute: () => {
+            useLayoutStore.getState().setActiveView('terminal');
+            writeToActiveTerminal(`/${cmd} ${selectedIssue}\n`);
+          },
+        });
+      }
     }
 
     return actions;
-  }, [projects, activeProjectId, issues, activeView, options?.onOpenShortcuts]);
+  }, [projects, activeProjectId, issues, activeView, selectedIssue, options?.onOpenShortcuts]);
 }

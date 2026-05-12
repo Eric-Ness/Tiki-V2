@@ -336,19 +336,25 @@ export function KanbanBoard() {
           </div>
         )}
         <div className="kanban-columns">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              issues={column.issues}
-              workItems={workItemsMap}
-              activeId={activeId}
-              onExecute={(issueNumber) => triggerExecution(issueNumber, column.id)}
-              onShip={requestShipConfirmation}
-              onOpenInGitHub={handleOpenInGitHub}
-            />
-          ))}
+          {columns.map((column) => {
+            const hasFailed = column.issues.some(
+              (issue) => workItemsMap.get(issue.number)?.status === 'failed'
+            );
+            return (
+              <KanbanColumn
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                issues={column.issues}
+                workItems={workItemsMap}
+                activeId={activeId}
+                hasFailed={hasFailed}
+                onExecute={(issueNumber) => triggerExecution(issueNumber, column.id)}
+                onShip={requestShipConfirmation}
+                onOpenInGitHub={handleOpenInGitHub}
+              />
+            );
+          })}
         </div>
       </div>
 

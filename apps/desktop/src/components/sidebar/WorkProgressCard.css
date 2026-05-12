@@ -10,6 +10,15 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.work-progress-card.clickable {
+  cursor: pointer;
+}
+
+.work-progress-card.clickable:focus-visible {
+  outline: 2px solid var(--text-secondary, #888);
+  outline-offset: 2px;
+}
+
 /* Status colors */
 .work-progress-card.status-executing {
   border-left-color: #4ade80;

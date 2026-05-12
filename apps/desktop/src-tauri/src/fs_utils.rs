@@ -1,4 +1,5 @@
 use serde::de::DeserializeOwned;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -64,13 +65,24 @@ pub fn read_json_resilient<T: DeserializeOwned>(path: &Path) -> Result<Option<T>
 }
 
 /// Atomically write content to a file by writing to a `.tmp` sibling first,
-/// then renaming. This prevents readers from seeing partial/corrupt JSON.
+/// `fsync`ing it, then renaming. The fsync closes the durability window where
+/// power loss between write and rename could revert the file to its pre-write
+/// state (some kernels buffer the write but commit the rename, or the rename
+/// is reordered ahead of the data in the journal).
 pub fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
     let tmp_path = path.with_extension("json.tmp");
 
-    // Write to temp file
-    std::fs::write(&tmp_path, content)
-        .map_err(|e| format!("Failed to write temp file {:?}: {}", tmp_path, e))?;
+    // Write + fsync the temp file so its bytes are durable on disk before
+    // we expose it via rename. Without this, the rename can land before the
+    // data, leaving an empty/partial state.json after a crash or power loss.
+    {
+        let mut file = std::fs::File::create(&tmp_path)
+            .map_err(|e| format!("Failed to create temp file {:?}: {}", tmp_path, e))?;
+        file.write_all(content.as_bytes())
+            .map_err(|e| format!("Failed to write temp file {:?}: {}", tmp_path, e))?;
+        file.sync_all()
+            .map_err(|e| format!("Failed to fsync temp file {:?}: {}", tmp_path, e))?;
+    } // file handle drops here, closing it before rename
 
     // Atomic rename (overwrites target on Windows via MoveFileEx internally)
     std::fs::rename(&tmp_path, path)

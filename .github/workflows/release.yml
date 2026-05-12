@@ -63,6 +63,30 @@ jobs:
           pnpm version-bump "$VERSION"
         shell: bash
 
+      - name: Compose release body from changelog
+        id: release_body
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          CHANGELOG=".tiki/releases/${TAG}-changelog.md"
+          {
+            echo "body<<TIKI_RELEASE_BODY_EOF"
+            if [ -f "$CHANGELOG" ]; then
+              cat "$CHANGELOG"
+              echo ""
+              echo "---"
+              echo ""
+              echo "**Downloads:** see the assets below for platform-specific installers."
+            else
+              echo "Tiki ${TAG}"
+              echo ""
+              echo "Per-release notes were not generated. See \`CHANGELOG.md\` in the repo root for a summary."
+              echo ""
+              echo "**Downloads:** see the assets below for platform-specific installers."
+            fi
+            echo "TIKI_RELEASE_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+        shell: bash
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -73,7 +97,7 @@ jobs:
           projectPath: apps/desktop
           tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: 'Tiki v__VERSION__'
-          releaseBody: 'See the assets below to download and install Tiki for your platform.'
+          releaseBody: ${{ steps.release_body.outputs.body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { WorkContext, PhaseStatus, PipelineStep } from "../work/WorkCard";
-import { useProjectsStore } from "../../stores";
+import { useProjectsStore, useDetailStore } from "../../stores";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./WorkProgressCard.css";
@@ -56,10 +56,19 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
   const [planPhases, setPlanPhases] = useState<PlanPhase[]>([]);
   const [showConfirmRemove, setShowConfirmRemove] = useState(false);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
+  const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
 
   // Extract issue-specific fields with proper type narrowing
   const issueNumber = work.type === "issue" ? work.issue.number : undefined;
   const issueTitle = work.type === "issue" ? work.issue.title : undefined;
+
+  // Clicking the card opens the issue (or release) in the detail panel.
+  // Action buttons inside stop propagation so they don't trigger this.
+  const handleCardClick = () => {
+    if (isIssue && issueNumber !== undefined) {
+      setSelectedIssue(issueNumber);
+    }
+  };
 
   // Stale work timestamp - use direct ternary to preserve discriminated union narrowing
   const activityTimestamp = work.type === 'issue' ? (work.lastActivity ?? work.createdAt) : work.createdAt;
@@ -106,7 +115,18 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
   const totalDuration = planPhases.length > 0 ? calculateTotalDuration(planPhases) : 0;
 
   return (
-    <div className={`work-progress-card status-${work.status}${isStale ? ' stale' : ''}`}>
+    <div
+      className={`work-progress-card status-${work.status}${isStale ? ' stale' : ''}${isIssue ? ' clickable' : ''}`}
+      onClick={isIssue ? handleCardClick : undefined}
+      role={isIssue ? 'button' : undefined}
+      tabIndex={isIssue ? 0 : undefined}
+      onKeyDown={isIssue ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick();
+        }
+      } : undefined}
+    >
       <div className="work-progress-header">
         <span className="work-progress-type">{isIssue ? "Issue" : "Release"}</span>
         {isStale && (
