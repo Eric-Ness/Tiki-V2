@@ -8,18 +8,48 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+---
+
+## [v0.5.0] — 2026-05-12
+
 ### Added
-- Enhancement backlog `docs/ENHANCEMENT-IDEAS.md` (48 items, IDs E1–E48).
+- **`state.mjs get <work-id> [--field <path>]`** — bash-friendly read path; dot-path field extraction; scalars print raw, objects as JSON (E27).
+- **`state.mjs remove <work-id>`** — atomic removal of an `activeWork` entry. Closes the standalone-ship direct-JSON exception (E25).
+- **`state.mjs append-history <issue|release>`** — typed appender for `history.recentIssues` / `history.recentReleases`; shapes match `state.schema.json` (E26).
+- **`state.mjs --dry-run`** — preview a `transition` / `remove` / `append-history` without writing; illegal transitions still exit 1 (E28).
+- **AUDIT-time algorithmic checks** — `audit.md` enforces bidirectional `successCriteria` ↔ `coverageMatrix` matching and runs Kahn's algorithm on phase dependencies to catch cycles at plan-time (E31, E32).
+- **Three-way transition-table parity test** at `packages/shared/src/__tests__/transitions-parity.test.ts` — parses both mirrors (`state.mjs` LEGAL, `state_transition.rs` match arms) and asserts pair-for-pair equality with the canonical `VALID_TRANSITIONS`. Replaces the "must be kept in sync" comments with mechanical enforcement (E44).
+
+### Changed
+- **`scripts/version-bump.mjs`** now also bumps root `package.json` (was stuck at `0.1.0`) (E45).
+- **`ship.md` and `release.md`** state-management sections rewritten to call the new shim subcommands instead of describing direct JSON writes.
+- **`package.json` root `test:ts`** now runs `packages/shared` tests in addition to `apps/desktop` (the existing `transitions.test.ts` was silently unrun in CI before this).
+- **`.github/workflows/pr.yml`** adds a `Vitest (packages/shared)` step so shared-package tests run on every PR.
 
 ---
 
-## [v0.4.1] — 2026-05-12 — _in flight_
+## [v0.4.2] — 2026-05-12
+
+### Added
+- **Semantic `WorkStatus` color tokens** in `index.css` for both dark and light themes (E49).
+- **Pulse animation on the currently-executing phase segment** anchored to `--status-executing` (E50).
+- **Selected-card elevation** — accent ring + soft drop-shadow on selected `IssueCard` / `KanbanCard` (E53).
+- **Accent ring on card hover** — `WorkProgressCard.clickable` and `IssueCard` get a 1px accent box-shadow on hover (E54).
+- **Pulse on busy terminal-tab `StatusDot`** when `status === 'busy'` (E56).
+
+### Accessibility
+- **Respect `prefers-reduced-motion`** — global CSS rule + `<MotionConfig reducedMotion="user">` wrapper so every framer-motion consumer honors the OS preference (E52).
+
+---
+
+## [v0.4.1] — 2026-05-12
 
 ### Added
 - **CHANGELOG.md** at repo root (E40).
 - **Click an Active Work card** in the sidebar to open it in the detail panel (E5).
 - **Failed-aware kanban columns** — column headers visually highlight when any contained card has `failed` status (E9).
 - **Command palette inherits selected-issue context** — `tiki:get`, `tiki:execute`, `tiki:ship`, `tiki:yolo` offer contextual `Run on #N (current issue)` variants when an issue is selected (E13).
+- Enhancement backlog `docs/ENHANCEMENT-IDEAS.md` (48 items, IDs E1–E48).
 
 ### Changed
 - **CLAUDE.md** documents the `packages/framework/scripts/state.mjs` shim (the bash-callable mirror of the Rust `state_transition` IPC), and warns about the Windows pnpm reparse-point env trap (E37).

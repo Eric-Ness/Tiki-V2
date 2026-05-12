@@ -105,13 +105,13 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### state.mjs shim — close the remaining write gaps
 
-- **E25. `state.mjs remove <work-id>` subcommand** — `ship.md:228` explicitly notes "delete the `issue:{number}` key from activeWork (direct JSON; shim does not expose deletion yet)." Add a validated, atomic `remove` subcommand so the last class of unvalidated state mutations goes through the shim. *Why:* eliminates the standalone-ship cleanup direct-JSON exception. *Effort:* S. *File:* `packages/framework/scripts/state.mjs`.
+- ~~**E25. `state.mjs remove <work-id>` subcommand**~~ _(shipped v0.5.0)_ — `ship.md:228` explicitly notes "delete the `issue:{number}` key from activeWork (direct JSON; shim does not expose deletion yet)." Add a validated, atomic `remove` subcommand so the last class of unvalidated state mutations goes through the shim. *Why:* eliminates the standalone-ship cleanup direct-JSON exception. *Effort:* S. *File:* `packages/framework/scripts/state.mjs`.
 
-- **E26. `state.mjs append-history` subcommand** — `ship.md:231` and `release.md:168` both append directly to `history.recentIssues` / `history.recentReleases` via raw JSON. A shim subcommand that enforces the `completedIssueRecord` / `completedReleaseRecord` shapes from `state.schema.json:353–392` would close this last structural mutation gap. *Why:* history appends race with the `remove` call above when both happen in one ship. *Effort:* S. *Files:* `state.mjs`, `state.schema.json`.
+- ~~**E26. `state.mjs append-history` subcommand**~~ _(shipped v0.5.0)_ — `ship.md:231` and `release.md:168` both append directly to `history.recentIssues` / `history.recentReleases` via raw JSON. A shim subcommand that enforces the `completedIssueRecord` / `completedReleaseRecord` shapes from `state.schema.json:353–392` would close this last structural mutation gap. *Why:* history appends race with the `remove` call above when both happen in one ship. *Effort:* S. *Files:* `state.mjs`, `state.schema.json`.
 
-- **E27. `state.mjs get <work-id> [--field X]` subcommand** — Commands today read state via inline `cat | jq` invocations. A `get` subcommand provides a consistent shim-managed read path, exposes `--tiki-path` for reads too, and clear-errors on missing keys. *Why:* lets command authors stop hand-rolling jq paths; opens the door for future tools to consume shim output reliably. *Effort:* S. *File:* `state.mjs`.
+- ~~**E27. `state.mjs get <work-id> [--field X]` subcommand**~~ _(shipped v0.5.0 — supports dot-path field extraction; scalars print raw, objects as JSON)_ — Commands today read state via inline `cat | jq` invocations. A `get` subcommand provides a consistent shim-managed read path, exposes `--tiki-path` for reads too, and clear-errors on missing keys. *Why:* lets command authors stop hand-rolling jq paths; opens the door for future tools to consume shim output reliably. *Effort:* S. *File:* `state.mjs`.
 
-- **E28. `state.mjs --dry-run`** — No way to preview a transition's output without writing. Adding `--dry-run` that prints would-be entry JSON and exits 0 (or 1 on illegal transition) without touching the file would let commands and tests assert shape pre-write. *Why:* debugging a misbehaving transition currently requires writing then manually undoing. *Effort:* S. *File:* `state.mjs`.
+- ~~**E28. `state.mjs --dry-run`**~~ _(shipped v0.5.0 — also honored by `remove` and `append-history`)_ — No way to preview a transition's output without writing. Adding `--dry-run` that prints would-be entry JSON and exits 0 (or 1 on illegal transition) without touching the file would let commands and tests assert shape pre-write. *Why:* debugging a misbehaving transition currently requires writing then manually undoing. *Effort:* S. *File:* `state.mjs`.
 
 - **E29. `state.mjs` JSON-Schema-validates output before write** — The shim builds entries through code logic but never runs the result against `state.schema.json`. Adding a post-apply validation pass (Ajv or a hand-rolled subset) would catch field drift before it hits disk. The three-mirror sync problem (TS/Rust/JS) is acknowledged at `state.mjs:50–55` as a risk. *Why:* schema validation on write is the automated backstop for that three-way drift. *Effort:* M. *Files:* `state.mjs`, `state.schema.json`.
 
@@ -119,9 +119,9 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Audit-time gap closures
 
-- **E31. AUDIT cross-checks `coverageMatrix` against `successCriteria` IDs** — `audit.md:22` says in prose "all success criteria have at least one phase addressing them" but this is unenforced. Schema (`plan.schema.json:74,116`) gives us structured IDs — verify every `SC*` appears as a key in `coverageMatrix` and every key references a real criterion. *Why:* silent coverage gaps reach EXECUTE today. *Effort:* S. *Files:* `audit.md`, `plan.schema.json`.
+- ~~**E31. AUDIT cross-checks `coverageMatrix` against `successCriteria` IDs**~~ _(shipped v0.5.0 — bidirectional check, also validates phase-number references)_ — `audit.md:22` says in prose "all success criteria have at least one phase addressing them" but this is unenforced. Schema (`plan.schema.json:74,116`) gives us structured IDs — verify every `SC*` appears as a key in `coverageMatrix` and every key references a real criterion. *Why:* silent coverage gaps reach EXECUTE today. *Effort:* S. *Files:* `audit.md`, `plan.schema.json`.
 
-- **E32. AUDIT runs Kahn's algorithm on phase `dependencies`** — `audit.md:30` lists "no circular dependencies" but the cycle check only actually runs in `execute.md:80–92`. Running the same Kahn's pass at AUDIT surfaces cycles in seconds rather than mid-run after sub-agent dispatch. *Why:* catches cycles cheaply at plan-time. *Effort:* S. *File:* `audit.md`.
+- ~~**E32. AUDIT runs Kahn's algorithm on phase `dependencies`**~~ _(shipped v0.5.0 — algorithm aligned with `execute.md`'s `<parallel-execution>` Step 2)_ — `audit.md:30` lists "no circular dependencies" but the cycle check only actually runs in `execute.md:80–92`. Running the same Kahn's pass at AUDIT surfaces cycles in seconds rather than mid-run after sub-agent dispatch. *Why:* catches cycles cheaply at plan-time. *Effort:* S. *File:* `audit.md`.
 
 ### Schemas, config, install
 
@@ -155,11 +155,11 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 - **E43. PR workflow should include a Windows job** — `pr.yml` runs `ubuntu-22.04` only. Windows-specific code in `apps/desktop/src-tauri/src/github.rs` (`CREATE_NO_WINDOW` `#[cfg(target_os = "windows")]`) and `pty.rs` is only exercised by the release matrix. Add `windows-latest` to PR CI. *Why:* Windows is the primary target; regressions are invisible until release time. *Effort:* M. *File:* `.github/workflows/pr.yml`.
 
-- **E44. Add a test verifying Rust + JS shim transition tables match `@tiki/shared`** — Three copies of `VALID_TRANSITIONS` exist (TS canonical, Rust, JS shim). Only the TS copy is tested. Add a vitest or script that parses the Rust file and JS shim and asserts every legal pair matches the canonical table. Comment in `state.mjs:50–55` calls out the risk but doesn't enforce it. *Why:* "must be kept in sync" is not enforcement. *Effort:* M. *Surface:* `packages/shared/src/__tests__/transitions.test.ts` + new test file.
+- ~~**E44. Add a test verifying Rust + JS shim transition tables match `@tiki/shared`**~~ _(shipped v0.5.0 — `transitions-parity.test.ts`; also fixed CI gap where `packages/shared` tests weren't being run at all)_ — Three copies of `VALID_TRANSITIONS` exist (TS canonical, Rust, JS shim). Only the TS copy is tested. Add a vitest or script that parses the Rust file and JS shim and asserts every legal pair matches the canonical table. Comment in `state.mjs:50–55` calls out the risk but doesn't enforce it. *Why:* "must be kept in sync" is not enforcement. *Effort:* M. *Surface:* `packages/shared/src/__tests__/transitions.test.ts` + new test file.
 
 ### Repo hygiene
 
-- **E45. `scripts/version-bump.mjs` should also bump root `package.json`** — Root `package.json` is still `"version": "0.1.0"` after multiple release cycles. The bump script updates `tauri.conf.json`, `Cargo.toml`, `plugin.json` per README, but skips the workspace root manifest. *Why:* tooling that reads workspace version is misled; minor confusion. *Effort:* S. *Files:* `scripts/version-bump.mjs`, `package.json`.
+- ~~**E45. `scripts/version-bump.mjs` should also bump root `package.json`**~~ _(shipped v0.5.0)_ — Root `package.json` is still `"version": "0.1.0"` after multiple release cycles. The bump script updates `tauri.conf.json`, `Cargo.toml`, `plugin.json` per README, but skips the workspace root manifest. *Why:* tooling that reads workspace version is misled; minor confusion. *Effort:* S. *Files:* `scripts/version-bump.mjs`, `package.json`.
 
 - **E46. Mechanical enforcement of "new module → new test"** — `apps/desktop/README.md:171` prose requires a `*.test.ts` next to every new `stores/` or `components/` file, but there's no lint rule, hook, or CI step. Add a small CI script that diffs PR-added files in those dirs and fails if no sibling test was added. *Why:* prose conventions without mechanical enforcement decay. *Effort:* S–M. *File:* `.github/workflows/pr.yml`.
 
@@ -246,7 +246,7 @@ A coherent visual-design pass. Each item is small but they compound — semantic
 
 That's 9 items, sequenced so foundational tokens (E49) ship first and the rest layer on them. Roughly 6–8 hours of work given the env state.
 
-### v0.5.0 — "Framework polish" (medium-sized release)
+### v0.5.0 — "Framework polish" _(shipped 2026-05-12)_
 
 Theme: tighten the shim contract and close audit-time gaps. Each item builds on v0.4.0's canonical transition work.
 
@@ -256,7 +256,7 @@ Theme: tighten the shim contract and close audit-time gaps. Each item builds on 
 - **E28** state.mjs `--dry-run`
 - **E31** AUDIT verifies coverageMatrix completeness
 - **E32** AUDIT runs Kahn's at plan-time
-- **E44** Test asserting Rust + JS shim mirror @tiki/shared
+- **E44** Test asserting Rust + JS shim mirror @tiki/shared (also closed CI gap where `packages/shared` tests weren't actually running)
 - **E45** version-bump.mjs handles root package.json
 
 ### v0.6.0 — "UX polish" (terminal & detail panel improvements)

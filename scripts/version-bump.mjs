@@ -18,6 +18,14 @@ const cleanVersion = version.replace(/^v/, "");
 
 const files = [
   {
+    path: resolve(root, "package.json"),
+    update(content) {
+      const json = JSON.parse(content);
+      json.version = cleanVersion;
+      return JSON.stringify(json, null, 2) + "\n";
+    },
+  },
+  {
     path: resolve(root, "apps/desktop/src-tauri/tauri.conf.json"),
     update(content) {
       const json = JSON.parse(content);

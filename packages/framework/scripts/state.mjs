@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tiki state.json CLI shim — issue #144.
+ * Tiki state.json CLI shim.
  *
  * Claude Code drives the Tiki framework via bash, not Tauri IPC. This script
  * is the bash-callable counterpart to the typed `state_transition` Tauri
@@ -9,15 +9,34 @@
  * transition table, so framework command prose can call either one and
  * get a consistent state.json.
  *
- * Usage:
+ * Subcommands:
  *
- *   node state.mjs transition <work-id> --to-status <status>
- *       [--to-step <step>]
- *       [--phase-current N --phase-total T --phase-status <status>]
- *       [--parent-release <version>]
- *       [--issue-number N --issue-title "..."]
- *       [--release-version V --release-issues "1,2,3"]
- *       [--tiki-path <path>]
+ *   transition <work-id> --to-status <s> [--to-step <S>] [--phase-*] ...
+ *     Mutate status / step / phase on an activeWork entry (creating it if
+ *     this is the first transition). Validates against the legal table.
+ *
+ *   get <work-id> [--field <path>]
+ *     Read an activeWork entry. With --field, returns just that
+ *     dot-path (scalars print raw, objects/arrays as JSON).
+ *
+ *   remove <work-id>
+ *     Delete activeWork[workId]. Used by ship.md when finalizing a
+ *     standalone issue.
+ *
+ *   append-history issue --number N --title "..." [--completed-at ISO]
+ *   append-history release --version V [--issues "1,2,3"] [--tag T] [--completed-at ISO]
+ *     Append a completed-work record to history.recentIssues /
+ *     recentReleases and update history.lastCompletedIssue /
+ *     lastCompletedRelease. Shapes match completedIssueRecord /
+ *     completedReleaseRecord in state.schema.json.
+ *
+ * Common flags:
+ *
+ *   --tiki-path <path>      Override .tiki location (defaults to <cwd>/.tiki).
+ *   --dry-run               Apply in memory and print the would-be result,
+ *                           but do NOT write state.json. Honored by
+ *                           transition, remove, and append-history.
+ *                           Illegal transitions still exit 1.
  *
  * Examples:
  *
@@ -29,12 +48,24 @@
  *   node state.mjs transition issue:42 --to-status executing --to-step EXECUTE \
  *     --phase-current 2 --phase-total 5 --phase-status executing
  *
- *   # Ship a release-child issue, preserving parentRelease:
- *   node state.mjs transition issue:42 --to-status completed --to-step SHIP
+ *   # Preview a transition without writing:
+ *   node state.mjs transition issue:42 --to-status shipping --to-step SHIP --dry-run
+ *
+ *   # Read the current status of an issue:
+ *   node state.mjs get issue:42 --field status
+ *
+ *   # Remove a finalized issue from activeWork (standalone ship):
+ *   node state.mjs remove issue:42
+ *
+ *   # Append a completed issue record to history:
+ *   node state.mjs append-history issue --number 42 --title "Add user profiles"
+ *
+ *   # Append a completed release record to history:
+ *   node state.mjs append-history release --version v1.2.0 --issues "41,42,43" --tag v1.2.0
  *
  * Exit codes:
- *   0  success (prints updated entry JSON to stdout)
- *   1  validation error (illegal transition, bad arguments)
+ *   0  success (prints relevant JSON or scalar to stdout)
+ *   1  validation error (illegal transition, bad arguments, missing entry)
  *   2  I/O error (read/write/atomic-rename failure)
  *
  * Backward compatibility:
@@ -51,7 +82,8 @@ import process from "node:process";
 // Legal transition table. The canonical table lives at
 // packages/shared/src/types/transitions.ts. This file mirrors it, as does
 // apps/desktop/src-tauri/src/state_transition.rs. All three must be kept in
-// sync.
+// sync (the parity test in packages/shared/src/__tests__/transitions-parity.test.ts
+// enforces this mechanically).
 //
 // Format: from-status -> Set of allowed to-statuses. Same-status transitions
 // (e.g. executing -> executing) are always allowed and not enumerated.
@@ -165,19 +197,55 @@ function writeStateAtomic(tikiPath, state) {
 }
 
 // ---------------------------------------------------------------------------
-// Transition application.
+// Shared helpers.
+// ---------------------------------------------------------------------------
+
+function assertWorkIdShape(workId) {
+  const isIssue = workId.startsWith("issue:");
+  const isRelease = workId.startsWith("release:");
+  if (!isIssue && !isRelease) {
+    die(1, `invalid work_id '${workId}': must start with 'issue:' or 'release:'`);
+  }
+  return { isIssue, isRelease };
+}
+
+function getNested(obj, dotPath) {
+  if (!dotPath) return obj;
+  const parts = dotPath.split(".");
+  let cur = obj;
+  for (const part of parts) {
+    if (cur === null || cur === undefined || typeof cur !== "object") {
+      return undefined;
+    }
+    cur = cur[part];
+  }
+  return cur;
+}
+
+function printValue(value) {
+  // Scalars (string/number/boolean) print raw for shell-friendliness.
+  // Objects, arrays, null → JSON, pretty-printed.
+  if (value === null) {
+    process.stdout.write("null\n");
+    return;
+  }
+  const t = typeof value;
+  if (t === "string" || t === "number" || t === "boolean") {
+    process.stdout.write(String(value) + "\n");
+    return;
+  }
+  process.stdout.write(JSON.stringify(value, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: transition
 // ---------------------------------------------------------------------------
 
 function applyTransition(state, input) {
   const { workId, toStatus, toStep, phase, parallelExecution, parentRelease, issue, release } =
     input;
 
-  // Sanity-check the work_id prefix.
-  const isIssue = workId.startsWith("issue:");
-  const isRelease = workId.startsWith("release:");
-  if (!isIssue && !isRelease) {
-    die(1, `invalid work_id '${workId}': must start with 'issue:' or 'release:'`);
-  }
+  const { isIssue } = assertWorkIdShape(workId);
 
   state.activeWork = state.activeWork || {};
   const existing = state.activeWork[workId];
@@ -262,18 +330,7 @@ function applyTransition(state, input) {
   return state.activeWork[workId];
 }
 
-// ---------------------------------------------------------------------------
-// CLI entry point.
-// ---------------------------------------------------------------------------
-
-function main() {
-  const argv = process.argv.slice(2);
-  const args = parseArgs(argv);
-
-  const subcommand = args._[0];
-  if (subcommand !== "transition") {
-    die(1, `unknown subcommand '${subcommand}' (only 'transition' is supported)`);
-  }
+function handleTransition(args) {
   const workId = args._[1];
   if (!workId) {
     die(1, "missing <work-id> argument (e.g. 'issue:42' or 'release:v1.2')");
@@ -342,9 +399,10 @@ function main() {
       }
     : null;
 
-  // Read existing state, apply, write atomically.
+  // Read existing state, apply, optionally write atomically.
   const tikiPath = resolveTikiPath(args["tiki-path"]);
   const state = readState(tikiPath);
+  const dryRun = args["dry-run"] === true;
 
   const updated = applyTransition(state, {
     workId,
@@ -357,10 +415,191 @@ function main() {
     release,
   });
 
-  writeStateAtomic(tikiPath, state);
+  if (!dryRun) {
+    writeStateAtomic(tikiPath, state);
+  }
 
   // Emit the updated entry as JSON to stdout. Callers can pipe / jq this.
   process.stdout.write(JSON.stringify(updated, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: get
+// ---------------------------------------------------------------------------
+
+function handleGet(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <work-id> argument (e.g. 'issue:42' or 'release:v1.2')");
+  }
+  assertWorkIdShape(workId);
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const state = readState(tikiPath);
+  const entry = (state.activeWork || {})[workId];
+  if (!entry) {
+    die(1, `no active work for '${workId}'`);
+  }
+
+  const field = args.field;
+  if (field === undefined || field === true) {
+    process.stdout.write(JSON.stringify(entry, null, 2) + "\n");
+    return;
+  }
+  const value = getNested(entry, String(field));
+  if (value === undefined) {
+    die(1, `field '${field}' not present on ${workId}`);
+  }
+  printValue(value);
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: remove
+// ---------------------------------------------------------------------------
+
+function handleRemove(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <work-id> argument (e.g. 'issue:42' or 'release:v1.2')");
+  }
+  assertWorkIdShape(workId);
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const state = readState(tikiPath);
+  state.activeWork = state.activeWork || {};
+  const entry = state.activeWork[workId];
+  if (!entry) {
+    die(1, `no active work for '${workId}'`);
+  }
+
+  delete state.activeWork[workId];
+  const dryRun = args["dry-run"] === true;
+  if (!dryRun) {
+    writeStateAtomic(tikiPath, state);
+  }
+
+  // Print the removed entry so callers can see what was deleted.
+  process.stdout.write(JSON.stringify(entry, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: append-history
+// ---------------------------------------------------------------------------
+
+function buildCompletedIssueRecord(args) {
+  const numberRaw = args.number;
+  if (numberRaw === undefined || numberRaw === true) {
+    die(1, "append-history issue requires --number N");
+  }
+  const number = Number(numberRaw);
+  if (!Number.isFinite(number) || number < 1) {
+    die(1, `invalid --number '${numberRaw}' (must be a positive integer)`);
+  }
+  const titleRaw = args.title;
+  const title = typeof titleRaw === "string" ? titleRaw : undefined;
+  if (!title) {
+    die(1, "append-history issue requires --title \"...\"");
+  }
+  const completedAtRaw = args["completed-at"];
+  const completedAt =
+    typeof completedAtRaw === "string" ? completedAtRaw : new Date().toISOString();
+
+  return { number, title, completedAt };
+}
+
+function buildCompletedReleaseRecord(args) {
+  const versionRaw = args.version;
+  const version = typeof versionRaw === "string" ? versionRaw : undefined;
+  if (!version) {
+    die(1, "append-history release requires --version V");
+  }
+  const issuesRaw = args.issues;
+  const issues =
+    typeof issuesRaw === "string"
+      ? issuesRaw
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n) && n >= 1)
+      : undefined;
+
+  const tagRaw = args.tag;
+  const tag = typeof tagRaw === "string" ? tagRaw : undefined;
+
+  const completedAtRaw = args["completed-at"];
+  const completedAt =
+    typeof completedAtRaw === "string" ? completedAtRaw : new Date().toISOString();
+
+  return {
+    version,
+    ...(issues !== undefined ? { issues } : {}),
+    completedAt,
+    ...(tag !== undefined ? { tag } : {}),
+  };
+}
+
+function handleAppendHistory(args) {
+  const kind = args._[1];
+  if (kind !== "issue" && kind !== "release") {
+    die(1, `append-history requires 'issue' or 'release' as the second argument (got '${kind}')`);
+  }
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const state = readState(tikiPath);
+  state.history = state.history || {};
+
+  let record;
+  if (kind === "issue") {
+    record = buildCompletedIssueRecord(args);
+    state.history.recentIssues = Array.isArray(state.history.recentIssues)
+      ? state.history.recentIssues
+      : [];
+    state.history.recentIssues.unshift(record);
+    state.history.lastCompletedIssue = record;
+  } else {
+    record = buildCompletedReleaseRecord(args);
+    state.history.recentReleases = Array.isArray(state.history.recentReleases)
+      ? state.history.recentReleases
+      : [];
+    state.history.recentReleases.unshift(record);
+    state.history.lastCompletedRelease = record;
+  }
+
+  const dryRun = args["dry-run"] === true;
+  if (!dryRun) {
+    writeStateAtomic(tikiPath, state);
+  }
+
+  process.stdout.write(JSON.stringify(record, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// CLI entry point.
+// ---------------------------------------------------------------------------
+
+function main() {
+  const argv = process.argv.slice(2);
+  const args = parseArgs(argv);
+
+  const subcommand = args._[0];
+  switch (subcommand) {
+    case "transition":
+      handleTransition(args);
+      return;
+    case "get":
+      handleGet(args);
+      return;
+    case "remove":
+      handleRemove(args);
+      return;
+    case "append-history":
+      handleAppendHistory(args);
+      return;
+    default:
+      die(
+        1,
+        `unknown subcommand '${subcommand}' (expected one of: transition, get, remove, append-history)`
+      );
+  }
 }
 
 main();

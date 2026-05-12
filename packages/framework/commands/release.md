@@ -165,7 +165,18 @@ node packages/framework/scripts/state.mjs transition release:{version} \
 node packages/framework/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
 ```
 
-After shipping (direct JSON — not in the shim surface): remove `release:{version}` from `activeWork`, remove ALL child `issue:N` entries with matching `parentRelease`, append to `history.recentReleases` (`{ version, issues, completedAt, tag }`), and move the release file to `.tiki/releases/archive/`.
+After shipping:
+
+```bash
+# Remove the release entry from activeWork:
+node packages/framework/scripts/state.mjs remove release:{version}
+# For each child issue with parentRelease == {version}, remove it:
+node packages/framework/scripts/state.mjs remove issue:{number}
+# Append the release completion record to history:
+node packages/framework/scripts/state.mjs append-history release --version {version} --issues "41,42,43" --tag {version}
+```
+
+Then move the release file to `.tiki/releases/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation).
 </state-management>
 
 <output>

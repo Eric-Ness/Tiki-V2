@@ -70,6 +70,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Vitest (packages/shared)
+        run: pnpm -C packages/shared test
+
       - name: Vitest (apps/desktop)
         run: pnpm -C apps/desktop test
 
