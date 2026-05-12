@@ -41,7 +41,7 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Sidebar / Active Work
 
-- **E5. Click a `WorkProgressCard` to open it in the detail panel** — `WorkProgressCard.tsx` renders issue number/title (lines 127–134) but has no `onClick` wired to `useDetailStore.setSelectedIssue`. `IssueCard.tsx` already does this on click. *Why:* seeing "Phase 3/7" begs to be clicked; today nothing happens. *Effort:* S. *Surface:* `components/sidebar/WorkProgressCard.tsx`.
+- ~~**E5. Click a `WorkProgressCard` to open it in the detail panel**~~ _(shipped v0.4.1)_ — `WorkProgressCard.tsx` renders issue number/title (lines 127–134) but has no `onClick` wired to `useDetailStore.setSelectedIssue`. `IssueCard.tsx` already does this on click. *Why:* seeing "Phase 3/7" begs to be clicked; today nothing happens. *Effort:* S. *Surface:* `components/sidebar/WorkProgressCard.tsx`.
 
 - **E6. "Last fetched N min ago" next to the Issues refresh button** — `IssuesSection.tsx` line 89 records `lastFetched` in the store but never surfaces it. Tiny `"2m ago"` label would surface data age. *Why:* after `/tiki:ship` the sidebar still shows "Open" until manual refresh — no hint about staleness. *Effort:* S. *Surface:* `components/sidebar/IssuesSection.tsx`, `stores/issuesStore.ts`.
 
@@ -49,9 +49,9 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Kanban
 
-- **E8. Per-column issue count badge** — `KanbanColumn.tsx` renders columns by title but no count. Data is in the `columns` array already. *Why:* "how many are in Execute vs Open" requires manual counting. *Effort:* S. *Surface:* `components/kanban/KanbanColumn.tsx`.
+- ~~**E8. Per-column issue count badge**~~ _(already shipped — found at `KanbanColumn.tsx:42–50` during exploration)_ — `KanbanColumn.tsx` renders columns by title but no count. Data is in the `columns` array already. *Why:* "how many are in Execute vs Open" requires manual counting. *Effort:* S. *Surface:* `components/kanban/KanbanColumn.tsx`.
 
-- **E9. Column header turns red when any card in it has `failed` status** — `KanbanBoard.tsx:151` routes `failed` into the Review column; card-level red badge exists but the column header looks normal. Failed work is the highest-priority signal. *Why:* time-sensitive failure indicator gets buried in a mixed-status column. *Effort:* S. *Surface:* `components/kanban/KanbanColumn.tsx`, `KanbanBoard.tsx`.
+- ~~**E9. Column header turns red when any card in it has `failed` status**~~ _(shipped v0.4.1)_ — `KanbanBoard.tsx:151` routes `failed` into the Review column; card-level red badge exists but the column header looks normal. Failed work is the highest-priority signal. *Why:* time-sensitive failure indicator gets buried in a mixed-status column. *Effort:* S. *Surface:* `components/kanban/KanbanColumn.tsx`, `KanbanBoard.tsx`.
 
 ### Detail panel
 
@@ -63,7 +63,7 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 - **E12. Show "stale" indicator on terminal tabs created before the last settings change** — Settings hint at line 107 is passive; users don't know which tabs need restarting. Store a `settingsVersion` and stamp tabs; mark older tabs with a small icon. *Why:* "why didn't my font change?" is a recurring confusion. *Effort:* M. *Surface:* `components/settings/SettingsPage.tsx`, `stores/terminalStore.ts`.
 
-- **E13. Command palette actions inherit selected-issue context** — `useCommandActions.ts:143–163` registers `/tiki:get`, `/tiki:execute`, etc. as bare commands. When `selectedIssue` is set in `useDetailStore`, the palette should offer contextual variants: "Run tiki:execute on #42 (current issue)". `useDetailStore` is already imported, just not used here. *Why:* the natural mental model is "Ctrl+K applies to what I'm looking at." *Effort:* S. *Surface:* `hooks/useCommandActions.ts`.
+- ~~**E13. Command palette actions inherit selected-issue context**~~ _(shipped v0.4.1)_ — `useCommandActions.ts:143–163` registers `/tiki:get`, `/tiki:execute`, etc. as bare commands. When `selectedIssue` is set in `useDetailStore`, the palette should offer contextual variants: "Run tiki:execute on #42 (current issue)". `useDetailStore` is already imported, just not used here. *Why:* the natural mental model is "Ctrl+K applies to what I'm looking at." *Effort:* S. *Surface:* `hooks/useCommandActions.ts`.
 
 - **E14. Recovery dialog: highlight the parse-failure line in the preview** — `StateRecoveryDialog.tsx:347–370` renders backup JSON in a `<pre>` tag. The error message at line 211 already contains line/column from serde, but the preview doesn't scroll-to or visually mark that location. Even line numbers + a yellow row highlight would dramatically help. *Why:* the whole point of preview is to spot the malformed line; dense monospace JSON without aid is sub-optimal. *Effort:* M. *Surface:* `components/recovery/StateRecoveryDialog.tsx`.
 
@@ -81,7 +81,7 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### State & atomic writes
 
-- **E18. `atomic_write` should `fsync` the tmp file before rename** — `fs_utils::atomic_write:68–78` writes tmp + rename, but never calls `File::sync_all()`. Power loss between write and rename can revert the file to pre-write state. One line fix; closes the durability window for state.json. *Why:* reliability for the single most critical write in the system. *Effort:* S. *File:* `apps/desktop/src-tauri/src/fs_utils.rs:68–78`.
+- ~~**E18. `atomic_write` should `fsync` the tmp file before rename**~~ _(shipped v0.4.1)_ — `fs_utils::atomic_write:68–78` writes tmp + rename, but never calls `File::sync_all()`. Power loss between write and rename can revert the file to pre-write state. One line fix; closes the durability window for state.json. *Why:* reliability for the single most critical write in the system. *Effort:* S. *File:* `apps/desktop/src-tauri/src/fs_utils.rs:68–78`.
 
 - **E19. `load_tiki_releases` should use `read_json_resilient`** — `commands.rs:241` uses bare `fs::read_to_string` while reading `.tiki/releases/*.json` mid-traversal. If `save_tiki_release` is doing an atomic rename concurrently, a `NotFound` propagates upward. `get_state` and `get_plan` already use the resilient helper — align this path. *Why:* eliminates latent crash from concurrent write/read. *Effort:* S. *File:* `commands.rs:233–253`.
 
@@ -139,17 +139,17 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Documentation
 
-- **E37. `CLAUDE.md` should reference the `state.mjs` shim and the Windows pnpm reparse-point gotcha** — CLAUDE.md describes the Tauri state_transition command but omits the bash-callable shim entirely, despite it being the preferred write path. Also missing the Windows reparse-point note now saved to project memory — adopters on Windows hit the same wall. *Why:* prevents future agents from falling back to raw JSON writes; warns about a known env trap. *Effort:* S. *File:* `CLAUDE.md`.
+- ~~**E37. `CLAUDE.md` should reference the `state.mjs` shim and the Windows pnpm reparse-point gotcha**~~ _(shipped v0.4.1; also covered E38's `pnpm build` ≠ `pnpm typecheck` note)_ — CLAUDE.md describes the Tauri state_transition command but omits the bash-callable shim entirely, despite it being the preferred write path. Also missing the Windows reparse-point note now saved to project memory — adopters on Windows hit the same wall. *Why:* prevents future agents from falling back to raw JSON writes; warns about a known env trap. *Effort:* S. *File:* `CLAUDE.md`.
 
-- **E38. `CLAUDE.md` should call out `pnpm build` ≠ `pnpm typecheck`** — MEMORY notes `tsc -b` (via `pnpm build`) is stricter than `tsc --noEmit` (via `pnpm typecheck`) — discriminated-union narrowing bugs slip past typecheck. CLAUDE.md only lists typecheck. *Why:* recurring CI breakage source documented in memory. *Effort:* S. *File:* `CLAUDE.md`.
+- ~~**E38. `CLAUDE.md` should call out `pnpm build` ≠ `pnpm typecheck`**~~ _(shipped v0.4.1, merged into E37)_ — MEMORY notes `tsc -b` (via `pnpm build`) is stricter than `tsc --noEmit` (via `pnpm typecheck`) — discriminated-union narrowing bugs slip past typecheck. CLAUDE.md only lists typecheck. *Why:* recurring CI breakage source documented in memory. *Effort:* S. *File:* `CLAUDE.md`.
 
 - **E39. Stamp `docs/DESIGN.md` and `docs/PLANNING-NOTES.md` with "last reviewed" dates** — Both still carry 2026-02-02 timestamps. Substantial evolution since (state_transition IPC, corruption recovery, canonical transitions). Readers can't tell which sections are current. *Why:* expectations for new contributors and external adopters. *Effort:* S. *Files:* `docs/DESIGN.md`, `docs/PLANNING-NOTES.md`.
 
-- **E40. Add `CHANGELOG.md` at repo root** — Only changelog source today is GitHub Releases (whose body is boilerplate, see E41) plus the gitignored `.tiki/releases/*.json` archive. No linear, contributor-readable history. *Why:* standard hygiene; also enriches `/tiki:version` output. *Effort:* S. *Surface:* repo root.
+- ~~**E40. Add `CHANGELOG.md` at repo root**~~ _(shipped v0.4.1)_ — Only changelog source today is GitHub Releases (whose body is boilerplate, see E41) plus the gitignored `.tiki/releases/*.json` archive. No linear, contributor-readable history. *Why:* standard hygiene; also enriches `/tiki:version` output. *Effort:* S. *Surface:* repo root.
 
 ### CI & releases
 
-- **E41. `release.yml` should generate a per-tag release body from the changelog file** — `release.yml:77` ships a hardcoded `releaseBody` ("See the assets below…") for every tag. Read `.tiki/releases/vX.Y.Z-changelog.md` or `.tiki/releases/archive/vX.Y.Z.json` and call `gh release edit --notes-file ...` after the binary build. *Why:* GitHub Releases page is currently uninformative. *Effort:* S. *File:* `.github/workflows/release.yml:77`.
+- ~~**E41. `release.yml` should generate a per-tag release body from the changelog file**~~ _(shipped v0.4.1)_ — `release.yml:77` ships a hardcoded `releaseBody` ("See the assets below…") for every tag. Read `.tiki/releases/vX.Y.Z-changelog.md` or `.tiki/releases/archive/vX.Y.Z.json` and call `gh release edit --notes-file ...` after the binary build. *Why:* GitHub Releases page is currently uninformative. *Effort:* S. *File:* `.github/workflows/release.yml:77`.
 
 - **E42. `release.yml` should run `pnpm test && pnpm typecheck` before tauri-action** — Workflow goes `pnpm install → pnpm version-bump → tauri-action`. A tagged release can ship test regressions if the tag was pushed without a PR. One 3-minute gate eliminates the risk. *Why:* prevents shipping broken binaries direct-to-tag. *Effort:* S. *File:* `.github/workflows/release.yml`.
 
