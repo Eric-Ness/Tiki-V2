@@ -32,6 +32,18 @@
   --warning-border: #856404;
   --warning-text: #f0ad4e;
 
+  /* WorkStatus semantic tokens (canonical: packages/shared/src/types/state.ts).
+     Component CSS references these via var(--status-X) instead of hex literals
+     so palette changes propagate from one place. */
+  --status-pending: #facc15;
+  --status-reviewing: #fb923c;
+  --status-planning: #c084fc;
+  --status-executing: #4ade80;
+  --status-paused: #60a5fa;
+  --status-shipping: #2dd4bf;
+  --status-completed: #818cf8;
+  --status-failed: #f87171;
+
   /* Scrollbar */
   --scrollbar-thumb: #3a3a3a;
   --scrollbar-track: #1e1e1e;
@@ -85,6 +97,30 @@
   /* Links */
   --link-color: #0066b8;
   --link-hover: #005ba4;
+
+  /* WorkStatus tokens — darker, less-saturated variants for light theme so
+     text remains legible against the bright background. */
+  --status-pending: #ca8a04;
+  --status-reviewing: #c2410c;
+  --status-planning: #9333ea;
+  --status-executing: #16a34a;
+  --status-paused: #2563eb;
+  --status-shipping: #0d9488;
+  --status-completed: #4f46e5;
+  --status-failed: #dc2626;
+}
+
+/* E52 — respect prefers-reduced-motion at the CSS layer. framer-motion
+   consumers are gated separately via <MotionConfig reducedMotion="user">. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {

@@ -73,6 +73,26 @@
   flex-shrink: 0;
 }
 
+/* E56 — pulse the dot while the terminal is busy. Scale + opacity so the
+   eye is drawn at peripheral vision; the background color is set inline
+   from the StatusDot colorMap so the hue here doesn't matter. The dot
+   uses `transform-origin: center` implicitly because it's a round span. */
+.terminal-tab-status--busy {
+  animation: terminal-tab-status-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 4px currentColor;
+}
+
+@keyframes terminal-tab-status-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.65;
+  }
+}
+
 .terminal-tab-title {
   max-width: 120px;
   overflow: hidden;

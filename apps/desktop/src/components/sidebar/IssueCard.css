@@ -5,7 +5,7 @@
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   border: 1px solid transparent;
   background-color: var(--bg-secondary, #1e1e1e);
   border-left: 3px solid var(--accent-color, #007acc);
@@ -15,8 +15,11 @@
   border-left-color: var(--text-tertiary, #6b6b6b);
 }
 
+/* E54 — accent ring on hover. Uses box-shadow rather than border-color so
+   the status-meaningful border-left isn't overwritten by the hover state. */
 .issue-card:hover {
   background-color: var(--bg-hover, #2a2a2a);
+  box-shadow: 0 0 0 1px rgba(0, 122, 204, 0.4);
 }
 
 .issue-card:focus {
@@ -24,9 +27,21 @@
   border-color: var(--accent-color, #007acc);
 }
 
+/* E53 — selected cards lift via shadow + brighter ring. Gives a clear
+   z-axis cue beyond the existing background+border-color shift, and
+   adds a soft drop-shadow that "elevates" the card off the list. */
 .issue-card.selected {
   background-color: rgba(14, 165, 233, 0.15);
   border-color: rgba(14, 165, 233, 0.3);
+  box-shadow: 0 0 0 2px var(--accent-color, #007acc), 0 4px 12px rgba(0, 0, 0, 0.28);
+  position: relative;
+  z-index: 1;
+}
+
+/* E53 — when a selected card is also hovered, preserve the lift but
+   strengthen the ring so the dual signal doesn't visually compete. */
+.issue-card.selected:hover {
+  box-shadow: 0 0 0 2px var(--accent-hover, #1a8ad4), 0 6px 16px rgba(0, 0, 0, 0.32);
 }
 
 .issue-card-header {

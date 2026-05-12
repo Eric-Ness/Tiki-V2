@@ -15,9 +15,16 @@ function StatusDot({ status }: StatusDotProps) {
     exited: '#ef4444',
   };
 
+  // E56 — pulse when busy. Modifier class gates the animation so we don't
+  // pulse on idle/ready/exited dots (which would just be noise).
+  const className =
+    status === 'busy'
+      ? 'terminal-tab-status terminal-tab-status--busy'
+      : 'terminal-tab-status';
+
   return (
     <span
-      className="terminal-tab-status"
+      className={className}
       style={{ backgroundColor: colorMap[status] }}
       title={status}
     />

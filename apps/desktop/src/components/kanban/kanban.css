@@ -198,9 +198,15 @@
   transform: translateY(-1px);
 }
 
+/* E53 — selected card lifts off the column via a stronger ring + shadow.
+   Keeps the existing amber accent (matches the kanban-execute column color)
+   but adds a soft drop-shadow that gives a clearer z-axis cue alongside
+   the color shift. */
 .kanban-card--selected {
   border-color: #f59e0b;
-  box-shadow: 0 0 0 1px #f59e0b;
+  box-shadow: 0 0 0 2px #f59e0b, 0 4px 12px rgba(0, 0, 0, 0.28);
+  position: relative;
+  z-index: 1;
 }
 
 .kanban-card--paused {

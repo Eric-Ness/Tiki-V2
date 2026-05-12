@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { Panel, Separator, Group } from "react-resizable-panels";
+import { MotionConfig } from "framer-motion";
 import { checkForAppUpdates } from "./utils/updater";
 import { ProjectsSection } from "./components/sidebar/ProjectsSection";
 import { IssuesSection } from "./components/sidebar/IssuesSection";
@@ -356,6 +357,10 @@ function App() {
   }, []);
 
   return (
+    // E52 — framer-motion respects the user's OS prefers-reduced-motion
+    // setting for every motion.X / AnimatePresence under this provider.
+    // Pairs with the CSS-layer override in index.css for non-framer animations.
+    <MotionConfig reducedMotion="user">
     <div className="app">
       <header className="header">
         <div className="header-left">
@@ -546,6 +551,7 @@ function App() {
         />
       )}
     </div>
+    </MotionConfig>
   );
 }
 

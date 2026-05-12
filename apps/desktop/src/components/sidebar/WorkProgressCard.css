@@ -3,7 +3,7 @@
   background: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   border-left: 3px solid var(--border-color, #3c3c3c);
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .work-progress-card:hover {
@@ -14,34 +14,55 @@
   cursor: pointer;
 }
 
+/* E54 — accent ring on hover for clickable cards. Uses box-shadow so the
+   status-color border-left is preserved (a true `border-color` shorthand
+   would overwrite it). The shadow draws a soft 1px ring in the accent
+   color, signaling "this is interactive" more clearly than the existing
+   sub-threshold background shift. */
+.work-progress-card.clickable:hover {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px rgba(0, 122, 204, 0.45), 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
 .work-progress-card.clickable:focus-visible {
   outline: 2px solid var(--text-secondary, #888);
   outline-offset: 2px;
 }
 
-/* Status colors */
-.work-progress-card.status-executing {
-  border-left-color: #4ade80;
-}
-
+/* Status colors — driven by tokens in index.css so palette changes
+   propagate from one place. Status names match the @tiki/shared
+   WorkStatus union. Hex fallbacks match the dark-theme values for
+   environments that don't load the variables. */
 .work-progress-card.status-pending {
-  border-left-color: #facc15;
+  border-left-color: var(--status-pending, #facc15);
 }
 
-.work-progress-card.status-paused {
-  border-left-color: #60a5fa;
-}
-
-.work-progress-card.status-completed {
-  border-left-color: #818cf8;
-}
-
-.work-progress-card.status-failed {
-  border-left-color: #f87171;
+.work-progress-card.status-reviewing {
+  border-left-color: var(--status-reviewing, #fb923c);
 }
 
 .work-progress-card.status-planning {
-  border-left-color: #c084fc;
+  border-left-color: var(--status-planning, #c084fc);
+}
+
+.work-progress-card.status-executing {
+  border-left-color: var(--status-executing, #4ade80);
+}
+
+.work-progress-card.status-paused {
+  border-left-color: var(--status-paused, #60a5fa);
+}
+
+.work-progress-card.status-shipping {
+  border-left-color: var(--status-shipping, #2dd4bf);
+}
+
+.work-progress-card.status-completed {
+  border-left-color: var(--status-completed, #818cf8);
+}
+
+.work-progress-card.status-failed {
+  border-left-color: var(--status-failed, #f87171);
 }
 
 /* Header */
@@ -67,34 +88,48 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Status badges (header pill). Color drives both text and a low-opacity
+   background. The `color-mix` fallback approach (rgba on hex) is kept as
+   a hex literal for browsers without color-mix support — modern Tauri
+   webviews all support it, but the fallback chain is cheap insurance. */
 .work-progress-status.executing {
   background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
+  color: var(--status-executing, #4ade80);
 }
 
 .work-progress-status.pending {
   background: rgba(250, 204, 21, 0.2);
-  color: #facc15;
+  color: var(--status-pending, #facc15);
+}
+
+.work-progress-status.reviewing {
+  background: rgba(251, 146, 60, 0.2);
+  color: var(--status-reviewing, #fb923c);
 }
 
 .work-progress-status.paused {
   background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
+  color: var(--status-paused, #60a5fa);
+}
+
+.work-progress-status.shipping {
+  background: rgba(45, 212, 191, 0.2);
+  color: var(--status-shipping, #2dd4bf);
 }
 
 .work-progress-status.completed {
   background: rgba(129, 140, 248, 0.2);
-  color: #818cf8;
+  color: var(--status-completed, #818cf8);
 }
 
 .work-progress-status.failed {
   background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  color: var(--status-failed, #f87171);
 }
 
 .work-progress-status.planning {
   background: rgba(192, 132, 252, 0.2);
-  color: #c084fc;
+  color: var(--status-planning, #c084fc);
 }
 
 /* Title */
@@ -146,14 +181,19 @@
   transition: background-color 0.3s ease;
 }
 
-/* Segment status colors */
+/* Segment status colors — phase progress reads like a small status track.
+   Tokens come from index.css; falls back to dark-theme hex if absent. */
 .phase-segment.segment-completed {
-  background: #4ade80;
+  background: var(--status-completed, #818cf8);
 }
 
+/* E50 — running phase uses the executing token (was paused-blue before)
+   and pulses opacity only. Keeps a stable hue so the eye reads "active
+   work" rather than "color-shifting status." */
 .phase-segment.segment-running {
-  background: #60a5fa;
+  background: var(--status-executing, #4ade80);
   animation: pulse-segment 1.5s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
 }
 
 .phase-segment.segment-pending {
@@ -161,18 +201,18 @@
 }
 
 .phase-segment.segment-failed {
-  background: #f87171;
+  background: var(--status-failed, #f87171);
 }
 
-/* Pulse animation for running phase */
+/* Pulse animation for running phase. Modulates opacity only — the hue
+   stays anchored to --status-executing so the segment doesn't appear to
+   "cycle through statuses." */
 @keyframes pulse-segment {
   0%, 100% {
     opacity: 1;
-    background: #60a5fa;
   }
   50% {
-    opacity: 0.5;
-    background: #3b82f6;
+    opacity: 0.55;
   }
 }
 
@@ -184,9 +224,10 @@
   text-align: right;
 }
 
-/* Duration display in progress text */
+/* Duration display in progress text — colored with the executing token
+   so it visually associates with the running segment above. */
 .work-progress-timer {
-  color: #60a5fa;
+  color: var(--status-executing, #4ade80);
   font-family: monospace;
   font-variant-numeric: tabular-nums;
   animation: pulse-segment 1.5s ease-in-out infinite;
