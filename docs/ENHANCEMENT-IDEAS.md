@@ -175,21 +175,21 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 
 ### Tokens & semantic color
 
-- **E49. Semantic status color tokens in `index.css`** — Status colors (executing `#4ade80`, pending `#facc15`, paused `#60a5fa`, completed `#818cf8`, failed `#f87171`, planning `#c084fc`) are hardcoded in `WorkProgressCard.css:14–36` and re-defined ad-hoc in kanban.css, terminal.css, etc. Lift to `--status-executing`, `--status-pending`, `--status-paused`, `--status-completed`, `--status-failed`, `--status-planning`, `--status-shipping` (and `--status-reviewing`) in `:root` and `[data-theme='light']`. Components reference variables; one palette change propagates. *Why:* same colors duplicated 5+ times; light-theme variants currently missing; future palette refinement is a one-liner. *Effort:* S. *Files:* `apps/desktop/src/index.css`, `WorkProgressCard.css`, `kanban.css`, others using inline status colors.
+- ~~**E49. Semantic status color tokens in `index.css`**~~ _(shipped v0.4.2)_ — Status colors (executing `#4ade80`, pending `#facc15`, paused `#60a5fa`, completed `#818cf8`, failed `#f87171`, planning `#c084fc`) are hardcoded in `WorkProgressCard.css:14–36` and re-defined ad-hoc in kanban.css, terminal.css, etc. Lift to `--status-executing`, `--status-pending`, `--status-paused`, `--status-completed`, `--status-failed`, `--status-planning`, `--status-shipping` (and `--status-reviewing`) in `:root` and `[data-theme='light']`. Components reference variables; one palette change propagates. *Why:* same colors duplicated 5+ times; light-theme variants currently missing; future palette refinement is a one-liner. *Effort:* S. *Files:* `apps/desktop/src/index.css`, `WorkProgressCard.css`, `kanban.css`, others using inline status colors.
 
-- **E50. Animated pulse on the currently-executing phase segment** — `WorkProgressCard.tsx` renders phase-segments as flat divs; the running segment has the same visual weight as completed or pending. A subtle CSS `@keyframes` pulse (opacity 0.7 ↔ 1.0, 1.5s loop) on `.segment-running` draws the eye to active work without being noisy. *Why:* at-a-glance scanning of the sidebar should immediately surface where Tiki is doing work. *Effort:* S. *Surface:* `WorkProgressCard.css`.
+- ~~**E50. Animated pulse on the currently-executing phase segment**~~ _(shipped v0.4.2 — refined existing animation to use --status-executing token)_ — `WorkProgressCard.tsx` renders phase-segments as flat divs; the running segment has the same visual weight as completed or pending. A subtle CSS `@keyframes` pulse (opacity 0.7 ↔ 1.0, 1.5s loop) on `.segment-running` draws the eye to active work without being noisy. *Why:* at-a-glance scanning of the sidebar should immediately surface where Tiki is doing work. *Effort:* S. *Surface:* `WorkProgressCard.css`.
 
 ### Affordance & interaction polish
 
 - **E11 (already listed above) — Illustrated empty state for the detail panel.** Still open; promote to v0.4.2.
 
-- **E53. Selected-card elevation via subtle shadow** — Selected items today (`.issue-card.selected`, `.kanban-card.selected`, soon `.work-progress-card.clickable:focus`) rely only on a subtle background shift. Add a `box-shadow: 0 0 0 2px var(--accent-color), 0 2px 6px rgba(0,0,0,0.25)` on `.selected` for clearer hierarchy. *Why:* hierarchy is hard to read in dense lists when only color shift indicates selection. *Effort:* S. *Surfaces:* `IssueCard.css`, `kanban.css`, `WorkProgressCard.css`.
+- ~~**E53. Selected-card elevation via subtle shadow**~~ _(shipped v0.4.2)_ — Selected items today (`.issue-card.selected`, `.kanban-card.selected`, soon `.work-progress-card.clickable:focus`) rely only on a subtle background shift. Add a `box-shadow: 0 0 0 2px var(--accent-color), 0 2px 6px rgba(0,0,0,0.25)` on `.selected` for clearer hierarchy. *Why:* hierarchy is hard to read in dense lists when only color shift indicates selection. *Effort:* S. *Surfaces:* `IssueCard.css`, `kanban.css`, `WorkProgressCard.css`.
 
-- **E54. Card hover state — accent-aware border shift** — `.work-progress-card:hover` is currently `background: rgba(255, 255, 255, 0.05)` — barely perceptible in dark theme, invisible in light. Add a `border-left-color: var(--accent-color)` shift on hover (preserving status-color when present, just brightening). *Why:* hover is sub-threshold; users don't realize cards are interactive until they click. *Effort:* S. *Surfaces:* `WorkProgressCard.css`, `IssueCard.css`.
+- ~~**E54. Card hover state — accent-aware border shift**~~ _(shipped v0.4.2)_ — `.work-progress-card:hover` is currently `background: rgba(255, 255, 255, 0.05)` — barely perceptible in dark theme, invisible in light. Add a `border-left-color: var(--accent-color)` shift on hover (preserving status-color when present, just brightening). *Why:* hover is sub-threshold; users don't realize cards are interactive until they click. *Effort:* S. *Surfaces:* `WorkProgressCard.css`, `IssueCard.css`.
 
 ### Status visibility
 
-- **E56. Pulsing dot for "busy" terminal tabs** — `TerminalTabs.tsx:9–25` already has a `StatusDot` with a `busy` state colored `#3b82f6`. Add a CSS `@keyframes` pulse (scale 1 ↔ 1.15, 1.5s loop) on the dot when `status === 'busy'`. *Why:* the current static dot conveys color but not motion; a pulse signals "actively running" at peripheral-vision level. *Effort:* S. *Surfaces:* `TerminalTabs.tsx`, terminal CSS.
+- ~~**E56. Pulsing dot for "busy" terminal tabs**~~ _(shipped v0.4.2)_ — `TerminalTabs.tsx:9–25` already has a `StatusDot` with a `busy` state colored `#3b82f6`. Add a CSS `@keyframes` pulse (scale 1 ↔ 1.15, 1.5s loop) on the dot when `status === 'busy'`. *Why:* the current static dot conveys color but not motion; a pulse signals "actively running" at peripheral-vision level. *Effort:* S. *Surfaces:* `TerminalTabs.tsx`, terminal CSS.
 
 - **E62. Shared `<StatusDot>` component used across all surfaces** — Today, only `TerminalTabs.tsx` has a `StatusDot`. `WorkProgressCard`, `IssueCard`, kanban headers, and the recovery dialog all describe status with text only. Extract `<StatusDot status="executing|pending|failed|..."/>` to `components/ui/StatusDot.tsx`, drive its color from the new E49 status tokens, and adopt it in 3–4 sites for visual consistency. *Why:* text + colored dot reads faster than text alone; reuses the E49 tokens; cohesion across the app. *Effort:* S–M. *Surfaces:* new `components/ui/StatusDot.tsx` + several consumers.
 
@@ -199,7 +199,7 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 
 ### Motion & accessibility
 
-- **E52. Respect `prefers-reduced-motion`** — `framer-motion` animates `AnimatePresence` on Kanban cards (`KanbanColumn.tsx:56–83`), the column-count badge (`KanbanColumn.tsx:42–50`), and the Pipeline Timeline transitions. Add a top-level `useReducedMotion()` check (framer-motion exports this hook) and gate animations off when the OS preference is set. *Why:* accessibility for vestibular sensitivity; also helps low-end hardware feel snappier. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `PipelineTimeline.tsx`, any other `motion.div` consumer.
+- ~~**E52. Respect `prefers-reduced-motion`**~~ _(shipped v0.4.2 — both CSS @media rule and framer-motion MotionConfig)_ — `framer-motion` animates `AnimatePresence` on Kanban cards (`KanbanColumn.tsx:56–83`), the column-count badge (`KanbanColumn.tsx:42–50`), and the Pipeline Timeline transitions. Add a top-level `useReducedMotion()` check (framer-motion exports this hook) and gate animations off when the OS preference is set. *Why:* accessibility for vestibular sensitivity; also helps low-end hardware feel snappier. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `PipelineTimeline.tsx`, any other `motion.div` consumer.
 
 - **E60. Smooth theme switch animation** — Toggling between dark and light theme today is instant (variables flip). Add `transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease` to `body`, `#root`, and a handful of containers in `index.css` so the change crossfades. *Why:* abrupt theme flip is jarring at high brightness; smooth transition feels more polished. *Effort:* S. *Surface:* `index.css`.
 
@@ -230,7 +230,7 @@ A small follow-up release packaging the highest-impact / lowest-effort items. Al
 - **E40** CHANGELOG.md
 - **E41** release.yml generates real release body from changelog
 
-### v0.4.2 — "Visual polish" (proposed; mostly S items, themed)
+### v0.4.2 — "Visual polish" _(shipped 2026-05-12)_
 
 A coherent visual-design pass. Each item is small but they compound — semantic tokens + animation + affordances + empty states together make the app feel meaningfully more polished. All S/S-M effort, no architecture risk.
 

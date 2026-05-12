@@ -8,8 +8,8 @@
       "completedAt": "2026-05-11T20:49:52.005Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.4.1",
-      "completedAt": "2026-05-12T15:20:00.000Z"
+      "version": "v0.4.2",
+      "completedAt": "2026-05-12T16:41:00.000Z"
     },
     "recentIssues": [
       {
@@ -264,6 +264,13 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.4.2",
+        "issues": [],
+        "completedAt": "2026-05-12T16:41:00.000Z",
+        "tag": "v0.4.2",
+        "note": "Visual polish bundle from ENHANCEMENT-IDEAS.md: E49, E50, E52, E53, E54, E56"
+      },
       {
         "version": "v0.4.1",
         "issues": [],
