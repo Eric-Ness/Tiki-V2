@@ -169,6 +169,52 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ---
 
+## 5. Desktop visual polish (added 2026-05-12)
+
+A coherent visual-design pass on the desktop app. Each item targets a specific visual gap — color tokens that don't exist yet, missing animations on state changes, weak affordances, abrupt transitions. Most are pure CSS or single-component edits.
+
+### Tokens & semantic color
+
+- **E49. Semantic status color tokens in `index.css`** — Status colors (executing `#4ade80`, pending `#facc15`, paused `#60a5fa`, completed `#818cf8`, failed `#f87171`, planning `#c084fc`) are hardcoded in `WorkProgressCard.css:14–36` and re-defined ad-hoc in kanban.css, terminal.css, etc. Lift to `--status-executing`, `--status-pending`, `--status-paused`, `--status-completed`, `--status-failed`, `--status-planning`, `--status-shipping` (and `--status-reviewing`) in `:root` and `[data-theme='light']`. Components reference variables; one palette change propagates. *Why:* same colors duplicated 5+ times; light-theme variants currently missing; future palette refinement is a one-liner. *Effort:* S. *Files:* `apps/desktop/src/index.css`, `WorkProgressCard.css`, `kanban.css`, others using inline status colors.
+
+- **E50. Animated pulse on the currently-executing phase segment** — `WorkProgressCard.tsx` renders phase-segments as flat divs; the running segment has the same visual weight as completed or pending. A subtle CSS `@keyframes` pulse (opacity 0.7 ↔ 1.0, 1.5s loop) on `.segment-running` draws the eye to active work without being noisy. *Why:* at-a-glance scanning of the sidebar should immediately surface where Tiki is doing work. *Effort:* S. *Surface:* `WorkProgressCard.css`.
+
+### Affordance & interaction polish
+
+- **E11 (already listed above) — Illustrated empty state for the detail panel.** Still open; promote to v0.4.2.
+
+- **E53. Selected-card elevation via subtle shadow** — Selected items today (`.issue-card.selected`, `.kanban-card.selected`, soon `.work-progress-card.clickable:focus`) rely only on a subtle background shift. Add a `box-shadow: 0 0 0 2px var(--accent-color), 0 2px 6px rgba(0,0,0,0.25)` on `.selected` for clearer hierarchy. *Why:* hierarchy is hard to read in dense lists when only color shift indicates selection. *Effort:* S. *Surfaces:* `IssueCard.css`, `kanban.css`, `WorkProgressCard.css`.
+
+- **E54. Card hover state — accent-aware border shift** — `.work-progress-card:hover` is currently `background: rgba(255, 255, 255, 0.05)` — barely perceptible in dark theme, invisible in light. Add a `border-left-color: var(--accent-color)` shift on hover (preserving status-color when present, just brightening). *Why:* hover is sub-threshold; users don't realize cards are interactive until they click. *Effort:* S. *Surfaces:* `WorkProgressCard.css`, `IssueCard.css`.
+
+### Status visibility
+
+- **E56. Pulsing dot for "busy" terminal tabs** — `TerminalTabs.tsx:9–25` already has a `StatusDot` with a `busy` state colored `#3b82f6`. Add a CSS `@keyframes` pulse (scale 1 ↔ 1.15, 1.5s loop) on the dot when `status === 'busy'`. *Why:* the current static dot conveys color but not motion; a pulse signals "actively running" at peripheral-vision level. *Effort:* S. *Surfaces:* `TerminalTabs.tsx`, terminal CSS.
+
+- **E62. Shared `<StatusDot>` component used across all surfaces** — Today, only `TerminalTabs.tsx` has a `StatusDot`. `WorkProgressCard`, `IssueCard`, kanban headers, and the recovery dialog all describe status with text only. Extract `<StatusDot status="executing|pending|failed|..."/>` to `components/ui/StatusDot.tsx`, drive its color from the new E49 status tokens, and adopt it in 3–4 sites for visual consistency. *Why:* text + colored dot reads faster than text alone; reuses the E49 tokens; cohesion across the app. *Effort:* S–M. *Surfaces:* new `components/ui/StatusDot.tsx` + several consumers.
+
+### Empty states
+
+- **E57. Illustrated empty state for kanban "No issues" columns** — `KanbanColumn.tsx:54` renders `<div className="kanban-column-empty">No issues</div>`. Replace with a tiny inline SVG (empty-tray glyph) plus the text, styled at low opacity. *Why:* current empty state feels harsh; subtle illustration warms an otherwise-blank column without consuming significant space. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `kanban.css`.
+
+### Motion & accessibility
+
+- **E52. Respect `prefers-reduced-motion`** — `framer-motion` animates `AnimatePresence` on Kanban cards (`KanbanColumn.tsx:56–83`), the column-count badge (`KanbanColumn.tsx:42–50`), and the Pipeline Timeline transitions. Add a top-level `useReducedMotion()` check (framer-motion exports this hook) and gate animations off when the OS preference is set. *Why:* accessibility for vestibular sensitivity; also helps low-end hardware feel snappier. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `PipelineTimeline.tsx`, any other `motion.div` consumer.
+
+- **E60. Smooth theme switch animation** — Toggling between dark and light theme today is instant (variables flip). Add `transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease` to `body`, `#root`, and a handful of containers in `index.css` so the change crossfades. *Why:* abrupt theme flip is jarring at high brightness; smooth transition feels more polished. *Effort:* S. *Surface:* `index.css`.
+
+### Iconography (defer to v0.4.3+)
+
+- **E55. Pipeline Timeline step icons replacing numbers** — `PipelineTimeline.tsx:159` shows `"1"…"6"` or `"✓"` inside step circles. Replace with step-specific SVGs (download for GET, magnifier for REVIEW, list for PLAN, clipboard for AUDIT, play for EXECUTE, paper-plane for SHIP). *Why:* immediate visual recognition; numbers are forgettable; matches modern timeline patterns in Linear/Jira. *Effort:* M. *Surface:* `PipelineTimeline.tsx`.
+
+- **E58. Custom titlebar showing active context** — Tauri window title is static "Tiki". Use `app.set_title` from Rust (or `getCurrent().setTitle` from frontend) to dynamically show "Tiki — issue #42 executing" or "Tiki — release v0.4.2 shipping" when `activeWork` has an entry. *Why:* at-a-glance taskbar/dock signal of what Tiki is doing. *Effort:* M. *Surfaces:* `App.tsx`, Rust side via Tauri command.
+
+- **E59. Sidebar "rail" mode — icon-only collapsed state** — Sidebar collapses fully today; an intermediate "icon rail" mode (VS Code style) would let users monitor active work via icons without sacrificing main-view space. *Why:* current options are all-or-nothing; users who want passive monitoring need an in-between. *Effort:* L. *Surface:* `App.tsx`, sidebar layout.
+
+- **E61. Issue label color contrast — overlay fallback for mid-luminance labels** — `IssueCard.tsx:42–48` computes contrast via luminance threshold of 0.5. Mid-luminance labels (e.g., GitHub's `#fbca04`) end up unreadable either way. Add a `text-shadow: 0 0 2px rgba(0,0,0,0.5)` or a semi-transparent dark overlay when luminance is in the 0.4–0.6 ambiguous range. *Why:* certain label colors are genuinely hard to read currently. *Effort:* S. *Surface:* `IssueCard.tsx`.
+
+---
+
 ## Suggested implementation bundles
 
 ### v0.4.1 — "Quick wins" (4–6 hours of work, mostly S items)
@@ -183,6 +229,22 @@ A small follow-up release packaging the highest-impact / lowest-effort items. Al
 - **E37** CLAUDE.md mentions state.mjs + Windows env note
 - **E40** CHANGELOG.md
 - **E41** release.yml generates real release body from changelog
+
+### v0.4.2 — "Visual polish" (proposed; mostly S items, themed)
+
+A coherent visual-design pass. Each item is small but they compound — semantic tokens + animation + affordances + empty states together make the app feel meaningfully more polished. All S/S-M effort, no architecture risk.
+
+- **E49** Semantic status color tokens in `index.css` (foundational — adopted by E50, E54, E62 below)
+- **E50** Pulse animation on currently-executing phase segment
+- **E11** Illustrated empty state for the detail panel (carries over from earlier brainstorm)
+- **E53** Selected-card elevation via subtle shadow
+- **E54** Card hover state — accent-aware border shift
+- **E56** Pulsing dot for "busy" terminal tabs
+- **E57** Illustrated empty state for kanban "No issues" columns
+- **E52** Respect `prefers-reduced-motion`
+- **E62** Shared `<StatusDot>` component across surfaces (depends on E49)
+
+That's 9 items, sequenced so foundational tokens (E49) ship first and the rest layer on them. Roughly 6–8 hours of work given the env state.
 
 ### v0.5.0 — "Framework polish" (medium-sized release)
 
