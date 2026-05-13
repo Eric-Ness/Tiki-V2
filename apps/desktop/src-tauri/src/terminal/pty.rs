@@ -237,7 +237,17 @@ pub fn start_output_reader(
     std::thread::spawn(move || {
         log::info!("Reader thread started for terminal '{}'", thread_id);
         let mut buffer = [0u8; 4096];
+        // Trailing bytes from a multi-byte UTF-8 sequence that landed across a
+        // read boundary. Prepended to the next read so split codepoints don't
+        // get mojibake'd into U+FFFD.
+        let mut leftover: Vec<u8> = Vec::with_capacity(8);
+        // Coalesce buffer — flushed every FLUSH_INTERVAL or at FLUSH_SIZE_BYTES.
+        // Stops PowerShell tab-completion from firing hundreds of IPC events.
+        let mut pending = String::new();
+        let mut last_flush = std::time::Instant::now();
         let mut was_stopped = false;
+        const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10);
+        const FLUSH_SIZE_BYTES: usize = 64 * 1024;
 
         loop {
             // Check for stop signal (non-blocking)
@@ -247,36 +257,98 @@ pub fn start_output_reader(
                 break;
             }
 
-            // Read from PTY with a small buffer
+            let mut is_would_block = false;
+            let mut should_break = false;
+
             match reader.read(&mut buffer) {
                 Ok(0) => {
-                    // EOF - terminal closed
                     log::info!("Terminal '{}' EOF reached", thread_id);
-                    break;
+                    // Flush any incomplete UTF-8 leftover lossily — residual partial
+                    // bytes at EOF are genuine garbage and U+FFFD is the correct rendering.
+                    if !leftover.is_empty() {
+                        pending.push_str(&String::from_utf8_lossy(&leftover));
+                        leftover.clear();
+                    }
+                    // Final emit of any pending bytes BEFORE the exit-event logic below.
+                    if !pending.is_empty() {
+                        let event = TerminalOutputEvent {
+                            id: thread_id.clone(),
+                            data: std::mem::take(&mut pending),
+                        };
+                        if let Err(e) = app_handle.emit("terminal-output", event) {
+                            log::error!("Failed to emit terminal-output event: {}", e);
+                        }
+                    }
+                    should_break = true;
                 }
                 Ok(n) => {
-                    // Convert to string (lossy for invalid UTF-8)
-                    let data = String::from_utf8_lossy(&buffer[..n]).to_string();
-
-                    // Emit event to frontend
-                    let event = TerminalOutputEvent {
-                        id: thread_id.clone(),
-                        data,
+                    // Combine any leftover from the previous read with the freshly read
+                    // bytes, then peel off the longest valid-UTF-8 prefix.
+                    let combined: Vec<u8> = if leftover.is_empty() {
+                        buffer[..n].to_vec()
+                    } else {
+                        let mut c = std::mem::take(&mut leftover);
+                        c.extend_from_slice(&buffer[..n]);
+                        c
                     };
 
-                    if let Err(e) = app_handle.emit("terminal-output", event) {
-                        log::error!("Failed to emit terminal-output event: {}", e);
+                    match std::str::from_utf8(&combined) {
+                        Ok(s) => pending.push_str(s),
+                        Err(e) => {
+                            let valid_up_to = e.valid_up_to();
+                            // SAFETY: bytes[..valid_up_to] is guaranteed valid UTF-8
+                            // by the Utf8Error contract.
+                            let valid = unsafe {
+                                std::str::from_utf8_unchecked(&combined[..valid_up_to])
+                            };
+                            pending.push_str(valid);
+                            match e.error_len() {
+                                None => {
+                                    // Incomplete multi-byte sequence at end — carry over.
+                                    leftover.extend_from_slice(&combined[valid_up_to..]);
+                                }
+                                Some(_) => {
+                                    // Genuine mid-stream garbage — lossy-replace this chunk's remainder.
+                                    // Don't try to carry over after mid-stream garbage; recovery is best-effort.
+                                    pending.push_str(&String::from_utf8_lossy(&combined[valid_up_to..]));
+                                }
+                            }
+                        }
                     }
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    is_would_block = true;
                 }
                 Err(e) => {
-                    // Check if it's a would-block error (non-blocking read)
-                    if e.kind() != std::io::ErrorKind::WouldBlock {
-                        log::error!("Error reading from PTY '{}': {}", thread_id, e);
-                        break;
-                    }
-                    // Small sleep to prevent busy-waiting
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    log::error!("Error reading from PTY '{}': {}", thread_id, e);
+                    should_break = true;
                 }
+            }
+
+            if should_break {
+                break;
+            }
+
+            // Flush coalesce buffer if interval elapsed or size threshold met.
+            // MUST run before the WouldBlock sleep — otherwise idle periods after
+            // a burst would leave the final chunk stuck waiting for more output.
+            if !pending.is_empty()
+                && (last_flush.elapsed() >= FLUSH_INTERVAL || pending.len() >= FLUSH_SIZE_BYTES)
+            {
+                let event = TerminalOutputEvent {
+                    id: thread_id.clone(),
+                    data: std::mem::take(&mut pending),
+                };
+                if let Err(e) = app_handle.emit("terminal-output", event) {
+                    log::error!("Failed to emit terminal-output event: {}", e);
+                }
+                last_flush = std::time::Instant::now();
+            }
+
+            // Only sleep on WouldBlock — non-WouldBlock iterations loop immediately
+            // to drain large bursts (tab completion, file dumps) as fast as possible.
+            if is_would_block {
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
 
