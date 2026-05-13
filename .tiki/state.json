@@ -14,13 +14,16 @@
           160,
           161
         ],
-        "currentIssue": 155,
-        "completedIssues": []
+        "currentIssue": null,
+        "completedIssues": [
+          155
+        ]
       },
-      "status": "executing",
+      "status": "paused",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-13T17:32:20.603Z",
-      "lastActivity": "2026-05-13T17:32:20.603Z"
+      "lastActivity": "2026-05-13T17:48:30.000Z",
+      "pauseReason": "Local node_modules in Windows-Defender-broken state per MEMORY.md windows_pnpm_reparse_point — pnpm build cannot verify. Resume with /tiki:release v0.5.3 --continue after repairing Defender exclusions."
     },
     "issue:155": {
       "type": "issue",
@@ -28,11 +31,11 @@
         "number": 155,
         "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "parentRelease": "v0.5.3",
       "createdAt": "2026-05-13T17:33:18.557Z",
-      "lastActivity": "2026-05-13T17:45:59.071Z",
+      "lastActivity": "2026-05-13T17:48:18.433Z",
       "phase": {
         "current": 1,
         "total": 1,
@@ -42,9 +45,9 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 154,
-      "title": "Render 'Related:' soft references as dashed edges to distinguish from hard dependencies in the dep graph",
-      "completedAt": "2026-05-13T16:54:06.008Z"
+      "number": 155,
+      "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY",
+      "completedAt": "2026-05-13T17:46:51.000Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.2",
@@ -58,6 +61,11 @@
       "tag": "v0.5.2"
     },
     "recentIssues": [
+      {
+        "number": 155,
+        "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY",
+        "completedAt": "2026-05-13T17:46:51.000Z"
+      },
       {
         "number": 154,
         "title": "Render 'Related:' soft references as dashed edges to distinguish from hard dependencies in the dep graph",
