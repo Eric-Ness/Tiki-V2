@@ -1,11 +1,47 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.5.1": {
+      "type": "release",
+      "release": {
+        "version": "v0.5.1",
+        "issues": [
+          147,
+          148,
+          149
+        ],
+        "completedIssues": [
+          148
+        ]
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-13T15:06:20.356Z",
+      "lastActivity": "2026-05-13T15:06:20.356Z"
+    },
+    "issue:148": {
+      "type": "issue",
+      "issue": {
+        "number": 148,
+        "title": "Bug: Dependency graph version dropdown uses string sort instead of semver — v0.2.9 appears after v0.2.15"
+      },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T15:07:14.380Z",
+      "lastActivity": "2026-05-13T15:26:06.182Z",
+      "parentRelease": "v0.5.1",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 87,
-      "title": "Terminal search (find in buffer)",
-      "completedAt": "2026-05-11T20:49:52.005Z"
+      "number": 148,
+      "title": "Bug: Dependency graph version dropdown uses string sort instead of semver — v0.2.9 appears after v0.2.15",
+      "completedAt": "2026-05-13T15:26:07.000Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.0",
@@ -13,6 +49,11 @@
       "tag": "v0.5.0"
     },
     "recentIssues": [
+      {
+        "number": 148,
+        "title": "Bug: Dependency graph version dropdown uses string sort instead of semver — v0.2.9 appears after v0.2.15",
+        "completedAt": "2026-05-13T15:26:07.000Z"
+      },
       {
         "number": 87,
         "title": "Terminal search (find in buffer)",
