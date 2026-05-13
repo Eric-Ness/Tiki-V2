@@ -105,6 +105,14 @@ export function SettingsPage() {
             />
           </div>
           <p className="settings-hint">Terminal settings apply to new terminals only.</p>
+
+          <p className="settings-info">
+            <strong>Ctrl+Z in the terminal</strong> sends <code>SIGTSTP</code> to the running
+            program, suspending it (look for <code>[1]+&nbsp;Stopped</code> in the shell).
+            To resume a suspended job, type <code>fg</code>. This is universal terminal
+            behavior — not editor-style undo. Use the shell's readline editing instead
+            (<code>Ctrl+U</code> clears the line, <code>Ctrl+W</code> deletes a word).
+          </p>
         </div>
 
         {/* Appearance */}

@@ -1,0 +1,23 @@
+{
+  "issue": {
+    "number": 160,
+    "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add static Ctrl+Z SIGTSTP explainer to Settings → Terminal",
+      "content": "Add a static informational block in `apps/desktop/src/components/settings/SettingsPage.tsx` under the Terminal section, placed after the existing `.settings-hint` paragraph at line 107.\n\nPer the issue body's recommendation (Option B / minimum viable), this is *only* the static Settings copy. Do NOT implement the toast-on-first-press (Option A) — that's an explicit defer in the issue body to avoid pulling in toast infrastructure for a single feature.\n\n**Change to `SettingsPage.tsx`:** insert a new informational block immediately after the existing line `<p className=\"settings-hint\">Terminal settings apply to new terminals only.</p>` (line 107). The new block should be a distinct paragraph styled with a new `.settings-info` class.\n\n```tsx\n          <p className=\"settings-info\">\n            <strong>Ctrl+Z in the terminal</strong> sends <code>SIGTSTP</code> to the running\n            program, suspending it (look for <code>[1]+&nbsp;Stopped</code> in the shell).\n            To resume a suspended job, type <code>fg</code>. This is universal terminal\n            behavior — not editor-style undo. Use the shell's readline editing instead\n            (<code>Ctrl+U</code> clears the line, <code>Ctrl+W</code> deletes a word).\n          </p>\n```\n\n**Change to `SettingsPage.css`:** append a `.settings-info` rule that distinguishes the info block from the lighter `.settings-hint`. Keep it visually congruent with the rest of the Settings styling (uses existing CSS vars). Place after the existing `.settings-hint` rule (line 201-206 area).\n\n```css\n.settings-info {\n  margin: 0;\n  padding: 10px 12px;\n  font-size: 12px;\n  line-height: 1.5;\n  color: var(--text-secondary, #858585);\n  background: rgba(255, 255, 255, 0.03);\n  border-left: 2px solid rgba(255, 255, 255, 0.15);\n  border-radius: 2px;\n}\n\n.settings-info strong {\n  color: var(--text-primary, #cccccc);\n  font-weight: 600;\n}\n\n.settings-info code {\n  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);\n  font-size: 11px;\n  padding: 1px 5px;\n  background: rgba(255, 255, 255, 0.06);\n  border-radius: 3px;\n  color: var(--text-primary, #cccccc);\n}\n```\n\nReasoning for the styling:\n- Subtle background tint + left accent strip differentiates the info block from the italic `.settings-hint` (which is for compact one-liners).\n- Inline `<code>` chips signal keyboard chords and shell command names.\n- Uses `var(--text-secondary)` / `var(--text-primary)` to inherit the project's dark theme tokens. No hard-coded colors except as fallbacks (matches the rest of the file).\n\n**Out of scope for this issue:**\n- The toast-on-first-press (Option A) is explicitly deferred per the issue body.\n- Per-hint dismissal state (`hints.ctrlZDismissed` etc.) is not introduced; no settings-store changes.\n- Mac platform — Cmd+Z behaves consistently (xterm passes it through; no special handling).\n- Localization — not relevant today; no i18n in the project.\n\n**Cross-reference:** the related `Ctrl+W` chord text now reads correctly because issue #156 (already shipped in this release) gated Ctrl+W behind the focus check, so the advice \"use the shell's readline editing — Ctrl+W deletes a word\" is no longer self-contradictory.",
+      "verification": [
+        "SettingsPage.tsx renders a new `.settings-info` paragraph immediately after the existing `.settings-hint` paragraph in the Terminal section.",
+        "The info block mentions: SIGTSTP, `fg` for resuming jobs, that Ctrl+Z is NOT editor undo, and references Ctrl+U / Ctrl+W as readline editing alternatives.",
+        "SettingsPage.css contains a `.settings-info` rule with subtle background, left accent stripe, and styled `<strong>` + `<code>` children.",
+        "No new Settings store fields (hints, dismissal state) are added — this is the minimum-viable static row.",
+        "Local TypeScript verification deferred to CI (`.github/workflows/pr.yml`).",
+        "Manual smoke: Settings page → Terminal section shows the info block under the existing terminal settings, visually distinct from the italic hint above it.",
+        "Manual smoke: copy still reads correctly — no orphaned references or broken sentences."
+      ],
+      "status": "pending"
+    }
+  ]
+}
