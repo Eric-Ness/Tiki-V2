@@ -225,10 +225,13 @@ Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the 
 node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
 # 2a. Release child (entry stays in activeWork; parentRelease preserved):
 node packages/framework/scripts/state.mjs transition issue:{number} --to-status completed --to-step SHIP
-# 2b. Standalone: delete the issue:{number} key from activeWork (direct JSON; shim does not expose deletion yet).
+# 2b. Standalone: remove the issue:{number} key from activeWork:
+node packages/framework/scripts/state.mjs remove issue:{number}
+# 3. In both cases, append the completion record to history:
+node packages/framework/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
 ```
 
-In **both cases**, also append to `history.recentIssues`, update `history.lastCompletedIssue`, and archive the plan file — these mutations are direct JSON writes (not in the shim).
+The plan file at `.tiki/plans/issue-{number}.json` is moved to `.tiki/plans/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation).
 </state-management>
 
 <errors>
