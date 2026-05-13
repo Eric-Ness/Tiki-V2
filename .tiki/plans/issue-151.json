@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 151,
+    "title": "Animate dep graph edges only when work is actively flowing through them",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/151"
+  },
+  "createdAt": "2026-05-13T16:48:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "correctness",
+      "description": "An edge is animated iff its source node is completed/closed AND its target node is executing"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "All other edges (both endpoints pending, all completed, failed targets, etc.) remain static (animated: false)"
+    },
+    {
+      "id": "SC3",
+      "category": "regression",
+      "description": "Critical Path mode's animation behavior is preserved (its styledEdges transform overlays animation on critical edges)"
+    },
+    {
+      "id": "SC4",
+      "category": "regression",
+      "description": "Hover lineage from #149 still works — animation is orthogonal to dimming/highlighting"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Set animated flag from source/target status pairing",
+      "status": "pending",
+      "content": "Modify the edge-builder loop in `apps/desktop/src/components/dependencies/useDependencyGraph.ts` (around line 192-206, the `fetchedIssues.forEach` block that pushes edges).\n\nThe nodes array built immediately above already has each node's resolved status in `data.status`. Build a lookup `Map<string, IssueNodeData['status']>` from `String(issue.number) → status` so the edge builder can cross-reference. Then per edge:\n\n```ts\nconst statusByNodeId = new Map<string, IssueNodeData['status']>();\nnodes.forEach((n) => statusByNodeId.set(n.id, n.data.status));\n\n// ...inside the forEach pushing edges:\nconst sourceStatus = statusByNodeId.get(String(depNumber));\nconst targetStatus = statusByNodeId.get(String(issue.number));\nconst isFlowing =\n  (sourceStatus === 'completed' || sourceStatus === 'closed') &&\n  targetStatus === 'executing';\n\nedges.push({\n  id: `e${depNumber}-${issue.number}`,\n  source: String(depNumber),\n  target: String(issue.number),\n  animated: isFlowing,\n  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },\n});\n```\n\nThat's the whole change. Critical Path mode's `styledEdges` useMemo block (in `DependencyGraph.tsx`) sets `animated: true` on critical edges via spread — base `animated` is overridden by the spread, so critical edges still animate. Non-critical edges retain whatever base `animated` they got from this flow detection (correctly).\n\nHover lineage's `styledEdges` block similarly uses spread — `animated` is not in its overlay, so the base value propagates through.\n\nEdge cases:\n- Failed target → not animated (matches the issue's intent: failed = stuck, not flowing).\n- Multiple executing downstreams of one completed upstream → multiple animated edges (correct).\n- Both endpoints completed → not animated (work has already passed through).\n\nNo new files, no new types, no new fetches.",
+      "verification": [
+        "Read post-edit useDependencyGraph.ts: confirm statusByNodeId map exists and edges' animated flag is computed from source+target status",
+        "Eyeball the v0.5.2 graph in the desktop app: should be all-pending currently (no executing issues), so NO edge animation — confirms the negative case",
+        "If feasible, manually trigger an executing state on an issue with a completed upstream to see animation; otherwise rely on logic review (the rule is small enough)",
+        "Toggle Critical Path mode — critical edges still animate (no regression on the override path)",
+        "Hover any node — lineage still dims/highlights correctly (no regression)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}

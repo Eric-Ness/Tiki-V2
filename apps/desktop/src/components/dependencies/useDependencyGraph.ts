@@ -192,17 +192,28 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
       };
     });
 
+    // Lookup of resolved status by node id so the edge builder can decide
+    // whether work is currently flowing through each edge.
+    const statusByNodeId = new Map<string, IssueNodeData['status']>();
+    nodes.forEach((n) => statusByNodeId.set(n.id, n.data.status));
+
     // Build edges by parsing dependencies from issue bodies
     const edges: Edge[] = [];
     fetchedIssues.forEach((issue) => {
       if (!issue.body) return;
       const deps = parseDependencies(issue.body, issueNumbers);
       deps.forEach((depNumber) => {
+        const sourceStatus = statusByNodeId.get(String(depNumber));
+        const targetStatus = statusByNodeId.get(String(issue.number));
+        const isFlowing =
+          (sourceStatus === 'completed' || sourceStatus === 'closed') &&
+          targetStatus === 'executing';
+
         edges.push({
           id: `e${depNumber}-${issue.number}`,
           source: String(depNumber),
           target: String(issue.number),
-          animated: false,
+          animated: isFlowing,
           markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
         });
       });

@@ -11,12 +11,14 @@
           153,
           154
         ],
-        "completedIssues": []
+        "completedIssues": [
+          152
+        ]
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-13T16:41:23.023Z",
-      "lastActivity": "2026-05-13T16:41:23.023Z"
+      "lastActivity": "2026-05-13T16:47:29.773Z"
     },
     "issue:152": {
       "type": "issue",
@@ -24,10 +26,27 @@
         "number": 152,
         "title": "Scale dep graph node height by plan phase count — small fixes look small, epics look big"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "createdAt": "2026-05-13T16:41:43.714Z",
-      "lastActivity": "2026-05-13T16:46:28.730Z",
+      "lastActivity": "2026-05-13T16:47:13.325Z",
+      "parentRelease": "v0.5.2",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "completed"
+      }
+    },
+    "issue:151": {
+      "type": "issue",
+      "issue": {
+        "number": 151,
+        "title": "Animate dep graph edges only when work is actively flowing through them"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T16:47:51.408Z",
+      "lastActivity": "2026-05-13T16:48:46.532Z",
       "parentRelease": "v0.5.2",
       "phase": {
         "current": 1,
@@ -38,9 +57,9 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 150,
-      "title": "Dep graph parser misses markdown 'Related:' sections — graph mostly empty across the project",
-      "completedAt": "2026-05-13T16:14:01.000Z"
+      "number": 152,
+      "title": "Scale dep graph node height by plan phase count — small fixes look small, epics look big",
+      "completedAt": "2026-05-13T16:47:15.881Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.1",
@@ -54,6 +73,11 @@
       "tag": "v0.5.1"
     },
     "recentIssues": [
+      {
+        "number": 152,
+        "title": "Scale dep graph node height by plan phase count — small fixes look small, epics look big",
+        "completedAt": "2026-05-13T16:47:15.881Z"
+      },
       {
         "number": 150,
         "title": "Dep graph parser misses markdown 'Related:' sections — graph mostly empty across the project",
