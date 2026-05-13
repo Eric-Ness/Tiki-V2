@@ -14,14 +14,15 @@
           161
         ],
         "completedIssues": [
-          156
+          156,
+          158
         ],
-        "currentIssue": 158
+        "currentIssue": 157
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-13T18:47:01.019Z",
-      "lastActivity": "2026-05-13T18:58:58.876Z"
+      "lastActivity": "2026-05-13T19:03:30.621Z"
     },
     "issue:156": {
       "type": "issue",
@@ -46,10 +47,27 @@
         "number": 158,
         "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "createdAt": "2026-05-13T19:00:06.114Z",
-      "lastActivity": "2026-05-13T19:02:10.925Z",
+      "lastActivity": "2026-05-13T19:03:30.209Z",
+      "parentRelease": "v0.5.4",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    },
+    "issue:157": {
+      "type": "issue",
+      "issue": {
+        "number": 157,
+        "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T19:04:43.383Z",
+      "lastActivity": "2026-05-13T19:06:37.623Z",
       "parentRelease": "v0.5.4",
       "phase": {
         "current": 1,
@@ -60,9 +78,9 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 156,
-      "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell",
-      "completedAt": "2026-05-13T18:58:58.876Z"
+      "number": 158,
+      "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)",
+      "completedAt": "2026-05-13T19:03:30.621Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.3",
@@ -73,6 +91,11 @@
       "tag": "v0.5.3"
     },
     "recentIssues": [
+      {
+        "number": 158,
+        "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)",
+        "completedAt": "2026-05-13T19:03:30.621Z"
+      },
       {
         "number": 156,
         "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell",
