@@ -1,6 +1,45 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.5.3": {
+      "type": "release",
+      "release": {
+        "version": "v0.5.3",
+        "issues": [
+          155,
+          156,
+          157,
+          158,
+          159,
+          160,
+          161
+        ],
+        "currentIssue": 155,
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-13T17:32:20.603Z",
+      "lastActivity": "2026-05-13T17:32:20.603Z"
+    },
+    "issue:155": {
+      "type": "issue",
+      "issue": {
+        "number": 155,
+        "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "parentRelease": "v0.5.3",
+      "createdAt": "2026-05-13T17:33:18.557Z",
+      "lastActivity": "2026-05-13T17:45:59.071Z",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 154,

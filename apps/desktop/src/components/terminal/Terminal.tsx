@@ -241,7 +241,11 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           terminalFocusRegistry.register(terminalId, () => xterm.focus());
         }
 
-        // Handle copy/paste keyboard shortcuts
+        // Handle copy keyboard shortcut. Paste is intentionally NOT handled
+        // here — xterm.js's built-in paste-event listener owns Ctrl+V and
+        // Ctrl+Shift+V. A custom keydown handler that also calls xterm.paste()
+        // double-pastes, because the browser's separate `paste` DOM event
+        // still fires on xterm's hidden textarea (see #155).
         xterm.attachCustomKeyEventHandler((e: KeyboardEvent) => {
           // Ctrl+Shift+C: Copy selection to clipboard
           if (e.ctrlKey && e.shiftKey && e.key === 'C' && e.type === 'keydown') {
@@ -249,26 +253,6 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
             if (selection) {
               navigator.clipboard.writeText(selection);
             }
-            return false; // Prevent xterm from processing
-          }
-
-          // Ctrl+Shift+V: Paste from clipboard
-          if (e.ctrlKey && e.shiftKey && e.key === 'V' && e.type === 'keydown') {
-            navigator.clipboard.readText().then((text) => {
-              if (text) {
-                xterm.paste(text);
-              }
-            });
-            return false; // Prevent xterm from processing
-          }
-
-          // Ctrl+V: Standard paste (supports voice-to-text apps like Wispr)
-          if (e.ctrlKey && !e.shiftKey && e.key === 'v' && e.type === 'keydown') {
-            navigator.clipboard.readText().then((text) => {
-              if (text) {
-                xterm.paste(text);
-              }
-            });
             return false; // Prevent xterm from processing
           }
 
