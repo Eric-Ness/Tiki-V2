@@ -1,12 +1,8 @@
 {
-  "version": "v0.5.3",
-  "name": "Terminal polish",
+  "version": "v0.5.4",
+  "name": "Terminal polish (continued)",
   "status": "pending",
   "issues": [
-    {
-      "number": 155,
-      "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY"
-    },
     {
       "number": 156,
       "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell"
@@ -32,6 +28,7 @@
       "title": "Tech debt: Migrate desktop app from legacy 'xterm' package to '@xterm/xterm' namespace"
     }
   ],
-  "createdAt": "2026-05-13T00:00:00.000Z",
-  "shipped": false
+  "createdAt": "2026-05-13T18:00:00.000Z",
+  "shipped": false,
+  "note": "Carries the 6 remaining 'Terminal polish' issues that were split out of v0.5.3 when build verification was blocked locally. Resume with /tiki:release v0.5.4 once Defender exclusions for the .pnpm virtual store are configured."
 }
