@@ -106,11 +106,27 @@ The canonical transition table lives at `packages/shared/src/types/transitions.t
 
 ### Windows pnpm reparse-point block
 
-On some Windows machines (notably this one), pnpm's isolated linker creates NTFS junctions under `node_modules/.pnpm/` that the OS rejects as "untrusted mount points," causing `pnpm install` to fail mid-link. Symptoms include `UNKNOWN: unknown error, open '...node_modules\.pnpm\<pkg>\node_modules\<sub>\package.json'`.
+On Windows 11 (24H2 and newer; possibly older builds), pnpm's isolated linker creates NTFS junctions under `node_modules/` that the OS rejects as "untrusted mount points," causing `pnpm install` to fail mid-link. Symptoms include `UNKNOWN: unknown error, open '...node_modules\.pnpm\<pkg>\node_modules\<sub>\package.json'` or, with a clearer error path, `The path cannot be traversed because it contains an untrusted mount point.`
 
-**Do NOT use `pnpm install --ignore-workspace` as a workaround** — it corrupts the node_modules layout (lower-version transitive packages hoist to root and shadow workspace-declared versions). The minimal-damage workaround that still produces a working install is `$env:NPM_CONFIG_NODE_LINKER='hoisted'` for the shell session only (no `.npmrc` committed).
+**Root cause:** This is a kernel-level mitigation, **not** Defender. Every NTFS reparse point gets labeled with the Mandatory Integrity Level of the process that created it, and the kernel refuses to follow Medium-IL-created junctions for any reader. Defender exclusions don't fix the underlying behavior — they only reduce scan overhead during installs.
 
-The durable fix is OS-level: add `node_modules` and `pnpm.exe`/`node.exe` exclusions to Windows Defender (or whichever filesystem filter driver is intercepting), or develop inside WSL.
+**Fix:** Run `pnpm install` from an **elevated PowerShell**. High-IL-created junctions are trusted by the kernel for all readers, so the rest of the toolchain (IDE, vite dev server, tauri build, vitest, cargo) keeps running from a normal (Medium-IL) shell afterward. Only the install step needs admin.
+
+```powershell
+# Elevated PowerShell — when installing/updating deps:
+cd <repo>
+pnpm install
+
+# Normal PowerShell — everything else:
+pnpm build
+pnpm tauri:dev
+```
+
+**Sticky-state gotcha:** If a previous Medium-IL `pnpm install` left partial junctions, a subsequent admin install's *verify* pass will report "Already up to date" without recreating them — and they remain untrusted to Medium-IL readers. To force re-creation: `cmd /c rmdir /s /q <node_modules>` at the repo root **and** each workspace dir (`apps/*/node_modules`, `packages/*/node_modules`), then re-run elevated install.
+
+**Do NOT use `pnpm install --ignore-workspace` as a workaround** — it corrupts the node_modules layout (lower-version transitive packages hoist to root and shadow workspace-declared versions). The `NPM_CONFIG_NODE_LINKER=hoisted` workaround **also no longer suffices** as of 24H2 — workspace junctions to `@tiki/shared` still trip the same kernel check.
+
+WSL is an alternative durable fix (bypasses the Windows reparse-point check entirely) if you don't want every install to require elevation.
 
 ## Documentation
 
