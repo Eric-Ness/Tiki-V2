@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import { useProjectsStore } from './projectsStore';
 import {
   createLeaf,
-  findLeafByTerminalId,
   firstLeafId,
   getTerminalIds,
   regenerateLeafIds,
