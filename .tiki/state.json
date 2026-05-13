@@ -15,14 +15,15 @@
         ],
         "completedIssues": [
           156,
-          158
+          158,
+          157
         ],
-        "currentIssue": 157
+        "currentIssue": 160
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
       "createdAt": "2026-05-13T18:47:01.019Z",
-      "lastActivity": "2026-05-13T19:03:30.621Z"
+      "lastActivity": "2026-05-13T19:07:29.617Z"
     },
     "issue:156": {
       "type": "issue",
@@ -64,10 +65,27 @@
         "number": 157,
         "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "createdAt": "2026-05-13T19:04:43.383Z",
-      "lastActivity": "2026-05-13T19:06:37.623Z",
+      "lastActivity": "2026-05-13T19:07:28.920Z",
+      "parentRelease": "v0.5.4",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    },
+    "issue:160": {
+      "type": "issue",
+      "issue": {
+        "number": 160,
+        "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T19:08:37.495Z",
+      "lastActivity": "2026-05-13T19:09:05.966Z",
       "parentRelease": "v0.5.4",
       "phase": {
         "current": 1,
@@ -78,9 +96,9 @@
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 158,
-      "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)",
-      "completedAt": "2026-05-13T19:03:30.621Z"
+      "number": 157,
+      "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)",
+      "completedAt": "2026-05-13T19:07:29.617Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.3",
@@ -91,6 +109,11 @@
       "tag": "v0.5.3"
     },
     "recentIssues": [
+      {
+        "number": 157,
+        "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)",
+        "completedAt": "2026-05-13T19:07:29.617Z"
+      },
       {
         "number": 158,
         "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)",
