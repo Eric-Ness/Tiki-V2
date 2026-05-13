@@ -1,0 +1,25 @@
+{
+  "version": "v0.5.1",
+  "name": "Dependency graph fixes + v2 visuals",
+  "status": "shipped",
+  "issues": [
+    {
+      "number": 147,
+      "title": "Bug: /tiki:release can't create release JSON — desktop UI was the only writer, leaving v0.4.1+ without JSON on disk"
+    },
+    {
+      "number": 148,
+      "title": "Bug: Dependency graph version dropdown uses string sort instead of semver — v0.2.9 appears after v0.2.15"
+    },
+    {
+      "number": 149,
+      "title": "Dependency Graph v2 — visual upgrade pack: swimlanes, in-node progress fills, hover-to-trace lineage"
+    },
+    {
+      "number": 150,
+      "title": "Dep graph parser misses markdown 'Related:' sections — graph mostly empty across the project"
+    }
+  ],
+  "createdAt": "2026-05-12T00:00:00.000Z",
+  "updatedAt": "2026-05-13T16:30:00.000Z"
+}
