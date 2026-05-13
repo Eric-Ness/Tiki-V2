@@ -5,6 +5,9 @@ use std::process::{Command, Stdio};
 /// Create a Command that suppresses console window creation on Windows.
 /// On non-Windows platforms, this is identical to `Command::new()`.
 fn hidden_command(program: &str) -> Command {
+    // `mut` is only needed for the Windows-only `cmd.creation_flags(...)` call below.
+    // On other platforms clippy would otherwise flag this as unused_mut under -D warnings.
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut cmd = Command::new(program);
     #[cfg(target_os = "windows")]
     {
