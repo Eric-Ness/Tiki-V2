@@ -16,9 +16,10 @@
         "completedIssues": [
           156,
           158,
-          157
+          157,
+          160
         ],
-        "currentIssue": 160
+        "currentIssue": 159
       },
       "status": "executing",
       "pipelineStep": "EXECUTE",
@@ -82,23 +83,40 @@
         "number": 160,
         "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo"
       },
-      "status": "shipping",
+      "status": "completed",
       "pipelineStep": "SHIP",
       "createdAt": "2026-05-13T19:08:37.495Z",
-      "lastActivity": "2026-05-13T19:09:05.966Z",
+      "lastActivity": "2026-05-13T19:09:57.083Z",
       "parentRelease": "v0.5.4",
       "phase": {
         "current": 1,
         "total": 1,
         "status": "executing"
       }
+    },
+    "issue:159": {
+      "type": "issue",
+      "issue": {
+        "number": 159,
+        "title": "Enhancement: 'Resume Conversation' action when the last command in a terminal was 'claude'"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T19:12:31.198Z",
+      "lastActivity": "2026-05-13T19:16:46.744Z",
+      "parentRelease": "v0.5.4",
+      "phase": {
+        "current": 2,
+        "total": 2,
+        "status": "executing"
+      }
     }
   },
   "history": {
     "lastCompletedIssue": {
-      "number": 157,
-      "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)",
-      "completedAt": "2026-05-13T19:07:29.617Z"
+      "number": 160,
+      "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo",
+      "completedAt": "2026-05-13T19:09:57.575Z"
     },
     "lastCompletedRelease": {
       "version": "v0.5.3",
@@ -109,6 +127,11 @@
       "tag": "v0.5.3"
     },
     "recentIssues": [
+      {
+        "number": 160,
+        "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo",
+        "completedAt": "2026-05-13T19:09:57.575Z"
+      },
       {
         "number": 157,
         "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)",

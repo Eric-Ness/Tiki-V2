@@ -4,8 +4,10 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { TerminalSearch } from "./TerminalSearch";
+import { ResumeBanner } from "./ResumeBanner";
 import { useTerminal } from "./useTerminal";
-import { terminalFocusRegistry, terminalActionsRegistry } from "../../stores/terminalStore";
+import { findLeafByTerminalId } from "../../stores/splitTree";
+import { terminalFocusRegistry, terminalActionsRegistry, useTerminalStore } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
 import type { ITheme } from "xterm";
 import "xterm/css/xterm.css";
@@ -100,6 +102,26 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   // Search overlay state (Phase 1: foundation only, UI lands in Phase 2)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Resume Conversation banner state — captured ONCE on first mount so the
+  // banner doesn't reappear if lastCommand is updated mid-session.
+  const [resumeCmd, setResumeCmd] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const autoResumeClaude = useSettingsStore((s) => s.terminal.autoResumeClaude);
+  useEffect(() => {
+    if (!terminalId) return;
+    const state = useTerminalStore.getState();
+    for (const tabs of Object.values(state.tabsByProject)) {
+      for (const tab of tabs) {
+        const leaf = findLeafByTerminalId(tab.splitRoot, terminalId);
+        if (leaf?.lastCommand && /^claude/.test(leaf.lastCommand)) {
+          setResumeCmd(leaf.lastCommand);
+          return;
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Keep ref in sync so the xterm key handler can read latest value without stale closure
   useEffect(() => {
     isSearchOpenRef.current = isSearchOpen;
@@ -153,6 +175,23 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   resizeTerminalRef.current = resizeTerminal;
   createTerminalRef.current = createTerminal;
   destroyTerminalRef.current = destroyTerminal;
+
+  const handleResume = useCallback(() => {
+    // 500ms grace lets the shell finish init before we type into it.
+    // The PTY is already created by the time this banner is interactive,
+    // but the prompt might not have rendered yet.
+    setBannerDismissed(true);
+    setTimeout(() => {
+      writeTerminalRef.current('claude --continue\r');
+    }, 500);
+  }, []);
+
+  const handleFresh = useCallback(() => {
+    if (terminalId) {
+      useTerminalStore.getState().setLastCommand(terminalId, '');
+    }
+    setBannerDismissed(true);
+  }, [terminalId]);
 
   // Watch for container visibility
   useEffect(() => {
@@ -286,8 +325,29 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           return true; // Let xterm handle all other keys
         });
 
-        // Connect user input to PTY
+        // Connect user input to PTY, and track `claude` invocations for the
+        // Resume Conversation banner. Privacy: only commands starting with
+        // `claude` are recorded; the buffer is reset for everything else.
+        // Known limitation: this keystroke heuristic misses history recall
+        // (Ctrl+R), shell aliases, and arrow-key edits. Documented in #159.
+        let inputBuffer = '';
         xterm.onData((data) => {
+          for (const ch of data) {
+            if (ch === '\r' || ch === '\n') {
+              const cmd = inputBuffer.trim();
+              if (/^claude(\s|$)/.test(cmd) && terminalId) {
+                useTerminalStore.getState().setLastCommand(terminalId, cmd);
+              }
+              inputBuffer = '';
+            } else if (ch === '\x7f' || ch === '\b') {
+              inputBuffer = inputBuffer.slice(0, -1);
+            } else if (ch >= ' ') {
+              inputBuffer += ch;
+            } else {
+              // Other control chars (Ctrl+C, arrows, etc.) — reset.
+              inputBuffer = '';
+            }
+          }
           writeTerminalRef.current(data);
         });
 
@@ -362,6 +422,14 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   return (
     <div className={`terminal-container ${className}`.trim()}>
       <div ref={terminalRef} className="terminal-content" />
+      {resumeCmd && !bannerDismissed && (
+        <ResumeBanner
+          lastCommand={resumeCmd}
+          autoResume={autoResumeClaude}
+          onResume={handleResume}
+          onFresh={handleFresh}
+        />
+      )}
       {isSearchOpen && searchAddonRef.current && (
         <TerminalSearch
           searchAddon={searchAddonRef.current}

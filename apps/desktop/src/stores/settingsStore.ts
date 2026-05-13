@@ -7,6 +7,8 @@ export interface TerminalSettings {
   fontFamily: string;
   scrollbackBuffer: number;
   defaultShell: string; // empty string = system default
+  /** When true, the Resume Conversation banner auto-resumes after 5 seconds. */
+  autoResumeClaude: boolean;
 }
 
 export const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
@@ -14,6 +16,7 @@ export const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
   fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
   scrollbackBuffer: 1000,
   defaultShell: '',
+  autoResumeClaude: false,
 };
 
 // --- Appearance Settings ---

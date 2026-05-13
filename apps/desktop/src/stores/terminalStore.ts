@@ -3,11 +3,13 @@ import { persist } from 'zustand/middleware';
 import { useProjectsStore } from './projectsStore';
 import {
   createLeaf,
+  findLeafByTerminalId,
   firstLeafId,
   getTerminalIds,
   regenerateLeafIds,
   removeFromTree,
   replaceInTree,
+  updateLeafByTerminalId,
   type SplitDirection,
   type SplitNode,
   type SplitTreeNode,
@@ -48,6 +50,7 @@ interface TerminalActions {
   splitTerminal: (tabId: string, terminalId: string, direction: SplitDirection) => void;
   closeSplit: (tabId: string, terminalId: string) => void;
   updateSplitSizes: (tabId: string, nodeId: string, sizes: number[]) => void;
+  setLastCommand: (terminalId: string, command: string) => void;
   cleanupProject: (projectId: string) => void;
 }
 
@@ -394,6 +397,27 @@ export const useTerminalStore = create<TerminalStore>()(
               ),
             },
           };
+        }),
+
+      setLastCommand: (terminalId, command) =>
+        set((state) => {
+          const newTabsByProject: Record<string, TerminalTab[]> = {};
+          let anyChanged = false;
+          for (const [projectId, tabs] of Object.entries(state.tabsByProject)) {
+            newTabsByProject[projectId] = tabs.map((tab) => {
+              const newSplitRoot = updateLeafByTerminalId(
+                tab.splitRoot,
+                terminalId,
+                (leaf) => ({ ...leaf, lastCommand: command })
+              );
+              if (newSplitRoot !== tab.splitRoot) {
+                anyChanged = true;
+                return { ...tab, splitRoot: newSplitRoot };
+              }
+              return tab;
+            });
+          }
+          return anyChanged ? { tabsByProject: newTabsByProject } : {};
         }),
 
       cleanupProject: (projectId) =>

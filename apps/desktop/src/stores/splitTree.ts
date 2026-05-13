@@ -11,6 +11,10 @@ export type SplitDirection = 'horizontal' | 'vertical';
 export interface TerminalLeaf {
   type: 'terminal';
   terminalId: string;
+  /** Last `claude` invocation typed in this terminal, if any. Used to surface
+   *  a Resume Conversation banner after a crash/restart. Only `claude` commands
+   *  are recorded — other commands are intentionally never stored. */
+  lastCommand?: string;
 }
 
 export interface SplitNode {
@@ -24,9 +28,10 @@ export interface SplitNode {
 export type SplitTreeNode = TerminalLeaf | SplitNode;
 
 /** Create a leaf node holding the given terminal id. */
-export const createLeaf = (terminalId: string): TerminalLeaf => ({
+export const createLeaf = (terminalId: string, lastCommand?: string): TerminalLeaf => ({
   type: 'terminal',
   terminalId,
+  ...(lastCommand !== undefined ? { lastCommand } : {}),
 });
 
 /**
@@ -125,12 +130,53 @@ export const regenerateLeafIds = (
   generateId: () => string
 ): SplitTreeNode => {
   if (node.type === 'terminal') {
-    return { type: 'terminal', terminalId: generateId() };
+    return {
+      type: 'terminal',
+      terminalId: generateId(),
+      ...(node.lastCommand !== undefined ? { lastCommand: node.lastCommand } : {}),
+    };
   }
   return {
     ...node,
     children: node.children.map((c) => regenerateLeafIds(c, generateId)),
   };
+};
+
+/**
+ * Walk the tree looking for the leaf whose `terminalId === targetId`,
+ * apply `mutator` to produce a new leaf, and return the new tree. Pure;
+ * never mutates inputs. Returns the unchanged tree if the target is not found.
+ */
+export const updateLeafByTerminalId = (
+  node: SplitTreeNode,
+  targetId: string,
+  mutator: (leaf: TerminalLeaf) => TerminalLeaf
+): SplitTreeNode => {
+  if (node.type === 'terminal') {
+    return node.terminalId === targetId ? mutator(node) : node;
+  }
+  return {
+    ...node,
+    children: node.children.map((c) => updateLeafByTerminalId(c, targetId, mutator)),
+  };
+};
+
+/**
+ * Read-only counterpart of updateLeafByTerminalId. Walk the tree to find
+ * the leaf whose `terminalId === targetId`. Returns undefined if not found.
+ */
+export const findLeafByTerminalId = (
+  node: SplitTreeNode,
+  targetId: string
+): TerminalLeaf | undefined => {
+  if (node.type === 'terminal') {
+    return node.terminalId === targetId ? node : undefined;
+  }
+  for (const child of node.children) {
+    const found = findLeafByTerminalId(child, targetId);
+    if (found) return found;
+  }
+  return undefined;
 };
 
 /** Return the terminalId of the first leaf in a depth-first walk. */
