@@ -13,9 +13,26 @@ interface FetchedIssue {
   title: string;
   body?: string;
   state: string;
+  phaseCount?: number;
 }
 
-function layoutGraph(nodes: IssueNodeType[], edges: Edge[]) {
+// Maps plan phase count to a node visual height. Undefined = no plan yet
+// (renders at default 60). Explicit 1 = smaller (50) so single-phase fixes
+// telegraph as light work. Saturates at 90 so a 20-phase epic doesn't dwarf
+// the canvas.
+export function computeNodeHeight(phaseCount: number | undefined): number {
+  if (phaseCount === undefined) return 60;
+  if (phaseCount <= 1) return 50;
+  if (phaseCount <= 3) return 60;
+  if (phaseCount <= 6) return 75;
+  return 90;
+}
+
+function layoutGraph(
+  nodes: IssueNodeType[],
+  edges: Edge[],
+  heights: Map<string, number>
+) {
   if (nodes.length === 0) return { nodes: [], edges: [] };
 
   const g = new dagre.graphlib.Graph();
@@ -23,7 +40,8 @@ function layoutGraph(nodes: IssueNodeType[], edges: Edge[]) {
   g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80 });
 
   nodes.forEach((node) => {
-    g.setNode(node.id, { width: 200, height: 60 });
+    const h = heights.get(node.id) ?? 60;
+    g.setNode(node.id, { width: 200, height: h });
   });
 
   edges.forEach((edge) => {
@@ -34,9 +52,10 @@ function layoutGraph(nodes: IssueNodeType[], edges: Edge[]) {
 
   const layoutedNodes = nodes.map((node) => {
     const pos = g.node(node.id);
+    const h = heights.get(node.id) ?? 60;
     return {
       ...node,
-      position: { x: pos.x - 100, y: pos.y - 30 },
+      position: { x: pos.x - 100, y: pos.y - h / 2 },
     };
   });
 
@@ -67,18 +86,32 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
     setIsLoading(true);
     setError(null);
 
+    const tikiPath = activeProject?.path
+      ? `${activeProject.path}/.tiki`
+      : undefined;
+
     Promise.all(
-      release.issues.map((issue) =>
-        invoke<FetchedIssue>('fetch_github_issue_by_number', {
-          number: issue.number,
-          projectPath: activeProject?.path ?? null,
-        }).catch(() => ({
-          number: issue.number,
-          title: issue.title,
-          body: undefined,
-          state: 'open',
-        }))
-      )
+      release.issues.map(async (issue) => {
+        const [details, plan] = await Promise.all([
+          invoke<FetchedIssue>('fetch_github_issue_by_number', {
+            number: issue.number,
+            projectPath: activeProject?.path ?? null,
+          }).catch(() => ({
+            number: issue.number,
+            title: issue.title,
+            body: undefined,
+            state: 'open',
+          })),
+          invoke<{ phases?: unknown[] } | null>('get_plan', {
+            issueNumber: issue.number,
+            tikiPath,
+          }).catch(() => null),
+        ]);
+        return {
+          ...details,
+          phaseCount: Array.isArray(plan?.phases) ? plan.phases.length : undefined,
+        };
+      })
     )
       .then((issues) => {
         if (!cancelled) {
@@ -140,18 +173,24 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
 
     const issueNumbers = new Set(release.issues.map((i) => i.number));
 
-    // Build nodes
-    const nodes: IssueNodeType[] = fetchedIssues.map((issue) => ({
-      id: String(issue.number),
-      type: 'issue' as const,
-      position: { x: 0, y: 0 },
-      data: {
-        issueNumber: issue.number,
-        title: issue.title,
-        status: resolveStatus(issue),
-        phaseProgress: resolvePhaseProgress(issue),
-      },
-    }));
+    // Build nodes + capture per-node heights for the dagre layout.
+    const heights = new Map<string, number>();
+    const nodes: IssueNodeType[] = fetchedIssues.map((issue) => {
+      const h = computeNodeHeight(issue.phaseCount);
+      heights.set(String(issue.number), h);
+      return {
+        id: String(issue.number),
+        type: 'issue' as const,
+        position: { x: 0, y: 0 },
+        data: {
+          issueNumber: issue.number,
+          title: issue.title,
+          status: resolveStatus(issue),
+          phaseProgress: resolvePhaseProgress(issue),
+          phaseCount: issue.phaseCount,
+        },
+      };
+    });
 
     // Build edges by parsing dependencies from issue bodies
     const edges: Edge[] = [];
@@ -169,7 +208,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
       });
     });
 
-    const layouted = layoutGraph(nodes, edges);
+    const layouted = layoutGraph(nodes, edges, heights);
     return { ...layouted, hasEdges: edges.length > 0 };
   }, [release, fetchedIssues, activeWork, recentIssues]);
 

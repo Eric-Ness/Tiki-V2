@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 152,
+    "title": "Scale dep graph node height by plan phase count — small fixes look small, epics look big",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/152"
+  },
+  "createdAt": "2026-05-13T16:43:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "data",
+      "description": "useDependencyGraph fetches plan files in parallel with issue bodies and surfaces phase count per issue"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "Node visual height varies with plan phase count: 1 phase → 50px, 2-3 → 60px, 4-6 → 75px, 7+ → 90px"
+    },
+    {
+      "id": "SC3",
+      "category": "correctness",
+      "description": "Dagre layout reserves matching vertical space so variable heights don't cause overlap or excessive gaps"
+    },
+    {
+      "id": "SC4",
+      "category": "regression",
+      "description": "Issues with no plan file render at the default height (60px) without errors"
+    },
+    {
+      "id": "SC5",
+      "category": "regression",
+      "description": "Swimlane bands from #149 still rank-group correctly — heights vary but x-positions stay aligned per rank"
+    },
+    {
+      "id": "SC6",
+      "category": "regression",
+      "description": "Hover lineage from #149 still works — height is orthogonal to lineage tracing"
+    },
+    {
+      "id": "SC7",
+      "category": "regression",
+      "description": "Progress bar from #149 still anchors to the bottom edge of variable-height nodes (position: absolute)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Wire plan fetch + apply variable node heights",
+      "status": "pending",
+      "content": "Three coupled changes in `apps/desktop/src/components/dependencies/`:\n\n**1. `useDependencyGraph.ts` — fetch plans in parallel with issues**\n\nAt the top of the file, add a height helper:\n```ts\nfunction computeNodeHeight(phaseCount: number | undefined): number {\n  if (phaseCount === undefined || phaseCount <= 1) return phaseCount === 1 ? 50 : 60;\n  if (phaseCount <= 3) return 60;\n  if (phaseCount <= 6) return 75;\n  return 90;\n}\n```\nNote the asymmetric handling: `undefined` (no plan yet) returns 60 (default), but `1` explicitly returns 50 (smaller).\n\nExtend `FetchedIssue` with `phaseCount?: number`.\n\nIn the fetch useEffect, parallel-invoke `get_plan` alongside `fetch_github_issue_by_number`:\n```ts\nPromise.all(\n  release.issues.map(async (issue) => {\n    const [details, plan] = await Promise.all([\n      invoke<FetchedIssue>('fetch_github_issue_by_number', {\n        number: issue.number,\n        projectPath: activeProject?.path ?? null,\n      }).catch(() => ({ number: issue.number, title: issue.title, body: undefined, state: 'open' })),\n      invoke<{ phases?: unknown[] } | null>('get_plan', {\n        issueNumber: issue.number,\n        tikiPath: null,  // resolves to cwd/.tiki — matches existing get_state pattern\n      }).catch(() => null),\n    ]);\n    return {\n      ...details,\n      phaseCount: Array.isArray(plan?.phases) ? plan.phases.length : undefined,\n    };\n  })\n)\n```\nNote `tikiPath: null` — `get_plan` resolves to `cwd/.tiki` when omitted (commands.rs:141-144). This matches how `get_state` is invoked elsewhere.\n\n**2. `useDependencyGraph.ts` — pass per-node height to dagre + thread phaseCount to node data**\n\nModify `layoutGraph` to accept node heights:\n```ts\nfunction layoutGraph(nodes: IssueNodeType[], edges: Edge[], heights: Map<string, number>) {\n  // ...\n  nodes.forEach((node) => {\n    const h = heights.get(node.id) ?? 60;\n    g.setNode(node.id, { width: 200, height: h });\n  });\n  // ...\n  const layoutedNodes = nodes.map((node) => {\n    const pos = g.node(node.id);\n    const h = heights.get(node.id) ?? 60;\n    return { ...node, position: { x: pos.x - 100, y: pos.y - h / 2 } };\n  });\n}\n```\nNote: `pos.y - h/2` replaces the hardcoded `pos.y - 30` so variable heights still center on dagre's computed y. This is what keeps swimlane rank grouping intact (rank y-centers stay consistent; only the box around them grows/shrinks).\n\nBuild the heights map and pass `phaseCount` into `IssueNodeData`:\n```ts\nconst heights = new Map<string, number>();\nconst nodes: IssueNodeType[] = fetchedIssues.map((issue) => {\n  const h = computeNodeHeight(issue.phaseCount);\n  heights.set(String(issue.number), h);\n  return {\n    id: String(issue.number),\n    type: 'issue' as const,\n    position: { x: 0, y: 0 },\n    data: {\n      issueNumber: issue.number,\n      title: issue.title,\n      status: resolveStatus(issue),\n      phaseProgress: resolvePhaseProgress(issue),\n      phaseCount: issue.phaseCount,\n    },\n  };\n});\n// ...\nconst layouted = layoutGraph(nodes, edges, heights);\n```\n\n**3. `IssueNode.tsx` — render the height**\n\nExtend `IssueNodeData`:\n```ts\nexport type IssueNodeData = {\n  issueNumber: number;\n  title: string;\n  status: 'pending' | 'executing' | 'completed' | 'failed' | 'open' | 'closed';\n  phaseProgress?: { current: number; total: number };\n  phaseCount?: number;\n};\n```\n\nIn the component, compute the height locally so the rendered box matches dagre's allocation. Use the same helper-equivalent inline (or duplicate the function — both modules want it):\n```tsx\nconst nodeHeight = data.phaseCount === undefined ? 60 : data.phaseCount <= 1 ? 50 : data.phaseCount <= 3 ? 60 : data.phaseCount <= 6 ? 75 : 90;\n```\n\nApply via inline style on the root div:\n```tsx\n<div className={`issue-node issue-node-${data.status}`} style={{ minHeight: nodeHeight }}>\n```\n\nUsing `minHeight` (not `height`) — content can still push the box taller if needed (e.g., a long title that wraps), but the floor matches dagre's allocation. Progress bar already `position: absolute; bottom: 0` so it sticks to whatever the box ends up being (preserves #149 Phase 2).\n\nNo CSS changes needed — `.issue-node` is already `position: relative` (IssueNode.css:127). The progress bar's absolute positioning naturally re-anchors to the new bottom edge.\n\n**Why not adjust width too:** the issue explicitly forbids it. Variable widths would break swimlane band rank-grouping from #149 Phase 1, which rounds y-positions. Heights vary; x stays aligned per rank.",
+      "verification": [
+        "Read post-edit useDependencyGraph.ts: confirm computeNodeHeight helper exists, Promise.all invokes get_plan alongside fetch_github_issue_by_number, layoutGraph signature takes heights map and uses pos.y - h/2 for y-centering",
+        "Read post-edit IssueNode.tsx: confirm IssueNodeData has phaseCount, root div has inline minHeight style",
+        "Run `cargo check` from apps/desktop/src-tauri — must be clean (sanity check, no Rust changes expected)",
+        "Open Dependency Graph for v0.5.2 in the desktop app: confirm #152 (1 phase) renders shorter than a multi-phase issue from history; if v0.5.1 issues have plans, confirm their nodes are visibly distinct sizes",
+        "Open Dependency Graph for a release where no plans exist (e.g., very old archived release): confirm all nodes render at default 60px without errors in devtools console",
+        "Hover any node on a release with edges: confirm lineage dimming/highlighting from #149 still works at any node height",
+        "Confirm progress bar (#149 Phase 2) stays anchored to bottom edge on the tallest (90px) nodes — should not float in middle"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts",
+        "apps/desktop/src/components/dependencies/IssueNode.tsx"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1],
+    "SC7": [1]
+  }
+}

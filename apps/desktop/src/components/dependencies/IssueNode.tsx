@@ -6,7 +6,19 @@ export type IssueNodeData = {
   title: string;
   status: 'pending' | 'executing' | 'completed' | 'failed' | 'open' | 'closed';
   phaseProgress?: { current: number; total: number };
+  phaseCount?: number;
 };
+
+// Mirror of computeNodeHeight in useDependencyGraph.ts. Kept local so the
+// rendered box honors dagre's allocation without an import cycle through the
+// hook module.
+function nodeHeightFor(phaseCount: number | undefined): number {
+  if (phaseCount === undefined) return 60;
+  if (phaseCount <= 1) return 50;
+  if (phaseCount <= 3) return 60;
+  if (phaseCount <= 6) return 75;
+  return 90;
+}
 
 type IssueNodeType = Node<IssueNodeData, 'issue'>;
 
@@ -32,9 +44,13 @@ export function IssueNode({ data }: NodeProps<IssueNodeType>) {
       ? Math.round((data.phaseProgress.current / data.phaseProgress.total) * 100)
       : 0;
   const showProgress = isDone || data.phaseProgress !== undefined;
+  const minHeight = nodeHeightFor(data.phaseCount);
 
   return (
-    <div className={`issue-node issue-node-${data.status}`}>
+    <div
+      className={`issue-node issue-node-${data.status}`}
+      style={{ minHeight }}
+    >
       <Handle type="target" position={Position.Top} />
       <div className="issue-node-header">
         <span className="issue-node-number">#{data.issueNumber}</span>
