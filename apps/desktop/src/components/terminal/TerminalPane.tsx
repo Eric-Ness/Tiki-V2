@@ -31,15 +31,20 @@ export function TerminalPane() {
 
     if (!modifier) return;
 
-    // Ctrl/Cmd + T: New tab
-    if (e.key === 't' || e.key === 'T') {
+    // Ctrl/Cmd + Shift + T: New tab.
+    // Ctrl+T (no shift) is left untouched — bash readline binds it to transpose-chars.
+    if (e.shiftKey && (e.key === 't' || e.key === 'T')) {
       e.preventDefault();
       addTab();
       return;
     }
 
-    // Ctrl/Cmd + W: Close current tab
+    // Ctrl/Cmd + W: Close current tab — but ONLY when an xterm doesn't have focus.
+    // In bash/zsh readline, Ctrl+W is unix-word-rubout (delete word backward).
+    // Without this gate, typing Ctrl+W in the shell would kill the entire terminal.
     if (e.key === 'w' || e.key === 'W') {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.xterm')) return;
       if (activeTabId) {
         e.preventDefault();
         removeTab(activeTabId);

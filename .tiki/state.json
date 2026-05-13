@@ -1,6 +1,43 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.5.4": {
+      "type": "release",
+      "release": {
+        "version": "v0.5.4",
+        "issues": [
+          156,
+          157,
+          158,
+          159,
+          160,
+          161
+        ],
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-13T18:47:01.019Z",
+      "lastActivity": "2026-05-13T18:47:01.019Z"
+    },
+    "issue:156": {
+      "type": "issue",
+      "issue": {
+        "number": 156,
+        "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-13T18:47:32.177Z",
+      "lastActivity": "2026-05-13T18:50:53.849Z",
+      "parentRelease": "v0.5.4",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 155,
