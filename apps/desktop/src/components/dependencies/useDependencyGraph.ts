@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { MarkerType, type Node, type Edge } from '@xyflow/react';
 import dagre from 'dagre';
-import { useTikiReleasesStore, useProjectsStore, useTikiStateStore } from '../../stores';
+import { useProjectsStore, useTikiStateStore, type TikiRelease } from '../../stores';
 import { parseDependencies } from './parseDependencies';
 import type { IssueNodeData } from './IssueNode';
 
@@ -43,8 +43,7 @@ function layoutGraph(nodes: IssueNodeType[], edges: Edge[]) {
   return { nodes: layoutedNodes, edges };
 }
 
-export function useDependencyGraph(releaseVersion: string | null) {
-  const releases = useTikiReleasesStore((s) => s.releases);
+export function useDependencyGraph(releaseVersion: string | null, releases: TikiRelease[]) {
   const activeProject = useProjectsStore((s) => s.getActiveProject());
   const activeWork = useTikiStateStore((s) => s.activeWork);
   const recentIssues = useTikiStateStore((s) => s.recentIssues);

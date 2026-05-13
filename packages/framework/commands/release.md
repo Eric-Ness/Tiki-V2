@@ -17,10 +17,22 @@ Execute a multi-issue release pipeline. Loads a release definition, calculates i
     - `release status` - Show all release statuses
     - `release status v1.2` - Show specific release status
   </step>
-  <step>**Load release definition** from `.tiki/releases/{version}.json`:
-    - Validate the file exists
-    - Extract issue list and metadata
-    - Check for linked milestone
+  <step>**Load or create release definition** at `.tiki/releases/{version}.json`:
+    - **If the file exists:** load it. Extract issue list and metadata. Check for linked milestone.
+    - **If it does not exist:** create a minimal scaffold via the `Write` tool. (The framework cannot call `save_tiki_release` — that's a desktop-only Tauri IPC.) Derive the issue list in this order:
+      1. From `--issues '147,148,149'` CLI flag if provided.
+      2. From a matching GitHub milestone: `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="{version}")'` — if present, use its issue list.
+      3. Interactive: prompt via `AskUserQuestion` for the comma-separated issue list.
+    - Scaffold shape:
+      ```json
+      {
+        "version": "{version}",
+        "status": "active",
+        "issues": [ { "number": 42, "title": "..." } ],
+        "createdAt": "{ISO timestamp now}"
+      }
+      ```
+    - Only error with `release-not-found` if all three derivation paths fail.
   </step>
   <step>**Fetch issue details** for dependency analysis:
     - For each issue in the release, fetch its body via `gh issue view`
@@ -424,11 +436,16 @@ Resume action: Start from beginning (same as without --continue)
     ```
   </error>
   <error type="release-not-found">
-    Release file not found: `.tiki/releases/{version}.json`
+    Release file not found and no issue list could be derived: `.tiki/releases/{version}.json`
 
-    To create a release:
-    1. Use the desktop app's Releases section
-    2. Or create the file manually with this structure:
+    `/tiki:release` will auto-create the file when invoked with one of:
+    - `--issues '42,43,44'` flag listing issue numbers
+    - A matching GitHub milestone titled `{version}` containing at least one issue
+    - An interactive issue list provided when prompted
+
+    If none of the above is available, create the file manually:
+    1. Use the desktop app's Releases section, or
+    2. Write the file directly with this structure:
     ```json
     {
       "version": "{version}",

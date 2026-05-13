@@ -8,10 +8,11 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { invoke } from '@tauri-apps/api/core';
 import { IssueNode } from './IssueNode';
 import { useDependencyGraph } from './useDependencyGraph';
 import { findCriticalPath } from './criticalPath';
-import { useTikiReleasesStore } from '../../stores';
+import { useTikiReleasesStore, useProjectsStore, type TikiRelease } from '../../stores';
 import './DependencyGraph.css';
 
 const nodeTypes: NodeTypes = {
@@ -19,8 +20,33 @@ const nodeTypes: NodeTypes = {
 };
 
 function DependencyGraphInner() {
-  const releases = useTikiReleasesStore((s) => s.releases);
+  // Central store (sidebar's view) — active releases only, never archived.
+  // Used as the trigger for re-fetching our archive-inclusive list.
+  const storeReleases = useTikiReleasesStore((s) => s.releases);
+  const activeProject = useProjectsStore((s) => s.getActiveProject());
   const { fitView } = useReactFlow();
+
+  // Local archive-inclusive release list (graph-only). Includes shipped releases
+  // from .tiki/releases/archive/ so historical work is browseable here without
+  // re-introducing #142's sidebar regression.
+  const [releases, setReleases] = useState<TikiRelease[]>(storeReleases);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tikiPath = activeProject ? `${activeProject.path}\\.tiki` : undefined;
+    invoke<TikiRelease[]>('load_tiki_releases', { tikiPath, includeArchived: true })
+      .then((all) => {
+        if (!cancelled) setReleases(all);
+      })
+      .catch((e) => {
+        console.error('Dependency Graph: failed to load archive-inclusive releases:', e);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // storeReleases dependency: re-fetch when the central store updates (file watcher
+    // signalled a change). activeProject changes also trigger a re-fetch.
+  }, [storeReleases, activeProject]);
 
   // Promote active releases to top; backend already returns descending semver order.
   const sortedReleases = useMemo(() => {
@@ -43,7 +69,7 @@ function DependencyGraphInner() {
   const [showCriticalPath, setShowCriticalPath] = useState(false);
 
   const { nodes, edges, isLoading, error, hasEdges, issueCount } =
-    useDependencyGraph(selectedVersion);
+    useDependencyGraph(selectedVersion, releases);
 
   // Compute critical path
   const criticalPath = useMemo(() => {

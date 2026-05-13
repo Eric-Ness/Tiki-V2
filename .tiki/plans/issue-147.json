@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 147,
+    "title": "Bug: /tiki:release can't create release JSON — desktop UI was the only writer, leaving v0.4.1+ without JSON on disk",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/147"
+  },
+  "createdAt": "2026-05-13T15:39:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "/tiki:release creates .tiki/releases/{version}.json from a minimal scaffold when the file does not already exist (instead of erroring)"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Dependency Graph release dropdown surfaces archived releases (releases/archive/*.json), not just top-level releases/*.json"
+    },
+    {
+      "id": "SC3",
+      "category": "data",
+      "description": "v0.4.1, v0.4.2, v0.5.0 release JSON files exist in .tiki/releases/archive/ with valid TikiRelease shape (parse cleanly via load_tiki_releases, no warn logs)"
+    },
+    {
+      "id": "SC4",
+      "category": "observability",
+      "description": "Startup or load-time warning logs a discrepancy when changelog count exceeds JSON count under .tiki/releases/ (top-level + archive/)"
+    },
+    {
+      "id": "SC5",
+      "category": "correctness",
+      "description": ".claude/commands/tiki/audit.md is byte-identical to packages/framework/commands/audit.md (the missing <errors> and <next-actions> sections are restored)"
+    },
+    {
+      "id": "SC6",
+      "category": "build",
+      "description": "Rust changes compile cleanly via cargo check; no new clippy warnings on touched code paths"
+    },
+    {
+      "id": "SC7",
+      "category": "regression",
+      "description": "Existing sidebar ReleasesSection still works (does not see archived releases by default — preserves the #142 fix that hid shipped releases from the sidebar)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add create-if-absent step to release.md (framework prose)",
+      "status": "pending",
+      "content": "Update step 2 of `<instructions>` in BOTH `.claude/commands/tiki/release.md` AND `packages/framework/commands/release.md` (they're mirrors — both must change).\n\nCurrent step 2: 'Load release definition from .tiki/releases/{version}.json — Validate the file exists'.\n\nNew step 2 logic:\n1. If `.tiki/releases/{version}.json` exists: load it (current behavior).\n2. If it does NOT exist: write a minimal scaffold via the Write tool (the framework cannot call save_tiki_release — that's a Tauri IPC, desktop-only).\n\nScaffold shape:\n```json\n{\n  \"version\": \"{version}\",\n  \"status\": \"active\",\n  \"issues\": [ /* derived from --issues flag, gh milestone query, or interactive prompt */ ],\n  \"createdAt\": \"{ISO}\"\n}\n```\n\nThe issue-list derivation order:\na. `--issues '147,148,149'` CLI flag (preferred).\nb. GitHub milestone matching the version (gh api repos/{owner}/{repo}/milestones?state=open).\nc. Interactive prompt asking for issue numbers (via AskUserQuestion).\n\nUpdate `<error type=\"release-not-found\">` to reflect that auto-create is now the default; the error becomes the fallback when no issue list can be derived at all.\n\nThis phase touches prose only — no Rust, no TS. Verification via Read tool to confirm the edits landed in both files.",
+      "verification": [
+        "`.claude/commands/tiki/release.md` step 2 instructions describe create-if-absent behavior",
+        "`packages/framework/commands/release.md` step 2 instructions are byte-identical to the .claude/ copy",
+        "`<error type=\"release-not-found\">` reworded as fallback case rather than primary error",
+        "git diff shows both files updated, no other prose files touched in this phase"
+      ],
+      "addressesCriteria": ["SC1"],
+      "files": [
+        ".claude/commands/tiki/release.md",
+        "packages/framework/commands/release.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Expose archived releases via load_tiki_releases includeArchived flag",
+      "status": "pending",
+      "content": "Extend `load_tiki_releases` (`apps/desktop/src-tauri/src/commands.rs:216`) to optionally include files from `releases/archive/`.\n\nSignature change:\n```rust\npub fn load_tiki_releases(\n    tiki_path: Option<String>,\n    include_archived: Option<bool>,  // default false\n) -> Result<Vec<TikiRelease>, String>\n```\n\nImplementation:\n- Existing logic stays for top-level `releases/*.json`.\n- If `include_archived.unwrap_or(false)`, also scan `releases/archive/*.json` and append to the result. Same parse + warn-on-fail behavior as the existing loop.\n- Final sort via `cmp_semver` still applies to the merged list.\n\nFrontend wiring:\n- `apps/desktop/src/components/dependencies/useDependencyGraph.ts` — when loading releases for the graph, pass `includeArchived: true` via `invoke('load_tiki_releases', { tikiPath, includeArchived: true })`. NOTE: the current code path goes through `App.tsx:290`'s shared loader. Cleanest fix: add a new effect in `useDependencyGraph` that does its own `invoke` with `includeArchived: true` and populates a local-to-the-hook list, OR thread the flag through the store. Prefer the latter only if multiple components need archived releases.\n- Sidebar `ReleasesSection.tsx:234` and `App.tsx:290` callers stay unchanged (default false preserves #142's fix).\n\nVerification via `cargo check` for the Rust side and visual inspection for TS.",
+      "verification": [
+        "`cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` passes with no new warnings",
+        "Grep `load_tiki_releases` callers: existing sidebar + App.tsx callers unchanged (no includeArchived flag, defaults to false)",
+        "Grep new call site in useDependencyGraph.ts shows includeArchived: true",
+        "Manual: launch desktop app, sidebar ReleasesSection still hides shipped releases (regression check vs #142)",
+        "Manual: Dependency Graph dropdown now includes v0.3.0, v0.4.0 (and post-Phase-3 also v0.4.1, v0.4.2, v0.5.0)"
+      ],
+      "addressesCriteria": ["SC2", "SC6", "SC7"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Backfill v0.4.1, v0.4.2, v0.5.0 release JSONs in archive/",
+      "status": "pending",
+      "content": "Write three release JSON files to `.tiki/releases/archive/` covering the gap.\n\nFor each version (v0.4.1, v0.4.2, v0.5.0):\n1. Read the matching `.tiki/releases/v{X}.{Y}.{Z}-changelog.md` for issue references. Most v0.5.0-era releases reference enhancement IDs (E25, E26, etc.) rather than raw issue numbers — cross-reference these to GitHub issue numbers by searching closed issues whose body or title mentions the E-ID.\n2. Source the `createdAt` and `completedAt` timestamps from the changelog commit's git log (`git log --format=%aI -1 -- .tiki/releases/v{X}.{Y}.{Z}-changelog.md`).\n3. Tag matches version with `v` prefix preserved.\n4. Status: `\"shipped\"` (these are all released).\n5. Write file at `.tiki/releases/archive/v{X}.{Y}.{Z}.json` matching the `TikiRelease` Rust struct shape (state.rs:584):\n   ```json\n   {\n     \"version\": \"vX.Y.Z\",\n     \"name\": \"<theme from changelog>\",\n     \"status\": \"shipped\",\n     \"issues\": [{ \"number\": N, \"title\": \"...\" }, ...],\n     \"createdAt\": \"<ISO>\",\n     \"updatedAt\": \"<ISO ship date>\"\n   }\n   ```\n   Extra fields like `completedAt` / `tag` (present in older files like v0.4.0.json) are tolerated by the Rust struct (no deny_unknown_fields), so optional.\n\nVerification: write the three files, then run `node -e 'console.log(require(\"./.tiki/releases/archive/v0.5.0.json\").issues.length)'` and confirm parse + non-empty issue list. Also: load_tiki_releases (post-Phase-2) with includeArchived=true should return them.",
+      "verification": [
+        "ls `.tiki/releases/archive/` shows v0.4.1.json, v0.4.2.json, v0.5.0.json present",
+        "Each file is valid JSON parseable as TikiRelease (Rust struct: version, status, issues[], createdAt required)",
+        "Issue arrays are populated (non-empty) — sourced from changelog E-ID cross-reference to GitHub closed issues",
+        "Manual: launch desktop app post-Phase-2, Dependency Graph dropdown shows v0.5.0, v0.4.2, v0.4.1 entries with correct issue counts"
+      ],
+      "addressesCriteria": ["SC3"],
+      "files": [
+        ".tiki/releases/archive/v0.4.1.json",
+        ".tiki/releases/archive/v0.4.2.json",
+        ".tiki/releases/archive/v0.5.0.json"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 4,
+      "title": "Add changelog↔JSON parity check at load time",
+      "status": "pending",
+      "content": "Add a parity check in the Rust `load_tiki_releases` (or a sibling helper called by it) that:\n1. Counts `*-changelog.md` files in top-level `releases/` (and optionally `archive/`).\n2. Counts `*.json` files in top-level `releases/` + `archive/`.\n3. If changelog count > JSON count, emit `log::warn!('release JSON gap: {N} changelogs without matching JSON: {versions}')` listing the gap versions.\n\nThe check runs every time `load_tiki_releases` is invoked. Cost is one `read_dir` per directory — cheap; matches the existing function's already-O(n) cost. No new public API surface; this is internal to commands.rs.\n\nReturn the result of `load_tiki_releases` unchanged regardless of the parity result — the warning is informational, not blocking.\n\nVerification: temporarily delete a release JSON and confirm the warn appears in the desktop app's stderr log. Then restore the file.",
+      "verification": [
+        "`cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` passes",
+        "Function returns full release list regardless of parity warn",
+        "Manual: rename one archive JSON aside, restart desktop app, confirm warn line in stderr/RUST_LOG output, restore the JSON",
+        "Post-Phase-3 with all JSONs present: NO parity warning fires"
+      ],
+      "addressesCriteria": ["SC4", "SC6"],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [3]
+    },
+    {
+      "number": 5,
+      "title": "Repair truncated .claude/commands/tiki/audit.md",
+      "status": "pending",
+      "content": "The `.claude/commands/tiki/audit.md` file is missing roughly 47 lines compared to its mirror at `packages/framework/commands/audit.md`. Specifically the `<errors>` and `<next-actions>` sections were dropped during a previous sync.\n\nFix: copy the missing tail from `packages/framework/commands/audit.md` (everything after the `</state-management>` closing tag, approximately lines 150-196) into the `.claude/` copy.\n\nVerify via `diff .claude/commands/tiki/audit.md packages/framework/commands/audit.md` — output should be empty (or only show legitimately diverged sections, if any).\n\nThis phase is mechanical and independent of the others; it could go in any order. Placed last because it's the cleanest 'finishing touch' that doesn't touch any other code path.",
+      "verification": [
+        "`diff .claude/commands/tiki/audit.md packages/framework/commands/audit.md` produces zero output (files identical)",
+        ".claude/ audit.md contains an `<errors>` block and `<next-actions>` block (verify via grep)",
+        "Line count of `.claude/` audit.md matches `packages/framework/` audit.md within ±2 lines (allows for trailing newline differences)"
+      ],
+      "addressesCriteria": ["SC5"],
+      "files": [
+        ".claude/commands/tiki/audit.md"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [3],
+    "SC4": [4],
+    "SC5": [5],
+    "SC6": [2, 4],
+    "SC7": [2]
+  }
+}

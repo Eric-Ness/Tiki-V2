@@ -4,7 +4,7 @@ use crate::watcher;
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
@@ -211,9 +211,17 @@ pub fn switch_project(app: tauri::AppHandle, path: String) -> Result<(), String>
     Ok(())
 }
 
-/// Load all Tiki releases from .tiki/releases/
+/// Load all Tiki releases from .tiki/releases/.
+///
+/// `include_archived` (default false) controls whether `releases/archive/*.json` is also
+/// scanned. The sidebar passes false (preserves the #142 fix that hides shipped releases
+/// from the active list). The Dependency Graph passes true so it can render the full
+/// historical view.
 #[tauri::command]
-pub fn load_tiki_releases(tiki_path: Option<String>) -> Result<Vec<TikiRelease>, String> {
+pub fn load_tiki_releases(
+    tiki_path: Option<String>,
+    include_archived: Option<bool>,
+) -> Result<Vec<TikiRelease>, String> {
     let path = match tiki_path {
         Some(p) => PathBuf::from(p),
         None => {
@@ -229,28 +237,112 @@ pub fn load_tiki_releases(tiki_path: Option<String>) -> Result<Vec<TikiRelease>,
     }
 
     let mut releases = Vec::new();
+    read_release_dir(&releases_dir, &mut releases);
 
-    let entries = std::fs::read_dir(&releases_dir).map_err(|e| e.to_string())?;
-
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let file_path = entry.path();
-
-        if file_path.extension().map_or(false, |ext| ext == "json") {
-            let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-            match serde_json::from_str::<TikiRelease>(&content) {
-                Ok(release) => releases.push(release),
-                Err(e) => {
-                    log::warn!("Failed to parse release file {:?}: {}", file_path, e);
-                }
-            }
+    if include_archived.unwrap_or(false) {
+        let archive_dir = releases_dir.join("archive");
+        if archive_dir.exists() {
+            read_release_dir(&archive_dir, &mut releases);
         }
     }
 
     // Sort by version (descending, semver-aware)
     releases.sort_by(|a, b| cmp_semver(&b.version, &a.version));
 
+    // Parity check: warn (don't fail) if changelog count outruns JSON count, so
+    // missing release records surface in logs instead of going unnoticed for
+    // months. Considers both top-level and archive/ so the count is honest
+    // regardless of where shipped JSONs live.
+    check_release_json_parity(&releases_dir);
+
     Ok(releases)
+}
+
+/// Scan a releases directory for `v*-changelog.md` and `v*.json` filenames and
+/// emit a warn log if any changelog lacks a matching JSON in either the
+/// top-level directory or `archive/`. Pure observability — does not alter
+/// `load_tiki_releases`'s return value.
+fn check_release_json_parity(releases_dir: &Path) {
+    use std::collections::HashSet;
+
+    let mut changelog_versions: HashSet<String> = HashSet::new();
+    let mut json_versions: HashSet<String> = HashSet::new();
+
+    if let Ok(entries) = std::fs::read_dir(releases_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if let Some(v) = name_str.strip_suffix("-changelog.md") {
+                changelog_versions.insert(v.to_string());
+            } else if let Some(v) = name_str.strip_suffix(".json") {
+                json_versions.insert(v.to_string());
+            }
+        }
+    }
+
+    let archive_dir = releases_dir.join("archive");
+    if archive_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&archive_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if let Some(v) = name_str.strip_suffix(".json") {
+                    json_versions.insert(v.to_string());
+                }
+            }
+        }
+    }
+
+    let mut missing: Vec<String> = changelog_versions
+        .difference(&json_versions)
+        .cloned()
+        .collect();
+    missing.sort();
+
+    if !missing.is_empty() {
+        log::warn!(
+            "release JSON gap in {:?}: {} changelog(s) without matching JSON: {:?}",
+            releases_dir,
+            missing.len(),
+            missing
+        );
+    }
+}
+
+/// Read `*.json` files from a single releases directory and parse each into a
+/// `TikiRelease`, pushing successful parses onto `out`. Parse failures are logged
+/// at warn level; the function does not abort on a single bad file. Symlinks and
+/// non-JSON entries are skipped. The `archive/` subdirectory itself is skipped
+/// when scanning the top-level `releases/` directory (it's traversed separately
+/// only when `include_archived` is true).
+fn read_release_dir(dir: &Path, out: &mut Vec<TikiRelease>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            log::warn!("Failed to read releases dir {:?}: {}", dir, e);
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.extension().map_or(false, |ext| ext == "json") {
+            continue;
+        }
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Failed to read release file {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+        match serde_json::from_str::<TikiRelease>(&content) {
+            Ok(release) => out.push(release),
+            Err(e) => {
+                log::warn!("Failed to parse release file {:?}: {}", file_path, e);
+            }
+        }
+    }
 }
 
 /// Save a Tiki release to .tiki/releases/{version}.json
