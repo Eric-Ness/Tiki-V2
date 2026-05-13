@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 149,
+    "title": "Dependency Graph v2 — visual upgrade pack: swimlanes, in-node progress fills, hover-to-trace lineage",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/149"
+  },
+  "createdAt": "2026-05-13T15:53:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "visual",
+      "description": "Dependency graph renders horizontal swimlane bands behind nodes, with each band's color reflecting the dominant status of nodes at that dagre rank"
+    },
+    {
+      "id": "SC2",
+      "category": "visual",
+      "description": "Each IssueNode renders a thin progress bar showing phase progress (full green for completed/closed, partial blue for executing, empty for pending)"
+    },
+    {
+      "id": "SC3",
+      "category": "data",
+      "description": "useDependencyGraph surfaces phaseProgress { current, total } from activeWork[issue:N].phase into IssueNodeData"
+    },
+    {
+      "id": "SC4",
+      "category": "interaction",
+      "description": "Hovering a node dims non-lineage nodes and edges; ancestor + descendant chain stays full opacity"
+    },
+    {
+      "id": "SC5",
+      "category": "interaction",
+      "description": "Hover lineage and the existing Critical Path mode coexist gracefully (lineage takes precedence on hover; critical path styling restores on hover-off)"
+    },
+    {
+      "id": "SC6",
+      "category": "build",
+      "description": "All changes type-check cleanly via tsc -b (verified by inspection given the Windows pnpm reparse-point block) and existing tests continue to pass"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Status swimlane backgrounds at dagre ranks",
+      "status": "pending",
+      "content": "Add a custom React component `<SwimlaneBackground>` rendered as a sibling to ReactFlow's `<Background>` inside the ReactFlow children of `DependencyGraph.tsx`. The component:\n\n1. Reads laid-out node positions via `useReactFlow().getNodes()` (after fitView completes).\n2. Groups nodes by their `position.y` value (each unique y is a 'rank' in dagre's layout).\n3. For each rank, computes the dominant status from the nodes there (e.g., if 3 of 4 are completed, the rank is 'completed-dominant'; ties default to the higher-priority status: executing > failed > completed > pending).\n4. Renders an absolutely-positioned `<div>` for each rank with a low-alpha gradient background scoped to the rank's vertical span.\n\nVertical band span = midpoint between this rank's y and the previous rank's y (top), midpoint between this rank's y and the next rank's y (bottom). For the topmost and bottommost ranks, extend to graph edges.\n\nColor mapping (CSS custom properties, defined in DependencyGraph.css alongside the existing legend dots):\n- executing-dominant: rgba(96, 165, 250, 0.06)\n- failed-dominant: rgba(239, 68, 68, 0.06)\n- completed-dominant: rgba(34, 197, 94, 0.04)\n- pending-dominant: rgba(255, 255, 255, 0.02) (subtle in dark theme)\n\nLight-theme adjustments via `[data-theme=\"light\"]` selector (lower alpha, shifted hues for legibility).\n\nThe component must NOT interfere with pan/zoom — render inside the ReactFlow viewport's transform so bands move with the canvas. ReactFlow exposes this via the `<Background>` slot; mounting alongside via the same pattern works.",
+      "verification": [
+        "Open desktop app, navigate to a non-empty release in Dependency Graph view, confirm horizontal colored bands appear behind nodes",
+        "Toggle Critical Path mode on/off — swimlane bands remain unaffected by critical path styling",
+        "Pan and zoom — bands track with the graph (they don't stay fixed in viewport)",
+        "Bands have low enough alpha to not interfere with node legibility (eyeball test)"
+      ],
+      "addressesCriteria": ["SC1", "SC6"],
+      "files": [
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Phase progress fill inside IssueNode",
+      "status": "pending",
+      "content": "Surface per-issue phase progress as a thin colored bar at the bottom edge of each IssueNode.\n\nData plumbing (`useDependencyGraph.ts`):\n1. Extend `IssueNodeData` (export from IssueNode.tsx) with `phaseProgress?: { current: number; total: number }`.\n2. In `useDependencyGraph`'s node-building loop, derive `phaseProgress` from `activeWork[\\`issue:${number}\\`]?.phase`. If status is 'completed' or 'closed', use `{ current: total, total: total }` (full); if 'executing', use the live `{ current, total }`; otherwise leave undefined.\n3. Pass into IssueNode's `data` prop.\n\nRender (`IssueNode.tsx` + `IssueNode.css`):\n1. Add a `<div className=\"issue-node-progress\">` as the last child of the node container.\n2. Inside it, a `<div className=\"issue-node-progress-fill\">` with inline `style={{ width: progressPercent + '%' }}`.\n3. CSS: 2px height, full width container with neutral bg, fill colored by status (green for completed, blue for executing). Position absolutely at bottom: 0 so it doesn't push title content.\n\nNo render when `phaseProgress` is undefined (pending/open nodes get an empty bottom strip — visual continuity, no jarring absence).",
+      "verification": [
+        "After the v0.5.1 ship completes, the Dependency Graph view for a release with active executing issues shows in-progress bars partially filled",
+        "Closed/completed issues in the graph show fully-filled green bars",
+        "Pending/open issues show no progress bar (or a faint placeholder track)",
+        "Node title remains legible — progress bar sits below the title cleanly"
+      ],
+      "addressesCriteria": ["SC2", "SC3", "SC6"],
+      "files": [
+        "apps/desktop/src/components/dependencies/IssueNode.tsx",
+        "apps/desktop/src/components/dependencies/IssueNode.css",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Hover-to-trace lineage",
+      "status": "pending",
+      "content": "Add `hoveredId: string | null` state to `DependencyGraphInner`. On `<ReactFlow onNodeMouseEnter>`, set; on `onNodeMouseLeave`, clear.\n\nLineage computation (memoize on `[nodes, edges]`):\n- Build forward adjacency map (source → Set<target>) and backward adjacency map (target → Set<source>).\n- Provide a helper `getLineage(id)` that returns `{ ancestors: Set<string>, descendants: Set<string>, edgeIds: Set<string> }` via BFS in both directions from the given node id.\n- Cache results by node id so re-hovers are cheap.\n\nApply styling (`styledNodes` and `styledEdges` useMemo blocks):\n- When `hoveredId !== null`, compute lineage and apply: hovered node + ancestors + descendants render at full opacity; everyone else at 0.3 opacity. Edges on the lineage chain stay full opacity; off-chain edges drop to 0.15.\n- Take precedence over Critical Path styling when both are active: lineage opacity overrides; critical path stroke color is preserved as a secondary signal on visible edges.\n\nThis lives in the same `styledNodes` / `styledEdges` blocks already used for critical path — just merge the opacity logic.",
+      "verification": [
+        "Hover any node in the graph: ancestor + descendant chain stays bright; rest dims to ~30% opacity",
+        "Hover off (mouseLeave): full opacity restored cleanly with no flicker",
+        "Enable Critical Path mode, then hover a node not on the critical path: lineage wins (its chain is bright, critical path edges that aren't on the lineage chain get dimmed)",
+        "Disable Critical Path, hover again: works as in case 1"
+      ],
+      "addressesCriteria": ["SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/criticalPath.ts"
+      ],
+      "dependencies": [2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [2],
+    "SC4": [3],
+    "SC5": [3],
+    "SC6": [1, 2, 3]
+  }
+}

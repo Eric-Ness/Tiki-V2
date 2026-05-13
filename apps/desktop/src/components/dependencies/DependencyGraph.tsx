@@ -10,6 +10,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { invoke } from '@tauri-apps/api/core';
 import { IssueNode } from './IssueNode';
+import { SwimlaneLayer } from './SwimlaneLayer';
 import { useDependencyGraph } from './useDependencyGraph';
 import { findCriticalPath } from './criticalPath';
 import { useTikiReleasesStore, useProjectsStore, type TikiRelease } from '../../stores';
@@ -67,6 +68,7 @@ function DependencyGraphInner() {
   }, [sortedReleases, selectedVersion]);
 
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const { nodes, edges, isLoading, error, hasEdges, issueCount } =
     useDependencyGraph(selectedVersion, releases);
@@ -79,8 +81,65 @@ function DependencyGraphInner() {
 
   const hasCycle = showCriticalPath && hasEdges && criticalPath === null;
 
-  // Apply critical path highlighting to edges
+  // Pre-compute adjacency maps so per-hover lineage BFS is cheap.
+  const adjacency = useMemo(() => {
+    const forward = new Map<string, Set<string>>();
+    const backward = new Map<string, Set<string>>();
+    for (const e of edges) {
+      if (!forward.has(e.source)) forward.set(e.source, new Set());
+      forward.get(e.source)!.add(e.target);
+      if (!backward.has(e.target)) backward.set(e.target, new Set());
+      backward.get(e.target)!.add(e.source);
+    }
+    return { forward, backward };
+  }, [edges]);
+
+  // When a node is hovered, compute its lineage (ancestors + descendants + edges
+  // along the chain). Memoized per hoveredId so re-hovers are cheap.
+  const lineage = useMemo(() => {
+    if (!hoveredId) return null;
+    const nodeIds = new Set<string>([hoveredId]);
+    const edgeIds = new Set<string>();
+    const walk = (start: string, dir: 'forward' | 'backward') => {
+      const map = dir === 'forward' ? adjacency.forward : adjacency.backward;
+      const queue = [start];
+      const seen = new Set([start]);
+      while (queue.length) {
+        const id = queue.shift()!;
+        const next = map.get(id);
+        if (!next) continue;
+        for (const n of next) {
+          if (seen.has(n)) continue;
+          seen.add(n);
+          nodeIds.add(n);
+          queue.push(n);
+          const edgeId =
+            dir === 'forward' ? `e${id}-${n}` : `e${n}-${id}`;
+          edgeIds.add(edgeId);
+        }
+      }
+    };
+    walk(hoveredId, 'forward');
+    walk(hoveredId, 'backward');
+    return { nodeIds, edgeIds };
+  }, [hoveredId, adjacency]);
+
+  // Apply edge styling: hover lineage takes precedence over critical path.
   const styledEdges = useMemo(() => {
+    if (lineage) {
+      return edges.map((edge) => {
+        const inLineage = lineage.edgeIds.has(edge.id);
+        return {
+          ...edge,
+          style: {
+            stroke: 'var(--text-secondary, #555)',
+            strokeWidth: inLineage ? 2.5 : 2,
+            opacity: inLineage ? 1 : 0.15,
+          },
+          animated: false,
+        };
+      });
+    }
     if (!criticalPath || criticalPath.edgeIds.size === 0) return edges;
     return edges.map((edge) => {
       const isOnPath = criticalPath.edgeIds.has(edge.id);
@@ -94,10 +153,16 @@ function DependencyGraphInner() {
         animated: isOnPath,
       };
     });
-  }, [edges, criticalPath]);
+  }, [edges, criticalPath, lineage]);
 
-  // Apply critical path highlighting to nodes
+  // Apply node styling: hover lineage takes precedence over critical path.
   const styledNodes = useMemo(() => {
+    if (lineage) {
+      return nodes.map((node) => ({
+        ...node,
+        className: lineage.nodeIds.has(node.id) ? 'lineage-node' : 'dimmed-node',
+      }));
+    }
     if (!criticalPath || criticalPath.nodeIds.size === 0) return nodes;
     return nodes.map((node) => {
       const isOnPath = criticalPath.nodeIds.has(node.id);
@@ -106,7 +171,9 @@ function DependencyGraphInner() {
         className: isOnPath ? 'critical-path-node' : 'dimmed-node',
       };
     });
-  }, [nodes, criticalPath]);
+  }, [nodes, criticalPath, lineage]);
+
+  const isStyled = showCriticalPath || lineage !== null;
 
   const handleFitView = useCallback(() => {
     fitView({ padding: 0.2, duration: 300 });
@@ -191,16 +258,19 @@ function DependencyGraphInner() {
             </div>
           )}
           <ReactFlow
-            nodes={showCriticalPath ? styledNodes : nodes}
-            edges={showCriticalPath ? styledEdges : edges}
+            nodes={isStyled ? styledNodes : nodes}
+            edges={isStyled ? styledEdges : edges}
             nodeTypes={nodeTypes}
+            onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
+            onNodeMouseLeave={() => setHoveredId(null)}
             fitView
             minZoom={0.3}
             maxZoom={2}
             proOptions={{ hideAttribution: true }}
           >
-            <Controls showFitView={false} />
+            <SwimlaneLayer />
             <Background gap={20} size={1} />
+            <Controls showFitView={false} />
           </ReactFlow>
           <div className="dependency-graph-legend">
             <span className="dependency-graph-legend-item">

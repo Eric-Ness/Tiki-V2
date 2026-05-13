@@ -119,6 +119,19 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
     return issue.state === 'closed' ? 'closed' : 'open';
   };
 
+  // Surface live phase progress for executing issues so the graph node can
+  // render a progress bar reflecting current/total phases.
+  const resolvePhaseProgress = (
+    issue: FetchedIssue
+  ): IssueNodeData['phaseProgress'] => {
+    const work = activeWork[`issue:${issue.number}`];
+    const phase = (work as { phase?: { current?: number; total?: number } } | undefined)?.phase;
+    if (phase && typeof phase.current === 'number' && typeof phase.total === 'number' && phase.total > 0) {
+      return { current: phase.current, total: phase.total };
+    }
+    return undefined;
+  };
+
   // Build nodes and edges from fetched issues
   const { nodes, edges, hasEdges } = useMemo(() => {
     if (!release || fetchedIssues.length === 0) {
@@ -136,6 +149,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
         issueNumber: issue.number,
         title: issue.title,
         status: resolveStatus(issue),
+        phaseProgress: resolvePhaseProgress(issue),
       },
     }));
 

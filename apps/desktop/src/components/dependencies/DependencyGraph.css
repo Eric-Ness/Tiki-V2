@@ -197,7 +197,17 @@
 }
 
 .dimmed-node .issue-node {
-  opacity: 0.4;
+  opacity: 0.3;
+  transition: opacity 0.15s ease;
+}
+
+/* Hover lineage: nodes on the ancestor/descendant chain of the hovered node
+   stay full opacity (and gain a subtle ring), while non-lineage nodes dim
+   via .dimmed-node. */
+.lineage-node .issue-node {
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--accent-primary, #58a6ff), 0 0 8px rgba(88, 166, 255, 0.25);
+  transition: box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
 /* Cycle warning banner */
