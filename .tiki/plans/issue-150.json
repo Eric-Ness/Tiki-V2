@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 150,
+    "title": "Dep graph parser misses markdown 'Related:' sections — graph mostly empty across the project",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/150"
+  },
+  "createdAt": "2026-05-13T16:12:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "correctness",
+      "description": "parseDependencies recognizes inline 'related to #N' and 'see also #N' in addition to the existing depends-on/blocked-by/requires/after vocabulary"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "parseDependencies finds #N references inside markdown 'Related' sections regardless of list/bullet formatting"
+    },
+    {
+      "id": "SC3",
+      "category": "regression",
+      "description": "Existing tight patterns ('depends on #N', 'blocked by #N', 'requires #N', 'after #N') still parse correctly"
+    },
+    {
+      "id": "SC4",
+      "category": "data",
+      "description": "Cross-release references are still filtered out (releaseIssueNumbers gating preserved)"
+    },
+    {
+      "id": "SC5",
+      "category": "demo",
+      "description": "Dependency Graph for v0.5.1 shows edges between #147, #148, #149 (since all three reference each other via ## Related sections in their bodies)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Extend parseDependencies with inline + section-based recognition",
+      "status": "pending",
+      "content": "Rewrite `apps/desktop/src/components/dependencies/parseDependencies.ts` to recognize three kinds of references:\n\n1. **Tight inline patterns (existing + extended):**\n   ```ts\n   const inlinePattern = /(?:depends on|blocked by|requires|after|related to|see also)\\s+#(\\d+)/gi;\n   ```\n   Adds `related to` and `see also` to the existing list. All four original triggers stay.\n\n2. **Section-based scan:**\n   ```ts\n   const sectionPattern = /(?:^|\\n)#{1,4}\\s*related[^\\n]*\\n([\\s\\S]*?)(?=\\n#{1,6}\\s|$)/gi;\n   ```\n   Matches any markdown heading (h1–h4) whose text contains `related` (case-insensitive). Captures the body following the heading up to the next heading or end of body. Inside the captured block, harvest every `#N` reference via a separate `/#(\\d+)/g` scan.\n\n3. **Merge + filter:**\n   Collect all parsed numbers into a `Set<number>` (deduplicates). Filter to `releaseIssueNumbers.has(num)` as today. Return as `number[]`.\n\nNo edge-type distinction yet (hard vs soft refs both become regular edges). That's a future polish — for now the goal is just to make the graph populated.\n\nFunction signature stays unchanged: `(body: string, releaseIssueNumbers: Set<number>) => number[]`. Callers don't need to change.",
+      "verification": [
+        "Read parseDependencies.ts post-edit; confirm both regex patterns are present and the function returns a Set-deduped, release-filtered array",
+        "Manual test in node REPL: parse a body containing '## Related\\n- #147\\n- #149' against a set containing 147, 148, 149 → returns [147, 149]",
+        "Manual test: parse 'requires the JSON to already exist' (the false-positive case from #147's body) against any set → does NOT extract any number (since 'requires' is not followed by #N)",
+        "Manual test: parse 'depends on #42' against {42} → returns [42] (regression check)",
+        "Launch desktop app, open Dependency Graph for v0.5.1, confirm edges between #147, #148, #149 are visible"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/components/dependencies/parseDependencies.ts"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1]
+  }
+}
