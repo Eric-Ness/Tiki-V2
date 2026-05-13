@@ -104,6 +104,17 @@ export function SettingsPage() {
               step={100}
             />
           </div>
+
+          <div className="settings-row">
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={terminal.autoResumeClaude}
+                onChange={(e) => updateTerminal({ autoResumeClaude: e.target.checked })}
+              />
+              <span>Auto-resume Claude conversations</span>
+            </label>
+          </div>
           <p className="settings-hint">Terminal settings apply to new terminals only.</p>
 
           <p className="settings-info">

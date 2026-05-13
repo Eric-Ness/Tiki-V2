@@ -1,0 +1,79 @@
+.resume-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+  min-width: 320px;
+  max-width: 520px;
+  background: rgba(30, 30, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  color: var(--text-primary, #cccccc);
+}
+
+.resume-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-banner-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #858585);
+}
+
+.resume-banner-cmd {
+  font-family: var(--font-mono, 'Cascadia Mono', Consolas, monospace);
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  color: var(--text-primary, #cccccc);
+  word-break: break-all;
+}
+
+.resume-banner-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.resume-banner-primary,
+.resume-banner-secondary {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.resume-banner-primary {
+  background: var(--accent, #0e639c);
+  color: #ffffff;
+  border-color: var(--accent, #0e639c);
+}
+
+.resume-banner-primary:hover {
+  background: var(--accent-hover, #1177bb);
+}
+
+.resume-banner-secondary {
+  background: transparent;
+  color: var(--text-secondary, #858585);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.resume-banner-secondary:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #cccccc);
+}
