@@ -22,12 +22,12 @@ function DependencyGraphInner() {
   const releases = useTikiReleasesStore((s) => s.releases);
   const { fitView } = useReactFlow();
 
-  // Sort releases: active first, then by version descending
+  // Promote active releases to top; backend already returns descending semver order.
   const sortedReleases = useMemo(() => {
     return [...releases].sort((a, b) => {
       if (a.status === 'active' && b.status !== 'active') return -1;
       if (b.status === 'active' && a.status !== 'active') return 1;
-      return b.version.localeCompare(a.version);
+      return 0;
     });
   }, [releases]);
 

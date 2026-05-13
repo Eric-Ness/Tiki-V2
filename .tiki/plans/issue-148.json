@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 148,
+    "title": "Bug: Dependency graph version dropdown uses string sort instead of semver — v0.2.9 appears after v0.2.15",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/148"
+  },
+  "createdAt": "2026-05-13T15:08:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "correctness",
+      "description": "DependencyGraph.tsx no longer references localeCompare for version ordering"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "Active-status releases stay pinned to top of dropdown"
+    },
+    {
+      "id": "SC3",
+      "category": "correctness",
+      "description": "Backend semver order from cmp_semver (commands.rs:251) is preserved through to dropdown render"
+    },
+    {
+      "id": "SC4",
+      "category": "build",
+      "description": "pnpm build passes from repo root (uses tsc -b, stricter than --noEmit)"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Remove broken localeCompare, trust backend semver sort",
+      "status": "pending",
+      "content": "Edit `apps/desktop/src/components/dependencies/DependencyGraph.tsx:26-32`. The Rust backend's `load_tiki_releases` already returns releases sorted descending by semver via `cmp_semver` (`apps/desktop/src-tauri/src/commands.rs:251`). The frontend `sortedReleases` useMemo then calls `b.version.localeCompare(a.version)`, which is lexicographic and undoes the correct order ('v0.2.9' > 'v0.2.15' under string compare).\n\nFix (Option A from the issue body): replace the `return b.version.localeCompare(a.version)` line with `return 0`. Keep the active-first promotion block above it intact. `Array.prototype.sort` is stable in modern engines (V8, JavaScriptCore), so a `return 0` comparator preserves the backend's existing semver order while the active-first comparison still pulls active releases to the top.\n\nThis matches the resolution pattern used for issue #120 (the analogous sidebar ReleasesSection bug, already shipped 2026-02-20). #148 is the second-consumer regression — DependencyGraph.tsx was added later as part of #92 and didn't inherit the fix.",
+      "verification": [
+        "Grep `apps/desktop/src/components/dependencies/DependencyGraph.tsx` for 'localeCompare' — no matches",
+        "Visual check: the active-first promotion `if (a.status === 'active' && ...)` block is still present in DependencyGraph.tsx:26-32",
+        "`pnpm build` passes from repo root with no new errors",
+        "Manual: launch desktop app, open Dependency Graph view, confirm dropdown shows v0.5.1 (active) first, then v0.2.15 → v0.2.14 → ... → v0.2.5 in correct descending order (not the broken v0.2.9, v0.2.8, ... v0.2.15 order)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4"],
+      "files": [
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1]
+  }
+}
