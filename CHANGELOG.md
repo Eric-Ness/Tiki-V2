@@ -10,6 +10,18 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.5.5] — 2026-05-13
+
+Single-issue release carrying the xterm namespace migration deferred from v0.5.4. Full per-issue summary: [`.tiki/releases/v0.5.5-changelog.md`](.tiki/releases/v0.5.5-changelog.md).
+
+### Changed
+- **xterm.js package namespace**: `xterm@5.3.0` → `@xterm/xterm@5.5.0` (#161). 5.3.0 was the last release on the unscoped name. No behavior change; addons were already on the scoped namespace, so TS jump-to-definition now lands on the right surface.
+
+### Known issues
+- Terminal clickable URLs and Ctrl+V/Ctrl+C clipboard shortcuts observed not working during v0.5.5 smoke test (#169). Investigation pending — may be pre-existing or a regression from the namespace swap; A/B against v0.5.4 will isolate.
+
+---
+
 ## [v0.5.4] — 2026-05-13
 
 Five-issue follow-up to v0.5.3's paste fix. Most were originally queued for v0.5.3 but split out after build verification was blocked locally. Full per-issue summaries: [`.tiki/releases/v0.5.4-changelog.md`](.tiki/releases/v0.5.4-changelog.md).

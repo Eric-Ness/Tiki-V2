@@ -1,0 +1,16 @@
+{
+  "version": "v0.5.5",
+  "name": "xterm package migration",
+  "status": "completed",
+  "issues": [
+    {
+      "number": 161,
+      "title": "Tech debt: Migrate desktop app from legacy 'xterm' package to '@xterm/xterm' namespace"
+    }
+  ],
+  "createdAt": "2026-05-13T19:18:00.000Z",
+  "completedAt": "2026-05-13T21:30:00.000Z",
+  "shipped": true,
+  "tag": "v0.5.5",
+  "note": "Carried the xterm.js namespace migration deferred from v0.5.4. The deferral root cause turned out to be a Win11 kernel-level reparse-point trust mitigation (not Defender), unblocked by running `pnpm install` from an elevated PowerShell. See CLAUDE.md."
+}
