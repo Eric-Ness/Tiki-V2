@@ -217,7 +217,7 @@ export function TerminalTabs() {
         <button
           className="terminal-tab-new"
           onClick={handleNewTab}
-          title="New terminal (Ctrl+T)"
+          title="New terminal (Ctrl+Shift+T)"
         >
           +
         </button>

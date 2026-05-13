@@ -1,0 +1,26 @@
+{
+  "issue": {
+    "number": 156,
+    "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Gate Ctrl+W and remap Ctrl+T → Ctrl+Shift+T in TerminalPane",
+      "content": "Modify `apps/desktop/src/components/terminal/TerminalPane.tsx` (current handler at lines 28-91) and `apps/desktop/src/components/terminal/TerminalTabs.tsx` (line 220 tooltip) to stop the window-level keydown handler from swallowing shell-relevant chords when an xterm has keyboard focus.\n\nChanges in `TerminalPane.tsx`:\n\n1. **Remove the Ctrl+T branch entirely** (currently lines 34-39 — `if (e.key === 't' || e.key === 'T') { e.preventDefault(); addTab(); return; }`). Ctrl+T is bash readline's `transpose-chars`; the terminal must see it untouched.\n\n2. **Add a new Ctrl+Shift+T branch** for \"new tab.\" Place it just before the existing Ctrl+W branch (so the modifier-shape ordering reads naturally). The check is `if (e.shiftKey && (e.key === 'T' || e.key === 't')) { e.preventDefault(); addTab(); return; }` — note that when Shift is held, the browser may report `e.key` as the uppercase `T`. Use the same case-insensitive check pattern other branches use.\n\n3. **Gate the Ctrl+W branch** with an xterm-focus check. Replace the existing Ctrl+W block (lines 41-48) with:\n\n   ```ts\n   // Ctrl/Cmd + W: Close current tab — but ONLY when an xterm doesn't have focus.\n   // In bash/zsh readline, Ctrl+W is `unix-word-rubout` (delete word backward).\n   // Without this gate, typing Ctrl+W in the shell would kill the entire terminal.\n   if (e.key === 'w' || e.key === 'W') {\n     const target = e.target as HTMLElement | null;\n     if (target?.closest('.xterm')) return;\n     if (activeTabId) {\n       e.preventDefault();\n       removeTab(activeTabId);\n     }\n     return;\n   }\n   ```\n\n   Using `.closest('.xterm')` catches both xterm's helper textarea and any descendant element inside `.xterm` containers. UI chrome (split bars, tab bar, settings) is *outside* `.xterm`, so Ctrl+W still works from those surfaces.\n\n4. **Do not blanket-gate the entire handler.** The other shortcuts — Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+Shift+H, Ctrl+Shift+| — must continue to fire even when the terminal has focus. Bash/zsh/PowerShell do not bind any of these chords, so they're safe to keep global. (This matches the verification line in the issue body: \"Ctrl+Shift+H still splits even from a focused terminal.\")\n\nChanges in `TerminalTabs.tsx`:\n\n5. **Update the \"+\" button tooltip** at line 220 from `title=\"New terminal (Ctrl+T)\"` to `title=\"New terminal (Ctrl+Shift+T)\"`.\n\nNo changes to `SettingsPage.tsx` in this issue. Sibling issue #160 (Ctrl+Z explainer) is the right home for any new \"Keyboard shortcuts\" reference block in Settings; adding one here would step on that scope.\n\nMac platform: the existing handler routes through `modifier = isMac ? e.metaKey : e.ctrlKey;` at line 30, so the new Ctrl+Shift+T and gated Ctrl+W inherit the same `modifier`-checked path. No mac-specific code needed.\n\nKeep the existing dependency list on `useCallback` unchanged (`[activeTabId, addTab, removeTab, setActiveTab, splitTerminal, tabs]`).",
+      "verification": [
+        "TerminalPane.tsx has no Ctrl+T branch, has a new Ctrl+Shift+T branch that calls addTab(), and the Ctrl+W branch contains a `.closest('.xterm')` early-return before `removeTab`.",
+        "TerminalTabs.tsx line 220 tooltip reads `New terminal (Ctrl+Shift+T)`.",
+        "`cargo check` from apps/desktop/src-tauri runs clean (sanity, no Rust changes expected).",
+        "Local TypeScript verification deferred to CI: .github/workflows/pr.yml runs `pnpm typecheck` and `pnpm build` (`tsc -b`, stricter than `--noEmit`) on the PR.",
+        "Manual smoke when the desktop app can be built: focus a terminal, type `echo hello world`, press Ctrl+W — readline deletes `world`, the tab does NOT close.",
+        "Manual smoke: from a focused terminal press Ctrl+T — no new tab opens; the shell receives transpose-chars (or its platform equivalent).",
+        "Manual smoke: from a focused terminal press Ctrl+Shift+T — a new terminal tab opens.",
+        "Manual smoke: click the tab bar (outside any .xterm container), press Ctrl+W — the active tab closes (regression check that the gate doesn't break the normal close path).",
+        "Manual smoke: from a focused terminal press Ctrl+Shift+H — still splits horizontally (regression check that the gate is scoped to Ctrl+W only).",
+        "Manual smoke: tooltip on the `+` button in the tab bar reads 'New terminal (Ctrl+Shift+T)'."
+      ],
+      "status": "pending"
+    }
+  ]
+}
