@@ -1,7 +1,8 @@
 {
   "version": "v0.5.4",
   "name": "Terminal polish (continued)",
-  "status": "pending",
+  "status": "shipped",
+  "shipped": true,
   "issues": [
     {
       "number": 156,
@@ -22,13 +23,9 @@
     {
       "number": 160,
       "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo"
-    },
-    {
-      "number": 161,
-      "title": "Tech debt: Migrate desktop app from legacy 'xterm' package to '@xterm/xterm' namespace"
     }
   ],
   "createdAt": "2026-05-13T18:00:00.000Z",
-  "shipped": false,
-  "note": "Carries the 6 remaining 'Terminal polish' issues that were split out of v0.5.3 when build verification was blocked locally. Resume with /tiki:release v0.5.4 once Defender exclusions for the .pnpm virtual store are configured."
+  "completedAt": "2026-05-13T19:20:00.000Z",
+  "note": "Shipped 5 of the original 6 'Terminal polish (continued)' issues. Issue #161 (xterm → @xterm/xterm migration) was deferred to v0.5.5 because the package.json change requires a pnpm-lock.yaml update that can't be generated locally (Windows Defender blocks pnpm install workspace junctions on this machine — see CLAUDE.md)."
 }

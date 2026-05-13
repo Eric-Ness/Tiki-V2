@@ -10,6 +10,26 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.5.4] — 2026-05-13
+
+Five-issue follow-up to v0.5.3's paste fix. Most were originally queued for v0.5.3 but split out after build verification was blocked locally. Full per-issue summaries: [`.tiki/releases/v0.5.4-changelog.md`](.tiki/releases/v0.5.4-changelog.md).
+
+### Added
+- **Clear Scrollback** terminal tab context-menu entry + **Ctrl+Shift+K** shortcut (#158). Fulfills ENHANCEMENT-IDEAS E1.
+- **Resume Conversation banner** for terminals that previously ran `claude` (#159). Auto-types `claude --continue` on click. Optional 5-second auto-resume via new **Auto-resume Claude conversations** setting. Privacy: only commands matching `^claude` are persisted.
+
+### Fixed
+- **Ctrl+W and Ctrl+T no longer eat shell keys** (#156). Ctrl+W is now gated by an `.xterm`-focus check; Ctrl+T is unbound (readline's `transpose-chars` reaches the shell). **Ctrl+Shift+T** opens new tabs.
+- **PTY UTF-8 carryover + 10ms IPC coalescing** (#157). Multi-byte sequences across 4KB read boundaries no longer become U+FFFD; PowerShell tab-completion no longer floods the renderer. Supersedes ENHANCEMENT-IDEAS E4.
+
+### Docs
+- **Settings explainer**: Ctrl+Z in the terminal is SIGTSTP, not undo (#160).
+
+### Deferred
+- `@xterm/xterm` package migration (#161) moved to v0.5.5 — the package.json swap requires a `pnpm-lock.yaml` regeneration that can't be done locally right now (Windows Defender blocks pnpm install workspace junctions on this machine).
+
+---
+
 ## [v0.5.0] — 2026-05-12
 
 ### Added
