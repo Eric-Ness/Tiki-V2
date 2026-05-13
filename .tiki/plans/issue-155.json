@@ -1,0 +1,22 @@
+{
+  "issue": {
+    "number": 155,
+    "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Delete redundant Ctrl+V and Ctrl+Shift+V handlers",
+      "content": "Remove the two custom paste branches in apps/desktop/src/components/terminal/Terminal.tsx (lines 255-273 in current HEAD): the Ctrl+Shift+V handler at 255-263 and the Ctrl+V handler at 265-273. Both call `xterm.paste(clipboardText)` after a custom `clipboard.readText()` call and return `false` from `attachCustomKeyEventHandler` — but xterm.js's own internal `paste` DOM event listener still fires independently, writing the same text a second time. Deleting both branches lets xterm.js's native paste path own paste exclusively. Keep the Ctrl+Shift+C copy branch (lines 247-253) — it is the only path for copy-on-Ctrl+Shift+C since xterm.js does not provide it. Update the section comment from \"Handle copy/paste keyboard shortcuts\" to \"Handle copy keyboard shortcut\" since paste is no longer handled here.",
+      "verification": [
+        "pnpm typecheck clean from repo root",
+        "pnpm build clean from repo root (uses tsc -b which is stricter than typecheck)",
+        "Manual smoke test in pnpm tauri:dev: paste a 200-character single line via Ctrl+V — appears exactly once",
+        "Paste a 5-line block via Ctrl+V — appears once, line endings preserved",
+        "Ctrl+Shift+V also pastes once (no longer doubled)",
+        "Ctrl+Shift+C still copies the selection (regression check)"
+      ],
+      "status": "pending"
+    }
+  ]
+}
