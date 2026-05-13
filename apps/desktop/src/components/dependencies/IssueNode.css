@@ -89,6 +89,32 @@
   padding-bottom: 6px;
 }
 
+/* Label chip row: small colored pills mirroring GitHub label colors.
+   Encoded as color only (no text) to keep horizontal real estate low;
+   hover reveals the name via the native title attr. */
+.issue-node-labels {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.issue-node-label-chip {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.issue-node-label-overflow {
+  font-size: 9px;
+  color: var(--text-secondary, #888);
+  margin-left: 2px;
+  letter-spacing: 0.2px;
+}
+
 /* Progress bar at the bottom edge of the node — surfaces phase progress
    without changing node height. */
 .issue-node-progress {

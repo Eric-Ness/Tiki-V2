@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 153,
+    "title": "Render GitHub labels as colored chips below the issue title in dep graph nodes",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/153"
+  },
+  "createdAt": "2026-05-13T16:49:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "data",
+      "description": "FetchedIssue surfaces labels (name + color) — the Rust side already returns them, just type-them in TS"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "IssueNode renders a row of colored chips matching each label's GitHub color"
+    },
+    {
+      "id": "SC3",
+      "category": "correctness",
+      "description": "Hovering a chip shows the label name via the native title attribute"
+    },
+    {
+      "id": "SC4",
+      "category": "correctness",
+      "description": "If an issue has >4 labels, only the first 4 chips render and a +N indicator shows the remainder"
+    },
+    {
+      "id": "SC5",
+      "category": "regression",
+      "description": "Issues with no labels render no chip row and no empty space — the node looks unchanged"
+    },
+    {
+      "id": "SC6",
+      "category": "regression",
+      "description": "Variable node heights from #152 still work — chips fit within the node box at all sizes"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Surface labels via FetchedIssue + render chip row",
+      "status": "pending",
+      "content": "**Discovery:** No Rust change needed. The existing `GitHubIssue` struct (`github.rs:32-42`) already includes `labels: Vec<GitHubLabel>` with name, color, description. The `gh issue view --json labels` invocation already requests them. The frontend just doesn't *type* them in.\n\n**Three changes, all TypeScript + CSS:**\n\n**1. `useDependencyGraph.ts` — surface labels through FetchedIssue → IssueNodeData**\n\nExtend `FetchedIssue`:\n```ts\ninterface FetchedIssue {\n  number: number;\n  title: string;\n  body?: string;\n  state: string;\n  phaseCount?: number;\n  labels?: { name: string; color: string }[];\n}\n```\n\nIn the fallback object inside the `.catch()` of `fetch_github_issue_by_number`, add `labels: []` (since errors won't have labels):\n```ts\n.catch(() => ({\n  number: issue.number,\n  title: issue.title,\n  body: undefined,\n  state: 'open',\n  labels: [],\n}))\n```\n\nThread labels into `IssueNodeData` in the nodes.map block:\n```ts\ndata: {\n  issueNumber: issue.number,\n  title: issue.title,\n  status: resolveStatus(issue),\n  phaseProgress: resolvePhaseProgress(issue),\n  phaseCount: issue.phaseCount,\n  labels: issue.labels ?? [],\n}\n```\n\n**2. `IssueNode.tsx` — render the chip row**\n\nExtend `IssueNodeData`:\n```ts\nexport type IssueNodeData = {\n  // ...\n  labels?: { name: string; color: string }[];\n};\n```\n\nAfter `.issue-node-title` and before the progress bar, render chips:\n```tsx\n{data.labels && data.labels.length > 0 && (\n  <div className=\"issue-node-labels\" aria-hidden=\"true\">\n    {data.labels.slice(0, 4).map((l) => (\n      <span\n        key={l.name}\n        className=\"issue-node-label-chip\"\n        style={{ backgroundColor: `#${l.color}` }}\n        title={l.name}\n      />\n    ))}\n    {data.labels.length > 4 && (\n      <span className=\"issue-node-label-overflow\" title={data.labels.slice(4).map((l) => l.name).join(', ')}>\n        +{data.labels.length - 4}\n      </span>\n    )}\n  </div>\n)}\n```\n\nThe `data.labels.slice(4).map(...).join(', ')` on the overflow title surfaces the hidden label names on hover, so they aren't completely lost.\n\n**3. `IssueNode.css` — chip styling**\n\nAdd:\n```css\n.issue-node-labels {\n  display: flex;\n  align-items: center;\n  gap: 3px;\n  margin-top: 2px;\n  margin-bottom: 4px;\n}\n\n.issue-node-label-chip {\n  display: inline-block;\n  width: 10px;\n  height: 6px;\n  border-radius: 2px;\n  flex-shrink: 0;\n}\n\n.issue-node-label-overflow {\n  font-size: 9px;\n  color: var(--text-secondary, #888);\n  margin-left: 2px;\n  letter-spacing: 0.2px;\n}\n```\n\nChip dimensions match the issue's spec (6×10px pill, 3px gap). Color comes from inline style (GitHub hex sans `#`).\n\n**Why no min-width changes to the node:** The current `min-width: 160px; max-width: 220px` (IssueNode.css:7-8) accommodates up to ~4 chips + overflow indicator at ~62px row width comfortably. No layout reflow needed.\n\n**Why slice(0, 4) is a hard cap:** Past 4 chips the row gets unreadable as encoding, and most issues won't have more than 4 labels anyway. The +N indicator is the escape hatch for the edge case.",
+      "verification": [
+        "Read post-edit IssueNode.tsx: chip row renders only when data.labels.length > 0, slice(0,4) bound, overflow indicator with combined name in title",
+        "Read post-edit IssueNode.css: chip dimensions 10x6px, border-radius 2px, flex layout with gap",
+        "Read post-edit useDependencyGraph.ts: FetchedIssue has labels?, IssueNodeData receives labels: issue.labels ?? [], fallback case has labels: []",
+        "Run cargo check — must be clean (no Rust changes expected)",
+        "Open Dependency Graph in desktop app: confirm v0.5.2 issues (which have labels: enhancement, desktop, styling, ux on #151) show colored chip rows",
+        "Confirm an issue with >4 labels (if any exists in the project history) shows 4 chips + '+N' indicator",
+        "Hover a chip in the desktop app: native title tooltip shows the label name",
+        "Confirm any issue with no labels shows no chip row and no empty space (regression check)",
+        "Confirm variable heights from #152 still work — chips visible at 50/60/75/90px node heights"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts",
+        "apps/desktop/src/components/dependencies/IssueNode.tsx",
+        "apps/desktop/src/components/dependencies/IssueNode.css"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1]
+  }
+}

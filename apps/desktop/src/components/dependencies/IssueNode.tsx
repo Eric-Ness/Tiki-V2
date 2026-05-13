@@ -7,6 +7,7 @@ export type IssueNodeData = {
   status: 'pending' | 'executing' | 'completed' | 'failed' | 'open' | 'closed';
   phaseProgress?: { current: number; total: number };
   phaseCount?: number;
+  labels?: { name: string; color: string }[];
 };
 
 // Mirror of computeNodeHeight in useDependencyGraph.ts. Kept local so the
@@ -59,6 +60,26 @@ export function IssueNode({ data }: NodeProps<IssueNodeType>) {
         </span>
       </div>
       <div className="issue-node-title">{truncatedTitle}</div>
+      {data.labels && data.labels.length > 0 && (
+        <div className="issue-node-labels" aria-hidden="true">
+          {data.labels.slice(0, 4).map((l) => (
+            <span
+              key={l.name}
+              className="issue-node-label-chip"
+              style={{ backgroundColor: `#${l.color}` }}
+              title={l.name}
+            />
+          ))}
+          {data.labels.length > 4 && (
+            <span
+              className="issue-node-label-overflow"
+              title={data.labels.slice(4).map((l) => l.name).join(', ')}
+            >
+              +{data.labels.length - 4}
+            </span>
+          )}
+        </div>
+      )}
       {showProgress && (
         <div className="issue-node-progress" aria-hidden="true">
           <div

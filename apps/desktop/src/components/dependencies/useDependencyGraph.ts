@@ -14,6 +14,7 @@ interface FetchedIssue {
   body?: string;
   state: string;
   phaseCount?: number;
+  labels?: { name: string; color: string }[];
 }
 
 // Maps plan phase count to a node visual height. Undefined = no plan yet
@@ -101,6 +102,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
             title: issue.title,
             body: undefined,
             state: 'open',
+            labels: [],
           })),
           invoke<{ phases?: unknown[] } | null>('get_plan', {
             issueNumber: issue.number,
@@ -188,6 +190,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
           status: resolveStatus(issue),
           phaseProgress: resolvePhaseProgress(issue),
           phaseCount: issue.phaseCount,
+          labels: issue.labels ?? [],
         },
       };
     });
