@@ -190,6 +190,21 @@
   background: #f59e0b;
 }
 
+/* Edge swatches in the legend — small horizontal lines mirroring the
+   solid (hard dependency) and dashed (soft related-to) edge styles. */
+.dependency-graph-legend-edge {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--text-secondary, #888);
+  margin-right: 2px;
+  vertical-align: middle;
+}
+
+.dependency-graph-legend-edge-dashed {
+  border-top-style: dashed;
+}
+
 /* Critical path node highlighting */
 .critical-path-node .issue-node {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);

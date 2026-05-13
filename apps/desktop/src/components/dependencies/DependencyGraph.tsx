@@ -132,6 +132,7 @@ function DependencyGraphInner() {
         return {
           ...edge,
           style: {
+            ...edge.style,
             stroke: 'var(--text-secondary, #555)',
             strokeWidth: inLineage ? 2.5 : 2,
             opacity: inLineage ? 1 : 0.15,
@@ -146,6 +147,7 @@ function DependencyGraphInner() {
       return {
         ...edge,
         style: {
+          ...edge.style,
           stroke: isOnPath ? '#f59e0b' : 'var(--text-secondary, #555)',
           strokeWidth: isOnPath ? 3 : 2,
           opacity: isOnPath ? 1 : 0.3,
@@ -285,6 +287,16 @@ function DependencyGraphInner() {
             <span className="dependency-graph-legend-item">
               <span className="dependency-graph-legend-dot legend-dot-failed" /> Failed
             </span>
+            {hasEdges && (
+              <>
+                <span className="dependency-graph-legend-item">
+                  <span className="dependency-graph-legend-edge dependency-graph-legend-edge-solid" /> Depends on
+                </span>
+                <span className="dependency-graph-legend-item">
+                  <span className="dependency-graph-legend-edge dependency-graph-legend-edge-dashed" /> Related to
+                </span>
+              </>
+            )}
             {showCriticalPath && criticalPath && criticalPath.edgeIds.size > 0 && (
               <span className="dependency-graph-legend-item">
                 <span className="dependency-graph-legend-dot legend-dot-critical" /> Critical

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 154,
+    "title": "Render 'Related:' soft references as dashed edges to distinguish from hard dependencies in the dep graph",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/154"
+  },
+  "createdAt": "2026-05-13T16:51:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "correctness",
+      "description": "parseDependencies returns { number, kind: 'hard' | 'soft' }[] — hard for depends-on/blocked-by/requires/after, soft for related-to/see-also and ## Related sections"
+    },
+    {
+      "id": "SC2",
+      "category": "correctness",
+      "description": "If the same target appears as both hard and soft, hard wins (more restrictive semantic)"
+    },
+    {
+      "id": "SC3",
+      "category": "correctness",
+      "description": "Hard edges render solid; soft edges render dashed (strokeDasharray)"
+    },
+    {
+      "id": "SC4",
+      "category": "regression",
+      "description": "Critical Path and hover-lineage style overlays preserve strokeDasharray on soft edges (currently they replace style entirely, dropping dasharray)"
+    },
+    {
+      "id": "SC5",
+      "category": "correctness",
+      "description": "Legend shows solid + dashed indicators with appropriate labels"
+    },
+    {
+      "id": "SC6",
+      "category": "regression",
+      "description": "Edge animation from #151 still works on hard edges; soft animated edges have the moving dash if flowing"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add edge-kind distinction end-to-end (parser → edge style → legend)",
+      "status": "pending",
+      "content": "**1. `parseDependencies.ts` — return `{ number, kind }[]`**\n\nReturn type changes from `number[]` to `{ number: number; kind: 'hard' | 'soft' }[]`.\n\nInternally, use a `Map<number, 'hard' | 'soft'>` so hard overrides soft if the same `#N` appears both ways:\n\n```ts\nconst deps = new Map<number, 'hard' | 'soft'>();\nconst record = (n: number, kind: 'hard' | 'soft') => {\n  const existing = deps.get(n);\n  if (existing === 'hard') return; // hard wins, never downgrade\n  deps.set(n, kind);\n};\n\n// Hard triggers\nfor (const m of body.matchAll(/(?:depends on|blocked by|requires|after)\\s+#(\\d+)/gi)) {\n  record(parseInt(m[1], 10), 'hard');\n}\n// Soft inline triggers\nfor (const m of body.matchAll(/(?:related to|see also)\\s+#(\\d+)/gi)) {\n  record(parseInt(m[1], 10), 'soft');\n}\n// Soft section scan\nconst sectionPattern = /(?:^|\\n)#{1,4}\\s*[^\\n]*related[^\\n]*\\n([\\s\\S]*?)(?=\\n#{1,6}\\s|$)/gi;\nfor (const sm of body.matchAll(sectionPattern)) {\n  for (const rm of sm[1].matchAll(/#(\\d+)/g)) {\n    record(parseInt(rm[1], 10), 'soft');\n  }\n}\n\nreturn [...deps.entries()]\n  .filter(([n]) => releaseIssueNumbers.has(n))\n  .map(([number, kind]) => ({ number, kind }));\n```\n\nUpdate the docstring to remove the line saying there's no edge-type distinction.\n\n**2. `useDependencyGraph.ts` — set strokeDasharray on soft edges**\n\nThe edge-builder loop currently iterates `deps.forEach((depNumber) => ...)`. After the parser change `deps` is `{ number, kind }[]`, so rename:\n\n```ts\ndeps.forEach((dep) => {\n  const sourceStatus = statusByNodeId.get(String(dep.number));\n  const targetStatus = statusByNodeId.get(String(issue.number));\n  const isFlowing =\n    (sourceStatus === 'completed' || sourceStatus === 'closed') &&\n    targetStatus === 'executing';\n\n  edges.push({\n    id: `e${dep.number}-${issue.number}`,\n    source: String(dep.number),\n    target: String(issue.number),\n    animated: isFlowing,\n    data: { kind: dep.kind },\n    style: dep.kind === 'soft' ? { strokeDasharray: '6 4' } : undefined,\n    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },\n  });\n});\n```\n\nNote: `dep.number` (not `depNumber`) — the variable name changes. Also note `data: { kind }` for downstream consumers (helpful for future analytics, optional but cheap).\n\n**3. `DependencyGraph.tsx` — preserve dashed style through overlays**\n\nThe two `styledEdges` overlays currently write `style: { stroke, strokeWidth, opacity }` which fully replaces the base style. If we want soft edges to STAY dashed in Critical Path / hover-lineage modes, spread the base in:\n\n```ts\n// Lineage block (line ~134):\nstyle: {\n  ...edge.style,\n  stroke: 'var(--text-secondary, #555)',\n  strokeWidth: inLineage ? 2.5 : 2,\n  opacity: inLineage ? 1 : 0.15,\n},\n\n// Critical-path block (line ~148):\nstyle: {\n  ...edge.style,\n  stroke: isOnPath ? '#f59e0b' : 'var(--text-secondary, #555)',\n  strokeWidth: isOnPath ? 3 : 2,\n  opacity: isOnPath ? 1 : 0.3,\n},\n```\n\nThe spread preserves `strokeDasharray` while overlay-specific keys (stroke, strokeWidth, opacity) still win.\n\n**4. `DependencyGraph.tsx` — legend update**\n\nAfter the status dot entries (around line 287, before the optional critical-path entry), add solid + dashed edge legend entries:\n\n```tsx\n<span className=\"dependency-graph-legend-item\">\n  <span className=\"dependency-graph-legend-edge dependency-graph-legend-edge-solid\" /> Depends on\n</span>\n<span className=\"dependency-graph-legend-item\">\n  <span className=\"dependency-graph-legend-edge dependency-graph-legend-edge-dashed\" /> Related to\n</span>\n```\n\n**5. `DependencyGraph.css` — legend edge swatch styling**\n\nAdd small visual swatches for the legend (12x2px line segments, solid and dashed):\n```css\n.dependency-graph-legend-edge {\n  display: inline-block;\n  width: 14px;\n  height: 0;\n  border-top: 2px solid var(--text-secondary, #888);\n  margin-right: 6px;\n  vertical-align: middle;\n}\n.dependency-graph-legend-edge-dashed {\n  border-top-style: dashed;\n}\n```\n\nThe dashed border-style on a 14px-wide element renders as a couple of dashes — visually consistent with the edge style on the graph.\n\n**Edge cases:**\n- An issue mentions #42 under '## Related' AND elsewhere says 'depends on #42' → hard wins (the record() helper enforces this).\n- Soft section heading like '## Related Research' (instead of '## Related') → still matched (regex is `[^\\n]*related[^\\n]*`).\n- Critical path on a soft edge → solid amber overlay, but dashed pattern preserved by the style spread. Some visual tension (amber + dashed), but truthful: the critical chain goes through a soft reference.\n- Animation from #151 on a dashed edge → ReactFlow's animation moves the dash pattern itself, which looks especially good (literal flowing dashes).",
+      "verification": [
+        "Read post-edit parseDependencies.ts: confirm return type is { number, kind }[], hard-takes-precedence logic in record() helper",
+        "REPL test in node: parse 'depends on #42 and related to #42' against {42} → returns [{ number: 42, kind: 'hard' }] (hard wins)",
+        "REPL test: parse '## Related\\n- #42' against {42} → returns [{ number: 42, kind: 'soft' }]",
+        "Read post-edit useDependencyGraph.ts: edges with dep.kind === 'soft' have style.strokeDasharray = '6 4'",
+        "Read post-edit DependencyGraph.tsx: both styledEdges blocks spread ...edge.style; legend has solid + dashed swatches",
+        "Read post-edit DependencyGraph.css: legend edge swatch styling present",
+        "Run cargo check — must be clean (no Rust changes)",
+        "Open Dependency Graph in desktop app: v0.5.1 issues (#147-#150) have ## Related sections referencing each other → edges should render dashed",
+        "Open older releases where issues use 'depends on #N' inline → edges render solid",
+        "Toggle Critical Path mode on a release with mixed edge kinds → critical edges render amber, but dashed stays dashed (no regression on style spread)",
+        "Hover a node with dashed lineage → dimming applies, dashes persist",
+        "Confirm legend shows both solid and dashed swatches with labels"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5", "SC6"],
+      "files": [
+        "apps/desktop/src/components/dependencies/parseDependencies.ts",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts",
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx",
+        "apps/desktop/src/components/dependencies/DependencyGraph.css"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1],
+    "SC6": [1]
+  }
+}

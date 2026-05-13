@@ -205,18 +205,20 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
     fetchedIssues.forEach((issue) => {
       if (!issue.body) return;
       const deps = parseDependencies(issue.body, issueNumbers);
-      deps.forEach((depNumber) => {
-        const sourceStatus = statusByNodeId.get(String(depNumber));
+      deps.forEach((dep) => {
+        const sourceStatus = statusByNodeId.get(String(dep.number));
         const targetStatus = statusByNodeId.get(String(issue.number));
         const isFlowing =
           (sourceStatus === 'completed' || sourceStatus === 'closed') &&
           targetStatus === 'executing';
 
         edges.push({
-          id: `e${depNumber}-${issue.number}`,
-          source: String(depNumber),
+          id: `e${dep.number}-${issue.number}`,
+          source: String(dep.number),
           target: String(issue.number),
           animated: isFlowing,
+          data: { kind: dep.kind },
+          style: dep.kind === 'soft' ? { strokeDasharray: '6 4' } : undefined,
           markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
         });
       });
