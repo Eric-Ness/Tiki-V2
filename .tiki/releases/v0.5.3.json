@@ -1,0 +1,37 @@
+{
+  "version": "v0.5.3",
+  "name": "Terminal polish",
+  "status": "pending",
+  "issues": [
+    {
+      "number": 155,
+      "title": "Bug: Ctrl+V double-pastes in terminal — custom keydown handler and xterm native paste event both write to PTY"
+    },
+    {
+      "number": 156,
+      "title": "Bug: Ctrl+W and Ctrl+T in terminal close/open Tiki tabs instead of going to the shell"
+    },
+    {
+      "number": 157,
+      "title": "Bug: PTY reader corrupts multi-byte UTF-8 across 4KB boundaries; also overloads IPC during Tab completion (E4)"
+    },
+    {
+      "number": 158,
+      "title": "Enhancement: Add 'Clear Scrollback' to terminal tab context menu + Ctrl+Shift+K shortcut (E1)"
+    },
+    {
+      "number": 159,
+      "title": "Enhancement: 'Resume Conversation' action when the last command in a terminal was 'claude'"
+    },
+    {
+      "number": 160,
+      "title": "Enhancement: Add Settings explainer that Ctrl+Z in the terminal is SIGTSTP, not editor undo"
+    },
+    {
+      "number": 161,
+      "title": "Tech debt: Migrate desktop app from legacy 'xterm' package to '@xterm/xterm' namespace"
+    }
+  ],
+  "createdAt": "2026-05-13T00:00:00.000Z",
+  "shipped": false
+}
