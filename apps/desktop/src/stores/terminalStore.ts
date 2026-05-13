@@ -87,6 +87,23 @@ export const terminalFocusRegistry = {
   },
 };
 
+// Terminal action function registry — out-of-band per-terminal actions
+// that need to reach the xterm instance directly (e.g. clear scrollback).
+// Mirrors terminalFocusRegistry: not persisted, not reactive, keyed by terminalId.
+const terminalActionFns = new Map<string, { clear: () => void }>();
+
+export const terminalActionsRegistry = {
+  register: (terminalId: string, actions: { clear: () => void }) => {
+    terminalActionFns.set(terminalId, actions);
+  },
+  unregister: (terminalId: string) => {
+    terminalActionFns.delete(terminalId);
+  },
+  clear: (terminalId: string) => {
+    terminalActionFns.get(terminalId)?.clear();
+  },
+};
+
 const initialState: TerminalState = {
   tabsByProject: {},
   activeTabByProject: {},
