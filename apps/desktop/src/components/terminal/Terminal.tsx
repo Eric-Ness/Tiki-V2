@@ -5,7 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { TerminalSearch } from "./TerminalSearch";
 import { useTerminal } from "./useTerminal";
-import { terminalFocusRegistry } from "../../stores/terminalStore";
+import { terminalFocusRegistry, terminalActionsRegistry } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
 import type { ITheme } from "xterm";
 import "xterm/css/xterm.css";
@@ -239,6 +239,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         // Register focus function so other components can focus this terminal
         if (terminalId) {
           terminalFocusRegistry.register(terminalId, () => xterm.focus());
+          terminalActionsRegistry.register(terminalId, { clear: () => xterm.clear() });
         }
 
         // Handle copy keyboard shortcut. Paste is intentionally NOT handled
@@ -272,6 +273,13 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
                 searchAddonRef.current?.findNext(query, { caseSensitive: false });
               }
             }
+            return false;
+          }
+
+          // Ctrl+Shift+K: Clear xterm scrollback. Bound under Shift to avoid
+          // colliding with bash readline's Ctrl+K (kill-line).
+          if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && (e.key === 'K' || e.key === 'k')) {
+            xterm.clear();
             return false;
           }
 
@@ -313,6 +321,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
       cancelled = true;
       if (terminalId) {
         terminalFocusRegistry.unregister(terminalId);
+        terminalActionsRegistry.unregister(terminalId);
       }
       if (xtermRef.current) {
         xtermRef.current.dispose();

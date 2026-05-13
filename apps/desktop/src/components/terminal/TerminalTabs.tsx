@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTerminalStore, useProjectsStore, type TerminalTab } from '../../stores';
+import { terminalActionsRegistry } from '../../stores/terminalStore';
 import { ContextMenu, type ContextMenuEntry, type ContextMenuPosition } from '../ui/ContextMenu';
 
 interface StatusDotProps {
@@ -125,6 +126,21 @@ export function TerminalTabs() {
       onClick: () => {
         setEditingTabId(contextMenuTab.id);
         setEditValue(contextMenuTab.title);
+      },
+    },
+    {
+      key: 'clear',
+      label: 'Clear Scrollback',
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 6h18" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+        </svg>
+      ),
+      onClick: () => {
+        terminalActionsRegistry.clear(contextMenuTab.activeTerminalId);
       },
     },
     { key: 'sep-1', separator: true },
