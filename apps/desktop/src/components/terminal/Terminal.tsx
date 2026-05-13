@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Terminal as XTerm } from "xterm";
+import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
@@ -9,8 +9,8 @@ import { useTerminal } from "./useTerminal";
 import { findLeafByTerminalId } from "../../stores/splitTree";
 import { terminalFocusRegistry, terminalActionsRegistry, useTerminalStore } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
-import type { ITheme } from "xterm";
-import "xterm/css/xterm.css";
+import type { ITheme } from "@xterm/xterm";
+import "@xterm/xterm/css/xterm.css";
 import "./Terminal.css";
 
 // --- Terminal theme definitions ---
