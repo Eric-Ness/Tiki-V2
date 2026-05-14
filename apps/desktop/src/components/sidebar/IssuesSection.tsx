@@ -136,6 +136,10 @@ export function IssuesSection() {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (!activeTab) return;
 
+    // Record the terminal association for the detail panel's "Jump to
+    // terminal" action (#175).
+    termState.associateWorkTerminal(issue.number, activeTab.activeTerminalId);
+
     useLayoutStore.getState().setActiveView('terminal');
     invoke('write_terminal', {
       id: activeTab.activeTerminalId,

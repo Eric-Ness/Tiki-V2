@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
-import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore } from "../../stores";
+import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore } from "../../stores";
+import { resolveWorkTerminal, terminalFocusRegistry } from "../../stores/terminalStore";
 import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -135,11 +136,20 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
+  const activeProjectId = useProjectsStore((state) => state.activeProjectId) ?? "default";
   const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
   const prs = usePullRequestsStore((state) => state.prs);
   const setSelectedPr = useDetailStore((state) => state.setSelectedPr);
+  const terminalTabs = useTerminalStore((state) => state.tabsByProject[activeProjectId] ?? []);
+  const workTerminalMap = useTerminalStore(
+    (state) => state.terminalByWorkIdByProject[activeProjectId]
+  );
   const [plan, setPlan] = useState<TikiPlan | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+
+  // The "Jump to terminal" action is offered only when this issue has active
+  // work AND a still-live terminal was recorded for it (see #175).
+  const jumpTarget = work ? resolveWorkTerminal(workTerminalMap, terminalTabs, issue.number) : null;
 
   // Load plan data for phase duration display
   useEffect(() => {
@@ -233,6 +243,22 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           </svg>
           Open in GitHub
         </button>
+        {jumpTarget && (
+          <button
+            className="detail-action-btn"
+            onClick={() => {
+              useLayoutStore.getState().setActiveView("terminal");
+              useTerminalStore.getState().setActiveTab(jumpTarget.tabId);
+              terminalFocusRegistry.focus(jumpTarget.terminalId);
+            }}
+            title="Switch to the terminal running this issue"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Zm2.78 3.97 2 2a.75.75 0 0 1 0 1.06l-2 2a.75.75 0 0 1-1.06-1.06L4.94 8 3.47 6.53a.75.75 0 0 1 1.06-1.06ZM8 9.5h3a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1 0-1.5Z" />
+            </svg>
+            Jump to terminal
+          </button>
+        )}
         {plan !== null && work?.status !== "executing" && (
           <button
             className="detail-action-btn"

@@ -34,6 +34,35 @@ export interface TerminalTab {
 interface TerminalState {
   tabsByProject: Record<string, TerminalTab[]>;
   activeTabByProject: Record<string, string | null>;
+  /**
+   * issueNumber (as string) -> terminalId, per project. Records which terminal
+   * an issue-scoped command was last dispatched to, so the detail panel can
+   * offer a "Jump to terminal" action. Session-only: NOT persisted, because
+   * partialize() regenerates every leaf's terminalId on reload, which would
+   * make persisted associations point at dead IDs.
+   */
+  terminalByWorkIdByProject: Record<string, Record<string, string>>;
+}
+
+/**
+ * Resolves an issue's recorded terminal association to a *live* terminal.
+ * Returns null when there is no association OR the associated terminal no
+ * longer exists in any tab (closed split / removed tab) — callers hide the
+ * Jump-to-terminal affordance in both cases. Pure; exported for testing.
+ */
+export function resolveWorkTerminal(
+  workMap: Record<string, string> | undefined,
+  tabs: TerminalTab[],
+  issueNumber: number,
+): { tabId: string; terminalId: string } | null {
+  const terminalId = workMap?.[String(issueNumber)];
+  if (!terminalId) return null;
+  for (const tab of tabs) {
+    if (getTerminalIds(tab.splitRoot).includes(terminalId)) {
+      return { tabId: tab.id, terminalId };
+    }
+  }
+  return null;
 }
 
 interface TerminalActions {
@@ -50,6 +79,8 @@ interface TerminalActions {
   closeSplit: (tabId: string, terminalId: string) => void;
   updateSplitSizes: (tabId: string, nodeId: string, sizes: number[]) => void;
   setLastCommand: (terminalId: string, command: string) => void;
+  /** Records that an issue-scoped command was dispatched to a terminal. */
+  associateWorkTerminal: (issueNumber: number, terminalId: string) => void;
   cleanupProject: (projectId: string) => void;
 }
 
@@ -109,6 +140,7 @@ export const terminalActionsRegistry = {
 const initialState: TerminalState = {
   tabsByProject: {},
   activeTabByProject: {},
+  terminalByWorkIdByProject: {},
 };
 
 export const useTerminalStore = create<TerminalStore>()(
@@ -419,13 +451,30 @@ export const useTerminalStore = create<TerminalStore>()(
           return anyChanged ? { tabsByProject: newTabsByProject } : {};
         }),
 
+      associateWorkTerminal: (issueNumber, terminalId) =>
+        set((state) => {
+          const projectId = getProjectId();
+          return {
+            terminalByWorkIdByProject: {
+              ...state.terminalByWorkIdByProject,
+              [projectId]: {
+                ...(state.terminalByWorkIdByProject[projectId] ?? {}),
+                [String(issueNumber)]: terminalId,
+              },
+            },
+          };
+        }),
+
       cleanupProject: (projectId) =>
         set((state) => {
           const { [projectId]: _removedTabs, ...remainingTabs } = state.tabsByProject;
           const { [projectId]: _removedActive, ...remainingActive } = state.activeTabByProject;
+          const { [projectId]: _removedWorkMap, ...remainingWorkMap } =
+            state.terminalByWorkIdByProject;
           return {
             tabsByProject: remainingTabs,
             activeTabByProject: remainingActive,
+            terminalByWorkIdByProject: remainingWorkMap,
           };
         }),
     }),

@@ -1,0 +1,44 @@
+{
+  "issue": {
+    "number": 175,
+    "title": "Enhancement: 'Jump to terminal' button on issue detail when work is active (E10)"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "terminalStore: project-scoped workId→terminalId association map + pure resolveWorkTerminal helper + test",
+      "content": "Add the association state and a pure, testable resolver to `apps/desktop/src/stores/terminalStore.ts`.\n\n### State\nAdd to `TerminalState`:\n```ts\n// issueNumber (as string) -> terminalId, per project. Session-only: NOT\n// persisted, because partialize() regenerates every leaf's terminalId on\n// reload, which would make persisted associations point at dead IDs.\nterminalByWorkIdByProject: Record<string, Record<string, string>>;\n```\nInitialise to `{}` in `initialState`.\n\n### Action\nAdd to `TerminalActions`:\n```ts\nassociateWorkTerminal: (issueNumber: number, terminalId: string) => void;\n```\nImplementation mirrors the other actions — uses `getProjectId()`, immutably sets `terminalByWorkIdByProject[projectId][String(issueNumber)] = terminalId`.\n\n### cleanupProject\nExtend the existing `cleanupProject` to also drop the project's entry from `terminalByWorkIdByProject` (one destructure line, same as the other two maps).\n\n### partialize\nDo NOT add `terminalByWorkIdByProject` to the `partialize` return — associations are session-only by design (see the state comment above).\n\n### Pure resolver helper (exported for testing)\n```ts\n// Resolves an issue's recorded terminal association to a *live* terminal.\n// Returns null when there is no association OR the associated terminal no\n// longer exists in any tab (closed split / removed tab) — the caller hides\n// the Jump button in both cases (\"gracefully hide when no association\").\nexport function resolveWorkTerminal(\n  workMap: Record<string, string> | undefined,\n  tabs: TerminalTab[],\n  issueNumber: number,\n): { tabId: string; terminalId: string } | null {\n  const terminalId = workMap?.[String(issueNumber)];\n  if (!terminalId) return null;\n  for (const tab of tabs) {\n    if (getTerminalIds(tab.splitRoot).includes(terminalId)) {\n      return { tabId: tab.id, terminalId };\n    }\n  }\n  return null;\n}\n```\n`getTerminalIds` is already imported from `./splitTree`.\n\n### Test\nNew `apps/desktop/src/stores/terminalStore.test.ts` covering `resolveWorkTerminal`: (a) returns null when no association, (b) returns null when the associated terminalId isn't in any tab, (c) returns `{tabId, terminalId}` when the terminal is a live leaf — including a split-tree tab where the terminal is a non-root leaf. Use `createLeaf` / a hand-built `SplitNode` for fixtures.",
+      "verification": [
+        "terminalStore.ts has `terminalByWorkIdByProject: Record<string, Record<string, string>>` in TerminalState, initialised to {} in initialState.",
+        "`associateWorkTerminal(issueNumber, terminalId)` action sets the project-scoped entry immutably and is exposed on the store.",
+        "`cleanupProject` removes the project's entry from terminalByWorkIdByProject.",
+        "`terminalByWorkIdByProject` is NOT included in the partialize return (session-only).",
+        "`resolveWorkTerminal` is exported, pure, and returns null for missing association / dead terminal, `{tabId, terminalId}` for a live one (including non-root split leaves).",
+        "New terminalStore.test.ts covers the three resolveWorkTerminal cases and passes under `pnpm test`.",
+        "`pnpm build` passes."
+      ],
+      "status": "completed",
+      "summary": "Added project-scoped terminalByWorkIdByProject map + associateWorkTerminal action to terminalStore; cleanupProject prunes it; not persisted (partialize excludes it) since terminalIds regenerate on reload. New pure exported resolveWorkTerminal(workMap,tabs,issueNumber) walks split trees via getTerminalIds and returns {tabId,terminalId} or null. New terminalStore.test.ts covers 4 cases incl. non-root split leaves."
+    },
+    {
+      "number": 2,
+      "title": "Record associations at the 3 issue-scoped dispatch sites + add the Jump-to-terminal button to IssueDetail",
+      "content": "Wire the Phase-1 store up to the dispatch sites and the detail panel.\n\n### Dispatch site 1 — KanbanBoard.tsx\n`triggerExecution(issueNumber, fromColumn)` already resolves the active terminal via `executeInTerminal` → `getActiveTerminalId()`. Restructure so it captures the terminalId: call `getActiveTerminalId()` directly, and if non-null call `useTerminalStore.getState().associateWorkTerminal(issueNumber, terminalId)` before `executeInTerminal`. Do the same in `confirmShip` using `shipConfirmation.issueNumber`.\n\n### Dispatch site 2 — IssuesSection.tsx\n`handleRunYolo(issue)` resolves `activeTab.activeTerminalId`. Add `useTerminalStore.getState().associateWorkTerminal(issue.number, activeTab.activeTerminalId)` right before the `write_terminal` invoke.\n\n### Dispatch site 3 — useCommandActions.ts\nThe contextual `Run X on #N (current issue)` variant is issue-scoped. Change `writeToActiveTerminal` to return the terminalId it wrote to (`Promise<string | null>`); in the contextual `execute`, await it and call `associateWorkTerminal(selectedIssue, terminalId)` when non-null. The bare (non-contextual) command ignores the return value.\n\n### IssueDetail.tsx — the button\nImport `useTerminalStore`, `terminalFocusRegistry`, `resolveWorkTerminal` from the terminal store, and `useLayoutStore`. Subscribe to the project-scoped `terminalByWorkIdByProject[activeProjectId]` map and `tabsByProject[activeProjectId]`. Compute `const jumpTarget = work ? resolveWorkTerminal(workMap, tabs, issue.number) : null;`.\n\nWhen `jumpTarget` is non-null, render a `detail-action-btn` in the existing `<div className=\"detail-actions\">` block (next to \"Open in GitHub\" / \"Edit Plan\"), labelled \"Jump to terminal\" with a small terminal-glyph SVG. onClick:\n```ts\nuseLayoutStore.getState().setActiveView('terminal');\nuseTerminalStore.getState().setActiveTab(jumpTarget.tabId);\nterminalFocusRegistry.focus(jumpTarget.terminalId);\n```\nThe button is simply not rendered when `jumpTarget` is null (no active work, or no live associated terminal) — satisfies \"gracefully hide when no association exists.\"\n\n### Scope boundaries\n- No new dependencies. No Rust changes.\n- The association is best-effort and session-only — if the user never dispatched an issue-scoped command for this issue from the desktop UI, the button simply doesn't appear (running `/tiki:yolo` by hand in a terminal is not tracked; that's an accepted limitation, the same one E10 implies by saying \"when an issue has active work *with a known terminal*\").",
+      "verification": [
+        "KanbanBoard.tsx `triggerExecution` and `confirmShip` call `associateWorkTerminal` with the issue number and the active terminalId before dispatching.",
+        "IssuesSection.tsx `handleRunYolo` calls `associateWorkTerminal(issue.number, activeTab.activeTerminalId)`.",
+        "useCommandActions.ts: `writeToActiveTerminal` returns the terminalId; the contextual `Run X on #N` variant associates it with `selectedIssue`.",
+        "IssueDetail.tsx renders a 'Jump to terminal' button in `.detail-actions` only when `work` is present AND `resolveWorkTerminal` returns a live target.",
+        "Clicking the button sets the view to 'terminal', sets the active tab to the resolved tabId, and focuses the resolved terminalId.",
+        "The button is absent when there is no active work or no live associated terminal.",
+        "`pnpm build` passes and `pnpm test` is green.",
+        "Manual smoke (user): drag an issue to Execute on the kanban (or run a contextual command on a selected issue), open that issue's detail panel, click 'Jump to terminal' — the app switches to the Terminal view, the correct tab, and the pane is focused."
+      ],
+      "status": "completed",
+      "dependencies": [
+        1
+      ],
+      "summary": "Wired associateWorkTerminal into all 3 issue-scoped dispatch sites: KanbanBoard triggerExecution + confirmShip, IssuesSection handleRunYolo, useCommandActions contextual Run-on-#N variant (writeToActiveTerminal now returns the terminalId). IssueDetail renders a \"Jump to terminal\" button in .detail-actions when work is active and resolveWorkTerminal finds a live target; click switches to terminal view, sets the active tab, and focuses the pane. Button hidden when no live association."
+    }
+  ]
+}

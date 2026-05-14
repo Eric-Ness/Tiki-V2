@@ -96,6 +96,13 @@ export function KanbanBoard() {
     const status = work && work.type === 'issue' ? work.status : undefined;
     const command = getExecuteCommand(issueNumber, fromColumn, status);
 
+    // Record which terminal this issue's work is running in, so the detail
+    // panel can offer a "Jump to terminal" action (#175).
+    const terminalId = getActiveTerminalId();
+    if (terminalId) {
+      useTerminalStore.getState().associateWorkTerminal(issueNumber, terminalId);
+    }
+
     // Switch to terminal view
     setActiveView('terminal');
 
@@ -104,7 +111,7 @@ export function KanbanBoard() {
     if (success) {
       console.log(`Started execution: ${command}`);
     }
-  }, [activeWork, setActiveView, executeInTerminal]);
+  }, [activeWork, setActiveView, executeInTerminal, getActiveTerminalId]);
 
   // Show ship confirmation dialog
   const requestShipConfirmation = useCallback((issueNumber: number) => {
@@ -120,6 +127,12 @@ export function KanbanBoard() {
 
     const command = `/tiki:ship ${shipConfirmation.issueNumber}`;
 
+    // Record the terminal association for the "Jump to terminal" action (#175).
+    const terminalId = getActiveTerminalId();
+    if (terminalId) {
+      useTerminalStore.getState().associateWorkTerminal(shipConfirmation.issueNumber, terminalId);
+    }
+
     // Switch to terminal view
     setActiveView('terminal');
 
@@ -131,7 +144,7 @@ export function KanbanBoard() {
 
     // Close the confirmation dialog
     setShipConfirmation(null);
-  }, [shipConfirmation, setActiveView, executeInTerminal]);
+  }, [shipConfirmation, setActiveView, executeInTerminal, getActiveTerminalId]);
 
   // Cancel ship operation
   const cancelShip = useCallback(() => {

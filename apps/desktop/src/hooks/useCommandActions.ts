@@ -15,13 +15,13 @@ import { terminalFocusRegistry } from '../stores/terminalStore';
  * Helper to write a command string to the active terminal and focus it.
  * Mirrors the pattern used by the "Start Claude" button in App.tsx.
  */
-async function writeToActiveTerminal(command: string): Promise<void> {
+async function writeToActiveTerminal(command: string): Promise<string | null> {
   const projectId = useProjectsStore.getState().activeProjectId ?? 'default';
   const termState = useTerminalStore.getState();
   const tabs = termState.tabsByProject[projectId] ?? [];
   const activeTabId = termState.activeTabByProject[projectId] ?? null;
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  if (!activeTab) return;
+  if (!activeTab) return null;
 
   try {
     await invoke('write_terminal', {
@@ -29,8 +29,10 @@ async function writeToActiveTerminal(command: string): Promise<void> {
       data: command,
     });
     terminalFocusRegistry.focus(activeTab.activeTerminalId);
+    return activeTab.activeTerminalId;
   } catch (err) {
     console.error('Failed to write to terminal:', err);
+    return null;
   }
 }
 
@@ -178,7 +180,13 @@ export function useCommandActions(options?: UseCommandActionsOptions): CommandAc
           keywords: [...keywords, String(selectedIssue), 'current', 'selected'],
           execute: () => {
             useLayoutStore.getState().setActiveView('terminal');
-            writeToActiveTerminal(`/${cmd} ${selectedIssue}\n`);
+            // Record the terminal association so the detail panel can offer a
+            // "Jump to terminal" action for this issue (#175).
+            void writeToActiveTerminal(`/${cmd} ${selectedIssue}\n`).then((terminalId) => {
+              if (terminalId !== null) {
+                useTerminalStore.getState().associateWorkTerminal(selectedIssue, terminalId);
+              }
+            });
           },
         });
       }
