@@ -1,0 +1,15 @@
+{
+  "version": "v0.5.6",
+  "status": "completed",
+  "issues": [
+    {
+      "number": 169,
+      "title": "Bug: Terminal clickable URLs not detected + Ctrl+V/Ctrl+C clipboard shortcuts not firing"
+    }
+  ],
+  "createdAt": "2026-05-13T23:43:05.746Z",
+  "completedAt": "2026-05-14T01:05:00.000Z",
+  "shipped": true,
+  "tag": "v0.5.6",
+  "note": "Single-issue follow-up to v0.5.5. Speculative fix for the clickable-URLs symptom of #169 via `allowProposedApi: true` on the XTerm constructor. Ctrl+V / Ctrl+Shift+C remain unverified — to be triaged in a future release if still broken."
+}

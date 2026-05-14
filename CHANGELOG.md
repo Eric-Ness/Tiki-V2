@@ -10,6 +10,18 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.5.6] — 2026-05-14
+
+Single-issue follow-up to v0.5.5 fixing the clickable-URL regression introduced by the xterm namespace migration. Full per-issue summary: [`.tiki/releases/v0.5.6-changelog.md`](.tiki/releases/v0.5.6-changelog.md).
+
+### Fixed
+- **Clickable URLs in terminal restored** (#169). Adds `allowProposedApi: true` to the `XTerm` constructor. `@xterm/addon-web-links@0.12.0` relies on an API that 5.4+ gates behind this flag — without it, `loadAddon` succeeded silently but URL click handlers were never attached. Confirms v0.5.5's "no behavior change" claim was incorrect.
+
+### Known limitations
+- Ctrl+V and Ctrl+Shift+C clipboard shortcuts remain unverified. Status (regression vs pre-existing) is still pending an A/B test against v0.5.4. Intentionally not changed in v0.5.6 to avoid re-introducing the #155 double-paste regression.
+
+---
+
 ## [v0.5.5] — 2026-05-13
 
 Single-issue release carrying the xterm namespace migration deferred from v0.5.4. Full per-issue summary: [`.tiki/releases/v0.5.5-changelog.md`](.tiki/releases/v0.5.5-changelog.md).
