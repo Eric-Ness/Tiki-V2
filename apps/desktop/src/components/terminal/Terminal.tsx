@@ -370,6 +370,33 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
             return false;
           }
 
+          // Ctrl+= / Ctrl+- / Ctrl+0: adjust the live terminal font size. xterm
+          // applies options.fontSize immediately; fitAddon.fit() reflows the
+          // grid to the new cell metrics. Runtime-only and not persisted —
+          // Settings still governs new terminals (the "applies to new
+          // terminals only" model). #174. Decrease matches only e.key === '-';
+          // Ctrl+Shift+- (e.key '_', readline undo) is left to pass through.
+          if (e.type === 'keydown' && e.ctrlKey) {
+            const FONT_MIN = 8;
+            const FONT_MAX = 32;
+            const current = xterm.options.fontSize ?? terminalSettings.fontSize;
+            if (e.key === '=' || e.key === '+') {
+              xterm.options.fontSize = Math.min(FONT_MAX, current + 1);
+              fitAddon.fit();
+              return false;
+            }
+            if (e.key === '-') {
+              xterm.options.fontSize = Math.max(FONT_MIN, current - 1);
+              fitAddon.fit();
+              return false;
+            }
+            if (e.key === '0') {
+              xterm.options.fontSize = terminalSettings.fontSize;
+              fitAddon.fit();
+              return false;
+            }
+          }
+
           return true; // Let xterm handle all other keys
         });
 
