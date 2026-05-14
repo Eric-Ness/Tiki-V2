@@ -229,6 +229,20 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
 
     // Use double RAF to ensure DOM is fully laid out
     let cancelled = false;
+
+    // Belt-and-suspenders for #155: if this WebView2 dispatches a native `paste`
+    // event on xterm's helper textarea, xterm's built-in listener would write the
+    // pasted text a second time. A capture-phase listener on the parent fires
+    // before the event reaches the textarea, so stopPropagation() prevents xterm
+    // from ever seeing it — our Ctrl+V keydown handler (below) is the single
+    // paste path. Declared at effect-body scope so the cleanup closure can
+    // remove it. NOTE: if a right-click "Paste" context-menu item is ever added
+    // to the terminal, this unconditional suppressor must become a guarded one.
+    const suppressNativePaste = (ev: ClipboardEvent) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+
     requestAnimationFrame(() => {
       if (cancelled) return;
       requestAnimationFrame(() => {
@@ -266,6 +280,11 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         // Open terminal in container
         xterm.open(container);
 
+        // Block xterm's native paste listener — see suppressNativePaste above
+        // (#155 double-paste / #171 dead-paste). Capture phase on the parent
+        // runs before the event reaches xterm's helper textarea.
+        container.addEventListener('paste', suppressNativePaste, true);
+
         // Fit after a small delay to ensure rendering is complete
         setTimeout(() => {
           if (!cancelled && container.offsetWidth > 0 && container.offsetHeight > 0) {
@@ -284,11 +303,13 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           terminalActionsRegistry.register(terminalId, { clear: () => xterm.clear() });
         }
 
-        // Handle copy keyboard shortcut. Paste is intentionally NOT handled
-        // here — xterm.js's built-in paste-event listener owns Ctrl+V and
-        // Ctrl+Shift+V. A custom keydown handler that also calls xterm.paste()
-        // double-pastes, because the browser's separate `paste` DOM event
-        // still fires on xterm's hidden textarea (see #155).
+        // Handle copy/paste keyboard shortcuts. #155 deleted the custom Ctrl+V
+        // branches on the premise that xterm.js's native paste-event listener
+        // owns paste — but that listener does not fire reliably inside the Tauri
+        // WebView2 (#171), so paste was dead in v0.5.6. We read the clipboard
+        // explicitly here and rely on `suppressNativePaste` (registered above)
+        // to keep this the single paste path, so a WebView2 that *does* fire the
+        // native event can't double-paste (the original #155 bug).
         xterm.attachCustomKeyEventHandler((e: KeyboardEvent) => {
           // Ctrl+Shift+C: Copy selection to clipboard
           if (e.ctrlKey && e.shiftKey && e.key === 'C' && e.type === 'keydown') {
@@ -297,6 +318,30 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
               navigator.clipboard.writeText(selection);
             }
             return false; // Prevent xterm from processing
+          }
+
+          // Ctrl+C: copy the selection if there is one (Windows Terminal /
+          // VS Code convention); otherwise fall through so xterm sends SIGINT
+          // (\x03) to the PTY. Plain Ctrl+C had no binding before #171 — it
+          // always sent SIGINT even with an active selection.
+          if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+            const selection = xterm.getSelection();
+            if (selection) {
+              navigator.clipboard.writeText(selection).catch(() => { /* clipboard write blocked */ });
+              return false; // handled — do NOT also send SIGINT
+            }
+            return true; // no selection — let xterm send SIGINT as usual
+          }
+
+          // Ctrl+V / Ctrl+Shift+V: paste from the clipboard. Read it explicitly
+          // (the native paste event is unreliable in the WebView2 — see #171)
+          // and hand it to xterm.paste(), which still honors the shell's
+          // bracketed-paste mode. No e.shiftKey discriminator: both chords paste.
+          if (e.type === 'keydown' && e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+            navigator.clipboard.readText()
+              .then((text) => { if (text) xterm.paste(text); })
+              .catch(() => { /* clipboard read blocked in this webview — nothing to paste */ });
+            return false;
           }
 
           // Ctrl+F: Open search overlay (Phase 1 sets state; Phase 2 renders the UI)
@@ -382,6 +427,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
     // Cleanup
     return () => {
       cancelled = true;
+      // Remove the capture-phase paste suppressor. Harmless no-op if the inner
+      // RAF was cancelled before xterm.open() ran and the listener was added.
+      container.removeEventListener('paste', suppressNativePaste, true);
       if (terminalId) {
         terminalFocusRegistry.unregister(terminalId);
         terminalActionsRegistry.unregister(terminalId);
