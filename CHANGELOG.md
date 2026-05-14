@@ -10,6 +10,18 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.5.7] — 2026-05-14
+
+Single-issue follow-up to v0.5.6 restoring terminal copy/paste, non-functional since the v0.5.3 terminal-polish bundle. Full per-issue summary: [`.tiki/releases/v0.5.7-changelog.md`](.tiki/releases/v0.5.7-changelog.md).
+
+### Fixed
+- **Ctrl+V paste and Ctrl+C copy restored in the terminal** (#171). #155 deleted the custom paste handler, betting xterm.js's native `paste`-event listener would own paste — but it doesn't fire reliably in the Tauri WebView2, so paste was dead in v0.5.6 with no fallback. Restores an explicit `Ctrl+V`/`Ctrl+Shift+V` handler (reads the clipboard, calls `xterm.paste()` — bracketed-paste preserved). Adds `Ctrl+C` with the Windows Terminal / VS Code convention: copy on selection, SIGINT otherwise (plain `Ctrl+C` previously always sent SIGINT). A capture-phase `paste` suppressor on the parent container structurally prevents the #155 double-paste regression. No new dependencies.
+
+### Known limitations
+- The `tauri-plugin-clipboard-manager` robustness upgrade was deferred — it needs an elevated `pnpm install` (the #161 reparse-point blocker). This release uses the no-dependency `navigator.clipboard` path, smoke-tested before tagging.
+
+---
+
 ## [v0.5.6] — 2026-05-14
 
 Single-issue follow-up to v0.5.5 fixing the clickable-URL regression introduced by the xterm namespace migration. Full per-issue summary: [`.tiki/releases/v0.5.6-changelog.md`](.tiki/releases/v0.5.6-changelog.md).
