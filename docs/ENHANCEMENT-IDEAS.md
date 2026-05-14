@@ -31,13 +31,13 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Terminal
 
-- **E1. "Clear scrollback" in terminal tab context menu** — `TerminalTabs.tsx` lines 109–165 has Rename / Split Right / Split Down / Close but no clear-buffer. xterm exposes `xterm.clear()`. *Why:* during long EXECUTE runs the user has no UI action to wipe the buffer (shell `clear` only clears the viewport, not what TerminalSearch sees). *Effort:* S. *Surface:* `components/terminal/TerminalTabs.tsx`.
+- ~~**E1. "Clear scrollback" in terminal tab context menu**~~ _(shipped v0.5.4 — #158, with Ctrl+Shift+K shortcut)_ — `TerminalTabs.tsx` lines 109–165 has Rename / Split Right / Split Down / Close but no clear-buffer. xterm exposes `xterm.clear()`. *Why:* during long EXECUTE runs the user has no UI action to wipe the buffer (shell `clear` only clears the viewport, not what TerminalSearch sees). *Effort:* S. *Surface:* `components/terminal/TerminalTabs.tsx`.
 
-- **E2. Regex toggle in terminal search** — `TerminalSearch.tsx` ships with `Aa` case toggle in v0.4.0 but no regex. `SearchAddon.findNext` accepts `regex: true`. Workflow output has structured patterns (`Phase N/M`, `Error:`, `SHIP`) worth pattern-matching. *Why:* power-user muscle memory; the addon already supports it. *Effort:* S. *Surface:* `components/terminal/TerminalSearch.tsx`.
+- **E2. Regex toggle in terminal search** (→ #173) — `TerminalSearch.tsx` ships with `Aa` case toggle in v0.4.0 but no regex. `SearchAddon.findNext` accepts `regex: true`. Workflow output has structured patterns (`Phase N/M`, `Error:`, `SHIP`) worth pattern-matching. *Why:* power-user muscle memory; the addon already supports it. *Effort:* S. *Surface:* `components/terminal/TerminalSearch.tsx`.
 
-- **E3. Ctrl+= / Ctrl+- runtime font-size on the live terminal** — `SettingsPage.tsx` line 107 says "Terminal settings apply to new terminals only." xterm exposes `xterm.options.fontSize = n; fitAddon.fit()`. Hooking it from `attachCustomKeyEventHandler` (Terminal.tsx ~245) would apply instantly. *Why:* peer screen-share and laptop↔monitor switching currently requires a tab restart. *Effort:* S. *Surface:* `components/terminal/Terminal.tsx`.
+- **E3. Ctrl+= / Ctrl+- runtime font-size on the live terminal** (→ #174) — `SettingsPage.tsx` line 107 says "Terminal settings apply to new terminals only." xterm exposes `xterm.options.fontSize = n; fitAddon.fit()`. Hooking it from `attachCustomKeyEventHandler` (Terminal.tsx ~245) would apply instantly. *Why:* peer screen-share and laptop↔monitor switching currently requires a tab restart. *Effort:* S. *Surface:* `components/terminal/Terminal.tsx`.
 
-- **E4. PTY output chunk-coalescing (10ms window)** — `pty.rs:237–269` reads 4KB chunks and emits each as a separate Tauri event (UTF-8 lossy serialize). During `cargo build` / `pnpm install` the IPC channel saturates. Batch chunks into a `Vec<u8>` and flush on 10ms or size limit. *Why:* IPC pressure during heavy CLI output. *Effort:* M. *Surface:* `apps/desktop/src-tauri/src/terminal/pty.rs:237–269`.
+- ~~**E4. PTY output chunk-coalescing (10ms window)**~~ _(superseded — shipped v0.5.4 as #157: PTY UTF-8 carryover + 10ms IPC coalescing)_ — `pty.rs:237–269` reads 4KB chunks and emits each as a separate Tauri event (UTF-8 lossy serialize). During `cargo build` / `pnpm install` the IPC channel saturates. Batch chunks into a `Vec<u8>` and flush on 10ms or size limit. *Why:* IPC pressure during heavy CLI output. *Effort:* M. *Surface:* `apps/desktop/src-tauri/src/terminal/pty.rs:237–269`.
 
 ### Sidebar / Active Work
 
@@ -55,9 +55,9 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 ### Detail panel
 
-- **E10. "Jump to terminal" button when an issue has active work** — `IssueDetail.tsx` shows the Pipeline Timeline but has no action to switch to the terminal pane running that issue. Requires storing a `workId → terminalId` association in `terminalStore`. *Why:* user opens an issue's plan to inspect, then wants live tail; today they hunt manually across tabs. *Effort:* M. *Surface:* `components/detail/IssueDetail.tsx`, `stores/terminalStore.ts`.
+- **E10. "Jump to terminal" button when an issue has active work** (→ #175) — `IssueDetail.tsx` shows the Pipeline Timeline but has no action to switch to the terminal pane running that issue. Requires storing a `workId → terminalId` association in `terminalStore`. *Why:* user opens an issue's plan to inspect, then wants live tail; today they hunt manually across tabs. *Effort:* M. *Surface:* `components/detail/IssueDetail.tsx`, `stores/terminalStore.ts`.
 
-- **E11. Illustrated empty state for the detail panel** — `App.tsx:502–507` renders `<h3>Detail</h3><p>Select an issue...</p>` when nothing is selected. This is the first-open experience. A simple pipeline diagram + Ctrl+K hint would orient new users. *Why:* current empty state shows no workflow surface area or shortcut hints. *Effort:* S. *Surface:* `App.tsx:502–507`.
+- **E11. Illustrated empty state for the detail panel** (→ #176) — `App.tsx:502–507` renders `<h3>Detail</h3><p>Select an issue...</p>` when nothing is selected. This is the first-open experience. A simple pipeline diagram + Ctrl+K hint would orient new users. *Why:* current empty state shows no workflow surface area or shortcut hints. *Effort:* S. *Surface:* `App.tsx:502–507`.
 
 ### Settings / Command palette / Recovery
 
@@ -65,7 +65,7 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 - ~~**E13. Command palette actions inherit selected-issue context**~~ _(shipped v0.4.1)_ — `useCommandActions.ts:143–163` registers `/tiki:get`, `/tiki:execute`, etc. as bare commands. When `selectedIssue` is set in `useDetailStore`, the palette should offer contextual variants: "Run tiki:execute on #42 (current issue)". `useDetailStore` is already imported, just not used here. *Why:* the natural mental model is "Ctrl+K applies to what I'm looking at." *Effort:* S. *Surface:* `hooks/useCommandActions.ts`.
 
-- **E14. Recovery dialog: highlight the parse-failure line in the preview** — `StateRecoveryDialog.tsx:347–370` renders backup JSON in a `<pre>` tag. The error message at line 211 already contains line/column from serde, but the preview doesn't scroll-to or visually mark that location. Even line numbers + a yellow row highlight would dramatically help. *Why:* the whole point of preview is to spot the malformed line; dense monospace JSON without aid is sub-optimal. *Effort:* M. *Surface:* `components/recovery/StateRecoveryDialog.tsx`.
+- **E14. Recovery dialog: highlight the parse-failure line in the preview** (→ #177) — `StateRecoveryDialog.tsx:347–370` renders backup JSON in a `<pre>` tag. The error message at line 211 already contains line/column from serde, but the preview doesn't scroll-to or visually mark that location. Even line numbers + a yellow row highlight would dramatically help. *Why:* the whole point of preview is to spot the malformed line; dense monospace JSON without aid is sub-optimal. *Effort:* M. *Surface:* `components/recovery/StateRecoveryDialog.tsx`.
 
 ---
 
@@ -181,7 +181,7 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 
 ### Affordance & interaction polish
 
-- **E11 (already listed above) — Illustrated empty state for the detail panel.** Still open; promote to v0.4.2.
+- **E11 (already listed above) — Illustrated empty state for the detail panel.** Promoted to #176 in the v0.6.0 UX pack (was slotted for v0.4.2 but never shipped).
 
 - ~~**E53. Selected-card elevation via subtle shadow**~~ _(shipped v0.4.2)_ — Selected items today (`.issue-card.selected`, `.kanban-card.selected`, soon `.work-progress-card.clickable:focus`) rely only on a subtle background shift. Add a `box-shadow: 0 0 0 2px var(--accent-color), 0 2px 6px rgba(0,0,0,0.25)` on `.selected` for clearer hierarchy. *Why:* hierarchy is hard to read in dense lists when only color shift indicates selection. *Effort:* S. *Surfaces:* `IssueCard.css`, `kanban.css`, `WorkProgressCard.css`.
 
@@ -212,6 +212,18 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 - **E59. Sidebar "rail" mode — icon-only collapsed state** — Sidebar collapses fully today; an intermediate "icon rail" mode (VS Code style) would let users monitor active work via icons without sacrificing main-view space. *Why:* current options are all-or-nothing; users who want passive monitoring need an in-between. *Effort:* L. *Surface:* `App.tsx`, sidebar layout.
 
 - **E61. Issue label color contrast — overlay fallback for mid-luminance labels** — `IssueCard.tsx:42–48` computes contrast via luminance threshold of 0.5. Mid-luminance labels (e.g., GitHub's `#fbca04`) end up unreadable either way. Add a `text-shadow: 0 0 2px rgba(0,0,0,0.5)` or a semi-transparent dark overlay when luminance is in the 0.4–0.6 ambiguous range. *Why:* certain label colors are genuinely hard to read currently. *Effort:* S. *Surface:* `IssueCard.tsx`.
+
+---
+
+## 6. New ideas (added 2026-05-14)
+
+Surfaced during the 2026-05-14 backlog review (the session that triaged the open GitHub issues 10 → 4 and audited the guiding docs).
+
+- **E63. Environment Doctor — a Settings health panel for external CLIs** — The desktop app shells out to `gh`, `git`, and `claude` but has no discovery or health layer. `check_claude_cli` (`github.rs:281`) runs `cmd /C claude --version` and reports a bare `false` on failure — which surfaces in `IssueFormModal.tsx` as a misleading **"CLI not installed"** even when Claude Code *is* installed but simply isn't on the GUI process's inherited PATH (a Windows GUI-app PATH-staleness gotcha). `enhance_issue_description` (`github.rs:719`) shells out the same way and fails for the same reason. A Settings → Environment panel should probe all three tools, show ✅ version / ⚠️ found-but-stale / ❌ missing, distinguish "not installed" from "not on PATH," and offer an explicit path-override field. *Why:* fixes a real user-visible bug (the mislabeled Enhance-with-AI button) and the whole class behind it. *Effort:* M. *Surfaces:* `github.rs` (new probe commands + path config), new `components/settings/EnvironmentPanel.tsx`, `IssueFormModal.tsx` (consume the better signal).
+
+- **E64. Pre-tag verification gate in `release.md` + `release.yml`** — Project memory records repeated ship-without-verification regret: v0.5.6 shipped a speculative one-line fix with no A/B test; v0.5.4's tag build failed on a TS6133 unused import that reached `main` untested. E42 (run `pnpm test` in `release.yml`) is one piece, but the real fix is a **mandatory smoke-test + `pnpm build` checklist in `release.md`** that must pass before the tag is pushed, plus the CI gate. *Why:* the tool that orchestrates careful development should hold itself to the same bar; this is a recurring, memory-documented failure mode. *Effort:* S–M. *Files:* `packages/framework/commands/release.md`, `.github/workflows/release.yml`. *Supersedes/absorbs E42.*
+
+- **E65. Rewrite or retire `docs/DESIGN.md` and `docs/PLANNING-NOTES.md`** — Both have been untouched since commit `1f9eb8f` on 2026-02-02 (~140 commits ago) and are now actively misleading: DESIGN.md's "Version History" tops out at design-draft "0.5" (not shipped v0.5.7), and its "Future versions" lists work that shipped months ago. A new contributor or future agent reading it gets day-one reality. E39 only proposes a date-stamp — insufficient. Either rewrite DESIGN.md as a current `ARCHITECTURE.md` (the four "Still Open" questions are the only salvageable forward-looking content), or demote both to `docs/archive/` and let `CLAUDE.md` + `CHANGELOG.md` be canonical. *Why:* stale guiding docs are a trap for every future reader. *Effort:* M. *Files:* `docs/DESIGN.md`, `docs/PLANNING-NOTES.md`, `CLAUDE.md` (update the Documentation section). *Supersedes E39.*
 
 ---
 
@@ -259,16 +271,18 @@ Theme: tighten the shim contract and close audit-time gaps. Each item builds on 
 - **E44** Test asserting Rust + JS shim mirror @tiki/shared (also closed CI gap where `packages/shared` tests weren't actually running)
 - **E45** version-bump.mjs handles root package.json
 
-### v0.6.0 — "UX polish" (terminal & detail panel improvements)
+### v0.6.0 — "UX polish" (terminal & detail panel improvements) — _scoped & filed 2026-05-14_
 
-Theme: make the desktop feel polished and contextual.
+Theme: make the desktop feel polished and contextual. Breaks the v0.5.4–v0.5.7 single-issue reactive-bugfix streak — the first backlog-driven release since v0.5.0. All items are filed as GitHub issues.
 
-- **E1** Clear scrollback
-- **E2** Regex toggle in search
-- **E3** Runtime font-size
-- **E10** Jump-to-terminal from issue detail
-- **E11** Empty state for detail panel
-- **E14** Recovery dialog highlights parse-failure line
+- **E2** Regex toggle in terminal search — #173
+- **E3** Ctrl+= / Ctrl+- runtime font-size — #174
+- **E10** Jump-to-terminal from issue detail — #175
+- **E11** Illustrated empty state for detail panel — #176
+- **E14** Recovery dialog highlights parse-failure line — #177
+- **#93** Phase summary view in detail panel — existing open issue; phase summaries already live in plan JSON, this is pure rendering. Folded in as the highest-value member of the bundle.
+
+_E1 ("Clear scrollback"), originally part of this bundle, already shipped standalone as #158 in v0.5.4._
 
 ### Reliability / hygiene (no specific release — slot into above as time permits)
 
