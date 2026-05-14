@@ -1,6 +1,6 @@
 {
   "version": "v0.6.0",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 173,
@@ -23,5 +23,8 @@
       "title": "Enhancement: Recovery dialog highlights the parse-failure line (E14)"
     }
   ],
-  "createdAt": "2026-05-14T15:53:41.003Z"
+  "createdAt": "2026-05-14T15:53:41.003Z",
+  "shipped": true,
+  "completedAt": "2026-05-14T16:41:05.391Z",
+  "tag": "v0.6.0"
 }
