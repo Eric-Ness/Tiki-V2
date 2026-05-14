@@ -14,6 +14,18 @@ export function isNoMatch(found: boolean, query: string): boolean {
   return query.trim().length > 0 && !found;
 }
 
+// Exported for unit testing. A regex search term that won't compile must not
+// throw out of the debounced effect — callers pre-validate with this.
+export function isValidRegex(query: string): boolean {
+  if (!query) return true; // empty query is a no-op search, not an error
+  try {
+    new RegExp(query);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 interface TerminalSearchProps {
   searchAddon: SearchAddon;
   onClose: () => void;
@@ -25,7 +37,9 @@ const DEBOUNCE_MS = 150;
 export function TerminalSearch({ searchAddon, onClose, onQueryChange }: TerminalSearchProps) {
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [useRegex, setUseRegex] = useState(false);
   const [found, setFound] = useState(true);
+  const [regexError, setRegexError] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,9 +59,21 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
         // Clear highlights by searching for empty
         searchAddon.findNext("", {});
         setFound(true);
+        setRegexError(false);
         return;
       }
-      const result = searchAddon.findNext(query, { caseSensitive, incremental: false });
+      if (useRegex && !isValidRegex(query)) {
+        // Don't hand an uncompilable pattern to the addon — flag it instead.
+        setRegexError(true);
+        setFound(false);
+        return;
+      }
+      setRegexError(false);
+      const result = searchAddon.findNext(query, {
+        caseSensitive,
+        regex: useRegex,
+        incremental: false,
+      });
       setFound(result);
     }, DEBOUNCE_MS);
 
@@ -56,7 +82,7 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, caseSensitive, searchAddon, onQueryChange]);
+  }, [query, caseSensitive, useRegex, searchAddon, onQueryChange]);
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
@@ -65,14 +91,16 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (e.shiftKey) {
-        searchAddon.findPrevious(query, { caseSensitive });
+        searchAddon.findPrevious(query, { caseSensitive, regex: useRegex });
       } else {
-        searchAddon.findNext(query, { caseSensitive });
+        searchAddon.findNext(query, { caseSensitive, regex: useRegex });
       }
     }
   };
 
-  const inputClass = `terminal-search-input${isNoMatch(found, query) ? " terminal-search-input--no-match" : ""}`;
+  const inputClass = `terminal-search-input${
+    isNoMatch(found, query) || regexError ? " terminal-search-input--no-match" : ""
+  }`;
 
   return (
     <div className="terminal-search">
@@ -86,7 +114,18 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
         onKeyDown={handleInputKeyDown}
         aria-label="Search terminal buffer"
       />
-      <span className="terminal-search-count">{formatMatchCount(found, query)}</span>
+      <span className="terminal-search-count">
+        {regexError ? "Invalid regex" : formatMatchCount(found, query)}
+      </span>
+      <button
+        type="button"
+        className={`terminal-search-btn${useRegex ? " terminal-search-btn--active" : ""}`}
+        onClick={() => setUseRegex((v) => !v)}
+        title={useRegex ? "Regex (on)" : "Regex (off)"}
+        aria-pressed={useRegex}
+      >
+        .*
+      </button>
       <button
         type="button"
         className={`terminal-search-btn${caseSensitive ? " terminal-search-btn--active" : ""}`}
@@ -99,7 +138,7 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
       <button
         type="button"
         className="terminal-search-btn"
-        onClick={() => searchAddon.findPrevious(query, { caseSensitive })}
+        onClick={() => searchAddon.findPrevious(query, { caseSensitive, regex: useRegex })}
         title="Previous match (Shift+Enter)"
         aria-label="Previous match"
       >
@@ -108,7 +147,7 @@ export function TerminalSearch({ searchAddon, onClose, onQueryChange }: Terminal
       <button
         type="button"
         className="terminal-search-btn"
-        onClick={() => searchAddon.findNext(query, { caseSensitive })}
+        onClick={() => searchAddon.findNext(query, { caseSensitive, regex: useRegex })}
         title="Next match (Enter)"
         aria-label="Next match"
       >

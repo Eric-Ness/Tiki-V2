@@ -1,0 +1,27 @@
+{
+  "version": "v0.6.0",
+  "status": "active",
+  "issues": [
+    {
+      "number": 173,
+      "title": "Enhancement: Regex toggle in terminal search (E2)"
+    },
+    {
+      "number": 174,
+      "title": "Enhancement: Ctrl+= / Ctrl+- runtime font-size for the live terminal (E3)"
+    },
+    {
+      "number": 175,
+      "title": "Enhancement: 'Jump to terminal' button on issue detail when work is active (E10)"
+    },
+    {
+      "number": 176,
+      "title": "Enhancement: Illustrated empty state for the detail panel (E11)"
+    },
+    {
+      "number": 177,
+      "title": "Enhancement: Recovery dialog highlights the parse-failure line (E14)"
+    }
+  ],
+  "createdAt": "2026-05-14T15:53:41.003Z"
+}
