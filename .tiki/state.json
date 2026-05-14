@@ -1,6 +1,39 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.5.7": {
+      "type": "release",
+      "release": {
+        "version": "v0.5.7",
+        "issues": [
+          171
+        ],
+        "currentIssue": 171,
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-14T11:09:24.221Z",
+      "lastActivity": "2026-05-14T11:09:24.221Z"
+    },
+    "issue:171": {
+      "type": "issue",
+      "issue": {
+        "number": 171,
+        "title": "Bug: Ctrl+C and Ctrl+V are completely non-functional in the terminal"
+      },
+      "status": "shipping",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-05-14T11:10:44.974Z",
+      "lastActivity": "2026-05-14T12:11:51.700Z",
+      "parentRelease": "v0.5.7",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    }
+  },
   "history": {
     "lastCompletedIssue": {
       "number": 169,
