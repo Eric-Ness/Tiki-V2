@@ -1,0 +1,24 @@
+{
+  "issue": {
+    "number": 174,
+    "title": "Enhancement: Ctrl+= / Ctrl+- runtime font-size for the live terminal (E3)"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add Ctrl+= / Ctrl+- / Ctrl+0 font-size branch to Terminal.tsx's attachCustomKeyEventHandler",
+      "content": "Single-file change to `apps/desktop/src/components/terminal/Terminal.tsx`. The custom key handler at line 313 already owns Ctrl+Shift+C / Ctrl+C / Ctrl+V / Ctrl+F / F3 / Ctrl+Shift+K. Both `xterm` and `fitAddon` are in lexical scope inside the handler, and `terminalSettings.fontSize` (the configured default) is also in scope from the enclosing effect.\n\n### Change — new branch before the final `return true` (after the Ctrl+Shift+K branch, ~line 371)\n\n```ts\n// Ctrl+= / Ctrl+- / Ctrl+0: adjust the live terminal font size. xterm\n// applies options.fontSize immediately; fitAddon.fit() reflows the grid to\n// the new cell metrics. Runtime-only and not persisted — Settings still\n// governs new terminals (the \"applies to new terminals only\" model). #174.\n// Note: Ctrl+- overrides nothing useful (readline undo is Ctrl+_/Ctrl+Shift+-,\n// matched as e.key === '_', which is deliberately left to pass through).\nif (e.type === 'keydown' && e.ctrlKey) {\n  const FONT_MIN = 8;\n  const FONT_MAX = 32;\n  const current = xterm.options.fontSize ?? terminalSettings.fontSize;\n  if (e.key === '=' || e.key === '+') {\n    xterm.options.fontSize = Math.min(FONT_MAX, current + 1);\n    fitAddon.fit();\n    return false;\n  }\n  if (e.key === '-') {\n    xterm.options.fontSize = Math.max(FONT_MIN, current - 1);\n    fitAddon.fit();\n    return false;\n  }\n  if (e.key === '0') {\n    xterm.options.fontSize = terminalSettings.fontSize;\n    fitAddon.fit();\n    return false;\n  }\n}\n```\n\n### Key-matching rationale\n- **Increase** matches both `'='` (Ctrl+=) and `'+'` (Ctrl+Shift+= / Ctrl++) — `e.key` already resolves the shift state, so both common 'bigger' chords work.\n- **Decrease** matches only `'-'` (Ctrl+-), NOT `'_'`. Ctrl+Shift+- produces `e.key === '_'`, which is readline's undo on many shells — left untouched to pass through to the PTY.\n- **Reset** matches `'0'` (Ctrl+0), the conventional 'reset zoom' chord.\n\n### Scope boundaries\n- No persistence: the change is runtime-only, consistent with the existing `SettingsPage.tsx` note that terminal settings apply to new terminals only. No settings-store or `terminalStore` changes.\n- No new dependencies. `xterm.options.fontSize` is a documented mutable property in `@xterm/xterm` 5.x.\n- The clamp range 8–32 matches a sane on-screen range; below 8 the grid math gets unstable, above 32 a single line barely fits.\n- No change to the other key branches or the resize/fit wiring elsewhere in the effect.",
+      "verification": [
+        "Terminal.tsx's attachCustomKeyEventHandler has a new `e.ctrlKey` keydown branch handling font-size before the final `return true`.",
+        "Ctrl+= and Ctrl++ (e.key '=' or '+') increase fontSize by 1, clamped to a max of 32, then call fitAddon.fit() and return false.",
+        "Ctrl+- (e.key '-') decreases fontSize by 1, clamped to a min of 8, then calls fitAddon.fit() and returns false.",
+        "Ctrl+0 resets fontSize to terminalSettings.fontSize, calls fitAddon.fit(), returns false.",
+        "e.key === '_' is NOT matched — Ctrl+Shift+- still passes through to the PTY.",
+        "No persistence code added; no changes outside Terminal.tsx.",
+        "`pnpm build` from the repo root passes (tsc -b + vite build) — no type or unused-symbol errors."
+      ],
+      "status": "completed",
+      "summary": "Added a Ctrl+= / Ctrl+- / Ctrl+0 branch to Terminal.tsx's attachCustomKeyEventHandler. Increase matches '=' and '+', decrease matches '-' only (leaving Ctrl+Shift+- / e.key '_' for readline undo), reset restores terminalSettings.fontSize. Each adjusts xterm.options.fontSize (clamped 8–32) and calls fitAddon.fit() to reflow the grid. Runtime-only, no persistence — consistent with the 'applies to new terminals only' settings model. pnpm build clean."
+    }
+  ]
+}

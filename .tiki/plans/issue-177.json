@@ -1,0 +1,42 @@
+{
+  "issue": {
+    "number": 177,
+    "title": "Enhancement: Recovery dialog highlights the parse-failure line (E14)"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "recoveryFlow.ts: pure parseJsonErrorLocation helper + tests",
+      "content": "Add a pure, tested location parser to `apps/desktop/src/components/recovery/recoveryFlow.ts`.\n\n```ts\nexport interface JsonErrorLocation {\n  line: number;\n  column: number;\n}\n\n/**\n * Extract a 1-based line/column from a JSON parse error message. Handles\n * both serde_json's format (\"... at line 12 column 5\") — the shape of the\n * `error` string `get_state` returns for a corrupt state.json — and modern\n * V8's format (\"Unexpected token ... (line 12 column 5)\") that JSON.parse\n * produces, which `validateBackupShape` captures into a backup's\n * invalidReason. Returns null when no location can be found.\n */\nexport function parseJsonErrorLocation(message: string): JsonErrorLocation | null {\n  const m = message.match(/line (\\d+) column (\\d+)/i);\n  if (!m) return null;\n  const line = Number(m[1]);\n  const column = Number(m[2]);\n  if (!Number.isFinite(line) || !Number.isFinite(column)) return null;\n  return { line, column };\n}\n```\n\n### Test — extend `__tests__/recoveryFlow.test.ts`\nAdd a `describe('parseJsonErrorLocation', ...)` block: (a) parses serde format `\"expected value at line 12 column 5\"`, (b) parses V8 format `\"Unexpected token } in JSON at position 40 (line 3 column 8)\"`, (c) returns null for a message with no location, (d) returns null for empty string.\n\n### Scope\n- Pure function only; no component or IPC changes in this phase.\n- Case-insensitive match; tolerant of surrounding text on either side.",
+      "verification": [
+        "recoveryFlow.ts exports `parseJsonErrorLocation` and the `JsonErrorLocation` interface.",
+        "It returns {line, column} for both serde_json (\"at line N column M\") and V8 (\"(line N column M)\") messages, and null when no location is present.",
+        "`__tests__/recoveryFlow.test.ts` has a parseJsonErrorLocation block covering serde, V8, no-location, and empty-string cases.",
+        "`pnpm test` passes including the new cases.",
+        "`pnpm build` passes."
+      ],
+      "status": "completed",
+      "summary": "Added pure parseJsonErrorLocation(message) to recoveryFlow.ts — single regex /line N column M/i handles both serde_json and modern V8 JSON.parse messages. 4 new test cases."
+    },
+    {
+      "number": 2,
+      "title": "StateRecoveryDialog: structured error-location callout + line-numbered preview with failing-row highlight & scroll",
+      "content": "Use the Phase-1 helper in `apps/desktop/src/components/recovery/StateRecoveryDialog.tsx` (+ its CSS).\n\n### Error summary callout\nImport `parseJsonErrorLocation`. Compute `const errorLocation = useMemo(() => parseJsonErrorLocation(error), [error]);`. In the `recovery-error-summary` section, when `errorLocation` is non-null, render a structured callout between the label and the raw `<pre>`:\n```tsx\n{errorLocation && (\n  <p className=\"recovery-error-location\">\n    Parse error at <strong>line {errorLocation.line}</strong>, column {errorLocation.column}\n  </p>\n)}\n```\nThe raw `<pre className=\"recovery-error-message\">{error}</pre>` stays — the callout surfaces the location, the pre keeps the full context.\n\n### Preview state\nAdd `const [previewErrorLocation, setPreviewErrorLocation] = useState<JsonErrorLocation | null>(null);`. In `handlePreview(row)`, also set it: `setPreviewErrorLocation(row.valid ? null : parseJsonErrorLocation(row.invalidReason ?? \"\"));` — an invalid backup's `invalidReason` (from `validateBackupShape`'s captured `JSON.parse` message) yields the offending line. In `handleClosePreview`, clear it to null.\n\n### Line-numbered preview with highlight + scroll\nReplace `<pre className=\"recovery-preview-content\">{previewContent}</pre>` with a line-numbered render: split `previewContent` on `\\n`, map each to a row with a non-selectable gutter line number and the line text. The row whose 1-based index equals `previewErrorLocation?.line` gets an `is-error-line` class and a `ref` callback that calls `scrollIntoView({ block: 'center' })` once mounted.\n```tsx\n<div className=\"recovery-preview-content\">\n  {previewContent.split(\"\\n\").map((lineText, i) => {\n    const lineNo = i + 1;\n    const isErrorLine = previewErrorLocation?.line === lineNo;\n    return (\n      <div\n        key={lineNo}\n        className={`recovery-preview-line${isErrorLine ? \" is-error-line\" : \"\"}`}\n        ref={isErrorLine ? (el) => el?.scrollIntoView({ block: \"center\" }) : undefined}\n      >\n        <span className=\"recovery-preview-gutter\">{lineNo}</span>\n        <span className=\"recovery-preview-text\">{lineText || \"\\u00a0\"}</span>\n      </div>\n    );\n  })}\n</div>\n```\n\n### CSS — StateRecoveryDialog.css\n- `.recovery-error-location`: small callout, warning-tinted text, the `<strong>` slightly emphasized.\n- `.recovery-preview-content`: keep it scrollable/monospve; switch from `<pre>` block styling to a flex/block column of lines (preserve the monospace font, border, max-height, overflow that the existing rule has).\n- `.recovery-preview-line`: `display: flex`, monospace, `white-space: pre`.\n- `.recovery-preview-gutter`: fixed-width (~3.5ch), right-aligned, dimmed, `user-select: none`.\n- `.recovery-preview-line.is-error-line`: yellow/red-tinted background + a left accent border so the offending row stands out.\n\n### Scope boundaries\n- Frontend-only — no Rust/IPC changes. The corrupt state.json itself is not loaded into the dialog (no read-raw-file IPC exists and adding one is out of scope); the error-summary callout surfaces its location, which is what the user needs before clicking Edit Manually.\n- The failing-row highlight applies to the **backup preview** for *invalid* backups (whose `invalidReason` carries a location). Valid backups preview with line numbers but no highlight — correct, they have no error line.\n- No behavior change to list/restore/edit/reset flows.",
+      "verification": [
+        "StateRecoveryDialog imports parseJsonErrorLocation and renders a `.recovery-error-location` callout (\"Parse error at line N, column M\") in the error summary when the error string carries a location.",
+        "handlePreview sets previewErrorLocation from an invalid backup's invalidReason; handleClosePreview clears it.",
+        "The preview overlay renders previewContent as line-numbered rows (gutter + text), replacing the bare <pre>.",
+        "The row matching previewErrorLocation.line gets an `is-error-line` class and is scrolled into view via a ref callback.",
+        "StateRecoveryDialog.css styles `.recovery-error-location`, `.recovery-preview-line`, `.recovery-preview-gutter`, and `.is-error-line` (left accent + tinted background), preserving the preview's monospace + scroll behavior.",
+        "Valid-backup previews show line numbers but no highlighted row.",
+        "`pnpm build` passes and `pnpm test` is green.",
+        "Manual smoke (user): trigger the recovery dialog, preview an invalid backup — the offending line is highlighted and scrolled into view; the error summary shows the structured line/column callout."
+      ],
+      "status": "completed",
+      "dependencies": [
+        1
+      ],
+      "summary": "StateRecoveryDialog: error summary now shows a structured \"Parse error at line N, column M\" callout when the state.json error carries a location. The backup preview is rendered as line-numbered rows (gutter + text) instead of a bare <pre>; for invalid backups whose invalidReason carries a location, the offending row gets an is-error-line highlight (left accent + tint) and is scrolled into view via a ref callback. CSS adds .recovery-error-location and the line/gutter/error-line styles. Frontend-only. pnpm build clean, pnpm test green."
+    }
+  ]
+}

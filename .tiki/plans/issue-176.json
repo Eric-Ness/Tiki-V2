@@ -1,0 +1,23 @@
+{
+  "issue": {
+    "number": 176,
+    "title": "Enhancement: Illustrated empty state for the detail panel (E11)"
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Create DetailEmptyState component (pipeline diagram + Ctrl+K hint) and use it in App.tsx's detail fallback",
+      "content": "Replace the bare `<h3>Detail</h3><p>Select an issue...</p>` fallback at `App.tsx:506-512` with a dedicated, illustrated component.\n\n### New file — `apps/desktop/src/components/detail/DetailEmptyState.tsx`\nA centered, low-emphasis empty state: a horizontal GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP pipeline diagram (rendered as small pill chips joined by `→`), a short orienting line, and the `Ctrl+K` command-palette hint. Pipeline labels match `PipelineTimeline.tsx`'s `PIPELINE_STEPS` ordering. No external SVG asset — the diagram is plain styled markup so it themes automatically.\n\n```tsx\nimport \"./DetailEmptyState.css\";\n\nconst PIPELINE_STEPS = [\"GET\", \"REVIEW\", \"PLAN\", \"AUDIT\", \"EXECUTE\", \"SHIP\"] as const;\n\n/**\n * Shown in the detail panel when nothing is selected. Orients new users with\n * the Tiki pipeline and the command-palette shortcut instead of a bare\n * \"Select an issue\" line (#176 / E11).\n */\nexport function DetailEmptyState() {\n  return (\n    <div className=\"detail-empty\">\n      <div className=\"detail-empty-pipeline\" aria-hidden=\"true\">\n        {PIPELINE_STEPS.map((step, i) => (\n          <div key={step} className=\"detail-empty-step-wrap\">\n            <span className=\"detail-empty-step\">{step}</span>\n            {i < PIPELINE_STEPS.length - 1 && (\n              <span className=\"detail-empty-arrow\">→</span>\n            )}\n          </div>\n        ))}\n      </div>\n      <h3 className=\"detail-empty-title\">Nothing selected</h3>\n      <p className=\"detail-empty-text\">\n        Select an issue or release from the sidebar to view its details and\n        pipeline progress.\n      </p>\n      <p className=\"detail-empty-hint\">\n        Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to open the command palette.\n      </p>\n    </div>\n  );\n}\n```\n\n### New file — `apps/desktop/src/components/detail/DetailEmptyState.css`\nFl/column-centered, fills the panel height, `text-align: center`. The pipeline row is `flex-wrap` (the detail panel can be narrow — min 15%), low opacity (~0.55). Step chips: ~9px bold uppercase, `1px solid var(--border-color)`, `var(--text-secondary)`. `kbd` styled with `var(--bg-tertiary)` + border. All colors via existing CSS custom properties so dark/light themes both work.\n\n### Wiring — `apps/desktop/src/components/detail/index.ts`\nAdd `export { DetailEmptyState } from './DetailEmptyState';`.\n\n### Wiring — `apps/desktop/src/App.tsx`\nAdd `DetailEmptyState` to the existing `import { ... } from \"./components/detail\"` line. Replace the `<> <h3>Detail</h3> <p className=\"hint\">...</p> </>` fallback (the final `: (` branch of the detail-content ternary chain, ~lines 506-512) with `<DetailEmptyState />`.\n\n### Scope boundaries\n- Pure presentational component, no props, no store access, no new dependencies.\n- Only the no-selection fallback branch changes; the five populated branches (IssueDetail / PullRequestDetail / ReleaseDetail / TikiReleaseDetail / ResearchDetail) are untouched.\n- No SVG asset files — keeps it themeable and diff-light.",
+      "verification": [
+        "New apps/desktop/src/components/detail/DetailEmptyState.tsx exports a propless `DetailEmptyState` component rendering the 6-step pipeline diagram, an orienting line, and a Ctrl+K hint.",
+        "New apps/desktop/src/components/detail/DetailEmptyState.css styles it centered and low-emphasis using existing CSS custom properties (no hardcoded theme colors).",
+        "components/detail/index.ts re-exports DetailEmptyState.",
+        "App.tsx imports DetailEmptyState from ./components/detail and renders <DetailEmptyState /> as the final fallback of the detail-content ternary; the bare <h3>Detail</h3> markup is gone.",
+        "The five populated detail branches are unchanged.",
+        "`pnpm build` passes (tsc -b + vite build)."
+      ],
+      "status": "completed",
+      "summary": "New propless DetailEmptyState component (+ themed CSS) renders a GET→REVIEW→PLAN→AUDIT→EXECUTE→SHIP pill diagram, an orienting line, and a Ctrl+K hint. Exported from the detail barrel; App.tsx detail-content fallback now renders <DetailEmptyState/> instead of the bare <h3>Detail</h3> markup. All colors via existing CSS custom properties. pnpm build clean."
+    }
+  ]
+}

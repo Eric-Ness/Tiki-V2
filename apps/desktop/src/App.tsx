@@ -13,7 +13,7 @@ import { ResearchSection } from "./components/sidebar/ResearchSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { ClaudeUsageSection } from "./components/sidebar/ClaudeUsageSection";
 import { TerminalPane } from "./components/terminal";
-import { IssueDetail, PullRequestDetail, ReleaseDetail, ResearchDetail, TikiReleaseDetail } from "./components/detail";
+import { IssueDetail, PullRequestDetail, ReleaseDetail, ResearchDetail, TikiReleaseDetail, DetailEmptyState } from "./components/detail";
 import { CenterTabs } from "./components/layout/CenterTabs";
 import { KanbanBoard } from "./components/kanban";
 import { DependencyGraph } from "./components/dependencies/DependencyGraph";
@@ -504,12 +504,7 @@ function App() {
             ) : selectedResearchDoc ? (
               <ResearchDetail filename={selectedResearchDoc} projectPath={activeProject?.path} />
             ) : (
-              <>
-                <h3>Detail</h3>
-                <p className="hint">
-                  Select an issue or release from the sidebar to view details
-                </p>
-              </>
+              <DetailEmptyState />
             )}
           </div>
         </Panel>

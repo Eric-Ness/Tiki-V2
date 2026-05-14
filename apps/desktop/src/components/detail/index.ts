@@ -3,3 +3,4 @@ export { PullRequestDetail } from './PullRequestDetail';
 export { ReleaseDetail } from './ReleaseDetail';
 export { TikiReleaseDetail } from './TikiReleaseDetail';
 export { ResearchDetail } from './ResearchDetail';
+export { DetailEmptyState } from './DetailEmptyState';
