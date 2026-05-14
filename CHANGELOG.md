@@ -10,6 +10,22 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.6.0] — 2026-05-14
+
+"UX polish" — the first backlog-driven release since v0.5.0, breaking the v0.5.4–v0.5.7 single-issue reactive-bugfix streak. Five enhancements from `docs/ENHANCEMENT-IDEAS.md` (E2, E3, E10, E11, E14) scoped and shipped together. Full per-issue summary: [`.tiki/releases/v0.6.0-changelog.md`](.tiki/releases/v0.6.0-changelog.md).
+
+### Added
+- **Regex toggle in terminal search** (#173). A `.*` toggle beside the `Aa` case toggle, forwarding `regex` to `@xterm/addon-search`; uncompilable patterns are caught with an "Invalid regex" indicator (E2).
+- **Runtime terminal font-size** (#174). `Ctrl+=` / `Ctrl++` / `Ctrl+-` / `Ctrl+0` resize the live terminal and reflow the grid; `Ctrl+Shift+-` still reaches readline undo (E3).
+- **Jump-to-terminal from the detail panel** (#175). Issue-scoped commands record their terminal; the issue detail panel offers a "Jump to terminal" button that switches view, tab, and focus. Hidden when no live association exists (E10).
+- **Illustrated detail-panel empty state** (#176). The bare "Select an issue" fallback becomes a GET → SHIP pipeline diagram plus a `Ctrl+K` hint (E11).
+- **Recovery dialog parse-failure line** (#177). A structured "line N, column M" callout in the error summary; backup previews are line-numbered with the offending row highlighted and scrolled into view (E14).
+
+### Internal
+- New unit tests (`TerminalSearch.test.ts`, `terminalStore.test.ts`, `parseJsonErrorLocation` cases) — desktop vitest suite grew from 76 to 89 cases.
+
+---
+
 ## [v0.5.7] — 2026-05-14
 
 Single-issue follow-up to v0.5.6 restoring terminal copy/paste, non-functional since the v0.5.3 terminal-polish bundle. Full per-issue summary: [`.tiki/releases/v0.5.7-changelog.md`](.tiki/releases/v0.5.7-changelog.md).
