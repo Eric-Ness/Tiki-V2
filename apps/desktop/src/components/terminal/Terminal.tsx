@@ -250,6 +250,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           lineHeight: 1.2,
           cursorBlink: true,
           cursorStyle: "block",
+          // @xterm/xterm 5.4+ gates some APIs the link/search addons rely on
+          // behind this flag; legacy xterm@5.3 exposed them unconditionally.
+          allowProposedApi: true,
         });
 
         // Add addons
