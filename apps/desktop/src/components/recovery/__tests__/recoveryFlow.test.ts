@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatRelativeAge,
   parseBackupTimestamp,
+  parseJsonErrorLocation,
   RESET_CONFIRMATION_PHRASE,
   validateBackupShape,
 } from '../recoveryFlow';
@@ -154,5 +155,28 @@ describe('validateBackupShape', () => {
 describe('RESET_CONFIRMATION_PHRASE', () => {
   it('is exactly "reset" — required by SC5', () => {
     expect(RESET_CONFIRMATION_PHRASE).toBe('reset');
+  });
+});
+
+describe('parseJsonErrorLocation', () => {
+  it('parses the serde_json format ("at line N column M")', () => {
+    expect(parseJsonErrorLocation('expected value at line 12 column 5')).toEqual({
+      line: 12,
+      column: 5,
+    });
+  });
+
+  it('parses the modern V8 JSON.parse format ("(line N column M)")', () => {
+    expect(
+      parseJsonErrorLocation('Unexpected token } in JSON at position 40 (line 3 column 8)')
+    ).toEqual({ line: 3, column: 8 });
+  });
+
+  it('returns null when the message carries no location', () => {
+    expect(parseJsonErrorLocation('Missing or invalid schemaVersion')).toBeNull();
+  });
+
+  it('returns null for an empty string', () => {
+    expect(parseJsonErrorLocation('')).toBeNull();
   });
 });

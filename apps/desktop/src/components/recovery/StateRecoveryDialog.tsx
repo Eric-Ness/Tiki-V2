@@ -17,8 +17,10 @@ import {
   formatBytes,
   formatRelativeAge,
   parseBackupTimestamp,
+  parseJsonErrorLocation,
   RESET_CONFIRMATION_PHRASE,
   validateBackupShape,
+  type JsonErrorLocation,
 } from "./recoveryFlow";
 import "./StateRecoveryDialog.css";
 
@@ -65,10 +67,16 @@ export function StateRecoveryDialog({
   const [busy, setBusy] = useState(false);
   const [previewFilename, setPreviewFilename] = useState<string | null>(null);
   const [previewContent, setPreviewContent] = useState<string>("");
+  const [previewErrorLocation, setPreviewErrorLocation] =
+    useState<JsonErrorLocation | null>(null);
   const [resetExpanded, setResetExpanded] = useState(false);
   const [resetInput, setResetInput] = useState("");
 
   const now = useMemo(() => new Date(), []);
+
+  // Line/column of the state.json parse failure, surfaced as a callout in the
+  // error summary so the user knows where to look before Edit Manually (#177).
+  const errorLocation = useMemo(() => parseJsonErrorLocation(error), [error]);
 
   const stateJsonPath = useMemo(() => {
     if (!tikiPath) return null;
@@ -149,11 +157,17 @@ export function StateRecoveryDialog({
   const handlePreview = useCallback((row: BackupRow) => {
     setPreviewFilename(row.info.filename);
     setPreviewContent(row.content ?? "(content not yet loaded)");
+    // An invalid backup's invalidReason carries the JSON.parse location;
+    // valid backups have no failing line to highlight.
+    setPreviewErrorLocation(
+      row.valid ? null : parseJsonErrorLocation(row.invalidReason ?? "")
+    );
   }, []);
 
   const handleClosePreview = useCallback(() => {
     setPreviewFilename(null);
     setPreviewContent("");
+    setPreviewErrorLocation(null);
   }, []);
 
   const handleEditManually = useCallback(async () => {
@@ -208,6 +222,12 @@ export function StateRecoveryDialog({
           <p className="recovery-error-label">
             Tiki could not parse your state file.
           </p>
+          {errorLocation && (
+            <p className="recovery-error-location">
+              Parse error at <strong>line {errorLocation.line}</strong>, column{" "}
+              {errorLocation.column}
+            </p>
+          )}
           <pre className="recovery-error-message">{error}</pre>
           {stateJsonPath && (
             <p className="recovery-file-path">
@@ -364,7 +384,26 @@ export function StateRecoveryDialog({
                   X
                 </button>
               </header>
-              <pre className="recovery-preview-content">{previewContent}</pre>
+              <div className="recovery-preview-content">
+                {previewContent.split("\n").map((lineText, i) => {
+                  const lineNo = i + 1;
+                  const isErrorLine = previewErrorLocation?.line === lineNo;
+                  return (
+                    <div
+                      key={lineNo}
+                      className={`recovery-preview-line${isErrorLine ? " is-error-line" : ""}`}
+                      ref={
+                        isErrorLine
+                          ? (el) => el?.scrollIntoView({ block: "center" })
+                          : undefined
+                      }
+                    >
+                      <span className="recovery-preview-gutter">{lineNo}</span>
+                      <span className="recovery-preview-text">{lineText || " "}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

@@ -130,3 +130,25 @@ export function validateBackupShape(json: string): BackupValidationResult {
  * the component and any test stay in sync.
  */
 export const RESET_CONFIRMATION_PHRASE = 'reset';
+
+export interface JsonErrorLocation {
+  line: number;
+  column: number;
+}
+
+/**
+ * Extract a 1-based line/column from a JSON parse error message. Handles
+ * both serde_json's format ("... at line 12 column 5") — the shape of the
+ * `error` string `get_state` returns for a corrupt state.json — and modern
+ * V8's format ("Unexpected token ... (line 12 column 5)") that JSON.parse
+ * produces, which `validateBackupShape` captures into a backup's
+ * invalidReason. Returns null when no location can be found.
+ */
+export function parseJsonErrorLocation(message: string): JsonErrorLocation | null {
+  const m = message.match(/line (\d+) column (\d+)/i);
+  if (!m) return null;
+  const line = Number(m[1]);
+  const column = Number(m[2]);
+  if (!Number.isFinite(line) || !Number.isFinite(column)) return null;
+  return { line, column };
+}
