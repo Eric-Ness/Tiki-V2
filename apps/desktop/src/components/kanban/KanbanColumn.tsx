@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useDetailStore, useProjectsStore } from '../../stores';
+import { useDetailStore, useKanbanStore, useProjectsStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { KanbanCard, type WorkItem } from './KanbanCard';
 
@@ -26,7 +27,12 @@ const cardVariants = {
 export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, workItems, activeId, hasFailed, onExecute, onShip, onOpenInGitHub }: KanbanColumnProps) {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const selectedIssue = useDetailStore((s) => s.selectionByProject[projectId]?.selectedIssue ?? null);
+  const hasCustomOrder = useKanbanStore(
+    (s) => Boolean(s.orderByColumnByProject[projectId]?.[id]?.length)
+  );
   const { isOver, setNodeRef } = useDroppable({ id });
+
+  const itemIds = issues.map((i) => i.number);
 
   const classNames = [
     'kanban-column',
@@ -50,6 +56,20 @@ export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, work
         >
           ({issues.length})
         </motion.span>
+        {hasCustomOrder && (
+          <button
+            type="button"
+            className="kanban-column-reset"
+            onClick={(e) => {
+              e.stopPropagation();
+              useKanbanStore.getState().clearColumnOrder(id);
+            }}
+            title="Reset to default order"
+            aria-label={`Reset ${title} column to default order`}
+          >
+            {'↺'}
+          </button>
+        )}
       </div>
       <div className="kanban-column-body">
         {issues.length === 0 ? (
@@ -75,34 +95,36 @@ export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, work
             </div>
           )
         ) : (
-          <AnimatePresence mode="popLayout">
-            {issues.map((issue) => (
-              <motion.div
-                key={issue.number}
-                layoutId={`kanban-card-${issue.number}`}
-                variants={cardVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{
-                  type: 'spring',
-                  stiffness: 500,
-                  damping: 30,
-                  layout: { duration: 0.3 },
-                }}
-              >
-                <KanbanCard
-                  issue={issue}
-                  workItem={workItems?.get(issue.number)}
-                  isSelected={selectedIssue === issue.number}
-                  isBeingDragged={activeId === issue.number}
-                  onExecute={onExecute}
-                  onShip={onShip}
-                  onOpenInGitHub={onOpenInGitHub}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+            <AnimatePresence mode="popLayout">
+              {issues.map((issue) => (
+                <motion.div
+                  key={issue.number}
+                  layoutId={`kanban-card-${issue.number}`}
+                  variants={cardVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 30,
+                    layout: { duration: 0.3 },
+                  }}
+                >
+                  <KanbanCard
+                    issue={issue}
+                    workItem={workItems?.get(issue.number)}
+                    isSelected={selectedIssue === issue.number}
+                    isBeingDragged={activeId === issue.number}
+                    onExecute={onExecute}
+                    onShip={onShip}
+                    onOpenInGitHub={onOpenInGitHub}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </SortableContext>
         )}
       </div>
     </div>

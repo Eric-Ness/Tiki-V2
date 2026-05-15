@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
-import { useDraggable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { useDetailStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
@@ -34,11 +35,24 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
   const canExecute = !isCompleted && !isExecuting && onExecute;
   const canShip = workItem?.status === 'shipping' || workItem?.status === 'executing';
 
-  // Only make non-completed cards draggable
-  const { attributes, listeners, setNodeRef, isDragging: isDraggingFromHook } = useDraggable({
+  // Only make non-completed cards sortable/draggable
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isDraggingFromHook,
+  } = useSortable({
     id: issue.number,
     disabled: isCompleted,
   });
+
+  const sortableStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDraggingFromHook ? 0 : undefined,
+  };
 
   const classNames = [
     'kanban-card',
@@ -112,6 +126,7 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
       <div
         ref={setNodeRef}
         className={classNames}
+        style={sortableStyle}
         onClick={() => setSelectedIssue(issue.number)}
         onContextMenu={handleContextMenu}
         {...listeners}
