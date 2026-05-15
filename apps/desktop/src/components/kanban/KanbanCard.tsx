@@ -19,18 +19,40 @@ export interface KanbanCardProps {
   isSelected?: boolean;
   isDragging?: boolean;
   isBeingDragged?: boolean;
+  /**
+   * Column id ("open" | "review" | etc.) — used as the surface key for
+   * shift+click range selection (`kanban:${columnId}`).
+   */
+  columnId: string;
+  /**
+   * Visible-order issue numbers in this column, used to compute the
+   * range for shift+click selection.
+   */
+  surfaceIssueNumbers: number[];
   onExecute?: (issueNumber: number) => void;
   onShip?: (issueNumber: number) => void;
   onOpenInGitHub?: (issue: GitHubIssue) => void;
 }
 
-export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, onExecute, onShip, onOpenInGitHub }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, columnId, surfaceIssueNumbers, onExecute, onShip, onOpenInGitHub }: KanbanCardProps) {
   const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const isBatchSelected = useSelectionStore(
     (s) => s.selectedByProject[projectId]?.has(issue.number) ?? false,
   );
   const toggleBatchSelection = useSelectionStore((s) => s.toggle);
+  const rangeSelect = useSelectionStore((s) => s.rangeSelect);
+  const surfaceKey = `kanban:${columnId}`;
+
+  const handleCheckboxClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.shiftKey) {
+      // Shift-click: range select. Prevent the default toggle that
+      // onChange would also produce — rangeSelect handles selection.
+      e.preventDefault();
+      rangeSelect(surfaceKey, surfaceIssueNumbers, issue.number);
+    }
+  };
   const contextMenu = useContextMenu();
 
   const isPaused = workItem?.status === 'paused';
@@ -143,8 +165,8 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
             type="checkbox"
             className="kanban-card-select"
             checked={isBatchSelected}
-            onChange={() => toggleBatchSelection(issue.number)}
-            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleBatchSelection(issue.number, surfaceKey)}
+            onClick={handleCheckboxClick}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label={`Select issue #${issue.number}`}
           />

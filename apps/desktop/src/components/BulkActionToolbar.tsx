@@ -3,10 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   useIssuesStore,
   useProjectsStore,
+  useReleaseDialogStore,
   useSelectionStore,
   useToastStore,
 } from '../stores';
 import { LabelPickerPopover } from './LabelPickerPopover';
+import { buildPrePopulatedRelease } from './bulkAssignHelpers';
 import './BulkActionToolbar.css';
 
 /**
@@ -34,8 +36,11 @@ export function BulkActionToolbar() {
   const clear = useSelectionStore((s) => s.clear);
   const triggerIssuesRefetch = useIssuesStore((s) => s.triggerRefetch);
   const addToast = useToastStore((s) => s.addToast);
-  const [busy, setBusy] = useState<'close' | 'label' | null>(null);
+  const allIssues = useIssuesStore((s) => s.issues);
+  const openReleaseDialog = useReleaseDialogStore((s) => s.openDialog);
+  const [busy, setBusy] = useState<'close' | 'label' | 'remove-label' | null>(null);
   const [labelOpen, setLabelOpen] = useState(false);
+  const [removeLabelOpen, setRemoveLabelOpen] = useState(false);
 
   if (selected.length === 0) return null;
 
@@ -100,6 +105,47 @@ export function BulkActionToolbar() {
     }
   };
 
+  const bulkAssignToRelease = () => {
+    if (busy) return;
+    const { initialIssues } = buildPrePopulatedRelease(selected, allIssues);
+    // Open the dialog in create mode (no editingRelease) with the
+    // selection pre-populated. We deliberately don't clear the
+    // selection — the user might cancel the dialog.
+    openReleaseDialog(undefined, { initialIssues });
+  };
+
+  const bulkRemoveLabel = async (labelName: string) => {
+    if (busy) return;
+    setBusy('remove-label');
+    setRemoveLabelOpen(false);
+    const failures: number[] = [];
+    await Promise.all(
+      selected.map((n) =>
+        invoke('edit_github_issue', {
+          number: n,
+          addLabels: [],
+          removeLabels: [labelName],
+          projectPath,
+        }).catch(() => {
+          failures.push(n);
+        })
+      )
+    );
+    setBusy(null);
+    triggerIssuesRefetch();
+    if (failures.length === 0) {
+      addToast(
+        `Removed "${labelName}" from ${selected.length} issue${plural(selected.length)}.`,
+        'success'
+      );
+    } else {
+      addToast(
+        `Removed from ${selected.length - failures.length} of ${selected.length}; failed: #${failures.join(', #')}`,
+        'error'
+      );
+    }
+  };
+
   return (
     <div
       className="bulk-action-toolbar"
@@ -113,9 +159,29 @@ export function BulkActionToolbar() {
         <button
           type="button"
           disabled={busy !== null}
-          onClick={() => setLabelOpen((v) => !v)}
+          onClick={() => {
+            setRemoveLabelOpen(false);
+            setLabelOpen((v) => !v);
+          }}
         >
           {busy === 'label' ? 'Labeling...' : 'Add label'}
+        </button>
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() => {
+            setLabelOpen(false);
+            setRemoveLabelOpen((v) => !v);
+          }}
+        >
+          {busy === 'remove-label' ? 'Removing...' : 'Remove label'}
+        </button>
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={bulkAssignToRelease}
+        >
+          Add to release
         </button>
         <button
           type="button"
@@ -133,6 +199,15 @@ export function BulkActionToolbar() {
             projectPath={projectPath}
             onPick={bulkAddLabel}
             onClose={() => setLabelOpen(false)}
+          />
+        )}
+        {removeLabelOpen && (
+          <LabelPickerPopover
+            projectPath={projectPath}
+            mode="remove"
+            selectedIssueNumbers={selected}
+            onPick={bulkRemoveLabel}
+            onClose={() => setRemoveLabelOpen(false)}
           />
         )}
       </div>

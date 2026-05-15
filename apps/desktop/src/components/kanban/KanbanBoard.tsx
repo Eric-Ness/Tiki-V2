@@ -402,7 +402,14 @@ export function KanbanBoard() {
       </div>
 
       <DragOverlay>
-        {activeIssue ? <KanbanCard issue={activeIssue} isDragging /> : null}
+        {activeIssue ? (
+          <KanbanCard
+            issue={activeIssue}
+            isDragging
+            columnId="drag-overlay"
+            surfaceIssueNumbers={[]}
+          />
+        ) : null}
       </DragOverlay>
 
       {/* Ship Confirmation Dialog */}

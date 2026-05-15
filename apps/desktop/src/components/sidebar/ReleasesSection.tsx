@@ -184,6 +184,7 @@ export function ReleasesSection() {
   // Dialog state (from store for global access)
   const isDialogOpen = useReleaseDialogStore((state) => state.isOpen);
   const editingRelease = useReleaseDialogStore((state) => state.editingRelease);
+  const initialIssues = useReleaseDialogStore((state) => state.initialIssues);
   const openDialog = useReleaseDialogStore((state) => state.openDialog);
   const closeDialog = useReleaseDialogStore((state) => state.closeDialog);
 
@@ -548,6 +549,7 @@ export function ReleasesSection() {
         editingRelease={editingRelease}
         suggestedVersion={suggestedVersion}
         projectPath={activeProject?.path}
+        initialIssues={initialIssues}
       />
     </>
   );
