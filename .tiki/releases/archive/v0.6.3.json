@@ -1,0 +1,11 @@
+{
+  "version": "v0.6.3",
+  "status": "active",
+  "issues": [
+    {
+      "number": 203,
+      "title": "Batch operations follow-up: shift+click range, bulk remove-label, bulk YOLO, bulk assign-to-release"
+    }
+  ],
+  "createdAt": "2026-05-15T17:06:51.570Z"
+}
