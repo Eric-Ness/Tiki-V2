@@ -26,8 +26,30 @@ import type { WorkContext } from "./components/work";
 import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore } from "./stores";
 import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
+import { detectGithubRefreshTriggers } from "./utils/githubRefreshTriggers";
 import "./App.css";
 import "./components/layout/layout.css";
+
+// Per-surface trailing-edge debounce for GitHub re-fetches triggered by
+// state.json transitions. The watcher already coalesces filesystem-level
+// events, but logical events (e.g. shipping a 5-issue release writes
+// state.json many times in quick succession) still produce N triggers per
+// surface. 500ms trailing-edge collapses that to one fetch per surface.
+type RefreshSurface = 'issues' | 'prs' | 'releases';
+const pendingRefreshTriggers: Map<RefreshSurface, ReturnType<typeof setTimeout>> = new Map();
+const REFRESH_DEBOUNCE_MS = 500;
+
+function scheduleRefresh(surface: RefreshSurface, fire: () => void): void {
+  const existing = pendingRefreshTriggers.get(surface);
+  if (existing) clearTimeout(existing);
+  pendingRefreshTriggers.set(
+    surface,
+    setTimeout(() => {
+      pendingRefreshTriggers.delete(surface);
+      fire();
+    }, REFRESH_DEBOUNCE_MS),
+  );
+}
 
 // Types matching Rust state structures
 interface TikiState {
@@ -269,7 +291,22 @@ function App() {
             tikiPath: projectTikiPath,
           });
           console.log("State reloaded, activeWork keys:", currentState?.activeWork ? Object.keys(currentState.activeWork) : 'none');
-          detectStateChanges(prevStateRef.current, currentState);
+          const prev = prevStateRef.current;
+          detectStateChanges(prev, currentState);
+          // Detect activeWork → history transitions to drive sidebar GitHub re-fetches
+          // (issue close, release ship). Debounced per-surface to coalesce bursts.
+          if (prev && currentState) {
+            const triggers = detectGithubRefreshTriggers(prev, currentState);
+            if (triggers.issuesRefresh) {
+              scheduleRefresh('issues', () => useIssuesStore.getState().triggerRefetch());
+            }
+            if (triggers.prsRefresh) {
+              scheduleRefresh('prs', () => usePullRequestsStore.getState().triggerRefetch());
+            }
+            if (triggers.releasesRefresh) {
+              scheduleRefresh('releases', () => useReleasesStore.getState().triggerRefetch());
+            }
+          }
           prevStateRef.current = currentState;
           setState(currentState);
           // Sync to tikiStateStore for Kanban
@@ -279,8 +316,6 @@ function App() {
           }
           // Sync recentIssues for Completed column
           useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
-          // Refresh issues sidebar so completed/changed issues update
-          useIssuesStore.getState().triggerRefetch();
         } catch (e) {
           console.error("Failed to reload state:", e);
         }
