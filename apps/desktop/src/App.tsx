@@ -20,14 +20,16 @@ import { DependencyGraph } from "./components/dependencies/DependencyGraph";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { BulkActionToolbar } from "./components/BulkActionToolbar";
+import { BulkYoloDialog } from "./components/BulkYoloDialog";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore, useBulkYoloStore } from "./stores";
 import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import { detectGithubRefreshTriggers } from "./utils/githubRefreshTriggers";
+import { dispatchNextBulkYolo } from "./utils/bulkYoloDispatch";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -307,6 +309,42 @@ function App() {
             if (triggers.releasesRefresh) {
               scheduleRefresh('releases', () => useReleasesStore.getState().triggerRefetch());
             }
+
+            // Bulk YOLO cascade: when state.json transitions the run's
+            // current issue from activeWork into history, advance the
+            // queue and dispatch the next /tiki:yolo. Detect failure
+            // (activeWork[issue].status === 'failed') and pause + toast.
+            const projectId =
+              useProjectsStore.getState().activeProjectId ?? 'default';
+            const bulkRun =
+              useBulkYoloStore.getState().runByProject[projectId] ?? null;
+            if (bulkRun && bulkRun.status === 'running') {
+              const currentIssue = bulkRun.queue[bulkRun.currentIndex];
+              if (currentIssue !== undefined) {
+                const wasActive =
+                  `issue:${currentIssue}` in (prev.activeWork ?? {});
+                const nowDone = (
+                  currentState.history?.recentIssues ?? []
+                ).some((i) => i.number === currentIssue);
+                const nowFailed =
+                  currentState.activeWork?.[`issue:${currentIssue}`]
+                    ?.status === 'failed';
+
+                if (wasActive && nowDone) {
+                  // Issue shipped — advance the queue and dispatch the next.
+                  useBulkYoloStore.getState().advance();
+                  void dispatchNextBulkYolo(projectId);
+                } else if (nowFailed) {
+                  useBulkYoloStore
+                    .getState()
+                    .recordFailure(`Issue #${currentIssue} pipeline failed`);
+                  useToastStore.getState().addToast(
+                    `Bulk YOLO paused: issue #${currentIssue} failed. Fix and resume from the dialog.`,
+                    'error',
+                  );
+                }
+              }
+            }
           }
           prevStateRef.current = currentState;
           setState(currentState);
@@ -567,6 +605,7 @@ function App() {
 
       <ToastContainer />
       <BulkActionToolbar />
+      <BulkYoloDialog />
       <CommandPalette actions={actions} />
       <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 

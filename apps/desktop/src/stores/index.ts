@@ -62,6 +62,13 @@ export { useKanbanStore } from './kanbanStore';
 
 export { useSelectionStore } from './selectionStore';
 
+export {
+  useBulkYoloStore,
+  type BulkYoloStatus,
+  type BulkYoloFailure,
+  type BulkYoloRun,
+} from './bulkYoloStore';
+
 export { useTikiStateStore } from './tikiStateStore';
 
 export {
