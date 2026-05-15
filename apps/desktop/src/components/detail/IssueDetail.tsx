@@ -8,6 +8,7 @@ import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
 import { PlanEditor, type EditorPlan } from "./PlanEditor";
+import { Skeleton } from "../ui/Skeleton";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./DetailPanel.css";
@@ -145,6 +146,7 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
     (state) => state.terminalByWorkIdByProject[activeProjectId]
   );
   const [plan, setPlan] = useState<TikiPlan | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
 
   // The "Jump to terminal" action is offered only when this issue has active
@@ -155,12 +157,20 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   useEffect(() => {
     if (!work) {
       setPlan(null);
+      setLoadingPlan(false);
       return;
     }
     const tikiPath = activeProject?.path ? `${activeProject.path}/.tiki` : undefined;
+    setLoadingPlan(true);
     invoke<TikiPlan | null>("get_plan", { issueNumber: issue.number, tikiPath })
-      .then((data) => setPlan(data ?? null))
-      .catch(() => setPlan(null));
+      .then((data) => {
+        setPlan(data ?? null);
+        setLoadingPlan(false);
+      })
+      .catch(() => {
+        setPlan(null);
+        setLoadingPlan(false);
+      });
   }, [issue.number, work, activeProject?.path]);
 
   // Find PRs linked to this issue
@@ -385,7 +395,14 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
                   style={{ width: `${(work.phase.current / work.phase.total) * 100}%` }}
                 />
               </div>
-              {plan && plan.phases.length > 0 && (
+              {loadingPlan && work !== null && (
+                <div className="detail-phase-list" aria-busy="true">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <Skeleton key={i} height={28} />
+                  ))}
+                </div>
+              )}
+              {!loadingPlan && plan && plan.phases.length > 0 && (
                 <div className="detail-phase-list">
                   {plan.phases.map((phase) => (
                     <PhaseItem key={phase.number} phase={phase} />

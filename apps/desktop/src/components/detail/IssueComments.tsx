@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useProjectsStore } from "../../stores";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { Skeleton } from "../ui/Skeleton";
 import "./IssueComments.css";
 
 interface CommentAuthor {
@@ -110,7 +111,7 @@ export function IssueComments({ issueNumber }: IssueCommentsProps) {
       </h3>
 
       {loading ? (
-        <div className="comments-status">Loading comments...</div>
+        <Skeleton.Text lines={3} />
       ) : error ? (
         <div className="comments-error">{error}</div>
       ) : comments.length === 0 ? (

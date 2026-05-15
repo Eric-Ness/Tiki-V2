@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { IssueFormModal } from "../ui/IssueFormModal";
+import { Skeleton } from "../ui/Skeleton";
 import { IssueCard } from "./IssueCard";
 import { useIssuesStore, useDetailStore, useProjectsStore, useTikiStateStore, useTerminalStore, useLayoutStore, useSettingsStore, filterIssuesBySearch, type GitHubIssue, type IssueFilter } from "../../stores";
 import { terminalFocusRegistry } from "../../stores/terminalStore";
@@ -319,9 +320,10 @@ export function IssuesSection() {
           )}
 
           {isLoading && issues.length === 0 && (
-            <div className="issues-section-loading">
-              <span className="issues-section-spinner" />
-              Loading issues...
+            <div className="issues-section-list" aria-busy="true">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Skeleton.Card key={i} />
+              ))}
             </div>
           )}
 
