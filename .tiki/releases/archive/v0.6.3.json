@@ -1,6 +1,9 @@
 {
   "version": "v0.6.3",
-  "status": "active",
+  "status": "shipped",
+  "shipped": true,
+  "completedAt": "2026-05-15T17:35:00.000Z",
+  "tag": "v0.6.3",
   "issues": [
     {
       "number": 203,
