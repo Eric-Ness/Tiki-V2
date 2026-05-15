@@ -13,6 +13,64 @@ const STEP_LABELS: Record<PipelineStep, string> = {
   SHIP: "SHIP",
 };
 
+const ICON_SVG_PROPS = {
+  width: 14,
+  height: 14,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+} as const;
+
+const STEP_ICONS: Record<PipelineStep, React.ReactNode> = {
+  GET: (
+    // Cloud-arrow-down: fetch / pull from remote
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <path d="M12 9v8m0 0-3-3m3 3 3-3" />
+      <path d="M18 16.5A4.5 4.5 0 0 0 17.5 7.5 7 7 0 0 0 4 9a4.5 4.5 0 0 0 1 9h1" />
+    </svg>
+  ),
+  REVIEW: (
+    // Magnifying glass: analyze / inspect
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  ),
+  PLAN: (
+    // Bullet list: break into phases
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <circle cx="4" cy="6" r="1" fill="currentColor" />
+      <circle cx="4" cy="12" r="1" fill="currentColor" />
+      <circle cx="4" cy="18" r="1" fill="currentColor" />
+    </svg>
+  ),
+  AUDIT: (
+    // Clipboard-check: validation
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <rect x="6" y="5" width="12" height="16" rx="2" />
+      <path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <path d="m9.5 13 2 2 4-4" />
+    </svg>
+  ),
+  EXECUTE: (
+    // Play triangle: run
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <path d="M7 4v16l13-8z" fill="currentColor" stroke="currentColor" />
+    </svg>
+  ),
+  SHIP: (
+    // Paper-airplane: deliver
+    <svg {...ICON_SVG_PROPS} aria-hidden="true">
+      <path d="m3 12 18-8-7 18-3-7-8-3z" />
+      <path d="M10 14 21 4" />
+    </svg>
+  ),
+};
+
 interface PipelineTimelineProps {
   currentStep?: PipelineStep;
   workStatus: string;
@@ -155,8 +213,8 @@ export function PipelineTimeline({
           return (
             <div key={step} style={{ display: "contents" }}>
               <div className="pipeline-step">
-                <div className={circleClasses}>
-                  {state === "completed" ? "\u2713" : index + 1}
+                <div className={circleClasses} title={STEP_LABELS[step]}>
+                  {state === "completed" ? "\u2713" : STEP_ICONS[step]}
                 </div>
                 <span className={`pipeline-step-label label-${state}`}>
                   {STEP_LABELS[step]}
