@@ -2,7 +2,7 @@
 name: release
 description: Execute a release - run all issues in dependency order, then tag and ship
 argument: <version> [--dry-run] [--continue] [--no-tag] | status [version]
-tools: Bash, Read, Write, Edit, Glob, Grep, Task, Skill, AskUserQuestion
+tools: Bash, Read, Write, Edit, Glob, Grep, Task, Skill
 ---
 
 # Release Execution
@@ -22,7 +22,7 @@ Execute a multi-issue release pipeline. Loads a release definition, calculates i
     - **If it does not exist:** create a minimal scaffold via the `Write` tool. (The framework cannot call `save_tiki_release` — that's a desktop-only Tauri IPC.) Derive the issue list in this order:
       1. From `--issues '147,148,149'` CLI flag if provided.
       2. From a matching GitHub milestone: `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="{version}")'` — if present, use its issue list.
-      3. Interactive: prompt via `AskUserQuestion` for the comma-separated issue list.
+      3. If no `--issues` flag and no matching milestone, error with `release-not-found` (see <errors>). Releases must be defined either by CLI flag, GitHub milestone, or a pre-existing `.tiki/releases/{version}.json` (which the desktop app's Releases section creates).
     - Scaffold shape:
       ```json
       {
@@ -49,14 +49,32 @@ Execute a multi-issue release pipeline. Loads a release definition, calculates i
     - Set status to `executing`
     - Initialize `currentIssue` and `completedIssues`
   </step>
-  <step>**Execute issues sequentially**:
-    - For each issue in dependency order:
-      1. Update `currentIssue` in state
-      2. Call `/tiki:yolo {issue}` via Skill tool
-      3. Wait for completion
-      4. Add to `completedIssues`
-      5. Continue to next issue
-    - If an issue fails, pause and offer recovery options
+  <step>**Execute issues by wave** (parallel dispatch via worktree sub-agents):
+    - For each wave from the independence analysis:
+      1. Update `release.currentIssues` in state (array of issue numbers in this wave).
+      2. For each issue in the wave, spawn an Agent in parallel with:
+         - description: `Run /tiki:yolo {N}`
+         - subagent_type: `general-purpose`
+         - isolation: `worktree`
+         - prompt: `Run the /tiki:yolo {N} skill in this worktree. Report back the branch name, head SHA, and PR URL on completion. Pause and report any failure.`
+      3. Wait for ALL Agents in the wave to return (block until all done).
+      4. For each completed Agent, append the issue number to `release.completedIssues` and the worktree branch name to `release.completedBranches`.
+      5. After the wave, in deterministic order (sort by issue number ascending), merge each completed branch into the main release branch via `git merge --no-ff origin/{branch-name}`. Abort the wave merge on the first conflict and surface the conflict to the user with both branches' names.
+      6. Move to the next wave.
+
+    **If any single Agent in a wave fails:**
+    - Mark its issue as failed in state.
+    - Wait for the OTHER Agents in the wave to finish (don't kill them — they may have produced useful work).
+    - After the wave drains, pause the cascade and report which issue failed and where (worktree path, branch). Do not auto-continue.
+
+    **Worktree merge order rule:** merge in ascending issue-number order within each wave. Deterministic across runs. If issues touch genuinely independent files (which they should — they're in the same wave because the analysis said no conflicts), order is just for reproducibility.
+
+    **Failure modes:**
+    1. **Agent reports phase failure** — that issue's worktree is left intact; user can `cd` into it to investigate. Wave continues until all Agents return; cascade then pauses.
+    2. **Merge conflict during wave merge** — analysis missed a soft conflict. Abort the wave merge at the first conflict, leave the conflicting branches unmerged. Report the conflict path to the user and pause.
+    3. **Worktree creation failure** (e.g. branch already exists from a prior run) — try `git worktree add -B {branch}` to force-recreate. If still failing, fall back to serial execution for that wave with a warning.
+
+    Conservative default: when in doubt about independence, serialize.
   </step>
   <step>**Generate changelog** after all issues complete:
     - Read the release file from `.tiki/releases/{version}.json` to get issue list
@@ -65,7 +83,7 @@ Execute a multi-issue release pipeline. Loads a release definition, calculates i
     - Categorize changes by conventional commit prefix (feat/fix/refactor/docs/perf/chore)
     - Generate structured markdown changelog with issue references and links
     - Write to `.tiki/releases/{version}-changelog.md`
-    - Present changelog to user for review/editing before publishing
+    - Write changelog to `.tiki/releases/{version}-changelog.md`. Continue directly to shipping — the file is committed to the repo (not just used for the GitHub Release body), so the user can amend it post-ship via a follow-up commit if needed.
     (See `<changelog-generation>` section for detailed format)
   </step>
   <step>**Ship the release** after changelog is approved:
@@ -116,6 +134,67 @@ Extracted dependencies: `[41, 43]`
 - External dependencies are assumed to be satisfied
 </dependency-parsing>
 
+<independence-analysis>
+## Independence Analysis
+
+Before dispatching issues, compute which can run concurrently. Two signals:
+
+### 1. Hard dependencies (already covered by <dependency-parsing>)
+
+`depends on #N` / `blocked by #N` patterns force serial ordering. These are user-declared and authoritative.
+
+### 2. Soft conflict heuristic (new)
+
+For each issue, derive a likely-touched-files set from its body using these signals:
+
+- **Explicit file paths** (e.g. `apps/desktop/src/components/Header.tsx`) — capture the path and its parent directory.
+- **Component / area keywords** — map to directory globs:
+  - `kanban` → `apps/desktop/src/components/sidebar/Kanban*` and `apps/desktop/src/stores/kanban*`
+  - `terminal` → `apps/desktop/src/components/terminal/**` and `apps/desktop/src-tauri/src/terminal*`
+  - `sidebar` → `apps/desktop/src/components/sidebar/**`
+  - `footer` / `header` → `apps/desktop/src/components/Header.*`
+  - `github API`, `gh CLI`, `rate limit` → `apps/desktop/src-tauri/src/github.rs`
+  - `state.json`, `state shim`, `transition` → `packages/framework/scripts/state.mjs` and `apps/desktop/src-tauri/src/state*.rs`
+  - `release.md`, `yolo.md`, `framework command` → `packages/framework/commands/**`
+  - `detail panel`, `issue detail` → `apps/desktop/src/components/detail/**`
+- **GitHub labels** — `desktop` widens scope to `apps/desktop/**`, `rust` narrows to `apps/desktop/src-tauri/**`, `framework` narrows to `packages/framework/**`.
+
+Two issues **conflict** if their derived file sets share any path or directory at depth ≥ 1. When in doubt, mark conflicting (conservative default — false positives just serialize, false negatives cause merge conflicts).
+
+### 3. Wave-based DAG
+
+With hard deps + conflicts in hand, partition issues into **waves**:
+
+- Wave 1: all issues with no unsatisfied hard deps AND no conflicts among themselves.
+- Wave 2: all remaining issues whose hard deps are now satisfied AND no conflicts among themselves or with already-running issues.
+- Repeat until all issues are placed.
+- Cap each wave at 3 concurrent sub-agents (resource limit; configurable via `--max-parallel N` flag, default 3).
+
+If two issues conflict but have no hard dep, place the larger one (more phases per its plan, if known) earlier so its scope is established before the smaller one rebases.
+
+### 4. Output the analysis (narration, not blocking)
+
+Before dispatching, print to chat:
+
+```
+## Execution Plan: {version}
+
+Dependency edges: {count}
+Conflict edges: {count}
+Waves: {N}
+
+Wave 1 (parallel): #{a}, #{b}, #{c}
+  - #{a}: touches apps/desktop/src/components/Header.tsx (no conflicts)
+  - #{b}: touches apps/desktop/src-tauri/src/github.rs (no conflicts)
+  - #{c}: touches packages/framework/commands/release.md (no conflicts)
+Wave 2 (parallel): #{d}, #{e}
+  - #{d}: depends on #{a}; conflicts with #{e} on apps/desktop/src/components/sidebar/Kanban.tsx — placed first by phase count
+  ...
+```
+
+This is informational. Do NOT prompt for confirmation. The user invoked the command — let them watch the analysis fly by; if it's wrong, they can interrupt and edit the release file.
+</independence-analysis>
+
 <release-flow>
 ```
 /tiki:release v1.2
@@ -165,17 +244,36 @@ Extracted dependencies: `[41, 43]`
 </release-flow>
 
 <state-management>
-Release lifecycle: **start** → **per-issue** → **ship**. See `yolo.md` `<state-management>` for the issue-side canonical shape.
+Release lifecycle: **start** → **per-wave** → **ship**. See `yolo.md` `<state-management>` for the issue-side canonical shape.
 
 ```bash
 # Start:
 node packages/framework/scripts/state.mjs transition release:{version} \
   --to-status executing --to-step EXECUTE --release-version {version} --release-issues "41,42,43"
-# Per issue: update release.currentIssue (direct JSON; shim does not edit nested release.* fields),
-# dispatch /tiki:yolo {issue} (yolo auto-detects parentRelease), then append to release.completedIssues.
+# Per wave: update release.currentIssues (array; direct JSON write — shim does not edit nested release.* fields),
+# spawn one Agent per issue with isolation: 'worktree', wait for the wave to drain, then
+# append each completed issue number to release.completedIssues and each worktree branch
+# name to release.completedBranches (also direct JSON writes).
 # Ship:
 node packages/framework/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
 ```
+
+**Release state shape** (additive — `currentIssue` retained for back-compat with serial mode and is ignored when `currentIssues` is set):
+
+```json
+{
+  "release": {
+    "version": "{version}",
+    "issues": [41, 42, 43],
+    "currentIssue": null,        // legacy: serial mode only
+    "currentIssues": [41, 42],   // new: array of issue numbers in the current wave
+    "completedIssues": [],
+    "completedBranches": []      // new: branch names from completed worktrees, in completion order
+  }
+}
+```
+
+Both `currentIssues` and `completedBranches` are direct-JSON nested edits. `state.mjs` does NOT need new flags — these follow the existing acknowledged exception for `release.currentIssue` (nested release.* fields are written directly to the JSON file by the framework command).
 
 After shipping:
 
@@ -699,10 +797,7 @@ If custom `categories` are specified, use those display names instead of default
 **Step 5: Write and review**
 
 1. Write the changelog to `.tiki/releases/{version}-changelog.md`
-2. Present the changelog content to the user
-3. Ask: "Would you like to edit this changelog before publishing?"
-4. If yes, let the user make edits, then re-read the file
-5. If no, proceed to shipping
+2. Continue directly to shipping. The changelog is now in the repo and travels with the release commit; downstream edits land via the normal commit/PR flow.
 </changelog-generation>
 
 <release-shipping>
@@ -757,7 +852,15 @@ After all issues complete and changelog is approved, ship the release:
    - Move `.tiki/releases/{version}.json` to archive
    - Add `completedAt` and `shipped: true` to archived file
 
-7. **Update state.json**
+7. **Prune wave worktrees** — after the tag is pushed and state finalized, remove all per-issue worktrees created during wave dispatch:
+   ```bash
+   for branch in $(jq -r '.completedBranches[]?' .tiki/releases/{version}.json 2>/dev/null); do
+     git worktree remove --force ".git/worktrees/release-{version}-issue-${branch##*-}" 2>/dev/null || true
+   done
+   ```
+   Worktrees may also be enumerated via `git worktree list --porcelain | grep release-{version}-issue-` and removed individually. Pruning is best-effort — a leftover worktree is recoverable via `git worktree prune`.
+
+8. **Update state.json**
    - Remove `release:{version}` from `activeWork`
    - Remove ALL child `issue:N` entries from `activeWork` where `parentRelease` matches this release version
    - Add to `history.recentReleases`:
@@ -818,56 +921,25 @@ After all issues complete and changelog is approved, ship the release:
 ```
 </release-shipping>
 
-<next-actions>
-**After successful execution (all issues complete):**
-Present using AskUserQuestion:
-- question: "All issues complete! Ready to ship release {version}?"
-- header: "Ship release"
-- options:
-  - label: "Ship release (Recommended)"
-    description: "Create tag, close milestone, archive release"
-  - label: "Ship without tag"
-    description: "Complete release but skip git tag"
-  - label: "Review first"
-    description: "Check all changes before shipping"
-  - label: "Pause"
-    description: "Save progress and stop here"
+<post-actions>
+## After successful execution (all issues complete)
 
-**After successful shipping:**
-Present using AskUserQuestion:
-- question: "Release {version} shipped! What's next?"
-- header: "Next step"
-- options:
-  - label: "Start another release"
-    description: "Execute another release version"
-  - label: "View release history"
-    description: "See completed releases"
-  - label: "Done"
-    description: "End the session"
+Proceed automatically to changelog generation, pre-tag verification, tag, and ship. No user confirmation required.
 
-**After issue failure:**
-Present using AskUserQuestion:
-- question: "Issue #{number} failed during release {version}. How would you like to proceed?"
-- header: "Issue failed"
-- options:
-  - label: "Fix and retry"
-    description: "Fix the issue and re-run with --continue"
-  - label: "Skip issue"
-    description: "Mark as skipped and continue (risky)"
-  - label: "Pause release"
-    description: "Stop and investigate"
-  - label: "Abort release"
-    description: "Cancel the release entirely"
+## After successful shipping
 
-**After partial completion (paused):**
-Present using AskUserQuestion:
-- question: "Release {version} paused. {completed}/{total} issues complete."
-- header: "Paused"
-- options:
-  - label: "Resume"
-    description: "Continue from where we left off"
-  - label: "View status"
-    description: "See detailed progress"
-  - label: "Abort"
-    description: "Cancel the release"
-</next-actions>
+Report the shipped tag and links. End the cascade. The user can run `/tiki:release status` later to see history; that's an explicit, separate command — not a follow-up prompt.
+
+## After issue failure
+
+Pause and report the failure (which step, which issue, what verification failed). Do NOT prompt for next-action — wait for the user to read the error and decide. They can:
+- Re-invoke `/tiki:release {version} --continue` after fixing
+- Manually run `/tiki:yolo {failed-issue}` to retry just that one
+- Investigate via `/tiki:get`, `/tiki:plan`, etc.
+
+This is the only acceptable pause — diagnostic, not ceremonial.
+
+## After paused (interrupted) state
+
+Same as failure: report the state (`{completed}/{total} issues complete`, last successful issue, currently paused issue). Do NOT prompt — exit and let the user decide.
+</post-actions>
