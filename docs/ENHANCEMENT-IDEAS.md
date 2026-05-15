@@ -45,7 +45,7 @@ These are *not* yet GitHub issues — they live here as a curated brainstorm unt
 
 - **E6. "Last fetched N min ago" next to the Issues refresh button** — `IssuesSection.tsx` line 89 records `lastFetched` in the store but never surfaces it. Tiny `"2m ago"` label would surface data age. *Why:* after `/tiki:ship` the sidebar still shows "Open" until manual refresh — no hint about staleness. *Effort:* S. *Surface:* `components/sidebar/IssuesSection.tsx`, `stores/issuesStore.ts`.
 
-- **E7. "Send to terminal" action button on each Active Work card** — `WorkProgressCard.tsx` has Pause/Reset/Remove, but to resume a paused issue users navigate to Terminal tab, find the right pane, and re-type `/tiki:execute <N>`. The `App.tsx:436` "Start Claude" button already uses the `invoke("write_terminal", ...)` pattern. One contextual button (current status → next step) saves the round-trip. *Why:* most common action after status-checking a card is "run the next step." *Effort:* S. *Surface:* `components/sidebar/WorkProgressCard.tsx`.
+- **E7. "Send to terminal" action button on each Active Work card** (→ #186) — `WorkProgressCard.tsx` has Pause/Reset/Remove, but to resume a paused issue users navigate to Terminal tab, find the right pane, and re-type `/tiki:execute <N>`. The `App.tsx:436` "Start Claude" button already uses the `invoke("write_terminal", ...)` pattern. One contextual button (current status → next step) saves the round-trip. *Why:* most common action after status-checking a card is "run the next step." *Effort:* S. *Surface:* `components/sidebar/WorkProgressCard.tsx`.
 
 ### Kanban
 
@@ -195,7 +195,7 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 
 ### Empty states
 
-- **E57. Illustrated empty state for kanban "No issues" columns** — `KanbanColumn.tsx:54` renders `<div className="kanban-column-empty">No issues</div>`. Replace with a tiny inline SVG (empty-tray glyph) plus the text, styled at low opacity. *Why:* current empty state feels harsh; subtle illustration warms an otherwise-blank column without consuming significant space. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `kanban.css`.
+- **E57. Illustrated empty state for kanban "No issues" columns** (→ #182) — `KanbanColumn.tsx:54` renders `<div className="kanban-column-empty">No issues</div>`. Replace with a tiny inline SVG (empty-tray glyph) plus the text, styled at low opacity. *Why:* current empty state feels harsh; subtle illustration warms an otherwise-blank column without consuming significant space. *Effort:* S. *Surfaces:* `KanbanColumn.tsx`, `kanban.css`.
 
 ### Motion & accessibility
 
@@ -205,7 +205,7 @@ A coherent visual-design pass on the desktop app. Each item targets a specific v
 
 ### Iconography (defer to v0.4.3+)
 
-- **E55. Pipeline Timeline step icons replacing numbers** — `PipelineTimeline.tsx:159` shows `"1"…"6"` or `"✓"` inside step circles. Replace with step-specific SVGs (download for GET, magnifier for REVIEW, list for PLAN, clipboard for AUDIT, play for EXECUTE, paper-plane for SHIP). *Why:* immediate visual recognition; numbers are forgettable; matches modern timeline patterns in Linear/Jira. *Effort:* M. *Surface:* `PipelineTimeline.tsx`.
+- **E55. Pipeline Timeline step icons replacing numbers** (→ #181) — `PipelineTimeline.tsx:159` shows `"1"…"6"` or `"✓"` inside step circles. Replace with step-specific SVGs (download for GET, magnifier for REVIEW, list for PLAN, clipboard for AUDIT, play for EXECUTE, paper-plane for SHIP). *Why:* immediate visual recognition; numbers are forgettable; matches modern timeline patterns in Linear/Jira. *Effort:* M. *Surface:* `PipelineTimeline.tsx`.
 
 - **E58. Custom titlebar showing active context** — Tauri window title is static "Tiki". Use `app.set_title` from Rust (or `getCurrent().setTitle` from frontend) to dynamically show "Tiki — issue #42 executing" or "Tiki — release v0.4.2 shipping" when `activeWork` has an entry. *Why:* at-a-glance taskbar/dock signal of what Tiki is doing. *Effort:* M. *Surfaces:* `App.tsx`, Rust side via Tauri command.
 
@@ -224,6 +224,18 @@ Surfaced during the 2026-05-14 backlog review (the session that triaged the open
 - **E64. Pre-tag verification gate in `release.md` + `release.yml`** — Project memory records repeated ship-without-verification regret: v0.5.6 shipped a speculative one-line fix with no A/B test; v0.5.4's tag build failed on a TS6133 unused import that reached `main` untested. E42 (run `pnpm test` in `release.yml`) is one piece, but the real fix is a **mandatory smoke-test + `pnpm build` checklist in `release.md`** that must pass before the tag is pushed, plus the CI gate. *Why:* the tool that orchestrates careful development should hold itself to the same bar; this is a recurring, memory-documented failure mode. *Effort:* S–M. *Files:* `packages/framework/commands/release.md`, `.github/workflows/release.yml`. *Supersedes/absorbs E42.*
 
 - **E65. Rewrite or retire `docs/DESIGN.md` and `docs/PLANNING-NOTES.md`** — Both have been untouched since commit `1f9eb8f` on 2026-02-02 (~140 commits ago) and are now actively misleading: DESIGN.md's "Version History" tops out at design-draft "0.5" (not shipped v0.5.7), and its "Future versions" lists work that shipped months ago. A new contributor or future agent reading it gets day-one reality. E39 only proposes a date-stamp — insufficient. Either rewrite DESIGN.md as a current `ARCHITECTURE.md` (the four "Still Open" questions are the only salvageable forward-looking content), or demote both to `docs/archive/` and let `CLAUDE.md` + `CHANGELOG.md` be canonical. *Why:* stale guiding docs are a trap for every future reader. *Effort:* M. *Files:* `docs/DESIGN.md`, `docs/PLANNING-NOTES.md`, `CLAUDE.md` (update the Documentation section). *Supersedes E39.*
+
+---
+
+## 7. New ideas (added 2026-05-15)
+
+Surfaced during the 2026-05-15 UI deep-dive that scoped v0.6.1's interface-design bundle. All three target perceived responsiveness / interaction polish gaps the audit flagged.
+
+- **E66. Skeleton loaders for issue list, plan fetch, and detail panel** (→ #183) — The app currently shows blank space + disabled buttons during data fetches; on a slow GitHub round-trip this looks like a freeze. Add a shared `<Skeleton>` primitive in `components/ui/Skeleton.tsx` (block + `<Skeleton.Text lines={N}>` + `<Skeleton.Card>`) and adopt it in `IssuesSection.tsx`, the plan-loading area of `IssueDetail.tsx`, and the detail-panel body. Shimmer animation gated on `prefers-reduced-motion`. *Why:* modern perception baseline; matches GitHub / Linear / Notion. *Effort:* M. *Surfaces:* new `components/ui/Skeleton.tsx` + 3 consumer sites.
+
+- **E67. Real-time inline validation across `IssueFormModal` fields** (→ #184) — `IssueFormModal.tsx` already validates the title field in real-time (`titleTouched && !title.trim()` → inline `.issue-form-field-error` span), but everything else fails silently on submit. Extend the pattern to the description-required-for-Enhance hint, custom-branch name regex (when custom strategy chosen), and the release-selection dropdown (when "Add to release" is checked). Wire each field's error span via `aria-describedby`. *Why:* the existing title-validation pattern is sound — this is just propagating it. *Effort:* S. *Surface:* `IssueFormModal.tsx`.
+
+- **E68. Toast action buttons (Retry / Open Settings / etc.)** (→ #185) — Today's toasts (`Toast.tsx` + `toastStore.ts`) are display-only: error → user has to manually navigate. Extend the toast API with an optional `action?: { label: string; onClick: () => void }` rendered as a compact button before the dismiss control. First adopters: CLI-not-found → "Open Environment Doctor" (pairs with E63 / #180); fetch failures → "Retry"; auth expired → "Open Settings". Action button keyboard-accessible; clicking it dismisses. *Why:* closes the loop between "something went wrong" and "here's how to fix it." *Effort:* S–M. *Surfaces:* `Toast.tsx`, `Toast.css`, `toastStore.ts`, 1+ consumer site for the proof-of-concept.
 
 ---
 

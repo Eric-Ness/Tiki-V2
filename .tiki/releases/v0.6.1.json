@@ -1,0 +1,36 @@
+{
+  "version": "v0.6.1",
+  "status": "active",
+  "issues": [
+    {
+      "number": 180,
+      "title": "Enhance-with-AI button mislabels \"CLI not installed\" when Claude Code is on PATH"
+    },
+    {
+      "number": 182,
+      "title": "Illustrated empty state for Kanban 'No issues' columns (E57)"
+    },
+    {
+      "number": 184,
+      "title": "Real-time inline validation across IssueFormModal fields (E67)"
+    },
+    {
+      "number": 186,
+      "title": "'Resume' / 'Send to terminal' button on Active Work cards (E7)"
+    },
+    {
+      "number": 185,
+      "title": "Toast action buttons (Retry / Open Settings / etc.) (E68)"
+    },
+    {
+      "number": 183,
+      "title": "Skeleton loaders for issue list, plan fetch, and detail panel (E66)"
+    },
+    {
+      "number": 181,
+      "title": "Pipeline Timeline: replace step numbers with step-specific icons (E55)"
+    }
+  ],
+  "createdAt": "2026-05-15T10:58:38.595Z",
+  "description": "UX polish continued — bundles the #180 CLI-resolver bug fix with six interface-design improvements scoped during the 2026-05-15 UI deep-dive: Kanban empty states, inline form validation, resume-from-card terminal action, toast action buttons, skeleton loaders, and pipeline step icons."
+}
