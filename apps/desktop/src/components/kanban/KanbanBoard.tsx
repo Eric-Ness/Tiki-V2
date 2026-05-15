@@ -11,7 +11,9 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore, filterIssuesBySearch } from '../../stores';
+import { applyColumnOrder } from '../../stores/kanbanStore';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard, type WorkItem } from './KanbanCard';
@@ -51,6 +53,7 @@ export function KanbanBoard() {
   const searchQuery = useIssuesStore((s) => s.searchQuery);
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const releaseFilter = useKanbanStore((s) => s.releaseFilterByProject[projectId] ?? null);
+  const orderByColumn = useKanbanStore((s) => s.orderByColumnByProject[projectId] ?? {});
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
   const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
   const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
@@ -211,11 +214,35 @@ export function KanbanBoard() {
     if (!over) return;
 
     const issueNumber = active.id as number;
-    const targetColumn = over.id as string;
     const sourceColumn = getIssueColumn(issueNumber);
+    if (!sourceColumn) return;
 
-    if (!sourceColumn || sourceColumn === targetColumn) return;
+    // dnd-kit's `over.id` is either a column id (when dropping on empty space)
+    // or another issue's number (when hovering over a sibling card).
+    const overId = over.id;
+    let targetColumn: string;
+    if (typeof overId === 'string') {
+      targetColumn = overId;
+    } else {
+      const overIssueColumn = getIssueColumn(overId as number);
+      if (!overIssueColumn) return;
+      targetColumn = overIssueColumn;
+    }
 
+    // Within-column reorder.
+    if (sourceColumn === targetColumn) {
+      const column = columns.find((c) => c.id === sourceColumn);
+      if (!column) return;
+      const ids = column.issues.map((i) => i.number);
+      const fromIdx = ids.indexOf(issueNumber);
+      const toIdx = typeof overId === 'number' ? ids.indexOf(overId) : ids.length - 1;
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      const reordered = arrayMove(ids, fromIdx, toIdx);
+      useKanbanStore.getState().setColumnOrder(sourceColumn, reordered);
+      return;
+    }
+
+    // Cross-column transition (existing logic).
     if (!isValidTransition(sourceColumn, targetColumn)) {
       // Invalid transition - card will snap back automatically
       console.log(`Invalid transition: ${sourceColumn} → ${targetColumn}`);
@@ -303,7 +330,10 @@ export function KanbanBoard() {
           createdAt: recent.completedAt,
           updatedAt: recent.completedAt,
         }));
-        return { ...col, issues: filterIssuesBySearch(completedIssues, searchQuery) };
+        return {
+          ...col,
+          issues: applyColumnOrder(filterIssuesBySearch(completedIssues, searchQuery), orderByColumn[col.id]),
+        };
       }
 
       const colIssues = filteredIssues.filter((issue) => {
@@ -329,10 +359,10 @@ export function KanbanBoard() {
         }
         return false;
       });
-      return { ...col, issues: colIssues };
+      return { ...col, issues: applyColumnOrder(colIssues, orderByColumn[col.id]) };
     });
     return result;
-  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers, searchQuery]);
+  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers, searchQuery, orderByColumn]);
 
   return (
     <DndContext
