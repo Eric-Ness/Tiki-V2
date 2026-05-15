@@ -60,6 +60,8 @@ export {
 
 export { useKanbanStore } from './kanbanStore';
 
+export { useSelectionStore } from './selectionStore';
+
 export { useTikiStateStore } from './tikiStateStore';
 
 export {

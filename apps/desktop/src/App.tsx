@@ -19,6 +19,7 @@ import { KanbanBoard } from "./components/kanban";
 import { DependencyGraph } from "./components/dependencies/DependencyGraph";
 import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
+import { BulkActionToolbar } from "./components/BulkActionToolbar";
 import { CommandPalette, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
@@ -565,6 +566,7 @@ function App() {
       </footer>
 
       <ToastContainer />
+      <BulkActionToolbar />
       <CommandPalette actions={actions} />
       <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 

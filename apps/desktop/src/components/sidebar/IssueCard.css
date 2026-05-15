@@ -44,6 +44,21 @@
   box-shadow: 0 0 0 2px var(--accent-hover, #1a8ad4), 0 6px 16px rgba(0, 0, 0, 0.32);
 }
 
+/* #96 — batch-selection checkbox + visual highlight. Independent of
+   `.selected` (detail-store open-in-detail) so multi-select doesn't
+   conflict with detail-panel selection. */
+.issue-card-select {
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: var(--accent-color, #007acc);
+  flex-shrink: 0;
+}
+
+.issue-card.is-batch-selected {
+  outline: 2px solid var(--accent-color, #007acc);
+  outline-offset: -2px;
+}
+
 .issue-card-header {
   display: flex;
   align-items: center;

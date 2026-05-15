@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { useProjectsStore, useSelectionStore } from "../../stores";
 import type { GitHubIssue } from "../../stores";
 import { useContextMenu, ContextMenu, type ContextMenuEntry } from "../ui/ContextMenu";
 import "./IssueCard.css";
@@ -23,6 +24,11 @@ export interface IssueCardProps {
 
 export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGitHub, onCopyUrl, onRunYolo, onCloseIssue }: IssueCardProps) {
   const contextMenu = useContextMenu();
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const isBatchSelected = useSelectionStore(
+    (s) => s.selectedByProject[projectId]?.has(issue.number) ?? false,
+  );
+  const toggleBatchSelection = useSelectionStore((s) => s.toggle);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -123,7 +129,7 @@ export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onCl
   return (
     <>
       <div
-        className={`issue-card ${issue.state}${isSelected ? ' selected' : ''}`}
+        className={`issue-card ${issue.state}${isSelected ? ' selected' : ''}${isBatchSelected ? ' is-batch-selected' : ''}`}
         onClick={onClick}
         onContextMenu={contextMenu.handleContextMenu}
         onKeyDown={handleKeyDown}
@@ -131,6 +137,15 @@ export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onCl
         role="button"
       >
         <div className="issue-card-header">
+          <input
+            type="checkbox"
+            className="issue-card-select"
+            checked={isBatchSelected}
+            onChange={() => toggleBatchSelection(issue.number)}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label={`Select issue #${issue.number}`}
+          />
           <span className="issue-card-number">#{issue.number}</span>
           <div className="issue-card-header-right">
             {onEdit && (

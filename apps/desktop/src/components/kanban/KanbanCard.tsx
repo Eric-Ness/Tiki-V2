@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { useDetailStore } from '../../stores';
+import { useDetailStore, useProjectsStore, useSelectionStore } from '../../stores';
 import type { GitHubIssue } from '../../stores';
 import { useContextMenu, ContextMenu, type ContextMenuEntry } from '../ui/ContextMenu';
 
@@ -26,6 +26,11 @@ export interface KanbanCardProps {
 
 export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected, isDragging, isBeingDragged, onExecute, onShip, onOpenInGitHub }: KanbanCardProps) {
   const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
+  const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
+  const isBatchSelected = useSelectionStore(
+    (s) => s.selectedByProject[projectId]?.has(issue.number) ?? false,
+  );
+  const toggleBatchSelection = useSelectionStore((s) => s.toggle);
   const contextMenu = useContextMenu();
 
   const isPaused = workItem?.status === 'paused';
@@ -57,6 +62,7 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
   const classNames = [
     'kanban-card',
     isSelected && 'kanban-card--selected',
+    isBatchSelected && 'is-batch-selected',
     isPaused && 'kanban-card--paused',
     isFailed && 'kanban-card--failed',
     (isDragging || isDraggingFromHook || isBeingDragged) && 'kanban-card--dragging',
@@ -133,6 +139,15 @@ export const KanbanCard = memo(function KanbanCard({ issue, workItem, isSelected
         {...attributes}
       >
         <div className="kanban-card-header">
+          <input
+            type="checkbox"
+            className="kanban-card-select"
+            checked={isBatchSelected}
+            onChange={() => toggleBatchSelection(issue.number)}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label={`Select issue #${issue.number}`}
+          />
           <span className="kanban-card-number">#{issue.number}</span>
           <div className="kanban-card-actions">
             {isPaused && <span className="kanban-card-badge kanban-card-badge--paused">PAUSED</span>}
