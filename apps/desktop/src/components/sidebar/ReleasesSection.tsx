@@ -168,6 +168,7 @@ export function ReleasesSection() {
   const setError = useReleasesStore((state) => state.setError);
   const clearError = useReleasesStore((state) => state.clearError);
   const setLastFetched = useReleasesStore((state) => state.setLastFetched);
+  const refetchCounter = useReleasesStore((state) => state.refetchCounter);
 
   // Tiki releases store
   const tikiReleases = useTikiReleasesStore((state) => state.releases);
@@ -244,7 +245,7 @@ export function ReleasesSection() {
     } finally {
       setLoading(false);
     }
-  }, [activeProject, setReleases, setLoading, setError, clearError, setLastFetched]);
+  }, [activeProject, setReleases, setLoading, setError, clearError, setLastFetched, refetchCounter]);
 
   const setSelectedRelease = useDetailStore((state) => state.setSelectedRelease);
   const projectId = useProjectsStore((state) => state.activeProjectId) ?? 'default';

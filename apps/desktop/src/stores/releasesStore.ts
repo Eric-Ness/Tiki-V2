@@ -14,6 +14,7 @@ interface ReleasesState {
   isLoading: boolean;
   error: string | null;
   lastFetched: string | null;
+  refetchCounter: number;
 }
 
 interface ReleasesActions {
@@ -22,6 +23,7 @@ interface ReleasesActions {
   setError: (error: string | null) => void;
   clearError: () => void;
   setLastFetched: (timestamp: string) => void;
+  triggerRefetch: () => void;
 }
 
 type ReleasesStore = ReleasesState & ReleasesActions;
@@ -31,6 +33,7 @@ const initialState: ReleasesState = {
   isLoading: false,
   error: null,
   lastFetched: null,
+  refetchCounter: 0,
 };
 
 export const useReleasesStore = create<ReleasesStore>()((set) => ({
@@ -45,4 +48,6 @@ export const useReleasesStore = create<ReleasesStore>()((set) => ({
   clearError: () => set({ error: null }),
 
   setLastFetched: (lastFetched) => set({ lastFetched }),
+
+  triggerRefetch: () => set((state) => ({ refetchCounter: state.refetchCounter + 1 })),
 }));
