@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Project } from "../../stores";
 import { useProjectsStore, useToastStore } from "../../stores";
@@ -21,10 +21,11 @@ export function ProjectCard({
     (s) => s.setProjectFrameworkVersion
   );
   const [isInstalling, setIsInstalling] = useState(false);
+  const isInstallingRef = useRef(false);
 
-  const handleInstallFramework = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (isInstalling) return;
+  const runInstall = async () => {
+    if (isInstallingRef.current) return;
+    isInstallingRef.current = true;
     setIsInstalling(true);
     try {
       const installed = await invoke<string>("install_framework", {
@@ -39,9 +40,30 @@ export function ProjectCard({
         .getState()
         .addToast(`Framework update failed: ${err}`, "error", 8000);
     } finally {
+      isInstallingRef.current = false;
       setIsInstalling(false);
     }
   };
+
+  const handleInstallFramework = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    await runInstall();
+  };
+
+  // Listen for toast-action-triggered install requests targeting this project.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectPath: string }>).detail;
+      if (detail?.projectPath === project.path) {
+        void runInstall();
+      }
+    };
+    window.addEventListener("tiki:install-framework", handler);
+    return () => {
+      window.removeEventListener("tiki:install-framework", handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.path]);
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
