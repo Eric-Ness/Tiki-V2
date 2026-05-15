@@ -1,6 +1,6 @@
 {
   "version": "v0.6.1",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 182,
@@ -28,5 +28,8 @@
     }
   ],
   "createdAt": "2026-05-15T10:58:38.595Z",
-  "description": "UX polish continued — six interface-design improvements scoped during the 2026-05-15 UI deep-dive: Kanban empty states, inline form validation, resume-from-card terminal action, toast action buttons, skeleton loaders, and pipeline step icons. (The #180 CLI-resolver fix shipped to main separately via PR #187 before this release cascade began.)"
+  "description": "UX polish continued — six interface-design improvements scoped during the 2026-05-15 UI deep-dive: Kanban empty states, inline form validation, resume-from-card terminal action, toast action buttons, skeleton loaders, and pipeline step icons. (The #180 CLI-resolver fix shipped to main separately via PR #187 before this release cascade began.)",
+  "shipped": true,
+  "completedAt": "2026-05-15T12:59:52.670Z",
+  "tag": "v0.6.1"
 }
