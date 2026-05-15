@@ -3,10 +3,6 @@
   "status": "active",
   "issues": [
     {
-      "number": 180,
-      "title": "Enhance-with-AI button mislabels \"CLI not installed\" when Claude Code is on PATH"
-    },
-    {
       "number": 182,
       "title": "Illustrated empty state for Kanban 'No issues' columns (E57)"
     },
@@ -32,5 +28,5 @@
     }
   ],
   "createdAt": "2026-05-15T10:58:38.595Z",
-  "description": "UX polish continued — bundles the #180 CLI-resolver bug fix with six interface-design improvements scoped during the 2026-05-15 UI deep-dive: Kanban empty states, inline form validation, resume-from-card terminal action, toast action buttons, skeleton loaders, and pipeline step icons."
+  "description": "UX polish continued — six interface-design improvements scoped during the 2026-05-15 UI deep-dive: Kanban empty states, inline form validation, resume-from-card terminal action, toast action buttons, skeleton loaders, and pipeline step icons. (The #180 CLI-resolver fix shipped to main separately via PR #187 before this release cascade began.)"
 }
