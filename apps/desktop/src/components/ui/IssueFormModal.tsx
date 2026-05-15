@@ -21,6 +21,23 @@ interface IssueFormModalProps {
   editingIssue?: GitHubIssue | null;
 }
 
+/**
+ * Practical subset of git's check-ref-format rules. Catches the common bad
+ * inputs (empty, leading dot/dash, '..', whitespace, special chars, '.lock'
+ * suffix) without trying to reproduce git's full regex — the error message
+ * needs to be actionable.
+ */
+const BRANCH_NAME_FORBIDDEN_CHARS = /[\s~^:?*\[\\@]/;
+function validateBranchName(name: string): string | null {
+  const v = name.trim();
+  if (!v) return "Branch name is required";
+  if (v.startsWith("-") || v.startsWith(".")) return "Branch name cannot start with '-' or '.'";
+  if (v.endsWith(".lock")) return "Branch name cannot end with '.lock'";
+  if (v.includes("..")) return "Branch name cannot contain '..'";
+  if (BRANCH_NAME_FORBIDDEN_CHARS.test(v)) return "Branch name cannot contain spaces or any of: ~ ^ : ? * [ \\ @";
+  return null;
+}
+
 export function IssueFormModal({
   isOpen,
   onClose,
@@ -35,6 +52,7 @@ export function IssueFormModal({
   const [loadingLabels, setLoadingLabels] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [titleTouched, setTitleTouched] = useState(false);
+  const [customBranchTouched, setCustomBranchTouched] = useState(false);
   const [priority, setPriority] = useState<Priority>(null);
   const [branchStrategy, setBranchStrategy] = useState<BranchStrategy>("current");
   const [customBranch, setCustomBranch] = useState("");
@@ -101,6 +119,7 @@ export function IssueFormModal({
       const workflowDefaults = useSettingsStore.getState().workflow;
       setBranchStrategy(workflowDefaults.defaultBranchStrategy);
       setCustomBranch("");
+      setCustomBranchTouched(false);
       setAiSettingsExpanded(false);
       setAiModel(workflowDefaults.defaultModel);
       setPlanningType(workflowDefaults.defaultPlanningType);
@@ -215,6 +234,15 @@ export function IssueFormModal({
       return;
     }
 
+    if (branchStrategy === "custom") {
+      const err = validateBranchName(customBranch);
+      if (err) {
+        setCustomBranchTouched(true);
+        setError(err);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
@@ -276,6 +304,9 @@ export function IssueFormModal({
   };
 
   if (!isOpen) return null;
+
+  const branchError = branchStrategy === "custom" ? validateBranchName(customBranch) : null;
+  const showBranchError = customBranchTouched && branchError !== null;
 
   return (
     <div
@@ -447,6 +478,11 @@ export function IssueFormModal({
               disabled={loading || enhancing}
               rows={5}
             />
+            {!body.trim() && claudeCliAvailable !== false && (
+              <span id="body-enhance-hint" className="issue-form-field-hint">
+                Add a description to use Enhance with AI
+              </span>
+            )}
           </div>
 
           <div className="issue-form-field">
@@ -533,14 +569,24 @@ export function IssueFormModal({
               <option value="custom">Custom</option>
             </select>
             {branchStrategy === "custom" && (
-              <input
-                type="text"
-                className="issue-form-custom-branch"
-                value={customBranch}
-                onChange={(e) => setCustomBranch(e.target.value)}
-                placeholder="feature/my-branch-name"
-                disabled={loading}
-              />
+              <>
+                <input
+                  type="text"
+                  className={`issue-form-custom-branch${showBranchError ? " invalid" : ""}`}
+                  value={customBranch}
+                  onChange={(e) => setCustomBranch(e.target.value)}
+                  onBlur={() => setCustomBranchTouched(true)}
+                  placeholder="feature/my-branch-name"
+                  disabled={loading}
+                  aria-invalid={showBranchError}
+                  aria-describedby={showBranchError ? "custom-branch-error" : undefined}
+                />
+                {showBranchError && (
+                  <span id="custom-branch-error" className="issue-form-field-error">
+                    {branchError}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
@@ -654,7 +700,7 @@ export function IssueFormModal({
             <button
               type="submit"
               className="issue-form-btn issue-form-btn-submit"
-              disabled={loading || !title.trim()}
+              disabled={loading || !title.trim() || (branchStrategy === "custom" && validateBranchName(customBranch) !== null)}
             >
               {loading ? (
                 <>
