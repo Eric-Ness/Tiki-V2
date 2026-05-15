@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore } from "../../stores";
@@ -7,6 +7,7 @@ import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
+import { PhaseSummaries } from "./PhaseSummaries";
 import { PlanEditor, type EditorPlan } from "./PlanEditor";
 import { Skeleton } from "../ui/Skeleton";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
@@ -172,6 +173,37 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
         setLoadingPlan(false);
       });
   }, [issue.number, work, activeProject?.path]);
+
+  // Convert TikiPlan (loose IPC shape) → EditorPlan (strict shape used by
+  // PhaseSummaries and PlanEditor). Memoized so PhaseSummaries doesn't
+  // recompute deriveSummaryRows on every render.
+  const editorPlan = useMemo<EditorPlan | null>(() => {
+    if (!plan) return null;
+    return {
+      schemaVersion: plan.schemaVersion ?? 1,
+      issue: plan.issue ?? { number: issue.number, title: issue.title },
+      createdAt: plan.createdAt ?? new Date().toISOString(),
+      successCriteria: (plan.successCriteria ?? []).map((sc) => ({
+        id: sc.id,
+        category: sc.category ?? "",
+        description: sc.description,
+      })),
+      phases: plan.phases.map((p) => ({
+        number: p.number,
+        title: p.title,
+        status: p.status,
+        content: p.content ?? p.summary ?? "",
+        verification: p.verification ?? [],
+        files: p.files ?? [],
+        addressesCriteria: p.addressesCriteria ?? [],
+        dependencies: p.dependencies ?? [],
+        startedAt: p.startedAt,
+        completedAt: p.completedAt,
+        summary: p.summary,
+      })),
+      coverageMatrix: plan.coverageMatrix ?? {},
+    };
+  }, [plan, issue.number, issue.title]);
 
   // Find PRs linked to this issue
   const linkedPrs = prs.filter((pr) => {
@@ -414,39 +446,19 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
         </div>
       )}
 
-      {showEditor && plan && (() => {
-        const editorPlan: EditorPlan = {
-          schemaVersion: plan.schemaVersion ?? 1,
-          issue: plan.issue ?? { number: issue.number, title: issue.title },
-          createdAt: plan.createdAt ?? new Date().toISOString(),
-          successCriteria: (plan.successCriteria ?? []).map((sc) => ({
-            id: sc.id,
-            category: sc.category ?? "",
-            description: sc.description,
-          })),
-          phases: plan.phases.map((p) => ({
-            number: p.number,
-            title: p.title,
-            status: p.status,
-            content: p.content ?? p.summary ?? "",
-            verification: p.verification ?? [],
-            files: p.files ?? [],
-            addressesCriteria: p.addressesCriteria ?? [],
-            dependencies: p.dependencies ?? [],
-            startedAt: p.startedAt,
-            completedAt: p.completedAt,
-            summary: p.summary,
-          })),
-          coverageMatrix: plan.coverageMatrix ?? {},
-        };
-        return (
-          <PlanEditor
-            plan={editorPlan}
-            issueNumber={issue.number}
-            onClose={() => setShowEditor(false)}
-          />
-        );
-      })()}
+      {!loadingPlan && editorPlan && (
+        <div className="detail-section">
+          <PhaseSummaries plan={editorPlan} />
+        </div>
+      )}
+
+      {showEditor && editorPlan && (
+        <PlanEditor
+          plan={editorPlan}
+          issueNumber={issue.number}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
 
       {issue.body && (
         <div className="detail-section detail-body-section">
