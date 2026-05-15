@@ -3,23 +3,61 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 171,
-      "title": "Bug: Ctrl+C and Ctrl+V are completely non-functional in the terminal",
-      "completedAt": "2026-05-14T14:11:46.496Z"
+      "number": 96,
+      "title": "Batch operations on issues",
+      "completedAt": "2026-05-15T15:55:00.000Z",
+      "parentRelease": "v0.6.2"
     },
     "lastCompletedRelease": {
-      "version": "v0.6.0",
+      "version": "v0.6.2",
       "issues": [
-        173,
-        174,
-        175,
-        176,
-        177
+        110,
+        195,
+        196,
+        93,
+        97,
+        96
       ],
-      "completedAt": "2026-05-14T16:41:05.128Z",
-      "tag": "v0.6.0"
+      "completedAt": "2026-05-15T16:00:00.000Z",
+      "tag": "v0.6.2"
     },
     "recentIssues": [
+      {
+        "number": 96,
+        "title": "Batch operations on issues",
+        "completedAt": "2026-05-15T15:55:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
+      {
+        "number": 97,
+        "title": "Kanban card reordering within columns",
+        "completedAt": "2026-05-15T15:42:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
+      {
+        "number": 93,
+        "title": "Phase diff / change summary view",
+        "completedAt": "2026-05-15T15:30:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
+      {
+        "number": 196,
+        "title": "Auto-refresh sidebar lists (Issues / Releases / Pull Requests) after issue close, ship, or release completion",
+        "completedAt": "2026-05-15T15:18:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
+      {
+        "number": 195,
+        "title": "/tiki:release: run hands-off (no AskUserQuestion) and parallelize independent issues via worktree sub-agents",
+        "completedAt": "2026-05-15T15:05:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
+      {
+        "number": 110,
+        "title": "GitHub API rate limit handling",
+        "completedAt": "2026-05-15T14:55:00.000Z",
+        "parentRelease": "v0.6.2"
+      },
       {
         "number": 181,
         "title": "Pipeline Timeline: replace step numbers with step-specific icons (E55)",
@@ -128,6 +166,19 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.6.2",
+        "issues": [
+          110,
+          195,
+          196,
+          93,
+          97,
+          96
+        ],
+        "completedAt": "2026-05-15T16:00:00.000Z",
+        "tag": "v0.6.2"
+      },
       {
         "version": "v0.6.1",
         "issues": [
