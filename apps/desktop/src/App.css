@@ -199,6 +199,12 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .footer .path {
   font-size: 0.75rem;
   color: var(--text-tertiary);

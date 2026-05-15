@@ -1,0 +1,64 @@
+.rate-limit-indicator-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.rate-limit-indicator {
+  font-family: monospace;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.rate-limit-indicator--healthy {
+  color: var(--success-color, #4ade80);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.rate-limit-indicator--warn {
+  color: var(--warning-color, #fbbf24);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.rate-limit-indicator--critical {
+  color: var(--error-color, #f87171);
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.rate-limit-indicator--loading,
+.rate-limit-indicator--error {
+  color: var(--text-tertiary);
+}
+
+.rate-limit-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.rate-limit-tooltip__row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: var(--text-secondary);
+}
+
+.rate-limit-tooltip__label {
+  color: var(--text-tertiary);
+  min-width: 50px;
+}

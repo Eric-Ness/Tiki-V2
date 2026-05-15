@@ -1,0 +1,31 @@
+{
+  "version": "v0.6.2",
+  "status": "active",
+  "issues": [
+    {
+      "number": 110,
+      "title": "GitHub API rate limit handling"
+    },
+    {
+      "number": 97,
+      "title": "Kanban card reordering within columns"
+    },
+    {
+      "number": 96,
+      "title": "Batch operations on issues"
+    },
+    {
+      "number": 93,
+      "title": "Phase diff / change summary view"
+    },
+    {
+      "number": 195,
+      "title": "/tiki:release: run hands-off (no AskUserQuestion) and parallelize independent issues via worktree sub-agents"
+    },
+    {
+      "number": 196,
+      "title": "Auto-refresh sidebar lists (Issues / Releases / Pull Requests) after issue close, ship, or release completion"
+    }
+  ],
+  "createdAt": "2026-05-15T14:01:39.614Z"
+}
