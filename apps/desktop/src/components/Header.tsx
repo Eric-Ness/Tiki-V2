@@ -1,3 +1,5 @@
+import { RateLimitIndicator } from "./RateLimitIndicator";
+
 interface HeaderProps {
   tikiPath: string;
   onResetLayout: () => void;
@@ -12,13 +14,16 @@ export function Header({ tikiPath, onResetLayout }: HeaderProps) {
       </header>
       <footer className="footer">
         <span className="path">{tikiPath}</span>
-        <button
-          className="reset-layout-btn"
-          onClick={onResetLayout}
-          title="Reset layout to defaults"
-        >
-          Reset Layout
-        </button>
+        <div className="footer-right">
+          <RateLimitIndicator />
+          <button
+            className="reset-layout-btn"
+            onClick={onResetLayout}
+            title="Reset layout to defaults"
+          >
+            Reset Layout
+          </button>
+        </div>
       </footer>
     </>
   );

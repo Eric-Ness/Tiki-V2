@@ -18,6 +18,156 @@ fn hidden_command(program: &str) -> Command {
     cmd
 }
 
+// ─── gh CLI Error Classification ──────────────────────────────────────────────
+
+/// Classification of a `gh` CLI failure derived purely from stderr text.
+/// The wrapper layer uses this to decide between retrying (secondary rate
+/// limits) and returning immediately (everything else).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GhErrorKind {
+    NotAuthenticated,
+    NotAGitRepo,
+    /// Primary rate limit (per-hour quota for the bucket).
+    RateLimitExceeded,
+    /// Secondary/abuse rate limit — short-lived, retry after backoff.
+    SecondaryRateLimit,
+    Other,
+}
+
+/// Classify `gh` CLI stderr text. Order matters: the secondary-rate-limit
+/// substring overlaps the primary one ("rate limit"), so check secondary first.
+pub(crate) fn classify_gh_error(stderr: &str) -> GhErrorKind {
+    let lower = stderr.to_lowercase();
+    if lower.contains("secondary rate limit") || lower.contains("abuse detection") {
+        return GhErrorKind::SecondaryRateLimit;
+    }
+    if lower.contains("rate limit") || lower.contains("x-ratelimit-remaining: 0") {
+        return GhErrorKind::RateLimitExceeded;
+    }
+    if lower.contains("not logged in") || lower.contains("authentication") {
+        return GhErrorKind::NotAuthenticated;
+    }
+    if lower.contains("not a git repository") || lower.contains("no git remotes") {
+        return GhErrorKind::NotAGitRepo;
+    }
+    GhErrorKind::Other
+}
+
+/// Convert a `gh` CLI stderr payload into a user-facing error message.
+/// Centralizes the error mapping previously inlined in every command.
+pub(crate) fn gh_error_message(stderr: &str) -> String {
+    match classify_gh_error(stderr) {
+        GhErrorKind::RateLimitExceeded => {
+            "GitHub API rate limit exceeded. Wait until the limit resets (the desktop footer shows the reset time) or run 'gh auth status' to verify you're authenticated (unauthenticated requests have a much lower limit).".to_string()
+        }
+        GhErrorKind::SecondaryRateLimit => {
+            "GitHub secondary rate limit hit. The desktop will retry automatically — if you keep seeing this, slow down bulk operations.".to_string()
+        }
+        GhErrorKind::NotAuthenticated => {
+            "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string()
+        }
+        GhErrorKind::NotAGitRepo => {
+            "Not in a GitHub repository. Please open a project with a GitHub remote.".to_string()
+        }
+        GhErrorKind::Other => format!("gh CLI failed: {}", stderr.trim()),
+    }
+}
+
+/// Retry budget for transient `gh` failures (secondary rate limit only).
+/// Total worst-case wait: 2 + 4 + 8 = 14 seconds across 4 attempts.
+const GH_RETRY_BACKOFF_SECS: &[u64] = &[2, 4, 8];
+
+/// Run a `gh` command with synchronous backoff retry on secondary rate limits.
+///
+/// `factory` returns a fresh `Command` each call (Command isn't Clone, and
+/// rebuilding via the same closure keeps args/env consistent across attempts).
+///
+/// Sleeps between attempts via `std::thread::sleep` — safe because Tauri
+/// commands run on a worker thread, not the UI thread. Returns the first
+/// successful Output, or the final error mapped through `gh_error_message`.
+pub(crate) fn run_gh_with_retry<F>(mut factory: F) -> Result<std::process::Output, String>
+where
+    F: FnMut() -> Command,
+{
+    let mut last_err: String = String::new();
+    let attempts = GH_RETRY_BACKOFF_SECS.len() + 1;
+
+    for attempt in 0..attempts {
+        let output = factory().output().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
+                    .to_string()
+            } else {
+                format!("Failed to run gh CLI: {}", e)
+            }
+        })?;
+
+        if output.status.success() {
+            return Ok(output);
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let kind = classify_gh_error(&stderr);
+
+        if kind != GhErrorKind::SecondaryRateLimit {
+            return Err(gh_error_message(&stderr));
+        }
+
+        last_err = stderr.into_owned();
+        if let Some(delay) = GH_RETRY_BACKOFF_SECS.get(attempt) {
+            log::warn!(
+                "gh secondary rate limit (attempt {}/{}); sleeping {}s before retry",
+                attempt + 1,
+                attempts,
+                delay
+            );
+            std::thread::sleep(std::time::Duration::from_secs(*delay));
+        }
+    }
+
+    Err(gh_error_message(&last_err))
+}
+
+// ─── Rate Limit Types ─────────────────────────────────────────────────────────
+
+/// One bucket from `gh api rate_limit` (core, search, graphql, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitBucket {
+    pub limit: u32,
+    pub used: u32,
+    pub remaining: u32,
+    /// Unix epoch seconds (UTC) when this bucket resets.
+    pub reset: u64,
+}
+
+/// Subset of `gh api rate_limit` exposed to the UI. The full GitHub response
+/// includes ~14 buckets; only the three the desktop actually exercises are
+/// surfaced (core for issue/PR/label/release fetches, search/graphql reserved
+/// for future use).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitStatus {
+    pub core: RateLimitBucket,
+    pub search: RateLimitBucket,
+    pub graphql: RateLimitBucket,
+    /// Unix epoch seconds when the desktop captured this snapshot. Frontend
+    /// formats to ISO via `new Date(epoch * 1000)` to avoid a Rust chrono dep.
+    pub fetched_at_epoch: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct GhRateLimitResponse {
+    resources: GhRateLimitResources,
+}
+
+#[derive(Debug, Deserialize)]
+struct GhRateLimitResources {
+    core: RateLimitBucket,
+    search: RateLimitBucket,
+    graphql: RateLimitBucket,
+}
+
 /// A GitHub label attached to an issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,46 +319,23 @@ pub fn fetch_github_prs(
     let filter = state_filter.unwrap_or_else(|| "open".to_string());
     let pr_limit = limit.unwrap_or(30);
 
-    let mut cmd = hidden_command("gh");
-    cmd.args([
-        "pr",
-        "list",
-        "--json",
-        "number,title,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,body,author",
-        "--state",
-        &filter,
-        "--limit",
-        &pr_limit.to_string(),
-    ]);
-
-    if let Some(ref path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "pr",
+            "list",
+            "--json",
+            "number,title,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,body,author",
+            "--state",
+            &filter,
+            "--limit",
+            &pr_limit.to_string(),
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err(
-                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
-            );
-        }
-        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
-            return Err(
-                "Not in a GitHub repository. Please open a project with a GitHub remote."
-                    .to_string(),
-            );
-        }
-        return Err(format!("gh pr list failed: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();
@@ -229,43 +356,20 @@ pub fn fetch_github_pr_detail(
     number: u32,
     project_path: Option<String>,
 ) -> Result<GitHubPrDetail, String> {
-    let mut cmd = hidden_command("gh");
-    cmd.args([
-        "pr",
-        "view",
-        &number.to_string(),
-        "--json",
-        "number,title,body,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,author,additions,deletions,commits,files,reviews",
-    ]);
-
-    if let Some(ref path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "pr",
+            "view",
+            &number.to_string(),
+            "--json",
+            "number,title,body,state,headRefName,baseRefName,url,isDraft,reviewDecision,statusCheckRollup,labels,author,additions,deletions,commits,files,reviews",
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err(
-                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
-            );
-        }
-        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
-            return Err(
-                "Not in a GitHub repository. Please open a project with a GitHub remote."
-                    .to_string(),
-            );
-        }
-        return Err(format!("gh pr view failed: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -415,31 +519,15 @@ pub fn check_gh_auth() -> Result<bool, String> {
     Ok(output.status.success())
 }
 
-/// Fetch GitHub issues from a repository
-/// - state: Filter by issue state ("open", "closed", "all"). Defaults to "open"
-/// - limit: Maximum number of issues to fetch. Defaults to 30
-/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
+/// Query GitHub's REST `/rate_limit` endpoint via `gh api`. Returns the three
+/// buckets the desktop actually uses plus a capture timestamp.
+///
+/// This call itself does NOT count against the rate limit (per GitHub docs),
+/// so polling it from the frontend is safe.
 #[tauri::command]
-pub fn fetch_github_issues(
-    state: Option<String>,
-    limit: Option<u32>,
-    project_path: Option<String>,
-) -> Result<Vec<GitHubIssue>, String> {
-    let state_filter = state.unwrap_or_else(|| "open".to_string());
-    let limit_val = limit.unwrap_or(30);
-
+pub fn fetch_rate_limit_status(project_path: Option<String>) -> Result<RateLimitStatus, String> {
     let mut cmd = hidden_command("gh");
-    cmd.args([
-        "issue",
-        "list",
-        "--json",
-        "number,title,body,state,labels,url,createdAt,updatedAt",
-        "--state",
-        &state_filter,
-        "--limit",
-        &limit_val.to_string(),
-    ]);
-
+    cmd.args(["api", "rate_limit"]);
     if let Some(path) = project_path {
         cmd.current_dir(path);
     }
@@ -454,15 +542,53 @@ pub fn fetch_github_issues(
     })?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err("Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string());
-        }
-        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
-            return Err("Not in a GitHub repository. Please open a project with a GitHub remote.".to_string());
-        }
-        return Err(format!("Failed to fetch issues: {}", stderr));
+        return Err(gh_error_message(&String::from_utf8_lossy(&output.stderr)));
     }
+
+    let parsed: GhRateLimitResponse = serde_json::from_slice(&output.stdout)
+        .map_err(|e| format!("Failed to parse rate_limit response: {}", e))?;
+
+    Ok(RateLimitStatus {
+        core: parsed.resources.core,
+        search: parsed.resources.search,
+        graphql: parsed.resources.graphql,
+        fetched_at_epoch: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    })
+}
+
+/// Fetch GitHub issues from a repository
+/// - state: Filter by issue state ("open", "closed", "all"). Defaults to "open"
+/// - limit: Maximum number of issues to fetch. Defaults to 30
+/// - project_path: Optional path to the project directory. If not provided, uses current working directory.
+#[tauri::command]
+pub fn fetch_github_issues(
+    state: Option<String>,
+    limit: Option<u32>,
+    project_path: Option<String>,
+) -> Result<Vec<GitHubIssue>, String> {
+    let state_filter = state.unwrap_or_else(|| "open".to_string());
+    let limit_val = limit.unwrap_or(30);
+
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "issue",
+            "list",
+            "--json",
+            "number,title,body,state,labels,url,createdAt,updatedAt",
+            "--state",
+            &state_filter,
+            "--limit",
+            &limit_val.to_string(),
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
+        }
+        cmd
+    })?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str(&stdout)
@@ -494,44 +620,21 @@ pub fn fetch_github_releases(
 ) -> Result<Vec<GitHubRelease>, String> {
     let limit_val = limit.unwrap_or(20);
 
-    let mut cmd = hidden_command("gh");
-    cmd.args([
-        "release",
-        "list",
-        "--json",
-        "tagName,name,isDraft,isPrerelease,publishedAt",
-        "--limit",
-        &limit_val.to_string(),
-    ]);
-
-    if let Some(path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "release",
+            "list",
+            "--json",
+            "tagName,name,isDraft,isPrerelease,publishedAt",
+            "--limit",
+            &limit_val.to_string(),
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err(
-                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
-            );
-        }
-        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
-            return Err(
-                "Not in a GitHub repository. Please open a project with a GitHub remote."
-                    .to_string(),
-            );
-        }
-        return Err(format!("Failed to fetch releases: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse releases: {}", e))
@@ -548,37 +651,14 @@ pub struct LabelInfo {
 /// - project_path: Optional path to the project directory. If not provided, uses current working directory.
 #[tauri::command]
 pub fn fetch_github_labels(project_path: Option<String>) -> Result<Vec<LabelInfo>, String> {
-    let mut cmd = hidden_command("gh");
-    cmd.args(["label", "list", "--json", "name,color", "--limit", "100"]);
-
-    if let Some(path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args(["label", "list", "--json", "name,color", "--limit", "100"]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err(
-                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
-            );
-        }
-        if stderr.contains("not a git repository") || stderr.contains("no git remotes") {
-            return Err(
-                "Not in a GitHub repository. Please open a project with a GitHub remote."
-                    .to_string(),
-            );
-        }
-        return Err(format!("Failed to fetch labels: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse labels: {}", e))
@@ -664,32 +744,20 @@ pub fn fetch_github_issue_by_number(
     number: u32,
     project_path: Option<String>,
 ) -> Result<GitHubIssue, String> {
-    let mut cmd = hidden_command("gh");
-    cmd.args([
-        "issue",
-        "view",
-        &number.to_string(),
-        "--json",
-        "number,title,body,state,labels,url,createdAt,updatedAt",
-    ]);
-
-    if let Some(path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "issue",
+            "view",
+            &number.to_string(),
+            "--json",
+            "number,title,body,state,labels,url,createdAt,updatedAt",
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Failed to fetch issue: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse issue: {}", e))
@@ -720,39 +788,22 @@ pub fn fetch_issue_comments(
     number: u32,
     project_path: Option<String>,
 ) -> Result<Vec<GitHubComment>, String> {
-    let mut cmd = hidden_command("gh");
-    cmd.args([
-        "issue",
-        "view",
-        &number.to_string(),
-        "--json",
-        "comments",
-        "--jq",
-        ".comments",
-    ]);
-
-    if let Some(path) = project_path {
-        cmd.current_dir(path);
-    }
-
-    let output = cmd.output().map_err(|e| {
-        if e.kind() == std::io::ErrorKind::NotFound {
-            "GitHub CLI (gh) is not installed. Please install it from https://cli.github.com/"
-                .to_string()
-        } else {
-            format!("Failed to run gh CLI: {}", e)
+    let output = run_gh_with_retry(move || {
+        let mut cmd = hidden_command("gh");
+        cmd.args([
+            "issue",
+            "view",
+            &number.to_string(),
+            "--json",
+            "comments",
+            "--jq",
+            ".comments",
+        ]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
         }
+        cmd
     })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("not logged in") || stderr.contains("authentication") {
-            return Err(
-                "Not authenticated with GitHub. Run 'gh auth login' to authenticate.".to_string(),
-            );
-        }
-        return Err(format!("Failed to fetch comments: {}", stderr));
-    }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let trimmed = stdout.trim();

@@ -67,6 +67,7 @@ pub fn run() {
             state_transition::state_transition,
             github::check_claude_cli,
             github::check_gh_auth,
+            github::fetch_rate_limit_status,
             github::fetch_github_issues,
             github::fetch_github_releases,
             github::fetch_github_labels,
