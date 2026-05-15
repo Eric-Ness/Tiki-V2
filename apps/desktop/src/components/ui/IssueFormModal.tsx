@@ -350,7 +350,7 @@ export function IssueFormModal({
                   disabled={loading || enhancing || !body.trim() || claudeCliAvailable === false}
                   aria-expanded={enhanceDropdownOpen}
                   aria-haspopup="menu"
-                  title={claudeCliAvailable === false ? "Claude CLI not installed. Install from https://github.com/anthropics/claude-code" : undefined}
+                  title={claudeCliAvailable === false ? "Claude CLI not found on PATH or in common install locations. Install it from https://github.com/anthropics/claude-code, or ensure it's on your PATH." : undefined}
                 >
                   {enhancing ? (
                     <>
@@ -374,7 +374,7 @@ export function IssueFormModal({
                           strokeLinejoin="round"
                         />
                       </svg>
-                      CLI not installed
+                      CLI not found
                     </>
                   ) : (
                     <>
