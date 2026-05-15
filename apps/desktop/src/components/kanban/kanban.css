@@ -242,6 +242,49 @@
   z-index: 1;
 }
 
+/* Batch-selection checkbox + selected highlight (#96).
+   Distinct from `.kanban-card--selected` (detail-store / open-in-detail-panel)
+   so multi-selecting issues for batch ops doesn't conflict with the existing
+   amber detail-selection ring. */
+.kanban-card-select {
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: var(--accent-color, #3b82f6);
+  flex-shrink: 0;
+}
+
+.kanban-card.is-batch-selected {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: -2px;
+}
+
+.kanban-selection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.kanban-selection-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.kanban-selection-clear {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.kanban-selection-clear:hover {
+  background: var(--bg-tertiary);
+}
+
 .kanban-card--paused {
   border-left: 3px solid #f59e0b;
 }

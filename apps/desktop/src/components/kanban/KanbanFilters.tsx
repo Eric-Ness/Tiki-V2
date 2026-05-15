@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { useKanbanStore, useProjectsStore, useTikiReleasesStore } from '../../stores';
+import { useKanbanStore, useProjectsStore, useSelectionStore, useTikiReleasesStore } from '../../stores';
 
 export const KanbanFilters = memo(function KanbanFilters() {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
@@ -7,6 +7,10 @@ export const KanbanFilters = memo(function KanbanFilters() {
   const setReleaseFilter = useKanbanStore((s) => s.setReleaseFilter);
   const releases = useTikiReleasesStore((s) => s.releases);
   const activeReleases = useMemo(() => releases.filter((r) => r.status === 'active'), [releases]);
+  const selectionCount = useSelectionStore(
+    (s) => s.selectedByProject[projectId]?.size ?? 0,
+  );
+  const clearSelection = useSelectionStore((s) => s.clear);
 
   return (
     <div className="kanban-filters">
@@ -29,6 +33,18 @@ export const KanbanFilters = memo(function KanbanFilters() {
           </optgroup>
         )}
       </select>
+      {selectionCount > 0 && (
+        <div className="kanban-selection-status">
+          <span className="kanban-selection-count">{selectionCount} selected</span>
+          <button
+            type="button"
+            className="kanban-selection-clear"
+            onClick={clearSelection}
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 });
