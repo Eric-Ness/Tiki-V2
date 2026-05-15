@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
+  useBulkYoloStore,
   useIssuesStore,
   useProjectsStore,
   useReleaseDialogStore,
   useSelectionStore,
+  useTerminalStore,
   useToastStore,
 } from '../stores';
 import { LabelPickerPopover } from './LabelPickerPopover';
 import { buildPrePopulatedRelease } from './bulkAssignHelpers';
+import { dispatchNextBulkYolo } from '../utils/bulkYoloDispatch';
 import './BulkActionToolbar.css';
 
 /**
@@ -38,6 +41,13 @@ export function BulkActionToolbar() {
   const addToast = useToastStore((s) => s.addToast);
   const allIssues = useIssuesStore((s) => s.issues);
   const openReleaseDialog = useReleaseDialogStore((s) => s.openDialog);
+  const startBulkYolo = useBulkYoloStore((s) => s.startRun);
+  const bulkYoloActive = useBulkYoloStore((s) =>
+    Boolean(
+      s.runByProject[projectId] &&
+        s.runByProject[projectId]!.status !== 'idle',
+    ),
+  );
   const [busy, setBusy] = useState<'close' | 'label' | 'remove-label' | null>(null);
   const [labelOpen, setLabelOpen] = useState(false);
   const [removeLabelOpen, setRemoveLabelOpen] = useState(false);
@@ -146,6 +156,28 @@ export function BulkActionToolbar() {
     }
   };
 
+  const onRunYolo = () => {
+    if (busy || bulkYoloActive) return;
+    // Active-terminal-required path: avoids the addTabInBackground race
+    // where the Rust PTY isn't ready when we'd dispatch /tiki:yolo. The
+    // user needs an open terminal to see the cascade output anyway.
+    const termState = useTerminalStore.getState();
+    const tabs = termState.tabsByProject[projectId] ?? [];
+    const activeTabId = termState.activeTabByProject[projectId] ?? null;
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    const terminalId = activeTab?.activeTerminalId;
+    if (!terminalId) {
+      addToast(
+        'Open a terminal first, then click Run YOLO. The cascade dispatches into the active terminal.',
+        'error',
+      );
+      return;
+    }
+    startBulkYolo(selected, terminalId);
+    void dispatchNextBulkYolo(projectId);
+    clear();
+  };
+
   return (
     <div
       className="bulk-action-toolbar"
@@ -182,6 +214,13 @@ export function BulkActionToolbar() {
           onClick={bulkAssignToRelease}
         >
           Add to release
+        </button>
+        <button
+          type="button"
+          disabled={busy !== null || bulkYoloActive}
+          onClick={onRunYolo}
+        >
+          {bulkYoloActive ? 'YOLO running' : 'Run YOLO'}
         </button>
         <button
           type="button"

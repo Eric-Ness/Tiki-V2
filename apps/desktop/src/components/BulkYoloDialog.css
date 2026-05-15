@@ -1,0 +1,133 @@
+.bulk-yolo-dialog {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1100; /* above BulkActionToolbar (1000) */
+  pointer-events: none;
+}
+.bulk-yolo-dialog__panel {
+  pointer-events: auto;
+  width: 380px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+}
+.bulk-yolo-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+.bulk-yolo-dialog__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.bulk-yolo-dialog__progress {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.bulk-yolo-dialog__status {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+.bulk-yolo-dialog__status--running {
+  color: var(--success-color, #4ade80);
+}
+.bulk-yolo-dialog__status--paused {
+  color: var(--warning-color, #fbbf24);
+}
+.bulk-yolo-dialog__status--failed {
+  color: var(--error-color, #f87171);
+}
+.bulk-yolo-dialog__status--idle {
+  color: var(--text-tertiary);
+}
+
+.bulk-yolo-dialog__queue {
+  list-style: none;
+  padding: 6px 0;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.bulk-yolo-dialog__item {
+  display: grid;
+  grid-template-columns: 24px 50px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 14px;
+}
+.bulk-yolo-dialog__icon {
+  font-family: monospace;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.bulk-yolo-dialog__item--done .bulk-yolo-dialog__icon {
+  color: var(--success-color, #4ade80);
+}
+.bulk-yolo-dialog__item--current {
+  background: var(--bg-hover);
+}
+.bulk-yolo-dialog__item--current .bulk-yolo-dialog__icon {
+  color: var(--warning-color, #fbbf24);
+}
+.bulk-yolo-dialog__num {
+  font-family: monospace;
+  color: var(--text-tertiary);
+}
+.bulk-yolo-dialog__title {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-yolo-dialog__failures {
+  border-top: 1px solid var(--border-color);
+  padding: 8px 14px;
+  color: var(--error-color, #f87171);
+}
+.bulk-yolo-dialog__failures ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.bulk-yolo-dialog__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-color);
+}
+.bulk-yolo-dialog__terminal {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  flex: 1;
+}
+.bulk-yolo-dialog__actions {
+  display: flex;
+  gap: 6px;
+}
+.bulk-yolo-dialog__actions button {
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.bulk-yolo-dialog__abort {
+  color: var(--error-color, #f87171);
+  border-color: var(--error-color, #f87171);
+}
