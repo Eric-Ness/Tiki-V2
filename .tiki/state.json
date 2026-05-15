@@ -3,20 +3,26 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 203,
-      "title": "Batch operations follow-up: shift+click range, bulk remove-label, bulk YOLO, bulk assign-to-release",
-      "completedAt": "2026-05-15T17:30:00.000Z",
-      "parentRelease": "v0.6.3"
+      "number": 206,
+      "title": "Bulk YOLO: enqueue selected issues into a serial /tiki:yolo cascade",
+      "completedAt": "2026-05-15T18:25:00.000Z",
+      "parentRelease": "v0.6.4"
     },
     "lastCompletedRelease": {
-      "version": "v0.6.3",
+      "version": "v0.6.4",
       "issues": [
-        203
+        206
       ],
-      "completedAt": "2026-05-15T17:35:00.000Z",
-      "tag": "v0.6.3"
+      "completedAt": "2026-05-15T18:30:00.000Z",
+      "tag": "v0.6.4"
     },
     "recentIssues": [
+      {
+        "number": 206,
+        "title": "Bulk YOLO: enqueue selected issues into a serial /tiki:yolo cascade",
+        "completedAt": "2026-05-15T18:25:00.000Z",
+        "parentRelease": "v0.6.4"
+      },
       {
         "number": 203,
         "title": "Batch operations follow-up: shift+click range, bulk remove-label, bulk YOLO, bulk assign-to-release",
@@ -167,6 +173,14 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.6.4",
+        "issues": [
+          206
+        ],
+        "completedAt": "2026-05-15T18:30:00.000Z",
+        "tag": "v0.6.4"
+      },
       {
         "version": "v0.6.3",
         "issues": [

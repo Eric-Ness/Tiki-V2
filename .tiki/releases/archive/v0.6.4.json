@@ -1,0 +1,14 @@
+{
+  "version": "v0.6.4",
+  "status": "shipped",
+  "shipped": true,
+  "completedAt": "2026-05-15T18:30:00.000Z",
+  "tag": "v0.6.4",
+  "issues": [
+    {
+      "number": 206,
+      "title": "Bulk YOLO: enqueue selected issues into a serial /tiki:yolo cascade"
+    }
+  ],
+  "createdAt": "2026-05-15T17:56:39.695Z"
+}
