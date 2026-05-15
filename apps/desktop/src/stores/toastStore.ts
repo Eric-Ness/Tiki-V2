@@ -3,12 +3,18 @@ import { useSettingsStore } from './settingsStore';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   type: ToastType;
   message: string;
   duration: number;
   createdAt: number;
+  action?: ToastAction;
 }
 
 interface ToastState {
@@ -16,7 +22,12 @@ interface ToastState {
 }
 
 interface ToastActions {
-  addToast: (message: string, type: ToastType, duration?: number) => string;
+  addToast: (
+    message: string,
+    type: ToastType,
+    duration?: number,
+    action?: ToastAction
+  ) => string;
   updateToast: (id: string, message: string) => void;
   removeToast: (id: string) => void;
   clearAll: () => void;
@@ -30,7 +41,7 @@ const toastTimers = new Map<string, ReturnType<typeof setTimeout>>();
 export const useToastStore = create<ToastStore>()((set) => ({
   toasts: [],
 
-  addToast: (message, type, duration) => {
+  addToast: (message, type, duration, action) => {
     const settings = useSettingsStore.getState().notifications;
     if (!settings.enabled) return '';
 
@@ -44,6 +55,7 @@ export const useToastStore = create<ToastStore>()((set) => ({
       message,
       duration: effectiveDuration,
       createdAt: Date.now(),
+      ...(action ? { action } : {}),
     };
 
     set((state) => {

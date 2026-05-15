@@ -87,3 +87,27 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+.toast-action {
+  flex-shrink: 0;
+  padding: 0 8px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toast-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toast-action:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}

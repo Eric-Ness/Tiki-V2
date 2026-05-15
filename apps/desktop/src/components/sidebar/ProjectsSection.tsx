@@ -65,9 +65,19 @@ export function ProjectsSection() {
           useToastStore
             .getState()
             .addToast(
-              `Tiki framework outdated for ${activeProject.name} — click the badge in the sidebar to update`,
+              `Tiki framework outdated for ${activeProject.name} — click Update to install v${bundled}`,
               "warning",
-              8000
+              8000,
+              {
+                label: "Update",
+                onClick: () => {
+                  window.dispatchEvent(
+                    new CustomEvent("tiki:install-framework", {
+                      detail: { projectPath: activeProject.path },
+                    })
+                  );
+                },
+              }
             );
         }
       } catch (err) {
