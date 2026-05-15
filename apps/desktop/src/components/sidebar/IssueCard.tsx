@@ -14,6 +14,12 @@ export interface IssueCardProps {
   issue: GitHubIssue;
   work?: WorkProgress;
   isSelected?: boolean;
+  /**
+   * Visible-order issue numbers in the surrounding list — used as the
+   * range domain for shift+click selection. Surface key is fixed to
+   * 'issues-list' since the sidebar is the only such surface.
+   */
+  surfaceIssueNumbers: number[];
   onClick?: () => void;
   onEdit?: (issue: GitHubIssue) => void;
   onOpenInGitHub?: (issue: GitHubIssue) => void;
@@ -22,13 +28,24 @@ export interface IssueCardProps {
   onCloseIssue?: (issue: GitHubIssue) => void;
 }
 
-export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onClick, onEdit, onOpenInGitHub, onCopyUrl, onRunYolo, onCloseIssue }: IssueCardProps) {
+const ISSUES_LIST_SURFACE = 'issues-list';
+
+export const IssueCard = memo(function IssueCard({ issue, work, isSelected, surfaceIssueNumbers, onClick, onEdit, onOpenInGitHub, onCopyUrl, onRunYolo, onCloseIssue }: IssueCardProps) {
   const contextMenu = useContextMenu();
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const isBatchSelected = useSelectionStore(
     (s) => s.selectedByProject[projectId]?.has(issue.number) ?? false,
   );
   const toggleBatchSelection = useSelectionStore((s) => s.toggle);
+  const rangeSelect = useSelectionStore((s) => s.rangeSelect);
+
+  const handleCheckboxClick = (e: React.MouseEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.shiftKey) {
+      e.preventDefault();
+      rangeSelect(ISSUES_LIST_SURFACE, surfaceIssueNumbers, issue.number);
+    }
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -141,8 +158,8 @@ export const IssueCard = memo(function IssueCard({ issue, work, isSelected, onCl
             type="checkbox"
             className="issue-card-select"
             checked={isBatchSelected}
-            onChange={() => toggleBatchSelection(issue.number)}
-            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleBatchSelection(issue.number, ISSUES_LIST_SURFACE)}
+            onClick={handleCheckboxClick}
             onPointerDown={(e) => e.stopPropagation()}
             aria-label={`Select issue #${issue.number}`}
           />

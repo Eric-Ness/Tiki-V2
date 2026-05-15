@@ -117,6 +117,8 @@ export const KanbanColumn = memo(function KanbanColumn({ id, title, issues, work
                     workItem={workItems?.get(issue.number)}
                     isSelected={selectedIssue === issue.number}
                     isBeingDragged={activeId === issue.number}
+                    columnId={id}
+                    surfaceIssueNumbers={itemIds}
                     onExecute={onExecute}
                     onShip={onShip}
                     onOpenInGitHub={onOpenInGitHub}

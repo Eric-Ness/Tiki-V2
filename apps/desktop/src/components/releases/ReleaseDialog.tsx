@@ -10,6 +10,12 @@ export interface ReleaseDialogProps {
   editingRelease?: TikiRelease;
   suggestedVersion?: string;
   projectPath?: string;
+  /**
+   * When opening for new-release-creation (no `editingRelease`),
+   * pre-fill the selected-issues list with these. Used by the
+   * bulk-action toolbar's "Add to release" button (#203).
+   */
+  initialIssues?: Array<{ number: number; title: string }>;
 }
 
 export function ReleaseDialog({
@@ -19,6 +25,7 @@ export function ReleaseDialog({
   editingRelease,
   suggestedVersion,
   projectPath,
+  initialIssues,
 }: ReleaseDialogProps) {
   const [version, setVersion] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +79,14 @@ export function ReleaseDialog({
         setSelectedIssues([...editingRelease.issues]);
       } else {
         setVersion(suggestedVersion ?? "");
-        setSelectedIssues([]);
+        // initialIssues lets the bulk-action toolbar pre-populate the
+        // new-release form with the user's selection. Falls back to
+        // empty when not provided.
+        setSelectedIssues(initialIssues ? [...initialIssues] : []);
       }
       setError(null);
     }
-  }, [isOpen, editingRelease, suggestedVersion]);
+  }, [isOpen, editingRelease, suggestedVersion, initialIssues]);
 
   // Fetch open issues when dialog opens
   useEffect(() => {

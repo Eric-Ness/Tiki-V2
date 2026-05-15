@@ -347,29 +347,33 @@ export function IssuesSection() {
 
           {filteredIssues.length > 0 && (
             <div className="issues-section-list">
-              {filteredIssues.map((issue) => {
-                const workKey = `issue:${issue.number}`;
-                const work = activeWork[workKey];
-                const workProgress = work && work.type === 'issue' ? {
-                  status: work.status,
-                  currentPhase: (work as { phase?: { current?: number } }).phase?.current,
-                  totalPhases: (work as { phase?: { total?: number } }).phase?.total,
-                } : undefined;
-                return (
-                  <IssueCard
-                    key={issue.number}
-                    issue={issue}
-                    work={workProgress}
-                    isSelected={selectedIssue === issue.number}
-                    onClick={() => handleIssueClick(issue)}
-                    onEdit={handleEditIssue}
-                    onOpenInGitHub={handleOpenInGitHub}
-                    onCopyUrl={handleCopyUrl}
-                    onRunYolo={handleRunYolo}
-                    onCloseIssue={handleCloseIssue}
-                  />
-                );
-              })}
+              {(() => {
+                const visibleIssueNumbers = filteredIssues.map((i) => i.number);
+                return filteredIssues.map((issue) => {
+                  const workKey = `issue:${issue.number}`;
+                  const work = activeWork[workKey];
+                  const workProgress = work && work.type === 'issue' ? {
+                    status: work.status,
+                    currentPhase: (work as { phase?: { current?: number } }).phase?.current,
+                    totalPhases: (work as { phase?: { total?: number } }).phase?.total,
+                  } : undefined;
+                  return (
+                    <IssueCard
+                      key={issue.number}
+                      issue={issue}
+                      work={workProgress}
+                      isSelected={selectedIssue === issue.number}
+                      surfaceIssueNumbers={visibleIssueNumbers}
+                      onClick={() => handleIssueClick(issue)}
+                      onEdit={handleEditIssue}
+                      onOpenInGitHub={handleOpenInGitHub}
+                      onCopyUrl={handleCopyUrl}
+                      onRunYolo={handleRunYolo}
+                      onCloseIssue={handleCloseIssue}
+                    />
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
