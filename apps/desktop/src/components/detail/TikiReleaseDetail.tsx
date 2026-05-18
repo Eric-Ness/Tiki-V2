@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TikiRelease } from "../../stores/tikiReleasesStore";
-import { useTerminalStore, useProjectsStore, useReleaseDialogStore, useTikiReleasesStore, useDetailStore } from "../../stores";
+import { useTerminalStore, useProjectsStore, useReleaseDialogStore, useTikiReleasesStore, useDetailStore, EMPTY_TABS } from "../../stores";
 import "./DetailPanel.css";
 
 interface TikiReleaseDetailProps {
@@ -23,7 +23,7 @@ const statusLabels: Record<string, string> = {
 
 export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
   const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
   const openDialog = useReleaseDialogStore((state) => state.openDialog);
   const deleteRelease = useTikiReleasesStore((state) => state.deleteRelease);

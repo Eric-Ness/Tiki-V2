@@ -26,6 +26,7 @@ export {
 
 export {
   useTerminalStore,
+  EMPTY_TABS,
   type TerminalTab,
   type TerminalStatus,
   type SplitDirection,
@@ -58,7 +59,7 @@ export {
   type PrFilter,
 } from './pullRequestsStore';
 
-export { useKanbanStore } from './kanbanStore';
+export { useKanbanStore, EMPTY_COLUMN_ORDER } from './kanbanStore';
 
 export { useSelectionStore } from './selectionStore';
 

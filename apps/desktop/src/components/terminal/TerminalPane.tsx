@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useTerminalStore, useProjectsStore } from '../../stores';
+import { useTerminalStore, useProjectsStore, EMPTY_TABS } from '../../stores';
 import { TerminalSplit } from './TerminalSplit';
 import { TerminalTabs } from './TerminalTabs';
 import './Terminal.css';
 
 export function TerminalPane() {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
   const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
   const { addTab, removeTab, setActiveTab, splitTerminal } = useTerminalStore();
   const hasInitialized = useRef(false);

@@ -7,6 +7,7 @@ import {
   useTerminalStore,
   useLayoutStore,
   useToastStore,
+  EMPTY_TABS,
 } from "../../stores";
 import { resolveWorkTerminal, terminalFocusRegistry } from "../../stores/terminalStore";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
@@ -107,7 +108,7 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
   const setSelectedIssue = useDetailStore((s) => s.setSelectedIssue);
   // E7 Resume button — mirrors the IssueDetail "Jump to terminal" selectors
   // so the same terminal-association data backs both affordances.
-  const projectTabs = useTerminalStore((s) => s.tabsByProject[activeProjectId] ?? []);
+  const projectTabs = useTerminalStore((s) => s.tabsByProject[activeProjectId] ?? EMPTY_TABS);
   const workTerminalMap = useTerminalStore(
     (s) => s.terminalByWorkIdByProject[activeProjectId]
   );

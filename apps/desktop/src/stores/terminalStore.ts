@@ -31,6 +31,12 @@ export interface TerminalTab {
   backgroundMode?: boolean;
 }
 
+// Stable empty fallback for `tabsByProject[projectId] ?? EMPTY_TABS` selectors.
+// MUST be a single module-level reference: inline `?? []` allocates a fresh
+// array on every selector call, which makes useSyncExternalStore see a "new"
+// snapshot and re-render forever (React 19 "Maximum update depth exceeded").
+export const EMPTY_TABS: TerminalTab[] = [];
+
 interface TerminalState {
   tabsByProject: Record<string, TerminalTab[]>;
   activeTabByProject: Record<string, string | null>;

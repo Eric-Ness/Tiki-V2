@@ -15,6 +15,10 @@ interface KanbanState {
   draggedCardId: number | null;
 }
 
+// Stable empty fallback for `orderByColumnByProject[projectId] ?? EMPTY_COLUMN_ORDER`.
+// See EMPTY_TABS in terminalStore.ts for why a module-level constant is required.
+export const EMPTY_COLUMN_ORDER: Record<string, number[]> = {};
+
 interface KanbanActions {
   setReleaseFilter: (release: string | null) => void;
   setDraggedCard: (issueNumber: number | null) => void;

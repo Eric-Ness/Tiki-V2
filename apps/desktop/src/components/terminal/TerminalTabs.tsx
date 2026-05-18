@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useTerminalStore, useProjectsStore, type TerminalTab } from '../../stores';
+import { useTerminalStore, useProjectsStore, EMPTY_TABS, type TerminalTab } from '../../stores';
 import { terminalActionsRegistry } from '../../stores/terminalStore';
 import { ContextMenu, type ContextMenuEntry, type ContextMenuPosition } from '../ui/ContextMenu';
 
@@ -34,7 +34,7 @@ function StatusDot({ status }: StatusDotProps) {
 
 export function TerminalTabs() {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
   const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
   const { addTab, removeTab, setActiveTab, updateTabTitle, splitTerminal } = useTerminalStore();
   const [editingTabId, setEditingTabId] = useState<string | null>(null);

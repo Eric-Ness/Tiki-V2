@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { Panel, Group, Separator, type Layout } from 'react-resizable-panels';
-import { useTerminalStore, useProjectsStore, type SplitTreeNode, type SplitDirection } from '../../stores';
+import { useTerminalStore, useProjectsStore, EMPTY_TABS, type SplitTreeNode, type SplitDirection } from '../../stores';
 import { Terminal } from './Terminal';
 
 interface TerminalSplitProps {
@@ -64,7 +64,7 @@ const countTerminals = (node: SplitTreeNode): number => {
 
 export function TerminalSplit({ tabId, node }: TerminalSplitProps) {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
   const { updateSplitSizes, updateTabStatus, setActiveTerminal } = useTerminalStore();
   const activeProject = useProjectsStore((state) => state.getActiveProject());
   const tab = tabs.find((t) => t.id === tabId);

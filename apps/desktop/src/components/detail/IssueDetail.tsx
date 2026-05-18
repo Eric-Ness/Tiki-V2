@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
-import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore } from "../../stores";
+import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore, EMPTY_TABS } from "../../stores";
 import { resolveWorkTerminal, terminalFocusRegistry } from "../../stores/terminalStore";
 import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
@@ -142,7 +142,7 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const triggerRefetch = useIssuesStore((state) => state.triggerRefetch);
   const prs = usePullRequestsStore((state) => state.prs);
   const setSelectedPr = useDetailStore((state) => state.setSelectedPr);
-  const terminalTabs = useTerminalStore((state) => state.tabsByProject[activeProjectId] ?? []);
+  const terminalTabs = useTerminalStore((state) => state.tabsByProject[activeProjectId] ?? EMPTY_TABS);
   const workTerminalMap = useTerminalStore(
     (state) => state.terminalByWorkIdByProject[activeProjectId]
   );

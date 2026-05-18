@@ -3,6 +3,7 @@ import {
   useProjectsStore,
   useIssuesStore,
   useTerminalStore,
+  EMPTY_TABS,
 } from '../stores';
 import './BulkYoloDialog.css';
 
@@ -18,7 +19,7 @@ export function BulkYoloDialog() {
   const resume = useBulkYoloStore((s) => s.resume);
   const abort = useBulkYoloStore((s) => s.abort);
   const issues = useIssuesStore((s) => s.issues);
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
 
   // Hide when no run, or when the run has wound down to idle (queue exhausted
   // and no failures to surface). recordFailure / pause keep the dialog up.

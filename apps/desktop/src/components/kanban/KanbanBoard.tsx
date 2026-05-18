@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore, filterIssuesBySearch } from '../../stores';
+import { useIssuesStore, useKanbanStore, useTikiReleasesStore, useTerminalStore, useProjectsStore, useLayoutStore, useTikiStateStore, filterIssuesBySearch, EMPTY_TABS, EMPTY_COLUMN_ORDER } from '../../stores';
 import { applyColumnOrder } from '../../stores/kanbanStore';
 import type { GitHubIssue } from '../../stores';
 import { KanbanColumn } from './KanbanColumn';
@@ -53,9 +53,9 @@ export function KanbanBoard() {
   const searchQuery = useIssuesStore((s) => s.searchQuery);
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
   const releaseFilter = useKanbanStore((s) => s.releaseFilterByProject[projectId] ?? null);
-  const orderByColumn = useKanbanStore((s) => s.orderByColumnByProject[projectId] ?? {});
+  const orderByColumn = useKanbanStore((s) => s.orderByColumnByProject[projectId] ?? EMPTY_COLUMN_ORDER);
   const tikiReleases = useTikiReleasesStore((s) => s.releases);
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? []);
+  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
   const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
   const setActiveView = useLayoutStore((s) => s.setActiveView);
   const activeWork = useTikiStateStore((s) => s.activeWork);
