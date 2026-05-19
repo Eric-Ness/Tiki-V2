@@ -9,7 +9,7 @@
     "clean": "pnpm -r clean",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm test:ts && pnpm test:rust",
-    "test:ts": "pnpm -C packages/shared test && pnpm -C apps/desktop test",
+    "test:ts": "pnpm -C packages/shared test && pnpm -C apps/desktop test && pnpm -C packages/framework test",
     "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "version-bump": "node scripts/version-bump.mjs"
   },

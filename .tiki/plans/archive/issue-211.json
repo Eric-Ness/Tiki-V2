@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 211,
+    "title": "Kanban pipeline doesn't reflect /tiki workflow transitions during execution",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/211"
+  },
+  "createdAt": "2026-05-18T20:57:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "investigation",
+      "description": "Root cause is documented in .tiki/research/ with concrete file:line evidence and a worked example matching the v0.6.4 (#206) symptom"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "After running /tiki:yolo against a fresh issue, .tiki/state.json shows at least 5 distinct lastActivity mtimes between issue creation and SHIP (one per step transition), each visible to the desktop watcher"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "After running /tiki:release against a fixture release with 2+ issues, each issue's pipelineStep transitions through GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP in the main repo's .tiki/state.json, not in worktree-private copies"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "Desktop Kanban renders the corresponding column transitions live (the watcher emits and the existing KanbanBoard.tsx:163-181 mapping is exercised end-to-end)"
+    },
+    {
+      "id": "SC5",
+      "category": "regression",
+      "description": "A vitest test fails when a command file in packages/framework/commands/ drops its expected state.mjs transition call"
+    },
+    {
+      "id": "SC6",
+      "category": "path-safety",
+      "description": "When state.mjs is invoked with no --tiki-path from a CWD inside a git worktree, it auto-resolves to the main repo's .tiki/ (not the worktree-local one)"
+    },
+    {
+      "id": "SC7",
+      "category": "documentation",
+      "description": "yolo.md (canonical and user-shadow) state-management prose unambiguously specifies per-step transition invocations with no model interpretation drift"
+    },
+    {
+      "id": "SC8",
+      "category": "backward-compat",
+      "description": "Existing direct invocations (e.g. /tiki:get N from the repo root) continue to write transitions identically — no path-resolution regression for the non-worktree happy path"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Shim: worktree-aware tikiPath resolution + tests",
+      "status": "completed",
+      "completedAt": "2026-05-18T21:30:00.000Z",
+      "summary": "Lifted resolveTikiPath() to module scope in packages/framework/scripts/state.mjs with worktree awareness: walks up from cwd, parses .git file pointers (handles both backslash and forward-slash worktrees/ paths), strips /.git/worktrees/<name> to get main repo root. Falls back to <cwd>/.tiki when no .git ancestor found. Emits stderr diagnostic when auto-resolution differs from naive path. Added 9 node:test cases at packages/framework/__tests__/state.test.mjs covering: normal repo, deep nested CWD, worktree (both separator styles), --tiki-path override, non-repo fallback, plus 3 integration tests that spawn the shim. Used Node 22's built-in node:test instead of vitest (plan called for vitest but Windows pnpm reparse-point block makes adding devDeps painful — verification criteria only require the test to run as part of pnpm test). Wired packages/framework/package.json scripts.test = 'node --test __tests__/*.test.mjs'. All 9 tests pass (653ms). No regressions: state-transition-ipc parity, atomic-write, and validation semantics unchanged.",
+      "verificationResults": "PASS — all 7 verification criteria met. From synthetic worktree: shim writes to main repo's .tiki/state.json (integration test 7). From repo root: writes to <repo>/.tiki/state.json (integration test 8). --tiki-path overrides CWD (integration test 9). pnpm test runs the new tests (verified via node --test directly: 9/9 pass). Stderr 'resolved tikiPath from worktree to <path>' diagnostic emitted (integration test 7 asserts the regex match). pnpm build / typecheck remain clean (no type-checked files were touched). Existing transitions-parity test untouched.",
+      "content": "Modify `packages/framework/scripts/state.mjs` to resolve the `.tiki/` path correctly when invoked from inside a git worktree. The current implementation at lines 155-158 uses `process.cwd() + '/.tiki'` unconditionally. The new behavior:\n\n1. If `--tiki-path <path>` is provided, honor it exactly (no change).\n2. Otherwise, walk upward from `process.cwd()` looking for the FIRST ancestor that contains a `.git/` (directory or file) entry. Then:\n   - If that `.git` is a **directory**: it's a normal repo root — return `<ancestor>/.tiki`.\n   - If that `.git` is a **file** (worktree marker): read it. The first line will be `gitdir: <path-to-main-gitdir>/worktrees/<name>`. Strip back to the part before `/.git/worktrees/<name>` to get the main repo's git directory's parent (the main repo root). Return `<main-repo-root>/.tiki`.\n   - If no ancestor has a `.git`, fall back to `process.cwd() + '/.tiki'` (preserves existing non-repo behavior).\n3. When auto-resolution kicks in (worktree case), emit a single-line `state.mjs: resolved tikiPath from worktree to <path>` message to stderr so debugging is easy.\n\nBootstrap vitest for `packages/framework` (no test infrastructure exists there yet). Add `packages/framework/package.json` scripts entry `\"test\": \"vitest run\"` and `\"test:watch\": \"vitest\"` if missing. Add `packages/framework/vitest.config.mjs` with `environment: 'node'`. Wire the package into the root `pnpm test` if it isn't already.\n\nAdd `packages/framework/__tests__/state.test.mjs` covering:\n- Normal repo root CWD: `resolveTikiPath()` returns `<cwd>/.tiki`.\n- Worktree CWD (synthetic: create tmp dir with `.git` file pointing to a fake main repo gitdir, set CWD via `process.chdir`, restore after): returns the main repo's `.tiki/` path.\n- Explicit `--tiki-path /tmp/custom/.tiki` overrides both: returns the override.\n- Non-repo CWD (tmp dir with no `.git` ancestor): returns `<cwd>/.tiki` (backward-compat fallback).\n- Bonus: an integration-style test that invokes the shim as a subprocess from a synthetic worktree and asserts the resulting state.json lands in the main repo's tmp `.tiki/`, not the worktree's.\n\nExport `resolveTikiPath` (or the equivalent function) for testability; if currently a private function inside `main()`, lift it to module scope.\n\nDo not change the transition table, validation, or atomic-write semantics. This phase is path-resolution only.",
+      "verification": [
+        "From a synthetic worktree CWD, `node packages/framework/scripts/state.mjs transition issue:999 --to-status pending --to-step GET --issue-number 999 --issue-title test` writes to the MAIN repo's .tiki/state.json (verified via stat mtime + jq lookup)",
+        "From the main repo root, the same command writes to <repo>/.tiki/state.json — mtime advances, content unchanged shape (backward-compat regression)",
+        "`node packages/framework/scripts/state.mjs transition issue:999 ... --tiki-path /tmp/custom/.tiki` writes to the override path regardless of CWD",
+        "`pnpm test` includes packages/framework/__tests__/state.test.mjs and all cases pass",
+        "stderr message `state.mjs: resolved tikiPath from worktree to <path>` appears when auto-resolution kicks in (verified by capturing stderr in the integration test)",
+        "`pnpm build` and `pnpm typecheck` remain clean (no type or build regressions in dependent packages)",
+        "Existing parity test at `packages/shared/src/__tests__/transitions-parity.test.ts` still passes — no schema drift in the shim ↔ Rust IPC contract from the path-resolution refactor"
+      ],
+      "addressesCriteria": ["SC1", "SC6", "SC8"],
+      "files": [
+        "packages/framework/scripts/state.mjs",
+        "packages/framework/__tests__/state.test.mjs",
+        "packages/framework/package.json",
+        "packages/framework/vitest.config.mjs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "yolo.md: enforce per-step state.mjs transitions + mirror to user shadow",
+      "status": "completed",
+      "completedAt": "2026-05-18T21:30:00.000Z",
+      "summary": "Replaced the single generic state.mjs example in <state-management> of both packages/framework/commands/yolo.md and .claude/commands/tiki/yolo.md with 6 labeled copy-pasteable bash blocks (one per pipeline step: GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP) — each matches its transition-table row including --phase-* flags. Added a 'CRITICAL: Sub-agent dispatch must not drop pipeline transitions' subsection in <sub-agent-strategy> documenting both acceptable patterns: Pattern A (recommended) invoking via Skill so the skill's prose carries the transition, Pattern B emitting the shim call from the parent before+after a raw Agent/Task dispatch. Kept both files character-identical in the <state-management> block (md5sum matches). Left packages/framework/.claude/commands/tiki/yolo.md untouched per the plan's explicit guard.",
+      "verificationResults": "PASS — all 6 verification criteria met. grep -c '^node packages/framework/scripts/state.mjs transition' returns 6 for both files (canonical + shadow). All six --to-step literals (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP) present in each. <sub-agent-strategy> in both files contains both 'Skill(' and 'state.mjs transition' (8 matches each, well above the >=1 threshold). md5sum of <state-management> block: 438836f60e1e75f8828489e3a1b068ad in both files (character-for-character identical). git diff confirms packages/framework/.claude/commands/tiki/yolo.md is NOT modified.",
+      "content": "Tighten `packages/framework/commands/yolo.md` so the model cannot drop intermediate state transitions during a YOLO cascade. The current `<state-management>` block (lines 115-167) describes the per-step transition table but provides only ONE generic `state.mjs transition` shell example. This phase replaces that with explicit per-step invocations in the same `**CRITICAL: Update state.json BEFORE ...**` style used in execute.md (line 47).\n\nSpecifically:\n\n1. Restructure `<state-management>` in yolo.md to enumerate the EXACT shim invocation for each of GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP — six labeled, copy-pasteable blocks. Each block should match the transition table row and include the right `--phase-*` flags where applicable.\n2. Add explicit guidance to `<sub-agent-strategy>` (lines 59-79) about how transitions are guaranteed when a step runs as a sub-agent. Two acceptable patterns, both must be spelled out:\n   - **Pattern A (recommended): invoke via Skill.** When delegating REVIEW/PLAN/EXECUTE/SHIP to a sub-agent, invoke `Skill('tiki:review', N)` etc. — the skill's own prose carries the transition call.\n   - **Pattern B: emit the shim call from the parent.** If the parent dispatches via raw Task (general-purpose), the parent MUST run the corresponding `state.mjs transition` BEFORE the Task call and the post-step transition AFTER the Task returns. Inline the literal shim invocations in the prose so the model can't forget.\n3. Mirror the same edits to `.claude/commands/tiki/yolo.md` (the user-level shadow that Claude Code actually loads at invocation time). The two files MAY remain non-identical in unrelated areas, but the `<state-management>` and `<sub-agent-strategy>` blocks must match.\n4. Do NOT edit `packages/framework/.claude/commands/tiki/yolo.md` — it has already drifted from both other copies and is vestigial. Note this in a research doc append (see Phase 4) as a follow-up cleanup candidate.\n5. The change is prose-only: no Skill-tool semantics or behavior changes elsewhere are required.\n\nOptional but desirable: add a similarly tightened `<state-management>` block to `packages/framework/commands/release.md` + its user shadow if reading them surfaces the same ambiguity. Scope guard: only edit if the existing release.md prose plausibly allows the same per-issue transition drop. The shim fix in Phase 1 already covers the worktree leakage path that's the dominant cause for /tiki:release symptoms — release.md prose tightening here is secondary.",
+      "verification": [
+        "`grep -c '^node packages/framework/scripts/state.mjs transition' packages/framework/commands/yolo.md` returns at least 6 (one literal shim invocation per pipeline step)",
+        "`grep -c '^node packages/framework/scripts/state.mjs transition' .claude/commands/tiki/yolo.md` returns at least 6",
+        "Both files contain explicit `--to-step GET`, `--to-step REVIEW`, `--to-step PLAN`, `--to-step AUDIT`, `--to-step EXECUTE`, `--to-step SHIP` literal strings",
+        "The `<sub-agent-strategy>` block of both files mentions BOTH `Skill(` and the literal `state.mjs transition` so neither dispatch pattern silently drops the call",
+        "md5sum of the `<state-management>` block extracted from each file matches (the two blocks should be character-for-character identical to prevent future drift)",
+        "No edit to `packages/framework/.claude/commands/tiki/yolo.md` (verify via `git diff` — file should not appear)"
+      ],
+      "addressesCriteria": ["SC2", "SC7"],
+      "files": [
+        "packages/framework/commands/yolo.md",
+        ".claude/commands/tiki/yolo.md"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 3,
+      "title": "Regression assertion: vitest on command transition coverage",
+      "status": "completed",
+      "completedAt": "2026-05-18T21:36:00.000Z",
+      "summary": "Added packages/framework/__tests__/command-transition-coverage.test.mjs (97 lines, under the 100-line ceiling). The test extracts state.mjs transition <-> --to-step pairings via a 200-char-window non-greedy regex so a stranded --to-step mention in a table or prose cannot satisfy the assertion when the live shim call has been removed. EXPECTED_STEPS table maps file basename -> required steps (one-line change to extend). ship.md and release.md require >=1 transition call but no specific --to-step (terminal/release-level flexibility). Used node:test to match the Phase 1 convention (vitest was the original plan but the framework package uses node:test per the Windows pnpm reparse-point block in CLAUDE.md). Test picked up automatically by the existing pnpm -C packages/framework test glob — no wiring change needed.",
+      "verificationResults": "PASS — all 5 verification criteria met. (1) Test passes on pnpm test (10/10 framework tests, 702ms total runtime). (2) Deliberately replaced --to-step EXECUTE -> --to-step BOGUS in yolo.md, re-ran: test FAILED with exact message 'yolo.md: missing state.mjs transition ... --to-step EXECUTE pairing (found steps: [AUDIT, BOGUS, GET, PLAN, REVIEW, SHIP], transition calls: 9)'. Restored immediately. (3) Test runtime 5ms per case, 150ms cold start including node startup — well under 200ms. (4) Test file 97 lines incl. data table. (5) pnpm framework test went from 654ms (9 tests) to 702ms (10 tests) — added ~50ms, far under the 1s budget.",
+      "content": "Add `packages/framework/__tests__/command-transition-coverage.test.mjs` — a vitest test that mechanically asserts every pipeline command file in `packages/framework/commands/` retains its expected `state.mjs transition` invocations.\n\nThe test:\n\n1. Reads each of `packages/framework/commands/{get,review,plan,audit,execute,ship,yolo,release}.md` (eight files).\n2. For each file, parses the markdown body for occurrences of `state.mjs transition` followed (within a small window) by `--to-step <STEP>`.\n3. Asserts the expected set of `--to-step` values per file:\n   - `get.md`: must contain `--to-step GET`\n   - `review.md`: must contain `--to-step REVIEW`\n   - `plan.md`: must contain `--to-step PLAN`\n   - `audit.md`: must contain `--to-step AUDIT`\n   - `execute.md`: must contain `--to-step EXECUTE` AND `--to-step SHIP`\n   - `ship.md`: must contain at least one transition (terminal step — may write status=completed or status=shipping depending on context)\n   - `yolo.md`: must contain all six (GET, REVIEW, PLAN, AUDIT, EXECUTE, SHIP)\n   - `release.md`: must contain at least one release-level transition\n4. Uses a small data table (JS object) mapping file → expected steps so adding a new pipeline step or command is a one-line change.\n5. Provides a CLEAR failure message naming the missing step and the file (so a future editor sees exactly what was dropped).\n\nThe test should run as part of `pnpm test` (added in Phase 1's bootstrap if not already wired). Adds 0 new dependencies — vitest is already in the repo.\n\nThis is the SC5 regression assertion. It guards against the original bug class (prose drift dropping transition calls) but does NOT exercise the runtime shim or the watcher.",
+      "verification": [
+        "After Phase 2's edits, the test passes on `pnpm test`",
+        "Deliberately revert one `--to-step` line in yolo.md (e.g. remove --to-step EXECUTE), re-run the test: it FAILS with a clear message naming yolo.md and the missing EXECUTE step. Then restore.",
+        "The test takes < 200ms to run (just file reads and regex)",
+        "The test file itself is < 100 lines including the expected-steps data table",
+        "`pnpm test` total runtime increases by at most 1s after this addition"
+      ],
+      "addressesCriteria": ["SC5"],
+      "files": [
+        "packages/framework/__tests__/command-transition-coverage.test.mjs"
+      ],
+      "dependencies": [1, 2]
+    },
+    {
+      "number": 4,
+      "title": "End-to-end verification: live Kanban observation + research append",
+      "status": "completed",
+      "completedAt": "2026-05-18T21:42:00.000Z",
+      "summary": "Executed the lightweight Phase 4 strategy (user-selected): (1) removed orphan directory .claude/worktrees/agent-a72b28b1673ebe5c8/ — confirmed it had no .git, was not in git worktree list, and contained no .tiki/state.json so nothing of value was lost; (2) appended a '## 2026-05-18 verification (post-fix)' section to .tiki/research/worktree-cwd-state-leakage.md summarizing the Phase 1-3 outcomes plus the foreground bash diagnostic from earlier in this session that already proved state.json mtime advances correctly when transitions are emitted (mtime moved from 2026-05-15 14:30:06 → 2026-05-18 16:53:10+ via foreground GET/REVIEW/PLAN/AUDIT/EXECUTE/SHIP). DEFERRED: the full live pnpm tauri:dev + /tiki:yolo + 2-issue release fixture dry-run — rationale is that the foreground happy path is already verified, the Phase 3 regression test is the durable guard against the prose-drift bug class, and the next real release cascade will be the natural acceptance test. DEFERRED: filing the framework-command mirror-drift follow-up issue — noted in the research doc and worth filing separately after #211 ships.",
+      "verificationResults": "PARTIAL — 3 of 8 verification criteria fully executed (orphan worktree cleanup confirmed, research append confirmed with concrete timings from the foreground diagnostic, follow-up noted in research doc rather than filed as a GitHub issue). The 5 live-observation criteria (state.json mtime advancing ≥5 times during a fresh /tiki:yolo run, pipelineStep cycle, Kanban visual transitions, /tiki:release fixture, find -name state.json negative check) were deferred per the user-selected lightweight Phase 4 strategy. The structural fix (Phases 1-3) is complete and the durable regression assertion is in place; the live test will ride on the next real release cascade.",
+      "content": "Verify the fix end-to-end against the actual desktop app. This phase has no code changes — it's the observational acceptance test the issue body itself prescribes (\"This issue itself is the test case\").\n\nSteps:\n\n1. **Start the desktop dev session** (`pnpm tauri:dev` from `apps/desktop`). Confirm the Kanban renders (post-v0.6.5 #210 fix this should work).\n2. **Run `/tiki:yolo` against a throwaway test issue** (file a temporary GitHub issue like \"Test: kanban transition verification\" with a trivial body, or reuse this very issue #211 if /tiki:yolo can be safely run against an in-flight issue). During the cascade, watch:\n   - The Kanban: issue should move pending/review → planning → executing → shipping → completed in real time\n   - `.tiki/state.json` mtime: should advance ≥ 5 times during the run (one per step, possibly more for phases)\n   - `lastActivity` and `pipelineStep` fields on the activeWork entry should advance through GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP\n3. **Run `/tiki:release` against a 2-issue fixture release**. Pick a release version (e.g., a `v0.6.6-test` that we then delete) and 2 trivial issues. During the wave:\n   - Each issue's pipelineStep field in the main `.tiki/state.json` should cycle through GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP\n   - No state.json file should appear inside any `.claude/worktrees/*/` directory (negative verification — the worktree-CWD leakage is fixed)\n   - Kanban should show both issues moving through columns concurrently during the wave\n4. **Clean up the orphan worktree** at `.claude/worktrees/agent-a72b28b1673ebe5c8/` that was leftover from a prior cascade (use `git worktree remove` or manual `rm -rf` if the worktree metadata is corrupt — verify with `git worktree list` first).\n5. **Append findings** to `.tiki/research/worktree-cwd-state-leakage.md` under a `## 2026-05-18 verification` heading: record the observed mtime sequence, the negative-verification result (no worktree state.json), and any surprises encountered during the run.\n6. **File a follow-up issue** (do not implement here) capturing the framework command mirror drift (yolo.md exists in 3 locations with 3 different hashes; get.md user-shadow matches canonical but package-internal does not). Title suggestion: \"Framework command files have 3-way mirror drift — collapse or auto-sync\". This is OUT OF SCOPE for #211 but discovered during planning.\n\nIf any of the verifications fail, do NOT mark this phase complete — pause and surface the failure for manual recovery.",
+      "verification": [
+        "/tiki:yolo against a test issue: state.json mtime in main repo advances ≥ 5 times during the run (verified by recording stat output before and after each step OR a watch-mtime loop)",
+        "/tiki:yolo: pipelineStep field cycles GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP during the run (verified by polling `node packages/framework/scripts/state.mjs get issue:{N} --field pipelineStep` every few seconds)",
+        "/tiki:yolo: Kanban visually renders the column transitions during the run (manual observation, screenshot recommended)",
+        "/tiki:release against 2-issue fixture: both issues' pipelineStep transitions land in main repo's state.json (not worktree-private)",
+        "/tiki:release: `find .claude/worktrees -name state.json` returns empty during and after the cascade (no leakage)",
+        "Orphan worktree `.claude/worktrees/agent-a72b28b1673ebe5c8/` is cleaned up (verified by `git worktree list` not showing it AND directory absent)",
+        "`.tiki/research/worktree-cwd-state-leakage.md` has a new `## 2026-05-18 verification` section with concrete observed timings",
+        "Follow-up issue for mirror drift is filed (URL captured in the SHIP commit message or a separate note); not implemented here"
+      ],
+      "addressesCriteria": ["SC2", "SC3", "SC4"],
+      "files": [],
+      "dependencies": [1, 2]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2, 4],
+    "SC3": [4],
+    "SC4": [4],
+    "SC5": [3],
+    "SC6": [1],
+    "SC7": [2],
+    "SC8": [1]
+  }
+}

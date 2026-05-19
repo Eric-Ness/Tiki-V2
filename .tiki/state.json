@@ -1,12 +1,35 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "issue:212": {
+      "type": "issue",
+      "issue": {
+        "number": 212,
+        "title": "Bug: Blank-screen regression v2 — App.tsx:152 passes fresh {} to useStaleWorkDetection → infinite re-render",
+        "body": "## Symptom\n\nSame blank-screen / `Maximum update depth exceeded` symptom as #210, with KanbanBoard crashing the whole React tree. Surfaces specifically when no active project is selected (the \"NONE no-id\" path).\n\nConsole output during the crash:\n\n```\nThe result of getSnapshot should be cached to avoid an infinite loop\nmountSyncExternalStore @ react-dom-client.development.js:8129\n[IssuesSection] activeProject changed: NONE no-id\n[IssuesSection] fetchIssues called, activeProject: NONE\n[IssuesSection] No active project - clearing issues\nUncaught Error: Maximum update depth exceeded.\n    at forceStoreRerender (react-dom-client.development.js:8261:18)\n    at updateStoreInstance (react-dom-client.development.js:8241:39)\n    ...\nAn error occurred in the <KanbanBoard> component.\nConsider adding an error boundary to your tree to customize error handling behavior.\n```\n\n## Root cause\n\n`apps/desktop/src/App.tsx:152`:\n\n```ts\nconst staleFlags = useStaleWorkDetection(state?.activeWork ?? {}, stalenessThresholdHours);\n```\n\nWhen `state` is `null` (initial render, OR no active project loaded), `state?.activeWork ?? {}` **allocates a fresh empty object `{}` on every render**.\n\n`apps/desktop/src/hooks/useStaleWorkDetection.ts:87`:\n\n```ts\nuseEffect(() => {\n  const runDetection = () => {\n    const nextFlags = computeStaleFlags(activeWork, thresholdHours);\n    setStaleFlags(nextFlags); // fresh {} reference → state update → re-render\n    // ...\n  };\n  runDetection();\n  const id = setInterval(runDetection, 300_000);\n  return () => clearInterval(id);\n}, [activeWork, thresholdHours]); // activeWork dep is unstable\n```\n\nCascade:\n\n1. App renders, passes fresh `{}` to `useStaleWorkDetection`\n2. Effect's `[activeWork, thresholdHours]` dep sees a new reference for `activeWork`\n3. Effect re-runs → `runDetection()` → `setStaleFlags(computeStaleFlags({}, ...))` produces a fresh `{}` (line 23 of the hook)\n4. `setStaleFlags` with a new reference → React schedules re-render\n5. Re-render → fresh `{}` again → loop until `Maximum update depth exceeded` fires\n6. `KanbanBoard` (downstream of the broken render cycle) throws\n7. **No error boundary above the panel sections in `App.tsx`** → the throw unmounts the whole tree → blank WebView for users (production builds ship without `devtools` feature, so no console)\n\n## Relationship to #210\n\nSame bug class, different surface:\n\n- #210 was about Zustand selectors returning `?? []` / `?? {}` inline. Fix: lift empty fallbacks to module-level constants (`EMPTY_TABS`, `EMPTY_COLUMN_ORDER`).\n- This bug is one indirection out — the unstable allocation is at the **hook-args layer**, not inside a Zustand selector. The grep used to find #210 cases (`useStore.*?? []`) did not catch this pattern.\n\nThe \"Consider adding an error boundary\" warning in the console is the exact follow-up I flagged after #210 but did not file. Without an error boundary above the panel sections, every future analogous bug will produce the same blank-screen incident.\n\n## Secondary suspect (less critical)\n\n`App.tsx:357` (inside the file-changed listener) and `App.tsx:246` (inside `loadState`):\n\n```ts\nuseTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);\n```\n\n`|| []` allocates fresh `[]` when `history.recentIssues` is missing. This fires on file watcher events (not every render), so it is not the loop driver. But it has the same shape and would cause downstream selector instability in subscribers of `useTikiStateStore.recentIssues`. Worth fixing in the same change.\n\n## Proposed fix\n\nThree edits in `apps/desktop/src/App.tsx`:\n\n1. Add module-level stable constants near the top of the file (matching the v0.6.5 `EMPTY_TABS` / `EMPTY_COLUMN_ORDER` pattern):\n   ```ts\n   const EMPTY_ACTIVE_WORK: Record<string, WorkContext> = {};\n   const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];\n   ```\n2. Replace `state?.activeWork ?? {}` at line 152 with `state?.activeWork ?? EMPTY_ACTIVE_WORK`.\n3. Replace `currentState?.history?.recentIssues || []` at lines 246 and 357 with `currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES`.\n\nPlus the structural fix:\n\n4. Add a React error boundary around the panel sections in App.tsx. Should wrap at least the center pane (KanbanBoard / DependencyGraph / TerminalPane / detail panels) so a single panel crash falls back to a recoverable error UI rather than unmounting the whole tree. The boundary should log the error (so a dev session sees it in console) and offer a \"Reload\" action.\n\n## Acceptance criteria\n\n- [ ] `App.tsx` uses stable empty-constant fallbacks for `activeWork` and `recentIssues` (no fresh `{}` / `[]` allocations during render)\n- [ ] Desktop dev session launches with no active project selected → KanbanBoard renders the empty-state UI without an infinite loop\n- [ ] `Maximum update depth exceeded` does not appear in console during normal app lifecycle (open with project / open without project / switch projects)\n- [ ] An error boundary is in place above the panel sections; deliberately throwing inside KanbanBoard (test via a one-line throw, then revert) shows a recoverable UI, not a blank tree\n- [ ] grep-based or eslint check guards against re-introducing inline `?? {}` / `?? []` / `|| []` allocations in hook arguments AND useState/useEffect dep arrays (the #210 lesson, extended)\n\n## Notes on workflow\n\nDiscovered while running `/tiki:execute` against issue #211 (which is about /tiki workflow Kanban transitions). Issue #211 is paused at Phase 2/4 (Phase 2 complete, uncommitted on disk); will resume after this v0.6.6 hotfix ships. v0.6.6 work is exclusively in `apps/desktop/src/` so it won't touch #211's `packages/framework/` changes.",
+        "state": "OPEN",
+        "url": "https://github.com/Eric-Ness/Tiki-V2/issues/212",
+        "labels": [],
+        "labelDetails": [],
+        "createdAt": "2026-05-18T21:09:58Z",
+        "updatedAt": "2026-05-18T21:09:58Z"
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-18T21:10:23.294Z",
+      "lastActivity": "2026-05-18T21:11:08.463Z",
+      "phase": {
+        "current": 1,
+        "total": 1,
+        "status": "executing"
+      }
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 206,
-      "title": "Bulk YOLO: enqueue selected issues into a serial /tiki:yolo cascade",
-      "completedAt": "2026-05-15T18:25:00.000Z",
-      "parentRelease": "v0.6.4"
+      "number": 211,
+      "title": "Kanban pipeline doesn't reflect /tiki workflow transitions during execution",
+      "completedAt": "2026-05-19T14:19:27.923Z"
     },
     "lastCompletedRelease": {
       "version": "v0.6.4",
@@ -17,6 +40,11 @@
       "tag": "v0.6.4"
     },
     "recentIssues": [
+      {
+        "number": 211,
+        "title": "Kanban pipeline doesn't reflect /tiki workflow transitions during execution",
+        "completedAt": "2026-05-19T14:19:27.923Z"
+      },
       {
         "number": 206,
         "title": "Bulk YOLO: enqueue selected issues into a serial /tiki:yolo cascade",

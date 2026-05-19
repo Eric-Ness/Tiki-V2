@@ -15,7 +15,8 @@
   ],
   "scripts": {
     "install-commands": "node install.js",
-    "state": "node ./scripts/state.mjs"
+    "state": "node ./scripts/state.mjs",
+    "test": "node --test __tests__/*.test.mjs"
   },
   "dependencies": {
     "@tiki/shared": "workspace:*"

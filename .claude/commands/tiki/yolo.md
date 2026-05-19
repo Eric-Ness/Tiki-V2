@@ -76,6 +76,29 @@ Phase 2 summary → Phase 3 context
 ...
 Final summary → SHIP context
 ```
+
+## CRITICAL: Sub-agent dispatch must not drop pipeline transitions
+
+When delegating REVIEW / PLAN / EXECUTE / SHIP to a sub-agent, the kanban board in the desktop app only reflects pipeline progress if `state.mjs transition` runs for each step. There are TWO acceptable patterns. **Pick one per dispatch; do not skip both.**
+
+### Pattern A (recommended): invoke via Skill
+
+Use the `Skill` tool with the matching tiki skill. The skill's own prompt body carries the `state.mjs transition` call automatically — you do not have to emit it from the parent.
+
+```
+Skill('tiki:review', '{number}')
+Skill('tiki:plan',   '{number}')
+Skill('tiki:execute','{number}')
+Skill('tiki:ship',   '{number}')
+```
+
+This is the preferred path because the transition stays co-located with the step that owns it. Use this whenever the skill exists.
+
+### Pattern B: emit the shim call from the parent
+
+If you dispatch via a raw `Agent` / `Task` (general-purpose) with a hand-crafted prompt — i.e. NOT via `Skill(...)` — the sub-agent's prompt will NOT contain the per-step transition. The parent MUST then emit the corresponding `node packages/framework/scripts/state.mjs transition` call BEFORE the dispatch (to mark the step as in-flight) and again AFTER the sub-agent returns (to mark completion / advance). Skip either call and the kanban board freezes on the prior step.
+
+See `<state-management>` below for the exact per-step shim invocations to run.
 </sub-agent-strategy>
 
 <output>
@@ -113,9 +136,9 @@ Issue #{number} has been fully processed:
 </output>
 
 <state-management>
-## State Updates at Each Pipeline Step
+## CRITICAL: Update state.json BEFORE each pipeline step
 
-Update `.tiki/state.json` BEFORE each step. Bump `lastActivity` on every change. Use nested `issue: { number, title }`, never top-level fields.
+The desktop kanban board reads `.tiki/state.json` to render pipeline progress. If you skip a transition, the card freezes on the prior step and the user sees a stale pipeline. **Run the per-step shim invocation below BEFORE dispatching each step, every time.** Bump `lastActivity` on every change. Use nested `issue: { number, title }`, never top-level fields.
 
 ### Transition table
 
@@ -129,16 +152,57 @@ Update `.tiki/state.json` BEFORE each step. Bump `lastActivity` on every change.
 | SHIP    | `shipping`  | `SHIP`         | —                                               |
 | Done    | `completed` | `SHIP`         | (cleared)                                       |
 
-### Recommended: shim
+### Per-step shim invocations (REQUIRED)
+
+Run the matching block BEFORE dispatching that step. The shim validates transitions, atomic-writes, and preserves `parentRelease`.
+
+**Before GET** (fresh issue — initializes the entry; pass `--issue-number` + `--issue-title` so the work item materializes):
 
 ```bash
 node packages/framework/scripts/state.mjs transition issue:{number} \
-  --to-status {status} --to-step {STEP} \
-  [--phase-current N --phase-total T --phase-status {pending|executing}] \
-  [--issue-number {number} --issue-title "{title}"]   # fresh GET only
+  --to-status pending --to-step GET \
+  --issue-number {number} --issue-title "{title}"
 ```
 
-The shim validates transitions, atomic-writes, and preserves `parentRelease`.
+**Before REVIEW**:
+
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status reviewing --to-step REVIEW
+```
+
+**Before PLAN** (phase total `N` is provisional — re-emit after plan.md writes the real count):
+
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status planning --to-step PLAN \
+  --phase-current 1 --phase-total {N} --phase-status pending
+```
+
+**Before AUDIT** (same `status: planning`, but `pipelineStep` advances to `AUDIT`):
+
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status planning --to-step AUDIT \
+  --phase-current 1 --phase-total {N} --phase-status pending
+```
+
+**Before EXECUTE** (each phase — `{current}` is the phase about to run, `{total}` is the plan's phase count):
+
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status executing --to-step EXECUTE \
+  --phase-current {current} --phase-total {total} --phase-status executing
+```
+
+**Before SHIP** (after all phases pass):
+
+```bash
+node packages/framework/scripts/state.mjs transition issue:{number} \
+  --to-status shipping --to-step SHIP
+```
+
+If you delegated the step to a sub-agent via `Skill(...)` (Pattern A in `<sub-agent-strategy>`), the skill's own prose emits the transition and you do NOT need to emit it again from the parent. If you dispatched via raw `Agent` / `Task`, the parent MUST emit the shim call here.
 
 ### Legacy: direct JSON
 

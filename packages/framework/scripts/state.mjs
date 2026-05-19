@@ -152,9 +152,100 @@ function die(code, msg) {
 // State file I/O.
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolve the `.tiki/` directory path with worktree awareness.
+ *
+ * Resolution rules:
+ *   1. If `override` is provided, honor it exactly (absolute resolved).
+ *   2. Otherwise, walk upward from `process.cwd()` looking for the first
+ *      ancestor that contains a `.git/` entry (directory OR file).
+ *        - `.git` directory  -> normal repo root, return `<ancestor>/.tiki`.
+ *        - `.git` file       -> git worktree marker. Parse `gitdir:` line,
+ *                               extract the path before `/worktrees/<name>`
+ *                               to get the main repo's `.git` directory, go
+ *                               up one level to reach the main repo root,
+ *                               return `<main-repo-root>/.tiki`.
+ *   3. If no ancestor has a `.git`, fall back to `<cwd>/.tiki`.
+ *
+ * Worktree case rationale: sub-agents dispatched with `isolation: "worktree"`
+ * have a CWD inside `<repo>/.git/worktrees/<name>/...`. The Tauri watcher
+ * observes the main repo's `.tiki/state.json`, not the worktree's. Without
+ * this resolution, sub-agent state writes are invisible to the desktop app.
+ *
+ * When auto-resolution produces a path that differs from the naive
+ * `<cwd>/.tiki`, a single-line debug message is emitted on stderr.
+ */
 function resolveTikiPath(override) {
   if (override) return path.resolve(override);
-  return path.join(process.cwd(), ".tiki");
+
+  const cwd = process.cwd();
+  const naive = path.join(cwd, ".tiki");
+
+  // Walk upward looking for `.git`.
+  let dir = cwd;
+  let resolved = null;
+  while (true) {
+    const gitEntry = path.join(dir, ".git");
+    if (fs.existsSync(gitEntry)) {
+      let stat;
+      try {
+        stat = fs.statSync(gitEntry);
+      } catch {
+        stat = null;
+      }
+      if (stat && stat.isDirectory()) {
+        // Normal repo root.
+        resolved = path.join(dir, ".tiki");
+      } else if (stat && stat.isFile()) {
+        // Worktree marker: read the gitdir pointer.
+        try {
+          const content = fs.readFileSync(gitEntry, "utf-8");
+          const firstLine = content.split(/\r?\n/, 1)[0] || "";
+          const match = firstLine.match(/^gitdir:\s*(.+)$/);
+          if (match) {
+            const gitDirPath = match[1].trim();
+            // Find `/worktrees/<name>` segment and strip it to find main .git.
+            const worktreesIdx = gitDirPath.search(/[\\/]worktrees[\\/]/);
+            if (worktreesIdx !== -1) {
+              const mainGitDir = gitDirPath.slice(0, worktreesIdx);
+              const mainRepoRoot = path.dirname(mainGitDir);
+              resolved = path.join(mainRepoRoot, ".tiki");
+            } else {
+              // Unrecognized .git file format - treat dir as repo root.
+              resolved = path.join(dir, ".tiki");
+            }
+          } else {
+            resolved = path.join(dir, ".tiki");
+          }
+        } catch {
+          resolved = path.join(dir, ".tiki");
+        }
+      } else {
+        // Some other entry type — bail to naive fallback.
+        resolved = path.join(dir, ".tiki");
+      }
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      // Hit filesystem root with no .git found.
+      break;
+    }
+    dir = parent;
+  }
+
+  if (resolved === null) {
+    // No `.git` ancestor — preserve legacy non-repo behavior.
+    return naive;
+  }
+
+  if (path.resolve(resolved) !== path.resolve(naive)) {
+    process.stderr.write(
+      `state.mjs: resolved tikiPath from worktree to ${resolved}\n`
+    );
+  }
+
+  return resolved;
 }
 
 function readState(tikiPath) {
@@ -602,4 +693,25 @@ function main() {
   }
 }
 
-main();
+// Only run main() when this file is invoked directly as a CLI, not when
+// imported as a module by tests. We compare the resolved entry script
+// against this module's URL.
+import { fileURLToPath } from "node:url";
+const isCliEntry = (() => {
+  try {
+    const thisFile = fileURLToPath(import.meta.url);
+    const entryFile = process.argv[1] ? path.resolve(process.argv[1]) : null;
+    return entryFile !== null && path.resolve(thisFile) === entryFile;
+  } catch {
+    return false;
+  }
+})();
+
+if (isCliEntry) {
+  main();
+}
+
+// Named exports for test/programmatic use. The CLI entry point above is
+// unaffected by these — they exist purely so tests can import the
+// resolver directly without spawning a subprocess for every assertion.
+export { resolveTikiPath };
