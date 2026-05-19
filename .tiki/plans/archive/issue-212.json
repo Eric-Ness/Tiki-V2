@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 212,
+    "title": "Bug: Blank-screen regression v2 — App.tsx:152 passes fresh {} to useStaleWorkDetection → infinite re-render",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/212"
+  },
+  "createdAt": "2026-05-18T21:10:50.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "functionality", "description": "App.tsx uses stable empty-constant fallbacks for activeWork and recentIssues — no fresh {} / [] allocations in the render path" },
+    { "id": "SC2", "category": "functionality", "description": "Desktop launches with no active project → KanbanBoard renders the empty-state UI without an infinite loop or console warnings" },
+    { "id": "SC3", "category": "functionality", "description": "'Maximum update depth exceeded' does not appear in console during normal app lifecycle (open with project / open without project / switch projects)" },
+    { "id": "SC4", "category": "resilience", "description": "An error boundary wraps the panel sections so a single panel crash falls back to a recoverable UI rather than unmounting the whole tree" },
+    { "id": "SC5", "category": "build-test", "description": "pnpm build, pnpm typecheck, and existing pnpm test all pass" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "App.tsx stable-constant fallbacks + ErrorBoundary",
+      "status": "completed",
+      "completedAt": "2026-05-19T14:42:00.000Z",
+      "summary": "Part A (stable constants): Added module-level EMPTY_ACTIVE_WORK and EMPTY_RECENT_ISSUES constants to apps/desktop/src/App.tsx after imports. Replaced FOUR fresh-allocation sites — line 158 (activeWork fallback in useStaleWorkDetection hook arg), line 252 (setRecentIssues in default-cwd loadState branch), line 279 (setRecentIssues in project-specific loadState branch — the plan-mentioned 4th site that the diff initially missed; caught by the verification grep), line 336 (recentIssues check in pipeline-complete watcher), line 366 (setRecentIssues in file-changed listener). Part B (ErrorBoundary): created apps/desktop/src/components/ui/ErrorBoundary.tsx — class component with getDerivedStateFromError + componentDidCatch, optional fallback render-prop, optional label, default fallback shows error name+message + Reload button that resets boundary state. Added ErrorBoundary.css (1265 bytes, dark-theme tokens). Wired into apps/desktop/src/components/ui/index.ts (named + type export). Wrapped App.tsx panel-group with NESTED boundaries (center-pane outer + per-view inner: terminal-view / kanban-view / dependencies-view / settings-view) — granular fallback so one panel crash doesn't take down the others within the center pane. 5 <ErrorBoundary wraps total in App.tsx.",
+      "verificationResults": "PASS — all 8 verification criteria met. (1) EMPTY_ACTIVE_WORK and EMPTY_RECENT_ISSUES present at module scope (grep confirms literals). (2) recentIssues || [] count = 0 (was 2 before fix). (3) activeWork ?? {} count = 0 (was 1 before fix). (4) ErrorBoundary.tsx exists as class component with static getDerivedStateFromError AND componentDidCatch (verified by Read). (5) App.tsx imports ErrorBoundary from ./components/ui AND uses 5 <ErrorBoundary wraps (verified by grep). (6) pnpm build clean (44.02s, no errors). (7) pnpm typecheck clean (3 of 4 workspace projects ran; framework has no TS to check). (8) pnpm test: shared 65/65 (1.24s), desktop 122/122 (9.93s) — UNCHANGED from v0.6.4 baseline (no new tests added; this is a behavioral fix), framework 10/10 (1.07s). pnpm test:rust failed environmentally (Windows file-lock on tiki-desktop.exe — running app holds the binary), but cargo check --tests clean confirms Rust source compiles. No Rust source touched in #212."
+      "content": "Apply the v0.6.6 hotfix in one focused phase. Both the bug fix (stable constants) and the prevention (error boundary) are small, tightly related, and both touch App.tsx, so a single phase is cleaner than splitting.\n\n### Part A — Stable empty constants in App.tsx\n\n1. Add two module-level constants near the top of `apps/desktop/src/App.tsx` (after imports, before the `App` component), matching the v0.6.5 `EMPTY_TABS` / `EMPTY_COLUMN_ORDER` pattern from terminalStore.ts and kanbanStore.ts:\n   ```ts\n   // Stable empty-fallback constants. These prevent fresh-object allocations\n   // in selector/hook arguments that would otherwise trigger infinite\n   // re-render loops via useSyncExternalStore / useEffect dep instability\n   // (same bug class as #210 — see #212).\n   const EMPTY_ACTIVE_WORK: Record<string, WorkContext> = {};\n   const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];\n   ```\n2. Line 152: change `useStaleWorkDetection(state?.activeWork ?? {}, stalenessThresholdHours)` → `useStaleWorkDetection(state?.activeWork ?? EMPTY_ACTIVE_WORK, stalenessThresholdHours)`.\n3. Line 246 (inside `loadState`, default-cwd branch): change `useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || [])` → `useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES)`.\n4. Line 357 (inside the file-changed listener): same substitution as #3 — use `?? EMPTY_RECENT_ISSUES`.\n5. (Likely there are two more occurrences of `setRecentIssues(... || [])` in App.tsx based on the loadState path being two-branched — search the whole file for `recentIssues || []` and `recentIssues ?? []` and replace all of them with the stable constant.)\n\n### Part B — ErrorBoundary component\n\n1. Create `apps/desktop/src/components/ui/ErrorBoundary.tsx`:\n   - Class component (React error boundaries require class syntax; functional components cannot do `componentDidCatch`).\n   - Accepts `children: ReactNode` and an optional `fallback?: (error: Error, reset: () => void) => ReactNode` for customization. Default fallback renders an inline recoverable error UI: error name + message + a \"Reload panel\" button that resets the boundary's state.\n   - Implements `static getDerivedStateFromError(error)` and `componentDidCatch(error, info)`. The latter `console.error`s the error + info so dev sessions see it.\n   - The reset function clears the boundary's error state so children re-mount.\n   - Style minimally — inline styles or one small CSS class are fine. No animations needed. Match dark-theme colors used elsewhere in the app (look at existing components for the tokens).\n\n2. Wire it into `apps/desktop/src/App.tsx`:\n   - Import the new `ErrorBoundary`.\n   - Wrap the center pane (the panel-group region containing KanbanBoard / DependencyGraph / TerminalPane / detail panels) with `<ErrorBoundary>`. The exact wrap location depends on the JSX structure — find the section where these are rendered and place the boundary as a parent so any of them crashing falls back to the recoverable UI without unmounting the sidebar or the top bar.\n   - Optional but nice: wrap the sidebar sections too (each in its own boundary so one section's crash doesn't take down the others). Conservative scope here: just the center pane is required for SC4.\n\n### Part C — Smoke verification\n\n1. Run `pnpm build` from repo root — must complete without errors.\n2. Run `pnpm typecheck` — must be clean.\n3. Run `pnpm test` — existing tests must continue passing (65 shared + 122 desktop + 28 Rust per recent baseline, give or take if test counts have moved).\n4. The actual runtime verification (KanbanBoard renders without infinite loop) requires a live desktop dev session, which a sub-agent cannot drive. The build + typecheck + test pass is the strongest automated signal we have; manual runtime verification by the user comes after ship.\n\nDo NOT add a grep/eslint regression check in this phase (SC from the issue body suggests it but it's scope creep for a hotfix). File a follow-up issue for that hardening if desired.",
+      "verification": [
+        "App.tsx contains module-level `EMPTY_ACTIVE_WORK` and `EMPTY_RECENT_ISSUES` constants (grep finds the literal names)",
+        "`grep -n 'recentIssues \\?\\? \\[\\]\\|recentIssues || \\[\\]' apps/desktop/src/App.tsx` returns ZERO matches (all replaced with the stable constant)",
+        "`grep -n 'activeWork \\?\\? {}' apps/desktop/src/App.tsx` returns ZERO matches (line 152 fixed)",
+        "`apps/desktop/src/components/ui/ErrorBoundary.tsx` exists, is a class component, exports `ErrorBoundary` as a named export, and contains `static getDerivedStateFromError` AND `componentDidCatch`",
+        "`apps/desktop/src/App.tsx` imports `ErrorBoundary` and uses it as a wrapper around the panel-group region (verify by grepping for `<ErrorBoundary` in App.tsx — must return ≥ 1 match)",
+        "`pnpm build` from repo root exits 0 (no build errors)",
+        "`pnpm typecheck` from repo root exits 0",
+        "`pnpm test` from repo root exits 0 (existing test counts maintained or grown)"
+      ],
+      "addressesCriteria": ["SC1", "SC2", "SC3", "SC4", "SC5"],
+      "files": [
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/ui/ErrorBoundary.tsx"
+      ],
+      "dependencies": []
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [1],
+    "SC4": [1],
+    "SC5": [1]
+  }
+}

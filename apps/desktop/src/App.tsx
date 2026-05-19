@@ -21,7 +21,7 @@ import { SettingsPage } from "./components/settings";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { BulkActionToolbar } from "./components/BulkActionToolbar";
 import { BulkYoloDialog } from "./components/BulkYoloDialog";
-import { CommandPalette, KeyboardShortcuts } from "./components/ui";
+import { CommandPalette, ErrorBoundary, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
 import type { WorkContext } from "./components/work";
@@ -53,6 +53,12 @@ function scheduleRefresh(surface: RefreshSurface, fire: () => void): void {
     }, REFRESH_DEBOUNCE_MS),
   );
 }
+
+// Stable empty-fallback constants. Prevent fresh-object allocations in
+// hook arguments that would otherwise trigger infinite re-render loops
+// via useEffect dep instability (same bug class as #210 — see #212).
+const EMPTY_ACTIVE_WORK: Record<string, WorkContext> = {};
+const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];
 
 // Types matching Rust state structures
 interface TikiState {
@@ -149,7 +155,7 @@ function App() {
   const stalenessThresholdHours = useSettingsStore((s) => s.workflow.stalenessThresholdHours);
 
   // Stale work detection: flags issues whose last activity exceeds the threshold
-  const staleFlags = useStaleWorkDetection(state?.activeWork ?? {}, stalenessThresholdHours);
+  const staleFlags = useStaleWorkDetection(state?.activeWork ?? EMPTY_ACTIVE_WORK, stalenessThresholdHours);
   useEffect(() => {
     const applyTheme = (resolved: 'dark' | 'light') => {
       document.documentElement.setAttribute('data-theme', resolved);
@@ -243,7 +249,7 @@ function App() {
           useTikiStateStore.getState().setActiveWork(currentState.activeWork);
         }
         // Sync recentIssues for Completed column
-        useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
+        useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
@@ -270,7 +276,7 @@ function App() {
         useTikiStateStore.getState().setActiveWork(currentState.activeWork);
       }
       // Sync recentIssues for Completed column
-      useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
+      useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
     } catch (e) {
       console.error("Error loading state:", e);
       setError(String(e));
@@ -324,7 +330,7 @@ function App() {
                 const wasActive =
                   `issue:${currentIssue}` in (prev.activeWork ?? {});
                 const nowDone = (
-                  currentState.history?.recentIssues ?? []
+                  currentState.history?.recentIssues ?? EMPTY_RECENT_ISSUES
                 ).some((i) => i.number === currentIssue);
                 const nowFailed =
                   currentState.activeWork?.[`issue:${currentIssue}`]
@@ -354,7 +360,7 @@ function App() {
             useTikiStateStore.getState().setActiveWork(currentState.activeWork);
           }
           // Sync recentIssues for Completed column
-          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues || []);
+          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
         } catch (e) {
           console.error("Failed to reload state:", e);
         }
@@ -542,18 +548,28 @@ function App() {
           <div className="main-content">
             <CenterTabs />
             <main className="main">
-              <section className={`section terminal-section ${activeView !== 'terminal' ? 'hidden' : ''}`}>
-                <TerminalPane />
-              </section>
-              <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
-                <KanbanBoard />
-              </section>
-              <section className={`section terminal-section ${activeView !== 'dependencies' ? 'hidden' : ''}`}>
-                <DependencyGraph />
-              </section>
-              <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>
-                <SettingsPage />
-              </section>
+              <ErrorBoundary label="center-pane">
+                <section className={`section terminal-section ${activeView !== 'terminal' ? 'hidden' : ''}`}>
+                  <ErrorBoundary label="terminal-view">
+                    <TerminalPane />
+                  </ErrorBoundary>
+                </section>
+                <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
+                  <ErrorBoundary label="kanban-view">
+                    <KanbanBoard />
+                  </ErrorBoundary>
+                </section>
+                <section className={`section terminal-section ${activeView !== 'dependencies' ? 'hidden' : ''}`}>
+                  <ErrorBoundary label="dependencies-view">
+                    <DependencyGraph />
+                  </ErrorBoundary>
+                </section>
+                <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>
+                  <ErrorBoundary label="settings-view">
+                    <SettingsPage />
+                  </ErrorBoundary>
+                </section>
+              </ErrorBoundary>
             </main>
           </div>
         </Panel>

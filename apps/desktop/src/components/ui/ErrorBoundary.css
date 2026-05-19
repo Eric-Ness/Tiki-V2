@@ -1,0 +1,56 @@
+.error-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  height: 100%;
+  min-height: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid #f85149;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.error-boundary-fallback .eb-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #f85149;
+}
+
+.error-boundary-fallback .eb-message {
+  color: var(--text-secondary);
+  max-width: 600px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.error-boundary-fallback .eb-label {
+  color: var(--text-tertiary, var(--text-secondary));
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.error-boundary-fallback .eb-reload-btn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  background: var(--bg-tertiary, #21262d);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.error-boundary-fallback .eb-reload-btn:hover {
+  background: var(--bg-hover, #30363d);
+  border-color: #58a6ff;
+}
