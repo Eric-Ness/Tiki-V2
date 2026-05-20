@@ -1,0 +1,16 @@
+{
+  "version": "v0.6.5",
+  "status": "active",
+  "issues": [
+    {
+      "number": 210,
+      "title": "Bug: Blank screen on desktop app launch — KanbanBoard infinite re-render via Zustand selector fresh references"
+    },
+    {
+      "number": 212,
+      "title": "Bug: Blank-screen regression v2 — App.tsx:152 passes fresh {} to useStaleWorkDetection → infinite re-render"
+    }
+  ],
+  "createdAt": "2026-05-18T20:52:17.356Z",
+  "note": "Blank-screen hotfix release bundling two occurrences of the same React-19 fresh-reference bug class. #210 (terminalStore/kanbanStore selectors) fixed in 0a60e28. #212 (App.tsx hook arguments + nested ErrorBoundary) fixed in 8ed7037. Issue #211 (framework state-shim worktree resolution, commit b6fb2ff) is also on main but unrelated to the blank-screen bug class — included in the tag incidentally but not advertised in release notes for this release."
+}
