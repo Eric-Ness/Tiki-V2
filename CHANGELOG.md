@@ -10,6 +10,15 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.6.7] — 2026-05-21
+
+Single-issue patch — fixes a release-pipeline data-loss bug (Wave 1 / MVP of epic #218). Full per-issue summary: [`.tiki/releases/v0.6.7-changelog.md`](.tiki/releases/v0.6.7-changelog.md).
+
+### Fixed
+- **Release-shipped issues now reach the Kanban Completed column** (#219). `/tiki:release` children were removed from `activeWork` but never added to `history.recentIssues`; the Completed column read only `recentIssues`, so release issues vanished from the board. The column now unions `recentIssues` + `recentReleases[].issues` (deduped) and the cross-column exclusion set is uncapped — retroactively surfacing past releases (incl. v0.6.6's #214/#215/#216) with no `state.json` migration. `release.md` teardown now appends per-child issue history (coverage-test guarded); `state.mjs append-history` is idempotent.
+
+---
+
 ## [v0.6.6] — 2026-05-21
 
 First feature release surfaced from the 2026-05-20 codebase deep-dive — three additions that activate dormant data-model capacity and stand up the long-specified extensibility layer. Full per-issue summary: [`.tiki/releases/v0.6.6-changelog.md`](.tiki/releases/v0.6.6-changelog.md).
