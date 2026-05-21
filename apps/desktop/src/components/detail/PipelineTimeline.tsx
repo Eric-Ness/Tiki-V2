@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { PipelineStep } from "../work/WorkCard";
+import type { PipelineState } from "../../utils/deriveDisplayStatus";
 import "./PipelineTimeline.css";
 
 const PIPELINE_STEPS: PipelineStep[] = ["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"];
@@ -76,6 +77,13 @@ interface PipelineTimelineProps {
   workStatus: string;
   createdAt?: string;
   lastActivity?: string;
+  /**
+   * Canonical pipeline rendering directive from `deriveDisplayStatus` (#222).
+   * When provided it DRIVES the step states (so a not-genuinely-complete item
+   * never shows all-green). When undefined, falls back to the legacy
+   * workStatus-based behavior for any other caller.
+   */
+  pipelineState?: PipelineState;
 }
 
 function formatElapsed(ms: number): string {
@@ -93,8 +101,40 @@ type StepState = "completed" | "active" | "pending" | "failed";
 function getStepState(
   stepIndex: number,
   currentIndex: number,
-  workStatus: string
+  workStatus: string,
+  pipelineState?: PipelineState
 ): StepState {
+  // When the canonical pipelineState is supplied it drives rendering (#222) —
+  // the key correctness goal is that an item that is NOT genuinely complete
+  // never shows an all-green pipeline.
+  if (pipelineState) {
+    switch (pipelineState) {
+      case "complete":
+        return "completed";
+      case "partial":
+        // All green except the final SHIP step (closed-not-merged).
+        return stepIndex === PIPELINE_STEPS.length - 1 ? "pending" : "completed";
+      case "reset":
+      case "none":
+        return "pending";
+      case "failed":
+        if (stepIndex < currentIndex) return "completed";
+        if (stepIndex === currentIndex) return "failed";
+        return "pending";
+      case "paused":
+        if (stepIndex < currentIndex) return "completed";
+        if (stepIndex === currentIndex) return "active";
+        return "pending";
+      case "active":
+      default:
+        if (stepIndex < currentIndex) return "completed";
+        if (stepIndex === currentIndex) return "active";
+        return "pending";
+    }
+  }
+
+  // Legacy fallback: derive from raw workStatus (preserved for any caller that
+  // doesn't yet pass pipelineState).
   if (workStatus === "completed") return "completed";
   if (workStatus === "failed") {
     if (stepIndex < currentIndex) return "completed";
@@ -118,6 +158,7 @@ export function PipelineTimeline({
   workStatus,
   createdAt,
   lastActivity,
+  pipelineState,
 }: PipelineTimelineProps) {
   const [elapsed, setElapsed] = useState<string>("");
   const [animations, setAnimations] = useState<AnimationClasses>({
@@ -188,7 +229,7 @@ export function PipelineTimeline({
     <div className="pipeline-timeline">
       <div className="pipeline-steps">
         {PIPELINE_STEPS.map((step, index) => {
-          const state = getStepState(index, currentIndex, workStatus);
+          const state = getStepState(index, currentIndex, workStatus, pipelineState);
           const isActivating = animations.activatingStep === index;
           const isCompleting = animations.completingStep === index;
           const isFilling = animations.fillingConnector === index;
