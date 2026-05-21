@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { GitHubIssue } from "../../stores";
-import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore, EMPTY_TABS } from "../../stores";
+import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore, useTikiStateStore, EMPTY_TABS } from "../../stores";
 import { resolveWorkTerminal, terminalFocusRegistry } from "../../stores/terminalStore";
+import { deriveDisplayStatus } from "../../utils/deriveDisplayStatus";
 import type { PipelineStep } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -147,6 +148,8 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   const workTerminalMap = useTerminalStore(
     (state) => state.terminalByWorkIdByProject[activeProjectId]
   );
+  const recentIssues = useTikiStateStore((state) => state.recentIssues);
+  const recentReleases = useTikiStateStore((state) => state.recentReleases);
   const [plan, setPlan] = useState<TikiPlan | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
@@ -233,9 +236,31 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
     return false;
   });
 
-  const normalizedState = issue.state.toLowerCase();
-  const badgeClass = stateBadgeStyles[normalizedState] || stateBadgeStyles.open;
-  const isClosed = normalizedState === "closed";
+  // Canonical display status — single source of truth shared with the Kanban
+  // board and pipeline timeline (#222). The badge text, pipeline rendering, and
+  // anomaly indicator all flow from this one selector so every surface agrees.
+  const display = useMemo(
+    () =>
+      deriveDisplayStatus({
+        number: issue.number,
+        work: work
+          ? {
+              status: work.status,
+              pipelineStep: work.pipelineStep,
+              parentRelease: (work as { parentRelease?: string }).parentRelease,
+            }
+          : null,
+        githubState: { state: issue.state.toLowerCase() === "closed" ? "closed" : "open" },
+        history: { recentIssues, recentReleases },
+      }),
+    [issue.number, issue.state, work, recentIssues, recentReleases]
+  );
+
+  const badgeClass = display.badge === "Closed" ? stateBadgeStyles.closed : stateBadgeStyles.open;
+  // `isClosed` still drives the "Close Issue" action visibility — it must track
+  // the REAL GitHub state, not the derived badge (e.g. a reopened issue shows an
+  // "Open" badge but should still expose the close action).
+  const isClosed = issue.state.toLowerCase() === "closed";
 
   const handleOpenInGitHub = () => {
     window.open(issue.url, "_blank");
@@ -275,8 +300,18 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
         <div className="detail-header-row">
           <span className="detail-issue-number">#{issue.number}</span>
           <span className={`detail-state-badge ${badgeClass}`}>
-            {normalizedState === "open" ? "Open" : "Closed"}
+            {display.badge}
           </span>
+          {display.anomaly && (
+            <span
+              className="detail-state-anomaly"
+              title={display.anomaly}
+              style={{ color: "#f59e0b", fontSize: "12px", cursor: "help" }}
+              aria-label={display.anomaly}
+            >
+              &#9888; {display.anomaly}
+            </span>
+          )}
         </div>
         <h2 className="detail-title">{issue.title}</h2>
       </div>
@@ -409,6 +444,7 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
             workStatus={work.status}
             createdAt={work.createdAt}
             lastActivity={work.lastActivity}
+            pipelineState={display.pipelineState}
           />
           {work.phase && work.phase.current && work.phase.total && (
             <div className="detail-workflow-phase">

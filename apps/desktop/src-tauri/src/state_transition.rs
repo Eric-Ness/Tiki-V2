@@ -228,6 +228,12 @@ pub fn apply_transition(state: &mut TikiState, input: TransitionInput) -> Result
         if matches!(input.to_status, WorkStatus::Shipping | WorkStatus::Completed) {
             ctx.parallel_execution = None;
         }
+        // Clear stale phase progress on completion so the pipeline timeline and
+        // sidebar don't show a leftover "1/N" after the work is done (#220).
+        // Mirrors the state.mjs impl.
+        if matches!(input.to_status, WorkStatus::Completed) {
+            ctx.phase = None;
+        }
         // parentRelease: only set if the input explicitly carries one. Never
         // overwrite an existing parent_release with None — preservation is
         // the contract per ship.md.
@@ -547,6 +553,43 @@ mod tests {
                 assert_eq!(p.current, 2);
                 assert_eq!(p.total, 5);
                 assert_eq!(p.status, PhaseProgressStatus::Executing);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_phase_cleared_on_completed() {
+        // Phase progress must be cleared when an issue completes, so the
+        // pipeline timeline and sidebar don't show a stale "1/N" after the work
+        // is done (#220). Parity with the state.mjs impl.
+        let mut state = fresh_state();
+        seed_issue(&mut state, 8, WorkStatus::Shipping, Some("v0.7.0"));
+        // Force a leftover phase onto the seeded entry.
+        if let Some(WorkContext::Issue(ctx)) = state.active_work.get_mut("issue:8") {
+            ctx.phase = Some(PhaseProgress {
+                current: 1,
+                total: 3,
+                status: PhaseProgressStatus::Executing,
+            });
+        }
+        let input = TransitionInput {
+            work_id: "issue:8".to_string(),
+            to_status: WorkStatus::Completed,
+            to_step: Some(PipelineStep::Ship),
+            phase: None,
+            parallel_execution: None,
+            parent_release: None,
+            issue: None,
+            release: None,
+            tiki_path: None,
+        };
+        apply_transition(&mut state, input).expect("ship to completed");
+        match state.active_work.get("issue:8").unwrap() {
+            WorkContext::Issue(c) => {
+                assert!(c.phase.is_none(), "phase must be cleared on completion");
+                // parentRelease preservation must still hold (regression guard).
+                assert_eq!(c.parent_release.as_deref(), Some("v0.7.0"));
             }
             _ => unreachable!(),
         }

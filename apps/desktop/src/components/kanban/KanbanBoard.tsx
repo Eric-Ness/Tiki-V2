@@ -20,6 +20,7 @@ import { KanbanCard, type WorkItem } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
 import { getExecuteCommand } from './executeCommand';
 import { collectCompletedIssueNumbers, buildCompletedCards } from './completedColumn';
+import { deriveDisplayStatus, type DisplayColumn } from '../../utils/deriveDisplayStatus';
 import './kanban.css';
 
 // Valid state transitions for drag-and-drop
@@ -161,43 +162,31 @@ export function KanbanBoard() {
     window.open(issue.url, '_blank');
   }, []);
 
-  // Map Tiki work status to column ID
-  const statusToColumn = (status: string): string => {
-    switch (status) {
-      case 'pending':
-      case 'reviewing':
-      case 'paused':
-      case 'failed':
-        return 'review';
-      case 'planning':
-        return 'plan';
-      case 'executing':
-        return 'execute';
-      case 'shipping':
-        return 'shipping';
-      case 'completed':
-        return 'completed';
-      default:
-        return 'review';
-    }
-  };
-
-  // Find which column an issue belongs to based on Tiki work state
-  const getIssueColumn = (issueNumber: number): string | null => {
+  // Resolve the canonical display column for an issue via the single-source-of-
+  // truth selector (issue #222). Replaces the old per-surface statusToColumn
+  // switch + GitHub-state fallback so the board agrees with the detail panel by
+  // construction. Returns null when the issue isn't loaded.
+  const displayColumnFor = useCallback((issueNumber: number): DisplayColumn | null => {
     const issue = issues.find((i) => i.number === issueNumber);
     if (!issue) return null;
+    const work = activeWork[`issue:${issueNumber}`];
+    const workLike =
+      work && work.type === 'issue'
+        ? { status: work.status, pipelineStep: work.pipelineStep, parentRelease: work.parentRelease }
+        : null;
+    return deriveDisplayStatus({
+      number: issueNumber,
+      work: workLike,
+      githubState: { state: issue.state.toLowerCase() === 'closed' ? 'closed' : 'open' },
+      history: { recentIssues, recentReleases },
+    }).column;
+  }, [issues, activeWork, recentIssues, recentReleases]);
 
-    // Check Tiki work state first
-    const workKey = `issue:${issueNumber}`;
-    const work = activeWork[workKey];
-    if (work && work.type === 'issue') {
-      return statusToColumn(work.status);
-    }
-
-    // Fall back to GitHub state
-    const state = issue.state.toLowerCase();
-    return state === 'closed' ? 'completed' : 'open';
-  };
+  // Find which column an issue belongs to (drag handlers consume this). Keeps
+  // the `string | null` contract by routing through the selector.
+  const getIssueColumn = useCallback((issueNumber: number): string | null => {
+    return displayColumnFor(issueNumber);
+  }, [displayColumnFor]);
 
   // Check if a transition is valid
   const isValidTransition = (fromColumn: string, toColumn: string): boolean => {
@@ -336,32 +325,21 @@ export function KanbanBoard() {
       }
 
       const colIssues = filteredIssues.filter((issue) => {
-        // Check Tiki work state FIRST - active work takes precedence over history
-        const workKey = `issue:${issue.number}`;
-        const work = activeWork[workKey];
-        if (work && work.type === 'issue') {
-          // If issue has active work, use that status for column placement
-          // This ensures re-opened issues appear in their correct column
-          const issueColumn = statusToColumn(work.status);
-          return issueColumn === col.id;
-        }
-
-        // Only exclude from non-completed columns if NO active work exists
+        // Belt-and-suspenders exclusion: anything in the release-children union
+        // stays out of non-completed columns even if it's somehow absent from
+        // the selector's history input (issue #219). Agrees with the selector,
+        // which already returns 'completed' for history/closed items.
         if (completedIssueNumbers.has(issue.number)) {
           return false;
         }
 
-        // Fall back to GitHub state for issues not in Tiki work
-        const state = issue.state.toLowerCase();
-        if (col.id === 'open') {
-          return state === 'open';
-        }
-        return false;
+        // Single source of truth for column placement (issue #222).
+        return displayColumnFor(issue.number) === col.id;
       });
       return { ...col, issues: applyColumnOrder(colIssues, orderByColumn[col.id]) };
     });
     return result;
-  }, [filteredIssues, activeWork, completedCards, completedIssueNumbers, searchQuery, orderByColumn]);
+  }, [filteredIssues, displayColumnFor, completedCards, completedIssueNumbers, searchQuery, orderByColumn]);
 
   return (
     <DndContext

@@ -1,0 +1,94 @@
+{
+  "issue": {
+    "number": 222,
+    "title": "D: Single source of truth — deriveDisplayStatus() selector"
+  },
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "deriveDisplayStatus() implements all 8 first-match precedence rows from #218 (incl. anomaly surfacing)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T20:59:19.276Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Kanban column placement, detail GitHub badge, and pipeline timeline all consume the selector (no independent status derivation remains on those surfaces)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T20:59:19.276Z"
+    },
+    {
+      "id": "SC3",
+      "description": "deriveDisplayStatus.test.ts passes with the 6 mandated fixtures (216-mid-cascade, release-child-shipped, reopened, closed-not-merged, failed, paused) + a determinism check",
+      "verified": true,
+      "verifiedAt": "2026-05-21T20:59:19.276Z"
+    },
+    {
+      "id": "SC4",
+      "description": "A grep guard test fails on inline ?? [] / ?? {} / || [] in selector/hook-arg positions (guards the #210/#212 fresh-ref crash class)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T20:59:19.276Z"
+    },
+    {
+      "id": "SC5",
+      "description": "pnpm build + pnpm test green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T20:59:19.276Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      1
+    ],
+    "SC4": [
+      3
+    ],
+    "SC5": [
+      3
+    ]
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Author the pure selector deriveDisplayStatus.ts + the 8-row precedence table + 6 fixtures",
+      "content": "Create `apps/desktop/src/utils/deriveDisplayStatus.ts` (sibling of `githubRefreshTriggers.ts`): a pure function, no React, no Zustand imports, minimal structural input interfaces. Implements the canonical first-match precedence table from #218. Returns `{ column, label, pipelineState, badge, anomaly? }`. Author the file directly (implementation, not design — spec is fixed in #218). Create `apps/desktop/src/utils/__tests__/deriveDisplayStatus.test.ts` with the 6 mandated fixtures + a referential-determinism check (same input ⇒ deep-equal output).",
+      "verification": [
+        "deriveDisplayStatus.ts exports deriveDisplayStatus + DisplayStatus/DisplayColumn/PipelineState/DisplayBadge types + the minimal input interfaces (WorkLike, GithubStateLike, HistoryLike)",
+        "All 8 precedence rows implemented in first-match order; row 1 (tiki done/shipping + GitHub open) sets an anomaly and pipelineState 'active' (NOT 'complete')",
+        "deriveDisplayStatus.test.ts has the 6 named fixtures + determinism test; vitest green"
+      ],
+      "status": "completed",
+      "summary": "Authored apps/desktop/src/utils/deriveDisplayStatus.ts (pure, no React/Zustand) implementing all 8 #218 precedence rows; 11 tests incl. 6 mandated fixtures + determinism check, green."
+    },
+    {
+      "number": 2,
+      "title": "Refactor Kanban column placement, detail badge, and pipeline timeline to consume the selector",
+      "content": "KanbanBoard.tsx: replace the inline statusToColumn + getIssueColumn + per-column activeWork/GitHub branching with deriveDisplayStatus(...).column (keep the completedColumn.ts union for the Completed card synthesis + exclusion — that is the #219 fix). IssueDetail.tsx: derive the GitHub badge via deriveDisplayStatus(...).badge instead of reading issue.state directly. PipelineTimeline.tsx: add a pipelineState prop; getStepState consumes it (complete=all green; active/failed/paused cap at currentStep; reset=all pending; partial=all green except SHIP). Wire IssueDetail to pass deriveDisplayStatus(...).pipelineState. All call sites memoized (useMemo) keyed on inputs — no inline fresh refs.",
+      "verification": [
+        "grep: KanbanBoard.tsx no longer contains a standalone statusToColumn switch for column placement (routes through deriveDisplayStatus)",
+        "IssueDetail badge text derives from deriveDisplayStatus(...).badge",
+        "PipelineTimeline renders from pipelineState; #216-style mid-cascade item shows NOT-all-green + Open badge",
+        "pnpm build green"
+      ],
+      "status": "completed",
+      "summary": "KanbanBoard column placement, IssueDetail GitHub badge, and PipelineTimeline now consume the selector. Anomaly surfaced in detail panel. #219 completed-column union untouched."
+    },
+    {
+      "number": 3,
+      "title": "Add the fresh-ref grep guard test + full build/test verification",
+      "content": "Add `apps/desktop/src/utils/__tests__/freshRefGuard.test.ts` (env node) that scans the selector + consuming-surface + store-selector files and fails on inline `?? []` / `?? {}` / `|| []` outside module-scope `EMPTY_`/`const` declarations (the #210/#212 crash class). Run pnpm build + pnpm test; fix any fallout.",
+      "verification": [
+        "freshRefGuard.test.ts present and passing; deliberately introducing an inline `?? []` in a scanned file makes it fail",
+        "pnpm build clean (tsc -b)",
+        "pnpm test green (shared + desktop + framework)"
+      ],
+      "status": "completed",
+      "summary": "Added freshRefGuard.test.ts; full desktop suite 168/168, pnpm build (tsc -b) clean."
+    }
+  ]
+}

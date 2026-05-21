@@ -1,0 +1,74 @@
+{
+  "issue": {
+    "number": 221,
+    "title": "C: GitHub freshness — re-sync on window focus"
+  },
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Issues/PRs/releases re-sync on window focus / tab visibility (default ON); an issue closed on GitHub while unfocused shows closed within one focus event",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:12:45.309Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Optional periodic poll is OFF by default; when enabled it is clamped to a 60s floor and gated by the GitHub rate-limit budget (#110)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:12:45.309Z"
+    },
+    {
+      "id": "SC3",
+      "description": "The focus refresh also invalidates the detail single-issue cache (bumps the #220 detail nonce)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:12:45.309Z"
+    },
+    {
+      "id": "SC4",
+      "description": "Pure policy helpers are unit-tested; pnpm build + desktop vitest green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:12:45.309Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2
+    ],
+    "SC2": [
+      1,
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2
+    ]
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pure freshness policy helpers + tests",
+      "content": "Create apps/desktop/src/utils/githubFreshness.ts: shouldRefreshOnVisibility(enabled, visibilityState), canIntervalPoll(rateLimitStatus) (gated via the #110 severityFor, fails open on unknown), effectiveIntervalMs(seconds) (null when <=0, else clamped to 60s floor). Unit tests for each.",
+      "verification": [
+        "githubFreshness.ts exports the three pure helpers + MIN_POLL_SECONDS",
+        "githubFreshness.test.ts green (visibility on/off/hidden, rate-limit healthy/critical/unknown, interval off/clamped/honored)"
+      ],
+      "status": "completed",
+      "summary": "githubFreshness.ts: shouldRefreshOnVisibility/canIntervalPoll/effectiveIntervalMs pure helpers; 9 tests green."
+    },
+    {
+      "number": 2,
+      "title": "Wire focus/visibility refresh + opt-in interval + settings UI",
+      "content": "Extend GitHubSettings (settingsStore) with focusRefresh (default true) + pollIntervalSeconds (default 0). App.tsx: listen for window focus + visibilitychange → debounced refreshAll (issues/PRs/releases triggerRefetch + detail nonce bump); optional setInterval gated by canIntervalPoll(fetch_rate_limit_status). SettingsPage GitHub section: focus-refresh checkbox + poll-interval input. Coalesce persisted-state-without-new-fields with ?? defaults.",
+      "verification": [
+        "settingsStore GitHubSettings has focusRefresh + pollIntervalSeconds with defaults true/0",
+        "App.tsx adds focus + visibilitychange listeners and a rate-limit-gated interval; SettingsPage exposes both",
+        "pnpm build clean; full desktop vitest green (177)"
+      ],
+      "status": "completed",
+      "summary": "settingsStore GitHubSettings +focusRefresh(true)/+pollIntervalSeconds(0); App.tsx focus+visibilitychange refresh + rate-limit-gated interval + detail nonce; SettingsPage GitHub toggles. build clean, desktop 177/177."
+    }
+  ]
+}

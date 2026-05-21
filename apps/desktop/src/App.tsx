@@ -30,6 +30,8 @@ import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import { detectGithubRefreshTriggers } from "./utils/githubRefreshTriggers";
 import { dispatchNextBulkYolo } from "./utils/bulkYoloDispatch";
+import { shouldRefreshOnVisibility, canIntervalPoll, effectiveIntervalMs } from "./utils/githubFreshness";
+import type { RateLimitStatus } from "./components/RateLimitIndicator";
 import "./App.css";
 import "./components/layout/layout.css";
 
@@ -207,6 +209,9 @@ function App() {
 
   // Get the selected issue/release objects
   const [fetchedIssue, setFetchedIssue] = useState<GitHubIssue | null>(null);
+  // Bumped on every state.json change so the on-demand issue fetch below
+  // re-runs and the detail GitHub badge updates without a reselection (#220).
+  const [detailRefreshNonce, setDetailRefreshNonce] = useState(0);
   const issueFromStore = selectedIssue
     ? issues.find((i) => i.number === selectedIssue) ?? null
     : null;
@@ -239,7 +244,7 @@ function App() {
       .then((issue) => { if (!cancelled) setFetchedIssue(issue); })
       .catch((err) => { console.error("Failed to fetch issue:", err); });
     return () => { cancelled = true; };
-  }, [selectedIssue, issueFromStore, activeProject?.path]);
+  }, [selectedIssue, issueFromStore, activeProject?.path, detailRefreshNonce]);
 
   // Get work context for selected issue
   const selectedIssueWork = selectedIssue && state?.activeWork
@@ -308,6 +313,47 @@ function App() {
     void loadState();
   }, [loadState]);
 
+  // GitHub freshness (#221): the watcher only watches .tiki/, so issues/PRs/
+  // releases closed outside the app stay stale. Re-sync on window focus / tab
+  // visibility (default on) and, optionally, on a rate-limit-gated interval
+  // (off by default).
+  const githubFocusRefresh = useSettingsStore((s) => s.github.focusRefresh);
+  const githubPollSeconds = useSettingsStore((s) => s.github.pollIntervalSeconds);
+  useEffect(() => {
+    const refreshAll = () => {
+      scheduleRefresh('issues', () => useIssuesStore.getState().triggerRefetch());
+      scheduleRefresh('prs', () => usePullRequestsStore.getState().triggerRefetch());
+      scheduleRefresh('releases', () => useReleasesStore.getState().triggerRefetch());
+      // Invalidate the detail single-issue cache too (pairs with #220).
+      setDetailRefreshNonce((n) => n + 1);
+    };
+
+    const onVisibility = () => {
+      if (shouldRefreshOnVisibility(githubFocusRefresh ?? true, document.visibilityState)) {
+        refreshAll();
+      }
+    };
+    window.addEventListener('focus', onVisibility);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Optional periodic poll — off by default, rate-limit-gated when enabled.
+    const intervalMs = effectiveIntervalMs(githubPollSeconds);
+    let timer: number | null = null;
+    if (intervalMs !== null) {
+      timer = window.setInterval(() => {
+        void invoke<RateLimitStatus>('fetch_rate_limit_status', { projectPath: null })
+          .then((status) => { if (canIntervalPoll(status)) refreshAll(); })
+          .catch(() => { if (canIntervalPoll(null)) refreshAll(); });
+      }, intervalMs);
+    }
+
+    return () => {
+      window.removeEventListener('focus', onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (timer !== null) window.clearInterval(timer);
+    };
+  }, [githubFocusRefresh, githubPollSeconds]);
+
   // Listen for file changes
   useEffect(() => {
     const unlisten = listen<FileEvent>("tiki-file-changed", async (event) => {
@@ -321,6 +367,10 @@ function App() {
           console.log("State reloaded, activeWork keys:", currentState?.activeWork ? Object.keys(currentState.activeWork) : 'none');
           const prev = prevStateRef.current;
           detectStateChanges(prev, currentState);
+          // Re-fetch the open detail issue's GitHub state on every state
+          // change so a close-elsewhere (e.g. release-child ship) updates the
+          // badge without reselection (#220, pairs with deriveDisplayStatus).
+          setDetailRefreshNonce((n) => n + 1);
           // Detect activeWork → history transitions to drive sidebar GitHub re-fetches
           // (issue close, release ship). Debounced per-surface to coalesce bursts.
           if (prev && currentState) {

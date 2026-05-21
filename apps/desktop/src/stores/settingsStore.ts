@@ -51,11 +51,25 @@ export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = {
 export interface GitHubSettings {
   issueFetchLimit: number;
   defaultLabels: string[];
+  /**
+   * Re-sync issues/PRs/releases from GitHub when the window regains focus /
+   * the tab becomes visible. Default ON — cheap and covers the common case of
+   * running a command in the terminal and alt-tabbing back (#221).
+   */
+  focusRefresh: boolean;
+  /**
+   * Periodic background re-sync interval in seconds. 0 = OFF (default).
+   * When enabled it is clamped to a 60s floor and gated by the GitHub API
+   * rate-limit budget (#110) so it can never starve interactive fetches.
+   */
+  pollIntervalSeconds: number;
 }
 
 export const DEFAULT_GITHUB_SETTINGS: GitHubSettings = {
   issueFetchLimit: 30,
   defaultLabels: [],
+  focusRefresh: true,
+  pollIntervalSeconds: 0,
 };
 
 // --- Notification Settings ---
