@@ -302,6 +302,39 @@ export function SettingsPage() {
             />
           </div>
           <p className="settings-hint">Comma-separated list of labels to apply by default.</p>
+
+          <div className="settings-row">
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={github.focusRefresh ?? true}
+                onChange={(e) => updateGitHub({ focusRefresh: e.target.checked })}
+              />
+              <span>Re-sync GitHub when the window regains focus</span>
+            </label>
+          </div>
+
+          <div className="settings-row">
+            <label htmlFor="settings-poll-interval">Background Poll Interval</label>
+            <div className="settings-input-group">
+              <input
+                id="settings-poll-interval"
+                type="number"
+                className="settings-input settings-input-narrow"
+                value={github.pollIntervalSeconds ?? 0}
+                onChange={(e) => updateGitHub({ pollIntervalSeconds: Number(e.target.value) })}
+                min={0}
+                max={3600}
+                step={30}
+              />
+              <span className="settings-input-suffix">seconds</span>
+            </div>
+          </div>
+          <p className="settings-hint">
+            Focus refresh keeps issue/PR/release status fresh after you run commands in the
+            terminal (recommended). Background polling is off by default (0); when enabled it is
+            clamped to a 60s minimum and skipped while the GitHub API rate limit is critical.
+          </p>
         </div>
 
         {/* Notifications */}
