@@ -8,6 +8,7 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   type NotificationSettings,
 } from "../../stores";
+import { WorkflowConfigSection } from "./WorkflowConfigSection";
 import "./SettingsPage.css";
 
 export function SettingsPage() {
@@ -250,6 +251,9 @@ export function SettingsPage() {
           </div>
           <p className="settings-hint">Work items with no activity for this many hours are flagged as stale.</p>
         </div>
+
+        {/* Workflow Config (.tiki/config.json) */}
+        <WorkflowConfigSection />
 
         {/* GitHub */}
         <div className="settings-section">

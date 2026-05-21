@@ -13,6 +13,7 @@ export * from './validation/index.js';
 export const SCHEMA_PATHS = {
   state: 'schemas/state.schema.json',
   plan: 'schemas/plan.schema.json',
+  config: 'schemas/config.schema.json',
 } as const;
 
 // Tiki file paths (relative to project root)
