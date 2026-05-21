@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 215,
+    "title": "feat(framework): lifecycle hooks (.tiki/hooks/) — pre/post execute, phase, ship",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/215",
+    "labels": [
+      "enhancement",
+      "framework"
+    ],
+    "milestone": "v0.6.6"
+  },
+  "createdAt": "2026-05-21T01:05:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "hooks.json registry is parsed; disabled or missing hooks are skipped silently (exit 0, no error)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "All six hook points (pre-execute, post-execute, phase-start, phase-complete, pre-ship, post-ship) fire from the command files with the documented TIKI_* env vars",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "Both .ps1 (PowerShell) and .sh (Git Bash) hook scripts are supported, resolved per-platform",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functional",
+      "description": "Hook failure behavior is implemented and documented: pre-* hooks block (non-zero propagates), post-* hooks warn only",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    },
+    {
+      "id": "SC5",
+      "category": "documentation",
+      "description": "A sample hooks.json (all disabled) + a sample hook script + docs are added",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    },
+    {
+      "id": "SC6",
+      "category": "other",
+      "description": "Framework node:test suite passes (incl. new runner tests + the transition-coverage regression) and pnpm build is green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:12:58.399Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Hook-runner script (run-hook.mjs) + tests",
+      "status": "completed",
+      "content": "Create packages/framework/scripts/run-hook.mjs MIRRORING the conventions of packages/framework/scripts/state.mjs (read it first: arg parsing, --tiki-path override, exit codes, and the worktree-aware path resolution resolveTikiPath). CLI: `run-hook <hook-name> [--env KEY=VALUE ...] [--tiki-path P]`. Behavior: (1) read .tiki/hooks/hooks.json registry { hooks: { '<name>': { script, enabled } } }; if file missing, hook absent, or enabled !== true -> exit 0 silently. (2) Resolve the script path under .tiki/hooks/: on win32 prefer a .ps1 (run via powershell -NoProfile -ExecutionPolicy Bypass -File), else run .sh via bash (git-bash). (3) Inject the provided TIKI_* env vars into the child environment. (4) Run the hook; on non-zero exit: if the hook name starts with 'pre-' exit non-zero (block); otherwise print a warning and exit 0 (warn-only). Add packages/framework/scripts/__tests__ or a *.test.mjs using node:test (the framework package uses node:test, NOT vitest, to avoid the Windows pnpm reparse block — confirm via packages/framework/package.json test script and match command-transition-coverage.test.mjs style). Tests: disabled hook -> skipped; missing registry -> skipped; env vars passed through; pre-* failure propagates non-zero; post-* failure warns but exits 0.",
+      "verification": [
+        "packages/framework node:test suite passes including new run-hook tests",
+        "disabled/missing hooks exit 0 silently",
+        "pre-* non-zero blocks, post-* non-zero warns"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC3",
+        "SC4",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/scripts/run-hook.mjs",
+        "packages/framework/scripts/run-hook.test.mjs"
+      ],
+      "completedAt": "2026-05-21T01:12:58.399Z",
+      "summary": "Created run-hook.mjs (Node built-ins only, mirrors state.mjs incl. worktree-aware resolveTikiPath): reads .tiki/hooks/hooks.json, skips disabled/missing (exit 0), resolves .ps1 first on win32 else .sh via bash, injects --env vars, pre-* blocks on non-zero / post-* warns. +11 node:test cases."
+    },
+    {
+      "number": 2,
+      "title": "Wire hook firing into execute.md + ship.md",
+      "status": "completed",
+      "content": "Add prose to the EXECUTE and SHIP command files invoking `node packages/framework/scripts/run-hook.mjs <hook>` at each lifecycle point with the documented env vars: pre-execute (TIKI_ISSUE, TIKI_TITLE, TIKI_TOTAL_PHASES) and post-execute (TIKI_ISSUE, TIKI_PHASES_COMPLETED) + phase-start (TIKI_ISSUE, TIKI_PHASE, TIKI_PHASE_TITLE) and phase-complete (TIKI_ISSUE, TIKI_PHASE, TIKI_PHASE_STATUS) in execute.md; pre-ship (TIKI_ISSUE, TIKI_TITLE) and post-ship (TIKI_ISSUE, TIKI_COMMIT_SHA) in ship.md. Update ALL shadow copies of each file: packages/framework/commands/{execute,ship}.md, packages/framework/.claude/commands/tiki/{execute,ship}.md, and .claude/commands/tiki/{execute,ship}.md. Keep edits consistent with each file's existing XML+markdown style and existing direct-invocation patterns (state.mjs calls). Document that a non-zero pre-* hook pauses the pipeline.",
+      "verification": [
+        "all six hook points are invoked from the command files",
+        "all shadow copies updated consistently",
+        "command-transition-coverage.test.mjs still passes (prose edits did not break it)"
+      ],
+      "addressesCriteria": [
+        "SC2"
+      ],
+      "files": [
+        "packages/framework/commands/execute.md",
+        "packages/framework/commands/ship.md",
+        "packages/framework/.claude/commands/tiki/execute.md",
+        "packages/framework/.claude/commands/tiki/ship.md",
+        ".claude/commands/tiki/execute.md",
+        ".claude/commands/tiki/ship.md"
+      ],
+      "completedAt": "2026-05-21T01:12:58.399Z",
+      "summary": "Wired all 6 hook points into execute.md (pre-execute/phase-start/phase-complete/post-execute) + ship.md (pre-ship/post-ship) across all 6 shadows (canonical pair kept byte-identical; divergent .claude shadow reworded to its own idiom). transition-coverage regression still passes."
+    },
+    {
+      "number": 3,
+      "title": "Sample registry + hook + docs",
+      "status": "completed",
+      "content": "Add a sample .tiki/hooks/hooks.json with ALL hooks present but enabled:false (so nothing fires until a user opts in) and a sample hook pair (post-ship.sh + post-ship.ps1) that echoes the issue/commit. Add a hooks reference doc (docs/HOOKS.md or a README section) documenting the registry shape, the six hook points + their env vars (table from DESIGN.md:485-494), .ps1/.sh resolution, and the block-vs-warn failure policy. Add a short pointer in CLAUDE.md's relevant section. IMPORTANT: keep every sample hook disabled so it does not execute during this very release.",
+      "verification": [
+        ".tiki/hooks/hooks.json exists with all hooks enabled:false",
+        "sample post-ship.sh + .ps1 present",
+        "docs describe registry, env vars, platform resolution, failure policy"
+      ],
+      "addressesCriteria": [
+        "SC5"
+      ],
+      "files": [
+        ".tiki/hooks/hooks.json",
+        ".tiki/hooks/post-ship.sh",
+        ".tiki/hooks/post-ship.ps1",
+        "docs/HOOKS.md",
+        "CLAUDE.md"
+      ],
+      "completedAt": "2026-05-21T01:12:58.399Z",
+      "summary": "Sample .tiki/hooks/hooks.json (all 6 enabled:false), sample post-ship.sh + .ps1, docs/HOOKS.md (registry, env-var table, resolution, block-vs-warn, worked examples), CLAUDE.md Lifecycle Hooks section."
+    },
+    {
+      "number": 4,
+      "title": "Verify",
+      "status": "completed",
+      "content": "Run the framework test suite (pnpm --filter @tiki/framework test or the node:test command from packages/framework/package.json) and pnpm build. Fix any failures. Note: pnpm build will not exercise the .mjs runner; the node:test suite is the gate for it.",
+      "verification": [
+        "framework node:test suite green",
+        "pnpm build green"
+      ],
+      "addressesCriteria": [
+        "SC6"
+      ],
+      "files": [],
+      "completedAt": "2026-05-21T01:12:58.399Z",
+      "summary": "Framework node:test 21/21 (10 prior + 11 new); pnpm build clean."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      1
+    ],
+    "SC4": [
+      1,
+      2
+    ],
+    "SC5": [
+      3
+    ],
+    "SC6": [
+      1,
+      4
+    ]
+  },
+  "notes": "Implements the never-built DESIGN.md:453-543 hook spec. Mechanism = a real run-hook.mjs runner (mirrors state.mjs) invoked from the command files, so hooks are testable rather than pure prose. Sample hooks ship DISABLED so they don't fire during this release. Desktop enable/disable UI deliberately deferred (could pair with #214's config editor).",
+  "updatedAt": "2026-05-21T01:12:58.399Z"
+}

@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "pre-execute": {
+      "script": "pre-execute.sh",
+      "enabled": false
+    },
+    "post-execute": {
+      "script": "post-execute.sh",
+      "enabled": false
+    },
+    "phase-start": {
+      "script": "phase-start.sh",
+      "enabled": false
+    },
+    "phase-complete": {
+      "script": "phase-complete.sh",
+      "enabled": false
+    },
+    "pre-ship": {
+      "script": "pre-ship.sh",
+      "enabled": false
+    },
+    "post-ship": {
+      "script": "post-ship.sh",
+      "enabled": false
+    }
+  }
+}

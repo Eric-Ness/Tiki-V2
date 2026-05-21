@@ -19,8 +19,10 @@ Finalize an issue by committing changes, pushing to remote, and closing the GitH
     - No uncommitted changes from unrelated work
   </step>
   <step>Run the full test suite (see `<pre-ship-tests>` block) before committing. Halt and prompt the user if tests fail.</step>
+  <step>**Fire the `pre-ship` lifecycle hook** before staging/committing (see `<lifecycle-hooks>`). If it BLOCKS (non-zero exit), pause and stop — do not commit.</step>
   <step>Stage and commit changes with a descriptive message</step>
   <step>Push to remote</step>
+  <step>**Fire the `post-ship` lifecycle hook** after a successful push, passing the commit SHA (see `<lifecycle-hooks>`).</step>
   <step>Close the GitHub issue with a summary comment</step>
   <step>Update `activeWork` in `.tiki/state.json` (see state-management section). If the issue has a `parentRelease` field, keep it in `activeWork` with `status: "completed"`. Otherwise, remove it from `activeWork`. In both cases, add to `history`.</step>
   <step>Archive the plan file</step>
@@ -114,6 +116,27 @@ Behavior by choice:
 - **Skip and ship anyway**: Continue to commit. Note the override in the commit body and the GitHub close comment.
 - **Abort**: Set work `status` back to `"executing"` and exit without committing.
 </pre-ship-tests>
+
+<lifecycle-hooks>
+## Lifecycle Hooks (`.tiki/hooks/`)
+
+SHIP fires two lifecycle hooks via the hook runner. Hooks are **opt-in** — the runner reads `.tiki/hooks/hooks.json`, and if a hook is missing, absent, or `enabled !== true` it prints nothing and exits 0, so this section is a no-op on projects without configured hooks. See `docs/HOOKS.md` for the registry shape, the `.ps1`-vs-`.sh` resolution, and the failure policy.
+
+**Fire points (run the runner with the Bash tool):**
+
+```bash
+# BEFORE staging/committing (after pre-ship tests pass):
+node packages/framework/scripts/run-hook.mjs pre-ship \
+  --env TIKI_ISSUE={number} --env TIKI_TITLE="{issue title}"
+
+# AFTER a successful push (capture the commit SHA first):
+SHA=$(git rev-parse HEAD)
+node packages/framework/scripts/run-hook.mjs post-ship \
+  --env TIKI_ISSUE={number} --env TIKI_COMMIT_SHA="$SHA"
+```
+
+**Failure policy:** a non-zero exit from `pre-ship` is BLOCKING — the runner exits non-zero. When that happens, **PAUSE the pipeline**: set work `status` to `"paused"`, leave `pipelineStep` as `"SHIP"`, surface the hook's output, and do NOT commit. `post-ship` is non-blocking — a non-zero exit only warns (runner exits 0); the issue is already pushed, so log the warning and continue to close the issue.
+</lifecycle-hooks>
 
 <commit-format>
 Generate a commit message following this format:

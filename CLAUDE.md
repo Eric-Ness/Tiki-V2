@@ -128,9 +128,14 @@ pnpm tauri:dev
 
 WSL is an alternative durable fix (bypasses the Windows reparse-point check entirely) if you don't want every install to require elevation.
 
+## Lifecycle Hooks
+
+The `.tiki/hooks/` lifecycle hook system (DESIGN.md §"Lifecycle Hooks") is **implemented** as a real runner: `packages/framework/scripts/run-hook.mjs` (Node built-ins only, mirrors `state.mjs` conventions). EXECUTE fires `pre-execute` / `phase-start` / `phase-complete` / `post-execute`; SHIP fires `pre-ship` / `post-ship`. The `execute.md` and `ship.md` command files invoke it at each point. `pre-*` hooks BLOCK on non-zero exit (pause the pipeline); `post-*` / `phase-*` hooks WARN only. Registry lives at `.tiki/hooks/hooks.json` (all sample hooks ship **disabled**). See [docs/HOOKS.md](docs/HOOKS.md) for the full contract.
+
 ## Documentation
 
 - [docs/DESIGN.md](docs/DESIGN.md) - Full architecture (773 lines)
+- [docs/HOOKS.md](docs/HOOKS.md) - Lifecycle hook system (registry, env vars, block-vs-warn policy)
 - [docs/PLANNING-NOTES.md](docs/PLANNING-NOTES.md) - Planning context and decisions
 - [docs/ENHANCEMENT-IDEAS.md](docs/ENHANCEMENT-IDEAS.md) - Backlog of small/medium enhancements (E1–E48)
 - [CHANGELOG.md](CHANGELOG.md) - Human-readable release history
