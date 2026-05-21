@@ -58,6 +58,8 @@ export {
   getUnverifiedCriteria,
   buildCoverageMatrix,
   getPlanPath,
+  deriveCriteriaVerification,
+  criteriaProgress,
 } from './plan.js';
 
 // Transition table & helpers

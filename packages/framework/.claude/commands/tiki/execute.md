@@ -364,6 +364,13 @@ During execution, update `.tiki/state.json`:
 - Update plan file: set phase status to "completed", add completedAt and summary
 - Update state: increment current phase or set status to "shipping" if done
 - Write phase summary for handoff to next phase
+- Update `successCriteria` verification in the same plan file (see "Success criteria verification" below)
+
+**Success criteria verification (after each phase completes):**
+- For each criterion in `successCriteria`, look up its covering phase numbers in `coverageMatrix[criterion.id]` (a missing or empty entry means no coverage).
+- If the criterion has at least one covering phase AND **every** covering phase now has `status: "completed"` in `phases[]` (matched by `phase.number`), set `verified: true` and `verifiedAt: "{ISO timestamp}"` (preserve an existing `verifiedAt`).
+- Otherwise leave it unverified (`verified: false`, no `verifiedAt`).
+- This mirrors `deriveCriteriaVerification` in `@tiki/shared`, which the desktop checklist uses to render the live tick-off.
 
 **On failure:**
 - Update plan file: set phase status to "failed", add error details

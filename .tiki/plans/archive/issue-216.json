@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 216,
+    "title": "feat(framework+desktop): live planning checklist — PLAN emits, EXECUTE ticks off, detail panel visualizes",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/216",
+    "labels": ["enhancement", "framework", "desktop", "ux"],
+    "milestone": "v0.6.6"
+  },
+  "createdAt": "2026-05-21T00:40:00.000Z",
+  "updatedAt": "2026-05-21T00:52:00.000Z",
+  "successCriteria": [
+    { "id": "SC1", "category": "functional", "description": "EXECUTE marks a success criterion verified (verified=true + verifiedAt) only when ALL phases covering it (per coverageMatrix) are completed", "verified": true, "verifiedAt": "2026-05-21T00:52:00.000Z" },
+    { "id": "SC2", "category": "functional", "description": "Desktop detail panel renders a live checklist of success criteria that ticks off without manual refresh and shows aggregate progress (n/total)", "verified": true, "verifiedAt": "2026-05-21T00:52:00.000Z" },
+    { "id": "SC3", "category": "functional", "description": "Checklist works for both in-flight and already-completed issues by reading existing plan files", "verified": true, "verifiedAt": "2026-05-21T00:52:00.000Z" },
+    { "id": "SC4", "category": "testing", "description": "A shared helper that derives criterion verification from phase completion + coverageMatrix is unit-tested", "verified": true, "verifiedAt": "2026-05-21T00:52:00.000Z" },
+    { "id": "SC5", "category": "other", "description": "pnpm build and pnpm test are green", "verified": true, "verifiedAt": "2026-05-21T00:52:00.000Z" }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Shared verification helper + EXECUTE writes verified state",
+      "status": "completed",
+      "completedAt": "2026-05-21T00:50:00.000Z",
+      "content": "Add deriveCriteriaVerification(plan) + criteriaProgress(plan) to @tiki/shared; export from index; unit-test; update execute.md (+ shadows) to persist verified/verifiedAt onto plan files.",
+      "verification": ["pnpm --filter @tiki/shared test passes including new helper tests", "deriveCriteriaVerification exported from @tiki/shared index", "execute.md documents writing verified/verifiedAt with the all-covering-phases-complete rule"],
+      "addressesCriteria": ["SC1", "SC4"],
+      "files": ["packages/shared/src/types/plan.ts", "packages/shared/src/types/index.ts", "packages/shared/src/__tests__/plan-checklist.test.ts", "packages/framework/commands/execute.md", "packages/framework/.claude/commands/tiki/execute.md", ".claude/commands/tiki/execute.md"],
+      "summary": "Added pure deriveCriteriaVerification + criteriaProgress helpers to @tiki/shared (verified iff all coverageMatrix phases completed; preserves existing verifiedAt; non-mutating) with 13 vitest cases. Updated all 3 execute.md shadows to persist verified/verifiedAt after each phase using the same rule, with the direct-JSON write acknowledged inline."
+    },
+    {
+      "number": 2,
+      "title": "Live checklist UI in the detail panel",
+      "status": "completed",
+      "completedAt": "2026-05-21T00:51:00.000Z",
+      "content": "Render a live success-criteria checklist in IssueDetail, derived from phase completion, with n/total progress; works for in-flight and completed issues.",
+      "verification": ["Detail panel shows a checklist with per-criterion checked/unchecked state and an n/total progress indicator", "Checklist updates on plan-file change without manual refresh", "Renders for completed issues by reading the plan file"],
+      "addressesCriteria": ["SC2", "SC3"],
+      "files": ["apps/desktop/src/components/detail/IssueDetail.tsx", "apps/desktop/src/components/detail/SuccessCriteriaChecklist.tsx", "apps/desktop/src/components/detail/SuccessCriteriaChecklist.css", "apps/desktop/src/utils/criteriaVerification.ts", "apps/desktop/src/utils/__tests__/criteriaVerification.test.ts"],
+      "summary": "Desktop does not import @tiki/shared at runtime, so replicated the helper locally in utils/criteriaVerification.ts (+9 tests). New collapsible SuccessCriteriaChecklist component (☑/☐ + id + description + covering phases + N/M progress), derived from phase completion so it ticks live via the existing stateChanged refresh. IssueDetail now loads the plan even when work is null so completed issues still render their final checklist."
+    },
+    {
+      "number": 3,
+      "title": "Verify build + tests green",
+      "status": "completed",
+      "completedAt": "2026-05-21T00:52:00.000Z",
+      "content": "Run pnpm build (tsc -b) and the vitest suites; fix any failures.",
+      "verification": ["pnpm build succeeds", "pnpm test passes (shared + desktop)"],
+      "addressesCriteria": ["SC5"],
+      "files": [],
+      "summary": "pnpm build clean. shared 78 passed (+13), desktop 131 passed (+9), framework 10 passed. ESLint clean on new/changed desktop files. Rust untouched (skipped cargo test)."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [2],
+    "SC4": [1],
+    "SC5": [3]
+  },
+  "notes": "Option A from the 2026-05-20 deep-dive: drive the checklist off existing SuccessCriterion.verified/verifiedAt + coverageMatrix rather than a new schema. Derive-from-phase-completion makes the UI correct even before EXECUTE persists the field. Dedicated hand-authored `checklist` concept deliberately deferred to a follow-up."
+}

@@ -8,6 +8,7 @@ import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
 import { PhaseSummaries } from "./PhaseSummaries";
+import { SuccessCriteriaChecklist } from "./SuccessCriteriaChecklist";
 import { PlanEditor, type EditorPlan } from "./PlanEditor";
 import { Skeleton } from "../ui/Skeleton";
 import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "../../utils/duration";
@@ -154,13 +155,15 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
   // work AND a still-live terminal was recorded for it (see #175).
   const jumpTarget = work ? resolveWorkTerminal(workTerminalMap, terminalTabs, issue.number) : null;
 
-  // Load plan data for phase duration display
+  // Load plan data for phase duration display + the live success-criteria
+  // checklist. We load for BOTH in-flight and completed issues: the plan file
+  // (`.tiki/plans/issue-N.json`) persists after the issue ships, so a closed
+  // issue still shows its final checklist. For in-flight issues, EXECUTE writes
+  // state.json per phase, which fires `stateChanged` in App.tsx → a fresh
+  // `work` object is passed in → this effect re-runs (work is in the dep array)
+  // → the plan is re-read and the checklist ticks off live. (`get_plan` returns
+  // null when no plan exists, which is harmless for unplanned issues.)
   useEffect(() => {
-    if (!work) {
-      setPlan(null);
-      setLoadingPlan(false);
-      return;
-    }
     const tikiPath = activeProject?.path ? `${activeProject.path}/.tiki` : undefined;
     setLoadingPlan(true);
     invoke<TikiPlan | null>("get_plan", { issueNumber: issue.number, tikiPath })
@@ -443,6 +446,12 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {!loadingPlan && editorPlan && editorPlan.successCriteria.length > 0 && (
+        <div className="detail-section">
+          <SuccessCriteriaChecklist plan={editorPlan} />
         </div>
       )}
 

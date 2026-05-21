@@ -308,6 +308,14 @@ The sub-agent's response becomes the phase summary.
 
 <state-management>
 See `<state-update-requirement>` for state.json. For the plan file: when a phase completes, set its `status: "completed"` with `completedAt` + `summary` in `.tiki/plans/issue-{number}.json`; on failure use `status: "failed"` + error details. For parallel groups, write `parallelExecution` directly in JSON (shim does not expose this yet — see `<parallel-execution>`).
+
+**After each phase completes, also update `successCriteria` verification** in the same plan file (`.tiki/plans/issue-{number}.json`), applying the "all covering phases complete" rule:
+
+- For each criterion in `successCriteria`, look up its covering phase numbers in `coverageMatrix[criterion.id]` (treat a missing or empty entry as no coverage).
+- If the criterion has at least one covering phase AND **every** covering phase now has `status: "completed"` in `phases[]` (matched by `phase.number`), set `verified: true` and `verifiedAt: "{ISO timestamp}"` on that criterion (preserve an existing `verifiedAt` if already set).
+- Otherwise leave the criterion unverified (`verified: false`, no `verifiedAt`).
+
+This is the same rule implemented by `deriveCriteriaVerification` in `@tiki/shared`; the desktop checklist derives the live state from phase completion, but persisting it here keeps the plan file authoritative once EXECUTE finishes. (Direct-JSON write is acknowledged — `successCriteria` is not exposed by the state shim.)
 </state-management>
 
 <errors>

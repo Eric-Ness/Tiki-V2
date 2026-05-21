@@ -201,3 +201,60 @@ export function buildCoverageMatrix(phases: Phase[]): CoverageMatrix {
 export function getPlanPath(issueNumber: number): string {
   return `.tiki/plans/issue-${issueNumber}.json`;
 }
+
+/**
+ * Derive the verification state of each success criterion from phase completion.
+ *
+ * Pure: does not mutate the input plan. Returns a fresh array of success
+ * criteria, each marked `verified: true` (with an ISO `verifiedAt` timestamp)
+ * iff EVERY phase listed for that criterion in `plan.coverageMatrix` has
+ * `status === 'completed'`. A criterion with no coverageMatrix entry (or an
+ * empty one) stays unverified.
+ *
+ * Phase status lives on `plan.phases[].status`, keyed by `phase.number`.
+ */
+export function deriveCriteriaVerification(plan: TikiPlan): SuccessCriterion[] {
+  const criteria = plan.successCriteria ?? [];
+  const coverage = plan.coverageMatrix ?? {};
+  const now = new Date().toISOString();
+
+  // Map phase number -> status for O(1) lookups.
+  const statusByNumber = new Map<number, PhaseStatus>();
+  for (const phase of plan.phases) {
+    statusByNumber.set(phase.number, phase.status);
+  }
+
+  return criteria.map((criterion) => {
+    const coveringPhases = coverage[criterion.id] ?? [];
+    const verified =
+      coveringPhases.length > 0 &&
+      coveringPhases.every(
+        (phaseNumber) => statusByNumber.get(phaseNumber) === 'completed'
+      );
+
+    if (verified) {
+      return {
+        ...criterion,
+        verified: true,
+        // Preserve an existing timestamp if the criterion was already verified.
+        verifiedAt: criterion.verifiedAt ?? now,
+      };
+    }
+
+    // Not verified: strip any stale verified/verifiedAt fields.
+    const { verified: _verified, verifiedAt: _verifiedAt, ...rest } = criterion;
+    return { ...rest, verified: false };
+  });
+}
+
+/** Count how many success criteria are verified (by phase completion). */
+export function criteriaProgress(plan: TikiPlan): {
+  verified: number;
+  total: number;
+} {
+  const derived = deriveCriteriaVerification(plan);
+  return {
+    verified: derived.filter((c) => c.verified).length,
+    total: derived.length,
+  };
+}
