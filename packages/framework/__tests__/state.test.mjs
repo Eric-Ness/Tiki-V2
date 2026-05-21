@@ -18,7 +18,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { resolveTikiPath } from "../scripts/state.mjs";
@@ -385,5 +385,65 @@ test("phase is cleared when an issue transitions to completed (#220)", async () 
     parsed.activeWork["issue:6001"].phase,
     undefined,
     "phase must be cleared on completion (#220)"
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Write-integrity lock (#224): concurrent read-modify-write must not lose an
+// update. Without the lock, interleaved writers clobber each other; with it,
+// every append survives.
+// ---------------------------------------------------------------------------
+
+test("concurrent state.mjs writers do not lose updates (#224 lock)", async () => {
+  const repo = await makeTmpDir("tiki-int-concurrent");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+  await fsp.mkdir(path.join(repo, ".tiki"), { recursive: true });
+
+  const N = 8;
+  const base = 5000;
+  // Launch all writers at once so their read-modify-write windows overlap.
+  const codes = await Promise.all(
+    Array.from({ length: N }, (_unused, i) => {
+      const num = base + i;
+      return new Promise((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          [
+            STATE_SHIM,
+            "append-history",
+            "issue",
+            "--number",
+            String(num),
+            "--title",
+            `concurrent ${num}`,
+          ],
+          { cwd: repo }
+        );
+        child.on("exit", (code) => resolve(code));
+        child.on("error", reject);
+      });
+    })
+  );
+
+  assert.ok(
+    codes.every((c) => c === 0),
+    `every concurrent writer should exit 0 (got ${codes.join(",")})`
+  );
+
+  const stateFile = path.join(repo, ".tiki", "state.json");
+  const parsed = JSON.parse(await fsp.readFile(stateFile, "utf-8"));
+  const got = new Set((parsed.history.recentIssues || []).map((r) => r.number));
+  for (let i = 0; i < N; i++) {
+    assert.ok(
+      got.has(base + i),
+      `lost update under concurrency: issue ${base + i} missing (got ${[...got].join(",")})`
+    );
+  }
+
+  // The lock file must not linger after all writers release.
+  assert.equal(
+    fs.existsSync(path.join(repo, ".tiki", "state.json.lock")),
+    false,
+    "state.json.lock should be released after all writers finish"
   );
 });

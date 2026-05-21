@@ -1,0 +1,62 @@
+{
+  "issue": {
+    "number": 224,
+    "title": "F: Write integrity — state.mjs lock + watcher active-project repoint"
+  },
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Concurrent state.mjs writers never lose an update (cross-process lock around read-modify-write)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T23:23:04.310Z"
+    },
+    {
+      "id": "SC2",
+      "description": "The desktop watcher observes the active project's .tiki after startup-restore, not just after a manual switch (no leftover cwd watcher / wrong-.tiki race)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T23:23:04.310Z"
+    },
+    {
+      "id": "SC3",
+      "description": "pnpm build + framework node:test + cargo test + clippy --deny warnings all green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T23:23:04.310Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      1,
+      2
+    ]
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Cross-process write lock in state.mjs",
+      "content": "Add withStateLock(tikiPath, fn) — exclusive lockfile (fs.openSync 'wx') with stale-steal (10s) + timeout (5s) + Atomics.wait sleep + process.on('exit') cleanup so die()/process.exit() never leaves a stale lock. Wrap the read-modify-write in handleTransition / handleRemove / handleAppendHistory (non-dry-run). Node built-ins only.",
+      "verification": [
+        "withStateLock wraps all three mutating handlers; dry-run still lock-free",
+        "state.test.mjs 'concurrent state.mjs writers do not lose updates' green (8 parallel appends, all survive, lockfile released)"
+      ],
+      "status": "completed",
+      "summary": "state.mjs withStateLock: exclusive lockfile + stale-steal + Atomics.wait + exit cleanup, wraps all 3 mutating handlers. Concurrent-writers test (8 parallel) green."
+    },
+    {
+      "number": 2,
+      "title": "Watcher active-project anchoring",
+      "content": "watcher.rs: fix start_watcher to store/pass the project ROOT (was passing cwd/.tiki → doubled to cwd/.tiki/.tiki); add is_superseded(current, mine) + a main-loop check so a watcher self-terminates when current_path moves on (fixes the stop_signal-vs-thread-startup race that left a cwd watcher emitting wrong-.tiki events after startup-restore). Skip .lock files in process_event.",
+      "verification": [
+        "start_watcher passes cwd root; main loop self-terminates on supersede",
+        "cargo test is_superseded_detects_project_switch green; clippy --deny warnings clean"
+      ],
+      "status": "completed",
+      "summary": "watcher.rs: start_watcher passes project root (fixes doubled .tiki); is_superseded + main-loop self-terminate fixes the startup-restore wrong-.tiki race; .lock files ignored."
+    }
+  ]
+}

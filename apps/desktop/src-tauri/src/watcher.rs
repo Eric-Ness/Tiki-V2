@@ -62,16 +62,19 @@ pub enum TikiFileEvent {
 /// Start watching the .tiki directory for changes (initial startup)
 pub fn start_watcher(app_handle: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let cwd = std::env::current_dir()?;
-    let tiki_path = cwd.join(".tiki");
 
-    // Initialize state with current path
+    // current_path holds the project ROOT (start_watcher_internal appends
+    // `.tiki` itself). switch_watch_path stores the project root too, so the
+    // supersede check can compare like-for-like — previously start_watcher
+    // stored `cwd/.tiki`, which then became `cwd/.tiki/.tiki` and never matched
+    // a real directory (#224).
     {
         let state = get_watcher_state();
         let mut guard = state.lock().map_err(|e| e.to_string())?;
-        guard.current_path = Some(tiki_path.clone());
+        guard.current_path = Some(cwd.clone());
     }
 
-    start_watcher_internal(app_handle, tiki_path)
+    start_watcher_internal(app_handle, cwd)
 }
 
 /// Internal watcher implementation that can be restarted for different paths
@@ -141,6 +144,25 @@ fn start_watcher_internal(
         if stop_rx.try_recv().is_ok() {
             log::info!("Received stop signal, stopping watcher for {:?}", tiki_path);
             break;
+        }
+
+        // Self-terminate if a newer switch_watch_path has superseded us. The
+        // stop_signal hand-off races with thread startup (a switch fired right
+        // after launch can run before this thread stored its stop_signal), so
+        // we ALSO consult the authoritative current_path here. This guarantees
+        // only the active project's watcher survives — fixing the
+        // startup-restore "wrong .tiki" race (#224).
+        {
+            let state = get_watcher_state();
+            let superseded = state
+                .lock()
+                .map(|guard| is_superseded(guard.current_path.as_ref(), &project_path))
+                .unwrap_or(false);
+            drop(state);
+            if superseded {
+                log::info!("Watcher for {:?} superseded by a project switch; stopping", project_path);
+                break;
+            }
         }
 
         // Use recv_timeout to allow periodic stop-signal checks and to wake the
@@ -221,6 +243,17 @@ fn flush_quiet_events(
     }
 }
 
+/// A watcher is superseded when the authoritative `current_path` no longer
+/// points at the project this watcher was started for (a newer
+/// `switch_watch_path` won). `None` means no active path is recorded yet — don't
+/// self-terminate. Pure and unit-testable (the threaded race-fix for #224).
+fn is_superseded(current: Option<&PathBuf>, mine: &PathBuf) -> bool {
+    match current {
+        Some(p) => p != mine,
+        None => false,
+    }
+}
+
 /// Process a file system event and determine what Tiki event to emit
 fn process_event(event: &Event) -> Option<TikiFileEvent> {
     // Only care about modify/create/remove events
@@ -235,8 +268,9 @@ fn process_event(event: &Event) -> Option<TikiFileEvent> {
         if let Some(file_name) = path.file_name() {
             let name = file_name.to_string_lossy();
 
-            // Ignore temp files from atomic writes
-            if name.ends_with(".tmp") {
+            // Ignore temp files from atomic writes and the state.json.lock
+            // file used by the state.mjs write lock (#224).
+            if name.ends_with(".tmp") || name.ends_with(".lock") {
                 continue;
             }
 
@@ -329,6 +363,18 @@ mod tests {
         );
         let ready = quiet_keys(&pending, now, debounce);
         assert_eq!(ready, vec!["state".to_string()]);
+    }
+
+    #[test]
+    fn is_superseded_detects_project_switch() {
+        let a = PathBuf::from("/proj/a");
+        let b = PathBuf::from("/proj/b");
+        // Same path → still the active watcher, keep running.
+        assert!(!is_superseded(Some(&a), &a));
+        // A newer switch pointed current_path elsewhere → self-terminate.
+        assert!(is_superseded(Some(&b), &a));
+        // No active path recorded yet → don't self-terminate.
+        assert!(!is_superseded(None, &a));
     }
 
     #[test]
