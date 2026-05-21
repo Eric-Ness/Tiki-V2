@@ -10,6 +10,15 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.7.1] — 2026-05-21
+
+Wave 3 (part 1) of the status-desync epic (#218) — write-integrity hardening, no UI changes. Full detail: [`.tiki/releases/v0.7.1-changelog.md`](.tiki/releases/v0.7.1-changelog.md).
+
+### Fixed
+- **Write integrity — `state.mjs` lock + watcher repoint** (#224). `state.mjs` now serializes its read-modify-write behind an exclusive lockfile (stale-steal + exit-cleanup, Node built-ins) so chained writes during a release cascade can't lose an update. The desktop watcher's startup anchoring is fixed (it watched a doubled `cwd/.tiki/.tiki` path) and a superseded watcher self-terminates, so after startup-restore it observes the active project's `.tiki`.
+
+---
+
 ## [v0.7.0] — 2026-05-21
 
 Wave 2 of the status-desync epic (#218). v0.6.7 fixed where release issues *landed*; v0.7.0 attacks the master cause — ~4 surfaces deriving status independently from ~5 sources — with a single source of truth plus a GitHub freshness mechanism. Full per-issue summary: [`.tiki/releases/v0.7.0-changelog.md`](.tiki/releases/v0.7.0-changelog.md).
