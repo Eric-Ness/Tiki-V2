@@ -288,6 +288,107 @@ function writeStateAtomic(tikiPath, state) {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-process write lock (#224).
+//
+// state.mjs is invoked once per transition, often chained rapidly during a
+// release cascade — and two processes doing read-modify-write on state.json can
+// interleave and LOSE an update (A reads, B reads, A writes, B writes; A's
+// mutation vanishes). writeStateAtomic's temp+rename only protects readers from
+// partial writes, not writers from clobbering each other. We serialize the whole
+// read-modify-write behind an exclusive lockfile.
+//
+// Node built-ins only (the Windows pnpm reparse-point block makes adding deps
+// painful — mirrors the node:test choice). Stale locks (from a crashed/killed
+// holder) are stolen after STALE_MS; an exit handler releases our own lock even
+// when die()/process.exit() unwinds past the finally.
+// ---------------------------------------------------------------------------
+
+let HELD_LOCK = null;
+
+function releaseHeldLock() {
+  if (!HELD_LOCK) return;
+  const { fd, path: lockPath } = HELD_LOCK;
+  HELD_LOCK = null;
+  try {
+    fs.closeSync(fd);
+  } catch {
+    /* ignore */
+  }
+  try {
+    fs.unlinkSync(lockPath);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Fires on normal exit AND process.exit() (which die() calls), so an illegal
+// transition inside the lock never leaves the lockfile behind.
+process.on("exit", releaseHeldLock);
+
+/** Synchronous sleep with zero deps (no busy-spin). */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Run `fn` while holding an exclusive lock on `<tikiPath>/state.json.lock`.
+ * `fn` performs the read-modify-write; serializing it prevents lost updates.
+ */
+function withStateLock(tikiPath, fn) {
+  if (!fs.existsSync(tikiPath)) {
+    fs.mkdirSync(tikiPath, { recursive: true });
+  }
+  const lockPath = path.join(tikiPath, "state.json.lock");
+  const STALE_MS = 10_000;
+  const MAX_WAIT_MS = 5_000;
+  const RETRY_MS = 25;
+  const start = Date.now();
+
+  let fd = null;
+  for (;;) {
+    try {
+      fd = fs.openSync(lockPath, "wx"); // exclusive create — fails if held
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") {
+        die(2, `failed to acquire state lock ${lockPath}: ${e.message}`);
+      }
+      // Lock is held. Steal it if the holder died and left it stale.
+      try {
+        const st = fs.statSync(lockPath);
+        if (Date.now() - st.mtimeMs > STALE_MS) {
+          try {
+            fs.unlinkSync(lockPath);
+          } catch {
+            /* another writer beat us to it */
+          }
+          continue;
+        }
+      } catch {
+        // Lock vanished between open and stat — retry immediately.
+        continue;
+      }
+      if (Date.now() - start > MAX_WAIT_MS) {
+        die(2, `timed out after ${MAX_WAIT_MS}ms waiting for state lock ${lockPath}`);
+      }
+      sleepSync(RETRY_MS);
+    }
+  }
+
+  try {
+    fs.writeSync(fd, String(process.pid));
+  } catch {
+    /* the pid is diagnostic only */
+  }
+  HELD_LOCK = { fd, path: lockPath };
+  try {
+    return fn();
+  } finally {
+    releaseHeldLock();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Shared helpers.
 // ---------------------------------------------------------------------------
 
@@ -496,25 +597,31 @@ function handleTransition(args) {
       }
     : null;
 
-  // Read existing state, apply, optionally write atomically.
+  // Read existing state, apply, optionally write atomically. The whole
+  // read-modify-write runs under the cross-process lock so chained writes
+  // during a release cascade can't lose an update (#224).
   const tikiPath = resolveTikiPath(args["tiki-path"]);
-  const state = readState(tikiPath);
   const dryRun = args["dry-run"] === true;
 
-  const updated = applyTransition(state, {
-    workId,
-    toStatus,
-    toStep: toStep || null,
-    phase,
-    parallelExecution: null, // not exposed via CLI yet — Rust IPC is canonical for parallel groups
-    parentRelease: parentRelease !== undefined ? parentRelease : undefined,
-    issue,
-    release,
-  });
-
-  if (!dryRun) {
-    writeStateAtomic(tikiPath, state);
-  }
+  let updated;
+  const apply = () => {
+    const state = readState(tikiPath);
+    updated = applyTransition(state, {
+      workId,
+      toStatus,
+      toStep: toStep || null,
+      phase,
+      parallelExecution: null, // not exposed via CLI yet — Rust IPC is canonical for parallel groups
+      parentRelease: parentRelease !== undefined ? parentRelease : undefined,
+      issue,
+      release,
+    });
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
 
   // Emit the updated entry as JSON to stdout. Callers can pipe / jq this.
   process.stdout.write(JSON.stringify(updated, null, 2) + "\n");
@@ -562,18 +669,23 @@ function handleRemove(args) {
   assertWorkIdShape(workId);
 
   const tikiPath = resolveTikiPath(args["tiki-path"]);
-  const state = readState(tikiPath);
-  state.activeWork = state.activeWork || {};
-  const entry = state.activeWork[workId];
-  if (!entry) {
-    die(1, `no active work for '${workId}'`);
-  }
-
-  delete state.activeWork[workId];
   const dryRun = args["dry-run"] === true;
-  if (!dryRun) {
-    writeStateAtomic(tikiPath, state);
-  }
+
+  let entry;
+  const apply = () => {
+    const state = readState(tikiPath);
+    state.activeWork = state.activeWork || {};
+    entry = state.activeWork[workId];
+    if (!entry) {
+      die(1, `no active work for '${workId}'`);
+    }
+    delete state.activeWork[workId];
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
 
   // Print the removed entry so callers can see what was deleted.
   process.stdout.write(JSON.stringify(entry, null, 2) + "\n");
@@ -641,41 +753,46 @@ function handleAppendHistory(args) {
   }
 
   const tikiPath = resolveTikiPath(args["tiki-path"]);
-  const state = readState(tikiPath);
-  state.history = state.history || {};
+  const dryRun = args["dry-run"] === true;
 
   let record;
-  if (kind === "issue") {
-    record = buildCompletedIssueRecord(args);
-    state.history.recentIssues = Array.isArray(state.history.recentIssues)
-      ? state.history.recentIssues
-      : [];
-    // Idempotent: drop any prior entry for the same issue number before
-    // re-inserting, so re-running append-history (e.g. ship.md during the
-    // cascade AND release.md teardown) never duplicates a child issue.
-    state.history.recentIssues = state.history.recentIssues.filter(
-      (entry) => entry == null || entry.number !== record.number
-    );
-    state.history.recentIssues.unshift(record);
-    state.history.lastCompletedIssue = record;
-  } else {
-    record = buildCompletedReleaseRecord(args);
-    state.history.recentReleases = Array.isArray(state.history.recentReleases)
-      ? state.history.recentReleases
-      : [];
-    // Idempotent: drop any prior entry for the same release version before
-    // re-inserting, so re-running append-history release never duplicates.
-    state.history.recentReleases = state.history.recentReleases.filter(
-      (entry) => entry == null || entry.version !== record.version
-    );
-    state.history.recentReleases.unshift(record);
-    state.history.lastCompletedRelease = record;
-  }
+  const apply = () => {
+    const state = readState(tikiPath);
+    state.history = state.history || {};
 
-  const dryRun = args["dry-run"] === true;
-  if (!dryRun) {
-    writeStateAtomic(tikiPath, state);
-  }
+    if (kind === "issue") {
+      record = buildCompletedIssueRecord(args);
+      state.history.recentIssues = Array.isArray(state.history.recentIssues)
+        ? state.history.recentIssues
+        : [];
+      // Idempotent: drop any prior entry for the same issue number before
+      // re-inserting, so re-running append-history (e.g. ship.md during the
+      // cascade AND release.md teardown) never duplicates a child issue.
+      state.history.recentIssues = state.history.recentIssues.filter(
+        (entry) => entry == null || entry.number !== record.number
+      );
+      state.history.recentIssues.unshift(record);
+      state.history.lastCompletedIssue = record;
+    } else {
+      record = buildCompletedReleaseRecord(args);
+      state.history.recentReleases = Array.isArray(state.history.recentReleases)
+        ? state.history.recentReleases
+        : [];
+      // Idempotent: drop any prior entry for the same release version before
+      // re-inserting, so re-running append-history release never duplicates.
+      state.history.recentReleases = state.history.recentReleases.filter(
+        (entry) => entry == null || entry.version !== record.version
+      );
+      state.history.recentReleases.unshift(record);
+      state.history.lastCompletedRelease = record;
+    }
+
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
 
   process.stdout.write(JSON.stringify(record, null, 2) + "\n");
 }
