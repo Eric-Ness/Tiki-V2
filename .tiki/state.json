@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 221,
-      "title": "C: GitHub freshness — re-sync on window focus",
-      "completedAt": "2026-05-21T21:24:40.117Z"
+      "number": 224,
+      "title": "F: Write integrity — state.mjs lock + watcher active-project repoint",
+      "completedAt": "2026-05-21T23:30:15.242Z"
     },
     "lastCompletedRelease": {
       "version": "v0.7.0",
@@ -18,6 +18,11 @@
       "tag": "v0.7.0"
     },
     "recentIssues": [
+      {
+        "number": 224,
+        "title": "F: Write integrity — state.mjs lock + watcher active-project repoint",
+        "completedAt": "2026-05-21T23:30:15.242Z"
+      },
       {
         "number": 221,
         "title": "C: GitHub freshness — re-sync on window focus",
