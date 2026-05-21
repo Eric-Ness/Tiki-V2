@@ -95,3 +95,24 @@ test("every command file retains its expected state.mjs transition --to-step pai
     `pairing so the desktop kanban board reflects pipeline progress (issue #211).`
   );
 });
+
+// Regression assertion for issue #219: the release teardown must append each
+// child issue to history.recentIssues (`append-history issue`). Without it, the
+// desktop Kanban "Completed" column — which reads only recentIssues — drops
+// release-shipped issues even though they were closed. This guards against the
+// step silently disappearing from release.md again.
+test("release.md teardown appends child issues to history (append-history issue)", () => {
+  const filePath = path.join(COMMANDS_DIR, "release.md");
+  assert.ok(
+    fs.existsSync(filePath),
+    `release.md not found at ${filePath}`
+  );
+  const content = fs.readFileSync(filePath, "utf-8");
+  assert.match(
+    content,
+    /state\.mjs\s+append-history\s+issue/,
+    `release.md must invoke 'state.mjs append-history issue' in its teardown so ` +
+    `release-shipped child issues land in history.recentIssues and stay visible ` +
+    `in the desktop Kanban Completed column (issue #219).`
+  );
+});

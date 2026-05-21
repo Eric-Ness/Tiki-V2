@@ -19,6 +19,7 @@ import { KanbanColumn } from './KanbanColumn';
 import { KanbanCard, type WorkItem } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
 import { getExecuteCommand } from './executeCommand';
+import { collectCompletedIssueNumbers, buildCompletedCards } from './completedColumn';
 import './kanban.css';
 
 // Valid state transitions for drag-and-drop
@@ -60,6 +61,7 @@ export function KanbanBoard() {
   const setActiveView = useLayoutStore((s) => s.setActiveView);
   const activeWork = useTikiStateStore((s) => s.activeWork);
   const recentIssues = useTikiStateStore((s) => s.recentIssues);
+  const recentReleases = useTikiStateStore((s) => s.recentReleases);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [shipConfirmation, setShipConfirmation] = useState<{ issueNumber: number; title: string } | null>(null);
 
@@ -307,32 +309,29 @@ export function KanbanBoard() {
     return map;
   }, [activeWork]);
 
-  // Get set of completed issue numbers from history (for exclusion from other columns)
+  // Get set of completed issue numbers from history (for exclusion from other
+  // columns). Uncapped union of recentIssues + every recentReleases[].issues[]
+  // so release-shipped children are excluded from non-completed columns too
+  // (issue #219).
   const completedIssueNumbers = useMemo(() => {
-    return new Set(recentIssues.slice(0, 8).map((i) => i.number));
-  }, [recentIssues]);
+    return collectCompletedIssueNumbers(recentIssues, recentReleases);
+  }, [recentIssues, recentReleases]);
+
+  // Synthesized cards for the Completed column: union of recentIssues +
+  // release children, deduped (recentIssues win), sorted desc, capped at 50.
+  const completedCards = useMemo(() => {
+    return buildCompletedCards(recentIssues, recentReleases, 50);
+  }, [recentIssues, recentReleases]);
 
   // Organize issues into columns based on Tiki work status
   const columns: ColumnData[] = useMemo(() => {
     const result = COLUMN_CONFIG.map((col) => {
-      // For the completed column, use recentIssues from history (limited to 8)
+      // For the completed column, use the union of recentIssues + release
+      // children from history (capped at 50, deduped — issue #219).
       if (col.id === 'completed') {
-        const completedIssues: GitHubIssue[] = [...recentIssues]
-          .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-          .slice(0, 8)
-          .map((recent) => ({
-          number: recent.number,
-          title: recent.title || `Issue #${recent.number}`,
-          state: 'CLOSED',
-          body: '',
-          labels: [],
-          url: `#${recent.number}`,
-          createdAt: recent.completedAt,
-          updatedAt: recent.completedAt,
-        }));
         return {
           ...col,
-          issues: applyColumnOrder(filterIssuesBySearch(completedIssues, searchQuery), orderByColumn[col.id]),
+          issues: applyColumnOrder(filterIssuesBySearch(completedCards, searchQuery), orderByColumn[col.id]),
         };
       }
 
@@ -362,7 +361,7 @@ export function KanbanBoard() {
       return { ...col, issues: applyColumnOrder(colIssues, orderByColumn[col.id]) };
     });
     return result;
-  }, [filteredIssues, activeWork, recentIssues, completedIssueNumbers, searchQuery, orderByColumn]);
+  }, [filteredIssues, activeWork, completedCards, completedIssueNumbers, searchQuery, orderByColumn]);
 
   return (
     <DndContext

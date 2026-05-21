@@ -644,6 +644,12 @@ function handleAppendHistory(args) {
     state.history.recentIssues = Array.isArray(state.history.recentIssues)
       ? state.history.recentIssues
       : [];
+    // Idempotent: drop any prior entry for the same issue number before
+    // re-inserting, so re-running append-history (e.g. ship.md during the
+    // cascade AND release.md teardown) never duplicates a child issue.
+    state.history.recentIssues = state.history.recentIssues.filter(
+      (entry) => entry == null || entry.number !== record.number
+    );
     state.history.recentIssues.unshift(record);
     state.history.lastCompletedIssue = record;
   } else {
@@ -651,6 +657,11 @@ function handleAppendHistory(args) {
     state.history.recentReleases = Array.isArray(state.history.recentReleases)
       ? state.history.recentReleases
       : [];
+    // Idempotent: drop any prior entry for the same release version before
+    // re-inserting, so re-running append-history release never duplicates.
+    state.history.recentReleases = state.history.recentReleases.filter(
+      (entry) => entry == null || entry.version !== record.version
+    );
     state.history.recentReleases.unshift(record);
     state.history.lastCompletedRelease = record;
   }

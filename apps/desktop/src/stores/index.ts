@@ -70,7 +70,11 @@ export {
   type BulkYoloRun,
 } from './bulkYoloStore';
 
-export { useTikiStateStore } from './tikiStateStore';
+export {
+  useTikiStateStore,
+  type CompletedIssue,
+  type CompletedRelease,
+} from './tikiStateStore';
 
 export {
   useToastStore,

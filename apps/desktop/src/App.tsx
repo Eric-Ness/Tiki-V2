@@ -25,7 +25,7 @@ import { CommandPalette, ErrorBoundary, KeyboardShortcuts } from "./components/u
 import { useCommandActions, useStaleWorkDetection } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
 import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore, useBulkYoloStore } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore, useBulkYoloStore, type CompletedRelease } from "./stores";
 import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
 import { detectGithubRefreshTriggers } from "./utils/githubRefreshTriggers";
@@ -59,6 +59,23 @@ function scheduleRefresh(surface: RefreshSurface, fire: () => void): void {
 // via useEffect dep instability (same bug class as #210 — see #212).
 const EMPTY_ACTIVE_WORK: Record<string, WorkContext> = {};
 const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];
+const EMPTY_RECENT_RELEASES: CompletedRelease[] = [];
+
+// Normalize raw history.recentReleases (where `issues` may be absent) into the
+// store's CompletedRelease shape (`issues: number[]`). Returns the stable
+// EMPTY_RECENT_RELEASES const when there is nothing, so consumers never see a
+// fresh empty-array ref (same fresh-ref bug class as #210/#212).
+function normalizeRecentReleases(
+  raw: Array<{ version: string; issues?: number[]; completedAt: string; tag?: string }> | undefined,
+): CompletedRelease[] {
+  if (!raw || raw.length === 0) return EMPTY_RECENT_RELEASES;
+  return raw.map((r) => ({
+    version: r.version,
+    issues: r.issues ?? [],
+    completedAt: r.completedAt,
+    ...(r.tag !== undefined ? { tag: r.tag } : {}),
+  }));
+}
 
 // Types matching Rust state structures
 interface TikiState {
@@ -248,8 +265,9 @@ function App() {
         if (currentState?.activeWork) {
           useTikiStateStore.getState().setActiveWork(currentState.activeWork);
         }
-        // Sync recentIssues for Completed column
+        // Sync recentIssues + recentReleases for Completed column
         useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
+        useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
@@ -275,8 +293,9 @@ function App() {
       if (currentState?.activeWork) {
         useTikiStateStore.getState().setActiveWork(currentState.activeWork);
       }
-      // Sync recentIssues for Completed column
+      // Sync recentIssues + recentReleases for Completed column
       useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
+      useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
     } catch (e) {
       console.error("Error loading state:", e);
       setError(String(e));
@@ -359,8 +378,9 @@ function App() {
             console.log("Syncing to tikiStateStore:", Object.entries(currentState.activeWork).map(([k, v]) => `${k}: ${v.status}`));
             useTikiStateStore.getState().setActiveWork(currentState.activeWork);
           }
-          // Sync recentIssues for Completed column
+          // Sync recentIssues + recentReleases for Completed column
           useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
+          useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
         } catch (e) {
           console.error("Failed to reload state:", e);
         }

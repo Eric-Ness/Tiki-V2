@@ -236,7 +236,7 @@ When starting a release, create the work entry in `.tiki/state.json`:
 
 **After shipping completes**:
 1. Remove `release:{version}` from `activeWork`
-2. Remove ALL child `issue:N` entries from `activeWork` where `parentRelease` matches this release version
+2. For EACH child issue with `parentRelease == {version}` (once per child): first run `node packages/framework/scripts/state.mjs append-history issue --number {number} --title "{issue title}"` so it lands in `history.recentIssues` (the desktop Kanban "Completed" column reads `recentIssues` — mirrors `ship.md`), THEN remove the `issue:N` entry from `activeWork`. `append-history` is idempotent on issue number, so this is safe even if `ship.md` already appended the child during the cascade.
 3. Add to `history.recentReleases`
 4. Archive release file to `.tiki/releases/archive/`
 </state-management>
