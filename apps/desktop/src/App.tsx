@@ -59,7 +59,8 @@ function scheduleRefresh(surface: RefreshSurface, fire: () => void): void {
 // Stable empty-fallback constants. Prevent fresh-object allocations in
 // hook arguments that would otherwise trigger infinite re-render loops
 // via useEffect dep instability (same bug class as #210 — see #212).
-const EMPTY_ACTIVE_WORK: Record<string, WorkContext> = {};
+// (activeWork now reads straight from tikiStateStore, whose initial value is
+// already a stable {} — so no EMPTY_ACTIVE_WORK fallback is needed here, #223.)
 const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];
 const EMPTY_RECENT_RELEASES: CompletedRelease[] = [];
 
@@ -174,7 +175,13 @@ function App() {
   const stalenessThresholdHours = useSettingsStore((s) => s.workflow.stalenessThresholdHours);
 
   // Stale work detection: flags issues whose last activity exceeds the threshold
-  const staleFlags = useStaleWorkDetection(state?.activeWork ?? EMPTY_ACTIVE_WORK, stalenessThresholdHours);
+  // Single source of truth for activeWork (#223): every surface — sidebar,
+  // kanban, detail, stale detection — reads tikiStateStore, so the React-local
+  // App.state copy no longer competes with the store. The store seeds
+  // activeWork to a stable {} ref, so no inline `?? {}` fallback is needed
+  // (that inline-fresh-ref pattern is the #210/#212 render-loop crash class).
+  const activeWork = useTikiStateStore((s) => s.activeWork);
+  const staleFlags = useStaleWorkDetection(activeWork, stalenessThresholdHours);
   useEffect(() => {
     const applyTheme = (resolved: 'dark' | 'light') => {
       document.documentElement.setAttribute('data-theme', resolved);
@@ -247,8 +254,8 @@ function App() {
   }, [selectedIssue, issueFromStore, activeProject?.path, detailRefreshNonce]);
 
   // Get work context for selected issue
-  const selectedIssueWork = selectedIssue && state?.activeWork
-    ? state.activeWork[`issue:${selectedIssue}`]
+  const selectedIssueWork = selectedIssue
+    ? activeWork[`issue:${selectedIssue}`] ?? null
     : null;
 
   // Hoisted into useCallback so the recovery dialog's `onRecovered` handler
@@ -534,7 +541,7 @@ function App() {
             <div className="sidebar-sections">
               {/* Active Work at the top for visibility */}
               {state && (
-                <StateSection activeWork={state.activeWork} staleFlags={staleFlags} />
+                <StateSection activeWork={activeWork} staleFlags={staleFlags} />
               )}
 
               {error && <div className="error">{error}</div>}
