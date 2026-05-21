@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 212,
-      "title": "Bug: Blank-screen regression v2 — App.tsx:152 passes fresh {} to useStaleWorkDetection → infinite re-render",
-      "completedAt": "2026-05-19T15:01:03.614Z"
+      "number": 219,
+      "title": "Release-shipped issues now reach Kanban Completed",
+      "completedAt": "2026-05-21T12:08:06.571Z"
     },
     "lastCompletedRelease": {
       "version": "v0.6.6",
@@ -18,6 +18,11 @@
       "tag": "v0.6.6"
     },
     "recentIssues": [
+      {
+        "number": 219,
+        "title": "Release-shipped issues now reach Kanban Completed",
+        "completedAt": "2026-05-21T12:08:06.571Z"
+      },
       {
         "number": 212,
         "title": "Bug: Blank-screen regression v2 — App.tsx:152 passes fresh {} to useStaleWorkDetection → infinite re-render",
