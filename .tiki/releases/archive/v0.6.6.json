@@ -1,0 +1,22 @@
+{
+  "version": "v0.6.6",
+  "status": "completed",
+  "issues": [
+    {
+      "number": 216,
+      "title": "feat(framework+desktop): live planning checklist — PLAN emits, EXECUTE ticks off, detail panel visualizes"
+    },
+    {
+      "number": 215,
+      "title": "feat(framework): lifecycle hooks (.tiki/hooks/) — pre/post execute, phase, ship"
+    },
+    {
+      "number": 214,
+      "title": "feat(framework+desktop): config.json schema, validation, and in-app editor"
+    }
+  ],
+  "createdAt": "2026-05-21T00:35:04.812Z",
+  "completedAt": "2026-05-21T01:23:45.393Z",
+  "shipped": true,
+  "tag": "v0.6.6"
+}
