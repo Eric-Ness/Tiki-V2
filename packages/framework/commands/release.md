@@ -280,7 +280,13 @@ After shipping:
 ```bash
 # Remove the release entry from activeWork:
 node packages/framework/scripts/state.mjs remove release:{version}
-# For each child issue with parentRelease == {version}, remove it:
+# For EACH child issue with parentRelease == {version} (run the next two lines
+# once per child): append it to history.recentIssues FIRST (so the desktop
+# Kanban "Completed" column, which reads recentIssues, shows release-shipped
+# issues — mirrors ship.md), THEN remove it from activeWork. append-history is
+# idempotent on issue number, so this is safe even if ship.md already appended
+# the child during the cascade.
+node packages/framework/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
 node packages/framework/scripts/state.mjs remove issue:{number}
 # Append the release completion record to history:
 node packages/framework/scripts/state.mjs append-history release --version {version} --issues "41,42,43" --tag {version}

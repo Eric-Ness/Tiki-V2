@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 219,
+    "title": "A: Release-shipped issues never reach Kanban Completed (live data-loss)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/219",
+    "labels": [
+      "bug",
+      "desktop",
+      "framework",
+      "reliability"
+    ],
+    "milestone": "epic #218"
+  },
+  "createdAt": "2026-05-21T02:30:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "release.md teardown appends issue history per child (all 3 shadows), and append-history is idempotent (dedupes by number/version)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T12:01:45.190Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "Kanban Completed column unions recentIssues + recentReleases[].issues deduped by number; cross-column exclusion set is uncapped; render cap raised (~50)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T12:01:45.190Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "Already-shipped release children (v0.6.6 #214/#215/#216) appear in Completed exactly once with no state.json migration",
+      "verified": true,
+      "verifiedAt": "2026-05-21T12:01:45.190Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "Pure-function tests for the union/dedup + a command-transition-coverage assertion that release.md teardown appends issue history per child",
+      "verified": true,
+      "verifiedAt": "2026-05-21T12:01:45.190Z"
+    },
+    {
+      "id": "SC5",
+      "category": "other",
+      "description": "pnpm build + shared/desktop vitest + framework node:test green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T12:01:45.190Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Framework: idempotent append-history + per-child append in release.md",
+      "status": "completed",
+      "content": "Make state.mjs handleAppendHistory idempotent (dedupe by number for issues / version for releases before unshift). Add per-child `append-history issue --number {number} --title \"{title}\"` to release.md teardown in all 3 shadows. Add a command-transition-coverage assertion that release.md teardown appends issue history per child.",
+      "verification": [
+        "framework node:test passes incl. new assertion",
+        "append-history re-run does not duplicate",
+        "all 3 release.md shadows updated"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC4"
+      ],
+      "files": [
+        "packages/framework/scripts/state.mjs",
+        "packages/framework/commands/release.md",
+        "packages/framework/.claude/commands/tiki/release.md",
+        ".claude/commands/tiki/release.md",
+        "packages/framework/__tests__/command-transition-coverage.test.mjs"
+      ],
+      "completedAt": "2026-05-21T12:01:45.190Z",
+      "summary": "state.mjs append-history now idempotent (dedupe by number/version before unshift); all 3 release.md shadows append issue history per child before remove; command-transition-coverage asserts release.md teardown appends issue history."
+    },
+    {
+      "number": 2,
+      "title": "Frontend: Completed column unions recentReleases, deduped + uncapped exclusion",
+      "status": "completed",
+      "content": "Expose recentReleases in tikiStateStore + sync in App.tsx (stable EMPTY const). KanbanBoard: union recentIssues + recentReleases[].issues for both the completed render (deduped, render cap ~50) and the exclusion set (uncapped). Extract pure helpers + unit-test against a v0.6.6-shaped fixture.",
+      "verification": [
+        "v0.6.6 children render once in Completed",
+        "no issue in two columns",
+        "pure-function tests pass"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/stores/tikiStateStore.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "completedAt": "2026-05-21T12:01:45.190Z",
+      "summary": "tikiStateStore exposes recentReleases (+App.tsx sync via stable EMPTY_RECENT_RELEASES const); new pure completedColumn.ts (collectCompletedIssueNumbers uncapped union + buildCompletedCards deduped, cap 50); KanbanBoard consumes both. 7 fixture tests incl. v0.6.6 exactly-once."
+    },
+    {
+      "number": 3,
+      "title": "Verify",
+      "status": "completed",
+      "content": "pnpm build + vitest (shared/desktop) + framework node:test. Fix failures.",
+      "verification": [
+        "pnpm build green",
+        "all test suites green"
+      ],
+      "addressesCriteria": [
+        "SC5"
+      ],
+      "files": [],
+      "completedAt": "2026-05-21T12:01:45.190Z",
+      "summary": "pnpm build clean; shared 86, desktop 151 (+29), framework 22 (+new assertion). No Rust."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2
+    ],
+    "SC5": [
+      3
+    ]
+  },
+  "notes": "Wave 1 / MVP of epic #218. Frontend union (deduped) repairs already-shipped releases with no migration; framework fix makes future releases populate recentIssues natively. Ship standalone (not via /tiki:release) to avoid the dogfooding trap.",
+  "updatedAt": "2026-05-21T12:01:45.190Z"
+}
