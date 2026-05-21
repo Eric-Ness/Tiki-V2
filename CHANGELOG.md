@@ -10,6 +10,19 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.7.0] — 2026-05-21
+
+Wave 2 of the status-desync epic (#218). v0.6.7 fixed where release issues *landed*; v0.7.0 attacks the master cause — ~4 surfaces deriving status independently from ~5 sources — with a single source of truth plus a GitHub freshness mechanism. Full per-issue summary: [`.tiki/releases/v0.7.0-changelog.md`](.tiki/releases/v0.7.0-changelog.md).
+
+### Added
+- **Single source of truth — `deriveDisplayStatus()` selector** (#222). One pure selector implements the canonical first-match precedence table from #218 (`{ column, label, pipelineState, badge, anomaly? }`); the Kanban board, detail GitHub badge, and pipeline timeline all consume it, so they agree by construction. GitHub/Tiki disagreement is surfaced as an explicit anomaly. A fresh-ref guard test protects the #210/#212 crash class.
+- **GitHub freshness — re-sync on window focus** (#221). Re-syncs issues/PRs/releases on window focus / tab visibility (default on), with an opt-in periodic poll (off by default, 60s floor, rate-limit-gated via #110). Settings in the GitHub section.
+
+### Fixed
+- **Frozen display across surfaces** (#220). Detail panel re-fetches the selected issue on state change (no reselection needed); the Rust watcher switched to trailing-edge debounce so the final write of a burst is always emitted; stale `work.phase` "1/N" is cleared on completion in both `state.mjs` and the Rust IPC (parity-tested).
+
+---
+
 ## [v0.6.7] — 2026-05-21
 
 Single-issue patch — fixes a release-pipeline data-loss bug (Wave 1 / MVP of epic #218). Full per-issue summary: [`.tiki/releases/v0.6.7-changelog.md`](.tiki/releases/v0.6.7-changelog.md).

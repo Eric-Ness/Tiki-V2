@@ -1,0 +1,20 @@
+{
+  "version": "v0.7.0",
+  "status": "active",
+  "issues": [
+    {
+      "number": 222,
+      "title": "D: Single source of truth — deriveDisplayStatus() selector"
+    },
+    {
+      "number": 220,
+      "title": "B: Frozen display across surfaces (detail badge, pipeline, watcher debounce)"
+    },
+    {
+      "number": 221,
+      "title": "C: GitHub freshness — re-sync on window focus"
+    }
+  ],
+  "epic": 218,
+  "createdAt": "2026-05-21T00:00:00.000Z"
+}
