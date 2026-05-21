@@ -343,3 +343,47 @@ test("integration: --tiki-path override wins over CWD-based resolution", async (
   const parsed = JSON.parse(await fsp.readFile(overrideState, "utf-8"));
   assert.equal(parsed.activeWork["issue:7777"].status, "pending");
 });
+
+// ---------------------------------------------------------------------------
+// Phase-clear parity (#220): completing an issue must drop a stale phase so the
+// pipeline timeline / sidebar don't show a leftover "1/N". Mirrors the Rust
+// test_phase_cleared_on_completed in state_transition.rs.
+// ---------------------------------------------------------------------------
+
+test("phase is cleared when an issue transitions to completed (#220)", async () => {
+  const repo = await makeTmpDir("tiki-int-phase-clear");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+  await fsp.mkdir(path.join(repo, ".tiki"), { recursive: true });
+
+  const runShim = (args) =>
+    spawnSync(process.execPath, [STATE_SHIM, ...args], { cwd: repo, encoding: "utf-8" });
+
+  // Put the issue into executing WITH phase progress set.
+  const set = runShim([
+    "transition", "issue:6001",
+    "--to-status", "executing", "--to-step", "EXECUTE",
+    "--issue-number", "6001", "--issue-title", "phase clear",
+    "--phase-current", "1", "--phase-total", "3", "--phase-status", "executing",
+  ]);
+  assert.equal(set.status, 0, `set phase failed: ${set.stderr}`);
+
+  const stateFile = path.join(repo, ".tiki", "state.json");
+  let parsed = JSON.parse(await fsp.readFile(stateFile, "utf-8"));
+  assert.ok(parsed.activeWork["issue:6001"].phase, "phase should be set after executing transition");
+  assert.equal(parsed.activeWork["issue:6001"].phase.current, 1);
+
+  // Complete it — phase must be gone.
+  const done = runShim([
+    "transition", "issue:6001",
+    "--to-status", "completed", "--to-step", "SHIP",
+  ]);
+  assert.equal(done.status, 0, `complete failed: ${done.stderr}`);
+
+  parsed = JSON.parse(await fsp.readFile(stateFile, "utf-8"));
+  assert.equal(parsed.activeWork["issue:6001"].status, "completed");
+  assert.equal(
+    parsed.activeWork["issue:6001"].phase,
+    undefined,
+    "phase must be cleared on completion (#220)"
+  );
+});

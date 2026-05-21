@@ -390,6 +390,12 @@ function applyTransition(state, input) {
     if (toStatus === "shipping" || toStatus === "completed") {
       delete entry.parallelExecution;
     }
+    // Clear stale phase progress on completion so the pipeline timeline and
+    // sidebar don't show a leftover "1/N" after the work is done (#220).
+    // Mirrors the Rust state_transition impl.
+    if (toStatus === "completed") {
+      delete entry.phase;
+    }
 
     state.activeWork[workId] = entry;
   } else {

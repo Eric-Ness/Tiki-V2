@@ -1,0 +1,81 @@
+{
+  "issue": {
+    "number": 220,
+    "title": "B: Frozen display across surfaces (detail badge, pipeline, watcher debounce)"
+  },
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Detail GitHub badge re-fetches on stateChanged (refresh nonce) so a close-elsewhere updates without reselection",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:06:56.790Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Rust watcher uses trailing-edge debounce (<=100ms) so the final write of a burst is always emitted (no freeze on intermediate state)",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:06:56.790Z"
+    },
+    {
+      "id": "SC3",
+      "description": "work.phase cleared on completion in BOTH state.mjs AND state_transition.rs, guarded by parity tests",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:06:56.790Z"
+    },
+    {
+      "id": "SC4",
+      "description": "pnpm build + cargo clippy --deny warnings + all test suites green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T21:06:56.790Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      3
+    ]
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Detail re-fetch on stateChanged (refresh nonce)",
+      "content": "App.tsx: add a detailRefreshNonce that increments on every stateChanged file event; thread it into the on-demand fetch_github_issue_by_number effect deps so the selected issue's GitHub state (and thus the deriveDisplayStatus badge) refreshes without reselection. Pairs with #222 (selector) and #218→A (release children now in recentIssues).",
+      "verification": [
+        "App.tsx fetch effect deps include detailRefreshNonce; nonce incremented in the tiki-file-changed stateChanged handler",
+        "pnpm build green"
+      ],
+      "status": "completed",
+      "summary": "App.tsx: detailRefreshNonce increments on stateChanged and feeds the on-demand issue fetch deps — badge updates without reselection."
+    },
+    {
+      "number": 2,
+      "title": "Rust watcher: leading-edge → trailing-edge debounce",
+      "content": "watcher.rs: replace the leading-edge should_emit with a trailing-edge scheme — pending HashMap<key,(event,Instant)>, poll at 50ms, flush a target only after it goes quiet for DEBOUNCE (100ms). Guarantees the final write of a burst (e.g. release teardown's remove+append-history) reaches the frontend instead of freezing on an intermediate write. Pure quiet_keys() helper + unit tests.",
+      "verification": [
+        "watcher.rs no longer has leading-edge should_emit; flush_quiet_events + quiet_keys present",
+        "cargo test: quiet_keys_excludes_active_and_includes_aged + trailing_edge_emits_only_after_burst_goes_quiet pass"
+      ],
+      "status": "completed",
+      "summary": "watcher.rs: leading-edge should_emit replaced with trailing-edge pending-map + quiet_keys/flush_quiet_events (100ms); 2 unit tests."
+    },
+    {
+      "number": 3,
+      "title": "Clear stale work.phase on completion (Node + Rust parity) + verification",
+      "content": "state.mjs and state_transition.rs: clear phase when toStatus === completed (next to the existing parallelExecution clear), so the timeline/sidebar don't show a stale '1/N'. Parity tests: Rust test_phase_cleared_on_completed + Node 'phase is cleared ... (#220)' spawn test. Run full build + clippy + cargo test + node --test + desktop vitest.",
+      "verification": [
+        "state.mjs deletes entry.phase on completed; state_transition.rs sets ctx.phase = None on Completed",
+        "Rust test_phase_cleared_on_completed + Node phase-clear test green; clippy --deny warnings clean; pnpm build clean; desktop vitest green"
+      ],
+      "status": "completed",
+      "summary": "phase cleared on completed in state.mjs + state_transition.rs; Rust + Node parity tests. build/clippy/cargo/node/vitest all green."
+    }
+  ]
+}

@@ -122,11 +122,18 @@ fn start_watcher_internal(
 
     log::info!("Watching .tiki directory for changes: {:?}", tiki_path);
 
-    // Leading-edge debounce: a single atomic write produces 3-5 raw notify
-    // events; we coalesce them per logical target so the frontend gets one
-    // reload instead of a storm. Bounded by issue/release cardinality.
-    let mut last_emissions: HashMap<String, Instant> = HashMap::new();
-    const DEBOUNCE: Duration = Duration::from_millis(50);
+    // Trailing-edge debounce: a single atomic write produces 3-5 raw notify
+    // events, and a burst of rapid state.mjs writes (e.g. a release teardown
+    // doing remove + append-history back-to-back) produces several writes in
+    // quick succession. We coalesce per logical target and emit only AFTER
+    // writes for that target go quiet for `DEBOUNCE`, so the frontend always
+    // receives the FINAL state of a burst instead of freezing on an
+    // intermediate write (issue #220). Bounded by issue/release cardinality.
+    let mut pending: HashMap<String, (TikiFileEvent, Instant)> = HashMap::new();
+    const DEBOUNCE: Duration = Duration::from_millis(100);
+    // Poll often enough to flush quiet targets promptly while still checking
+    // the stop signal regularly.
+    const POLL: Duration = Duration::from_millis(50);
 
     // Process events
     loop {
@@ -136,31 +143,31 @@ fn start_watcher_internal(
             break;
         }
 
-        // Use recv_timeout to allow periodic stop signal checks
-        match rx.recv_timeout(Duration::from_millis(500)) {
+        // Use recv_timeout to allow periodic stop-signal checks and to wake the
+        // loop so pending events can be flushed even when no new event arrives.
+        match rx.recv_timeout(POLL) {
             Ok(Ok(event)) => {
                 if let Some(file_event) = process_event(&event) {
-                    if should_emit(&mut last_emissions, &file_event, DEBOUNCE) {
-                        log::info!("Tiki file changed: {:?}", file_event);
-                        if let Err(e) = app_handle.emit("tiki-file-changed", file_event) {
-                            log::error!("Failed to emit event: {}", e);
-                        }
-                    } else {
-                        log::debug!("Debounced duplicate event: {:?}", file_event);
-                    }
+                    // Record/refresh this target's pending event; emission is
+                    // deferred until the target goes quiet (trailing edge).
+                    let key = debounce_key(&file_event);
+                    pending.insert(key, (file_event, Instant::now()));
                 }
             }
             Ok(Err(e)) => {
                 log::error!("Watch error: {:?}", e);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                // Normal timeout, continue loop
+                // Normal timeout, fall through to the flush below.
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 log::error!("Watcher channel disconnected");
                 break;
             }
         }
+
+        // Emit any target that has been quiet for at least DEBOUNCE.
+        flush_quiet_events(&mut pending, DEBOUNCE, &app_handle);
     }
 
     Ok(())
@@ -177,21 +184,39 @@ fn debounce_key(file_event: &TikiFileEvent) -> String {
     }
 }
 
-/// Leading-edge debounce check. Returns true if this event should be emitted
-/// (and records the emission); false if it falls within the debounce window
-/// of a prior emission for the same key.
-fn should_emit(
-    last_emissions: &mut HashMap<String, Instant>,
-    file_event: &TikiFileEvent,
+/// Trailing-edge readiness check (pure, testable). Returns the keys whose last
+/// raw notify activity is at least `debounce` before `now` — these targets have
+/// gone quiet, so their final coalesced state is ready to emit.
+fn quiet_keys(
+    pending: &HashMap<String, (TikiFileEvent, Instant)>,
+    now: Instant,
     debounce: Duration,
-) -> bool {
-    let key = debounce_key(file_event);
-    let now = Instant::now();
-    match last_emissions.get(&key) {
-        Some(t) if now.duration_since(*t) < debounce => false,
-        _ => {
-            last_emissions.insert(key, now);
-            true
+) -> Vec<String> {
+    let mut keys = Vec::new();
+    for (key, (_event, last)) in pending.iter() {
+        if now.duration_since(*last) >= debounce {
+            keys.push(key.clone());
+        }
+    }
+    keys
+}
+
+/// Emit (and remove) every pending event that has gone quiet for `debounce`, so
+/// the frontend receives one event reflecting the FINAL state of a write burst.
+fn flush_quiet_events(
+    pending: &mut HashMap<String, (TikiFileEvent, Instant)>,
+    debounce: Duration,
+    app_handle: &AppHandle,
+) {
+    if pending.is_empty() {
+        return;
+    }
+    for key in quiet_keys(pending, Instant::now(), debounce) {
+        if let Some((file_event, _)) = pending.remove(&key) {
+            log::info!("Tiki file changed: {:?}", file_event);
+            if let Err(e) = app_handle.emit("tiki-file-changed", file_event) {
+                log::error!("Failed to emit event: {}", e);
+            }
         }
     }
 }
@@ -278,4 +303,50 @@ fn is_in_research_dir(path: &Path) -> Option<&str> {
 /// Check if a path is inside the backups directory
 fn is_in_backups_dir(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "backups")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quiet_keys_excludes_active_and_includes_aged() {
+        let now = Instant::now();
+        let debounce = Duration::from_millis(100);
+        let mut pending: HashMap<String, (TikiFileEvent, Instant)> = HashMap::new();
+        // Last touched 200ms ago → quiet → ready to emit.
+        pending.insert(
+            "state".to_string(),
+            (TikiFileEvent::StateChanged, now - Duration::from_millis(200)),
+        );
+        // Last touched 10ms ago → burst still in flight → NOT ready.
+        pending.insert(
+            "plan-1".to_string(),
+            (
+                TikiFileEvent::PlanChanged { issue_number: 1 },
+                now - Duration::from_millis(10),
+            ),
+        );
+        let ready = quiet_keys(&pending, now, debounce);
+        assert_eq!(ready, vec!["state".to_string()]);
+    }
+
+    #[test]
+    fn trailing_edge_emits_only_after_burst_goes_quiet() {
+        // A burst overwrites the same key repeatedly; insert() keeps only the
+        // LAST event + timestamp, so a single coalesced event survives — and it
+        // is withheld until the target stops changing for the debounce window.
+        let now = Instant::now();
+        let debounce = Duration::from_millis(100);
+        let mut pending: HashMap<String, (TikiFileEvent, Instant)> = HashMap::new();
+        pending.insert(
+            "state".to_string(),
+            (TikiFileEvent::StateChanged, now - Duration::from_millis(5)),
+        );
+        // Still within the burst → nothing emitted yet.
+        assert!(quiet_keys(&pending, now, debounce).is_empty());
+        // After the target goes quiet → the final state is emitted exactly once.
+        let later = now + Duration::from_millis(150);
+        assert_eq!(quiet_keys(&pending, later, debounce), vec!["state".to_string()]);
+    }
 }
