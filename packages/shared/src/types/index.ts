@@ -58,7 +58,22 @@ export {
   getUnverifiedCriteria,
   buildCoverageMatrix,
   getPlanPath,
+  deriveCriteriaVerification,
+  criteriaProgress,
 } from './plan.js';
+
+// Config types
+export type {
+  AutoHealCategory,
+  TestsConfig,
+  AutoHealConfig,
+  ParallelConfig,
+  WorkflowConfig,
+  ChangelogConfig,
+  TikiConfig,
+} from './config.js';
+
+export { CONFIG_DEFAULTS } from './config.js';
 
 // Transition table & helpers
 export * from './transitions.js';

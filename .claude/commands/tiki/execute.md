@@ -14,14 +14,18 @@ Execute the phases of a planned issue. Each phase runs with focused context, pro
   <step>Load current state from `.tiki/state.json` to find current phase</step>
   <step>**Retrieve relevant research** from `.tiki/research/` before dispatching any sub-agent (see `<research-retrieval>` below). Research content must be included in every sub-agent prompt under a `## Research Context` heading.</step>
   <step>**CRITICAL: Update state.json with phase info BEFORE starting work** (see state-update-requirement below)</step>
+  <step>**Fire the `pre-execute` lifecycle hook** before the first phase (see `<lifecycle-hooks>`). If it BLOCKS (non-zero exit), pause and stop — do not run any phase.</step>
   <step>For the current phase:
     1. Display phase details (title, files, verification criteria)
-    2. Execute the phase content (the actual work)
-    3. Run verification checks
-    4. Run test integration (see `<test-integration>` block) before declaring verification passed
-    5. Generate a summary of what was accomplished (include `testResults` if tests ran)
-    6. Update phase status and save state
+    2. **Fire the `phase-start` hook** (see `<lifecycle-hooks>`)
+    3. Execute the phase content (the actual work)
+    4. Run verification checks
+    5. Run test integration (see `<test-integration>` block) before declaring verification passed
+    6. Generate a summary of what was accomplished (include `testResults` if tests ran)
+    7. Update phase status and save state
+    8. **Fire the `phase-complete` hook** with the phase's final status (see `<lifecycle-hooks>`)
   </step>
+  <step>**Fire the `post-execute` hook** after all phases finish (see `<lifecycle-hooks>`), before transitioning to `shipping`.</step>
   <step>If verification passes, advance to next phase or complete</step>
   <step>If verification fails (including test failures), follow `<auto-heal>` (when enabled in `.tiki/config.json`) before offering manual recovery options</step>
 </instructions>
@@ -56,6 +60,34 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
 ```
 </state-update-requirement>
+
+<lifecycle-hooks>
+## Lifecycle Hooks (`.tiki/hooks/`)
+
+EXECUTE fires four lifecycle hooks via the hook runner. Hooks are **opt-in** — the runner reads `.tiki/hooks/hooks.json`, and if a hook is missing, absent, or `enabled !== true` it prints nothing and exits 0, so this section is a no-op on projects without configured hooks. See `docs/HOOKS.md` for the registry shape, the `.ps1`-vs-`.sh` resolution, and the failure policy.
+
+**Fire points (run the runner with the Bash tool):**
+
+```bash
+# Once, BEFORE the first phase (after computing the total phase count):
+node packages/framework/scripts/run-hook.mjs pre-execute \
+  --env TIKI_ISSUE={number} --env TIKI_TITLE="{issue title}" --env TIKI_TOTAL_PHASES={T}
+
+# Immediately BEFORE starting each phase N (after the state.mjs transition):
+node packages/framework/scripts/run-hook.mjs phase-start \
+  --env TIKI_ISSUE={number} --env TIKI_PHASE={N} --env TIKI_PHASE_TITLE="{phase title}"
+
+# Immediately AFTER each phase N returns (status is "completed" | "failed" | "skipped"):
+node packages/framework/scripts/run-hook.mjs phase-complete \
+  --env TIKI_ISSUE={number} --env TIKI_PHASE={N} --env TIKI_PHASE_STATUS="{phase status}"
+
+# Once, AFTER all phases finish (before the shipping transition):
+node packages/framework/scripts/run-hook.mjs post-execute \
+  --env TIKI_ISSUE={number} --env TIKI_PHASES_COMPLETED={count of completed phases}
+```
+
+**Failure policy:** a non-zero exit from a `pre-*` hook (here `pre-execute`) is BLOCKING — the runner exits non-zero. When that happens, **PAUSE the pipeline**: set work `status` to `"paused"`, leave `pipelineStep` as `"EXECUTE"`, surface the hook's output, and stop before running any phase. The non-blocking hooks (`phase-start`, `phase-complete`, `post-execute`) only warn on failure (runner exits 0); log the warning and continue.
+</lifecycle-hooks>
 
 <parallel-execution>
 ## Parallel Phase Execution
@@ -308,6 +340,14 @@ The sub-agent's response becomes the phase summary.
 
 <state-management>
 See `<state-update-requirement>` for state.json. For the plan file: when a phase completes, set its `status: "completed"` with `completedAt` + `summary` in `.tiki/plans/issue-{number}.json`; on failure use `status: "failed"` + error details. For parallel groups, write `parallelExecution` directly in JSON (shim does not expose this yet — see `<parallel-execution>`).
+
+**After each phase completes, also update `successCriteria` verification** in the same plan file (`.tiki/plans/issue-{number}.json`), applying the "all covering phases complete" rule:
+
+- For each criterion in `successCriteria`, look up its covering phase numbers in `coverageMatrix[criterion.id]` (treat a missing or empty entry as no coverage).
+- If the criterion has at least one covering phase AND **every** covering phase now has `status: "completed"` in `phases[]` (matched by `phase.number`), set `verified: true` and `verifiedAt: "{ISO timestamp}"` on that criterion (preserve an existing `verifiedAt` if already set).
+- Otherwise leave the criterion unverified (`verified: false`, no `verifiedAt`).
+
+This is the same rule implemented by `deriveCriteriaVerification` in `@tiki/shared`; the desktop checklist derives the live state from phase completion, but persisting it here keeps the plan file authoritative once EXECUTE finishes. (Direct-JSON write is acknowledged — `successCriteria` is not exposed by the state shim.)
 </state-management>
 
 <errors>

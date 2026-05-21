@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/config.schema.json",
+  "title": "Tiki Config",
+  "description": "Project-level configuration for Tiki workflow commands (.tiki/config.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "workflow": {
+      "type": "object",
+      "description": "Workflow behavior for the GET -> SHIP pipeline",
+      "additionalProperties": false,
+      "properties": {
+        "tests": {
+          "$ref": "#/$defs/testsConfig"
+        },
+        "autoHeal": {
+          "$ref": "#/$defs/autoHealConfig"
+        },
+        "parallel": {
+          "$ref": "#/$defs/parallelConfig"
+        }
+      }
+    },
+    "changelog": {
+      "$ref": "#/$defs/changelogConfig"
+    },
+    "backupRetention": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of timestamped state.json backups to keep (default 10)"
+    }
+  },
+  "$defs": {
+    "testsConfig": {
+      "type": "object",
+      "description": "Test-running behavior during EXECUTE and SHIP",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether tests run at all (default true)"
+        },
+        "command": {
+          "type": ["string", "null"],
+          "description": "Explicit test command override. If null, the framework auto-detects (vitest, jest, pytest, cargo test, go test)."
+        },
+        "runOnEachPhase": {
+          "type": "boolean",
+          "description": "Run tests after every phase, not just the final one (default false)"
+        },
+        "runBeforeShip": {
+          "type": "boolean",
+          "description": "Run the full test suite before shipping (default true)"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Timeout in seconds for a test run (default 300)"
+        }
+      }
+    },
+    "autoHealConfig": {
+      "type": "object",
+      "description": "Opt-in auto-heal loop for failed phase verification",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether auto-heal is enabled (default false)"
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum heal attempts per phase (default 3)"
+        },
+        "categories": {
+          "type": "array",
+          "description": "Error categories eligible for auto-heal",
+          "items": {
+            "type": "string",
+            "enum": ["build-error", "type-error", "test-failure", "lint-error", "other"]
+          }
+        }
+      }
+    },
+    "parallelConfig": {
+      "type": "object",
+      "description": "Parallel phase execution (EXECUTE)",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether independent phases may run in parallel (default true)"
+        }
+      }
+    },
+    "changelogConfig": {
+      "type": "object",
+      "description": "Changelog generation customization (RELEASE)",
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "type": "string",
+          "description": "Path to a custom changelog template with placeholders"
+        },
+        "categories": {
+          "type": "object",
+          "description": "Maps commit prefixes to display category names",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "includeCommitHashes": {
+          "type": "boolean",
+          "description": "Include commit hashes in changelog entries (default false)"
+        },
+        "includeAuthors": {
+          "type": "boolean",
+          "description": "Include commit authors in changelog entries (default false)"
+        }
+      }
+    }
+  }
+}

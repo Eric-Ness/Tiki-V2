@@ -10,6 +10,20 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.6.6] — 2026-05-21
+
+First feature release surfaced from the 2026-05-20 codebase deep-dive — three additions that activate dormant data-model capacity and stand up the long-specified extensibility layer. Full per-issue summary: [`.tiki/releases/v0.6.6-changelog.md`](.tiki/releases/v0.6.6-changelog.md).
+
+### Added
+- **Live planning checklist** (#216). PLAN's success criteria become a live checklist: EXECUTE marks each criterion verified once **all** of its covering phases (per `coverageMatrix`) complete, and the detail panel renders a ticking ☑/☐ list with `N/M` progress for both in-flight and completed issues. Activates the dormant `SuccessCriterion.verified`/`verifiedAt` fields — no schema change.
+- **`config.json` schema, validation, and in-app editor** (#214). A canonical JSON schema (`additionalProperties:false`) for `.tiki/config.json`, a validator that flags misspelled keys as warnings instead of silently defaulting, atomic `read_tiki_config`/`save_tiki_config` Tauri commands, and a Settings → Workflow editor with inline validation (E33).
+- **Lifecycle hooks** (#215). The long-specified `.tiki/hooks/` system, implemented as a real `run-hook.mjs` runner invoked from EXECUTE and SHIP. Six hook points with documented `TIKI_*` env vars; `.ps1`/`.sh` support; `pre-*` hooks block on failure, `post-*` warn. Sample registry ships disabled. See [`docs/HOOKS.md`](docs/HOOKS.md).
+
+### Internal
+- `@tiki/shared` +21 tests, desktop +25 vitest / +6 Rust, framework `node:test` 10 → 21. Test totals at ship: shared 86, desktop 144, framework 21, Rust 34. `pnpm build` + `cargo clippy --deny warnings` clean.
+
+---
+
 ## [v0.6.0] — 2026-05-14
 
 "UX polish" — the first backlog-driven release since v0.5.0, breaking the v0.5.4–v0.5.7 single-issue reactive-bugfix streak. Five enhancements from `docs/ENHANCEMENT-IDEAS.md` (E2, E3, E10, E11, E14) scoped and shipped together. Full per-issue summary: [`.tiki/releases/v0.6.0-changelog.md`](.tiki/releases/v0.6.0-changelog.md).

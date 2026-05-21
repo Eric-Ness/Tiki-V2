@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 214,
+    "title": "feat(framework+desktop): config.json schema, validation, and in-app editor",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/214",
+    "labels": [
+      "enhancement",
+      "framework",
+      "desktop",
+      "reliability"
+    ],
+    "milestone": "v0.6.6"
+  },
+  "createdAt": "2026-05-21T00:55:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "config.schema.json exists in packages/shared/schemas with additionalProperties:false covering all referenced keys (workflow.tests, workflow.autoHeal, workflow.parallel, changelog, backupRetention); exported from @tiki/shared",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "Reading config surfaces unknown/misspelled keys as a clear warning instead of silently defaulting",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "Desktop Settings has a Workflow config section that views and edits .tiki/config.json through the validated path, persisted atomically, with inline errors on invalid input",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functional",
+      "description": "New Tauri commands read_tiki_config / save_tiki_config use the existing atomic_write + read_json_resilient helpers and are registered in the invoke handler",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "TS types + Ajv validation (and Rust config parsing) have tests",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    },
+    {
+      "id": "SC6",
+      "category": "other",
+      "description": "pnpm build, pnpm test, and cargo check are green",
+      "verified": true,
+      "verifiedAt": "2026-05-21T01:05:11.403Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Shared config schema + types + Ajv validator",
+      "status": "completed",
+      "content": "First grep the whole repo (command .md files, scripts, Rust, desktop) for every .tiki/config.json key actually referenced so the schema is COMPLETE. Then add packages/shared/schemas/config.schema.json with additionalProperties:false at every object level, covering workflow.tests {enabled,command,runOnEachPhase,runBeforeShip,timeoutSeconds}, workflow.autoHeal {enabled,maxAttempts,categories}, workflow.parallel {enabled}, changelog {...as referenced...}, and top-level backupRetention. Add a TikiConfig TypeScript type (packages/shared/src/types/config.ts) and a validateConfig() in packages/shared/src/validation that returns { valid, errors, unknownKeys } (unknown keys are warnings, not hard errors). Export schema/type/validator from the package index (follow how state/plan schema+types+validation are already exported). Add packages/shared/src/__tests__/config-validation.test.ts covering valid config, unknown key -> warning, wrong type -> error, partial config -> valid (defaults assumed), empty object -> valid.",
+      "verification": [
+        "pnpm --filter @tiki/shared test passes including new config tests",
+        "config.schema.json has additionalProperties:false at each level",
+        "validateConfig exported and flags unknown keys as warnings"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "packages/shared/schemas/config.schema.json",
+        "packages/shared/src/types/config.ts",
+        "packages/shared/src/types/index.ts",
+        "packages/shared/src/validation/index.ts",
+        "packages/shared/src/__tests__/config-validation.test.ts"
+      ],
+      "completedAt": "2026-05-21T01:05:11.403Z",
+      "summary": "Added config.schema.json (draft 2020-12, additionalProperties:false at every level) covering workflow.tests/autoHeal/parallel, changelog, backupRetention; TikiConfig type + CONFIG_DEFAULTS; validateConfig() using Ajv2020 (errors) + manual schema-walk (unknown keys as warnings). +8 shared tests."
+    },
+    {
+      "number": 2,
+      "title": "Rust read_tiki_config / save_tiki_config Tauri commands",
+      "status": "completed",
+      "content": "Add #[tauri::command] read_tiki_config (reads .tiki/config.json via read_json_resilient; returns the parsed config plus a list of unknown-key warnings; missing file -> return defaults with no error) and save_tiki_config (validates, then writes via atomic_write; reject on type errors). Mirror the schema's known keys with a serde struct using #[serde(default)] for optional fields; collect unknown keys as warnings (do NOT use deny_unknown_fields which would hard-error — instead capture extras, e.g. via a flatten HashMap, and report them). Register both commands in the invoke_handler in lib.rs. Add Rust unit tests for parse + unknown-key collection. Resolve .tiki path the same way the other commands do.",
+      "verification": [
+        "cargo check (and cargo test if the app exe is not locked) in apps/desktop/src-tauri succeeds",
+        "both commands registered in lib.rs invoke_handler",
+        "read returns warnings for unknown keys; save rejects type-invalid config"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "completedAt": "2026-05-21T01:05:11.403Z",
+      "summary": "Rust read_tiki_config (missing file -> defaults, returns unknown-key warnings via serde flatten extra maps) + save_tiki_config (validates, atomic_write); registered in lib.rs invoke handler. +6 Rust tests; clippy --deny warnings clean."
+    },
+    {
+      "number": 3,
+      "title": "Desktop Settings — Workflow config section",
+      "status": "completed",
+      "content": "Add a Workflow config section to the desktop Settings page that calls read_tiki_config on open and save_tiki_config on change, persisted atomically. Surface validation errors and unknown-key warnings inline (reuse the existing IssueFormModal inline-validation pattern / .issue-form-field-error style). Provide form controls for the known workflow.tests / workflow.autoHeal / workflow.parallel fields and backupRetention. Disable save while invalid. Follow the existing SettingsPage structure and CSS conventions. Add a vitest for any new pure logic (e.g. the form<->config mapping).",
+      "verification": [
+        "Settings shows a Workflow config section bound to .tiki/config.json",
+        "invalid input shows an inline error and blocks save",
+        "save persists and re-reads correctly",
+        "desktop vitest passes"
+      ],
+      "addressesCriteria": [
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/settings/SettingsPage.tsx"
+      ],
+      "completedAt": "2026-05-21T01:05:11.403Z",
+      "summary": "Desktop WorkflowConfigSection: loads via read_tiki_config, saves via save_tiki_config (atomic), inline validation errors + amber unknown-key warning banner, save disabled while invalid/clean. Pure form<->config helpers with +16 tests. No @tiki/shared runtime dep."
+    },
+    {
+      "number": 4,
+      "title": "Verify build + tests + cargo check",
+      "status": "completed",
+      "content": "Run pnpm build (tsc -b), pnpm --filter @tiki/shared test, desktop vitest, and cargo check in apps/desktop/src-tauri. Fix any failures. cargo test may fail with a Windows file-lock if the desktop app exe is running — cargo check is the minimum bar; note if test is blocked.",
+      "verification": [
+        "pnpm build succeeds",
+        "shared + desktop vitest pass",
+        "cargo check succeeds"
+      ],
+      "addressesCriteria": [
+        "SC6"
+      ],
+      "files": [],
+      "completedAt": "2026-05-21T01:05:11.403Z",
+      "summary": "pnpm build clean; shared 86, desktop 144, Rust 34 passing; cargo check + clippy clean."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1,
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      2
+    ],
+    "SC5": [
+      1,
+      2
+    ],
+    "SC6": [
+      4
+    ]
+  },
+  "notes": "Backlog E33. Canonical validator lives in @tiki/shared (testable spec); Rust owns the read/write/validate commands the desktop calls (desktop does not import @tiki/shared at runtime). Unknown keys are warnings on read, rejected on save.",
+  "updatedAt": "2026-05-21T01:05:11.403Z"
+}
