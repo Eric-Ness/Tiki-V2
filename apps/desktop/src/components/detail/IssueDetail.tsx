@@ -4,7 +4,7 @@ import type { GitHubIssue } from "../../stores";
 import { useProjectsStore, useIssuesStore, usePullRequestsStore, useDetailStore, useTerminalStore, useLayoutStore, useTikiStateStore, EMPTY_TABS } from "../../stores";
 import { resolveWorkTerminal, terminalFocusRegistry } from "../../stores/terminalStore";
 import { deriveDisplayStatus } from "../../utils/deriveDisplayStatus";
-import type { PipelineStep } from "../work/WorkCard";
+import type { PipelineStep, WorkContext } from "../work/WorkCard";
 import { IssueComments } from "./IssueComments";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PipelineTimeline } from "./PipelineTimeline";
@@ -16,24 +16,9 @@ import { formatDuration, calculatePhaseDuration, calculateTotalDuration } from "
 import { useElapsedTimer } from "../../hooks/useElapsedTimer";
 import "./DetailPanel.css";
 
-interface WorkContext {
-  status: string;
-  pipelineStep?: string;
-  phase?: {
-    current?: number;
-    total?: number;
-    status?: string;
-  };
-  parallelExecution?: {
-    phases: number[];
-    completedInGroup?: number[];
-    totalInGroup?: number;
-    startedAt?: string;
-  };
-  createdAt?: string;
-  lastActivity?: string;
-}
-
+// WorkContext is the shared-derived desktop view model (#237). IssueDetail only
+// reads fields common to both union members (status / pipelineStep / phase /
+// parallelExecution / createdAt / lastActivity), so no narrowing is needed.
 interface PlanPhase {
   number: number;
   title: string;

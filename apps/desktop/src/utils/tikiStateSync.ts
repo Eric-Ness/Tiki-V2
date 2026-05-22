@@ -4,7 +4,14 @@
 import { useTikiStateStore, useToastStore, type CompletedRelease } from "../stores";
 import type { WorkContext } from "../components/work";
 
-// Types matching the Rust state structures (state.json).
+// Desktop view of state.json. The anti-drift win lives in `activeWork`: it holds
+// the shared-derived WorkContext view models (#237 — IssueContext/ReleaseContext
+// derive from @tiki/shared's IssueWork/ReleaseWork via Pick/Omit). The history
+// records stay an inline object literal on purpose: detectGithubRefreshTriggers
+// consumes `history.recentIssues` via an implicit index signature, which an
+// inline literal satisfies but a NAMED shared interface (CompletedIssueRecord)
+// does not — and `tsc -b` (project-reference build) enforces that where
+// `tsc --noEmit` does not. Keeping history inline avoids that mismatch.
 export interface TikiState {
   schemaVersion: number;
   activeWork: Record<string, WorkContext>;

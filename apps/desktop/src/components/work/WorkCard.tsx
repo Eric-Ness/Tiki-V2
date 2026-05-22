@@ -1,74 +1,47 @@
-// Canonical status/pipeline unions live in @tiki/shared. Import them for local use AND
-// re-export so the existing `import ... from "../work/WorkCard"` sites keep working,
-// while @tiki/shared remains the single source of truth. Type-only → erased at build
-// (no runtime import). Fixes prior PhaseStatus drift: the local copy was missing
-// "skipped" and carried a non-canonical "running".
-import type { WorkStatus, PhaseStatus, PipelineStep } from "@tiki/shared";
-export type { WorkStatus, PhaseStatus, PipelineStep };
+// The desktop consumes a TRIMMED/augmented shape of the canonical @tiki/shared
+// work types (a smaller `issue`, an optional `lastActivity`, and a UI-only
+// `auditPassed`). Rather than re-declaring them — which drifted before (#231) —
+// these view models are DERIVED from shared via Pick/Omit, so a field rename or
+// type change in shared becomes a compile error here (#237). Type-only imports
+// → erased at build (no @tiki/shared at runtime).
+import type {
+  WorkStatus,
+  PhaseStatus,
+  PipelineStep,
+  PipelineStepRecord,
+  IssueWork,
+  ReleaseWork,
+  IssueInfo,
+  PhaseProgress,
+  ParallelExecution,
+  ReleaseInfo,
+} from "@tiki/shared";
 
-export interface PhaseInfo {
-  total: number;
-  current: number;
-  status: PhaseStatus;
-}
+// Re-export the canonical primitives/records so existing
+// `import ... from "../work/WorkCard"` sites keep resolving.
+export type { WorkStatus, PhaseStatus, PipelineStep, PipelineStepRecord, ReleaseInfo };
+
+/** Phase progress — alias of the shared canonical shape. */
+export type PhaseInfo = PhaseProgress;
+/** Parallel-execution group tracking — alias of the shared canonical shape. */
+export type ParallelExecutionInfo = ParallelExecution;
 
 /**
- * Parallel execution tracking — present only when multiple phases are running concurrently.
- * When set, sub-agents are dispatched for each phase in `phases`; once all return, the
- * parent clears this field and advances to the next group.
+ * Desktop view model: the shared IssueWork with a trimmed `issue` (the sidebar
+ * only needs number/title/url), an optional `lastActivity`, and the UI-only
+ * `auditPassed` flag. Everything else (status, pipelineStep, phase,
+ * parallelExecution, parentRelease, …) tracks shared automatically.
  */
-export interface ParallelExecutionInfo {
-  /** Phase numbers currently running in parallel */
-  phases: number[];
-  /** Phase numbers in this group that have already completed */
-  completedInGroup: number[];
-  /** Total phases in this parallel group (for progress display) */
-  totalInGroup: number;
-  /** ISO timestamp when the group started */
-  startedAt: string;
-}
-
-export interface PipelineStepRecord {
-  step: PipelineStep;
-  startedAt: string;
-  completedAt?: string;
-}
-
-export interface IssueContext {
-  type: "issue";
-  issue: {
-    number: number;
-    title?: string;
-    url?: string;
-  };
-  status: WorkStatus;
-  pipelineStep?: PipelineStep;
-  pipelineHistory?: PipelineStepRecord[];
-  phase?: PhaseInfo;
-  /** Set only while a multi-phase parallel group is in flight; cleared when group completes */
-  parallelExecution?: ParallelExecutionInfo;
-  createdAt: string;
+export type IssueContext = Omit<IssueWork, "issue" | "lastActivity"> & {
+  issue: Pick<IssueInfo, "number" | "title" | "url">;
   lastActivity?: string;
   auditPassed?: boolean;
-  parentRelease?: string;
-}
+};
 
-export interface ReleaseInfo {
-  version: string;
-  issues: number[];
-  currentIssue?: number;
-  completedIssues?: number[];
-  milestone?: string;
-}
-
-export interface ReleaseContext {
-  type: "release";
-  release: ReleaseInfo;
-  status: WorkStatus;
-  pipelineStep?: PipelineStep;
-  createdAt: string;
+/** Desktop view model: the shared ReleaseWork with an optional `lastActivity`. */
+export type ReleaseContext = Omit<ReleaseWork, "lastActivity"> & {
   lastActivity?: string;
-}
+};
 
 export type WorkContext = IssueContext | ReleaseContext;
 
