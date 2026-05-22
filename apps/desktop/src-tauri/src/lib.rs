@@ -1,5 +1,6 @@
 mod claude_usage;
 mod commands;
+mod config;
 mod fs_utils;
 mod github;
 pub mod state;
@@ -64,8 +65,8 @@ pub fn run() {
             commands::read_research_doc,
             commands::install_framework,
             commands::read_framework_version,
-            commands::read_tiki_config,
-            commands::save_tiki_config,
+            config::read_tiki_config,
+            config::save_tiki_config,
             state_transition::state_transition,
             github::check_claude_cli,
             github::check_gh_auth,
