@@ -1,6 +1,10 @@
-export type WorkStatus = "pending" | "reviewing" | "planning" | "executing" | "paused" | "completed" | "failed" | "shipping";
-export type PhaseStatus = "pending" | "running" | "executing" | "completed" | "failed";
-export type PipelineStep = "GET" | "REVIEW" | "PLAN" | "AUDIT" | "EXECUTE" | "SHIP";
+// Canonical status/pipeline unions live in @tiki/shared. Import them for local use AND
+// re-export so the existing `import ... from "../work/WorkCard"` sites keep working,
+// while @tiki/shared remains the single source of truth. Type-only → erased at build
+// (no runtime import). Fixes prior PhaseStatus drift: the local copy was missing
+// "skipped" and carried a non-canonical "running".
+import type { WorkStatus, PhaseStatus, PipelineStep } from "@tiki/shared";
+export type { WorkStatus, PhaseStatus, PipelineStep };
 
 export interface PhaseInfo {
   total: number;
