@@ -28,8 +28,18 @@ interface FileEvent {
 }
 
 interface UseTikiFileSyncParams {
-  /** Active project (or null/undefined for the default cwd-based path). */
-  activeProject: { path: string } | null | undefined;
+  /**
+   * Active project PATH (or null/undefined for the default cwd-based path).
+   *
+   * Deliberately a primitive string, NOT the whole project object: the project
+   * object is reallocated on every framework-version stamp (projectsStore
+   * setProjectFrameworkVersion does `projects.map(p => ({...p}))`), which would
+   * make this effect's dep change on each stamp and tear down + re-subscribe the
+   * async `tiki-file-changed` listener — any state write landing in that gap is
+   * lost. Keying on the path string keeps the subscription stable across stamps,
+   * so it re-subscribes only on a real project switch (#249 / epic #244).
+   */
+  activeProjectPath: string | null | undefined;
   /** App's previous-state ref, updated after each reload for change detection. */
   prevStateRef: RefObject<TikiState | null>;
   /** App's state setter — the reloaded state is pushed here for rendering. */
@@ -41,7 +51,7 @@ interface UseTikiFileSyncParams {
 }
 
 export function useTikiFileSync({
-  activeProject,
+  activeProjectPath,
   prevStateRef,
   setState,
   bumpDetailRefresh,
@@ -52,7 +62,7 @@ export function useTikiFileSync({
       console.log("File changed:", event.payload);
       if (event.payload.type === "stateChanged") {
         try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
+          const projectTikiPath = activeProjectPath ? `${activeProjectPath}/.tiki` : undefined;
           const currentState = await invoke<TikiState | null>("get_state", {
             tikiPath: projectTikiPath,
           });
@@ -87,7 +97,7 @@ export function useTikiFileSync({
         }
       } else if (event.payload.type === "releaseChanged") {
         try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
+          const projectTikiPath = activeProjectPath ? `${activeProjectPath}/.tiki` : undefined;
           const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath: projectTikiPath });
           useTikiReleasesStore.getState().setReleases(loadedReleases);
         } catch (e) {
@@ -95,7 +105,7 @@ export function useTikiFileSync({
         }
       } else if (event.payload.type === "researchChanged") {
         try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
+          const projectTikiPath = activeProjectPath ? `${activeProjectPath}/.tiki` : undefined;
           const loadedDocs = await invoke<ResearchDocMeta[]>("list_research_docs", { tikiPath: projectTikiPath });
           useResearchStore.getState().setDocs(loadedDocs);
         } catch (e) {
@@ -107,5 +117,5 @@ export function useTikiFileSync({
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [activeProject, prevStateRef, setState, bumpDetailRefresh, onStateChange]);
+  }, [activeProjectPath, prevStateRef, setState, bumpDetailRefresh, onStateChange]);
 }

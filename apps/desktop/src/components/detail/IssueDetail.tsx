@@ -51,6 +51,8 @@ interface TikiPlan {
 interface IssueDetailProps {
   issue: GitHubIssue;
   work?: WorkContext | null;
+  /** True when this issue's tracked state is stale (drives the anomaly badge, #246). */
+  stale?: boolean;
 }
 
 function PhaseItem({ phase }: { phase: PlanPhase }) {
@@ -120,7 +122,7 @@ function getLinkedPrReviewLabel(decision: string): string {
   return "Review";
 }
 
-export function IssueDetail({ issue, work }: IssueDetailProps) {
+export function IssueDetail({ issue, work, stale }: IssueDetailProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,8 +239,9 @@ export function IssueDetail({ issue, work }: IssueDetailProps) {
           : null,
         githubState: { state: issue.state.toLowerCase() === "closed" ? "closed" : "open" },
         history: { recentIssues, recentReleases },
+        stale: stale ?? false,
       }),
-    [issue.number, issue.state, work, recentIssues, recentReleases]
+    [issue.number, issue.state, work, recentIssues, recentReleases, stale]
   );
 
   const badgeClass = display.badge === "Closed" ? stateBadgeStyles.closed : stateBadgeStyles.open;

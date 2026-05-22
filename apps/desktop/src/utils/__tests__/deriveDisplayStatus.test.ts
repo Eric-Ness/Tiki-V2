@@ -52,6 +52,39 @@ describe('deriveDisplayStatus — #218 precedence table', () => {
     expect(out.anomaly).toBeTruthy();
   });
 
+  it('stale: in-flight executing + stale=true → active pipeline with a stall anomaly (#246)', () => {
+    const out = deriveDisplayStatus({
+      number: 500,
+      work: { status: 'executing', pipelineStep: 'EXECUTE' },
+      githubState: { state: 'open' },
+      stale: true,
+    });
+    expect(out.column).toBe('execute');
+    expect(out.pipelineState).toBe('active');
+    expect(out.anomaly).toMatch(/stalled/i);
+  });
+
+  it('not stale: in-flight executing + stale=false → no anomaly (#246)', () => {
+    const out = deriveDisplayStatus({
+      number: 501,
+      work: { status: 'executing', pipelineStep: 'EXECUTE' },
+      githubState: { state: 'open' },
+      stale: false,
+    });
+    expect(out.anomaly).toBeUndefined();
+  });
+
+  it('stale never overrides the higher-priority Tiki-done/GitHub-open anomaly (#246)', () => {
+    const out = deriveDisplayStatus({
+      number: 502,
+      work: { status: 'shipping', pipelineStep: 'SHIP' },
+      githubState: { state: 'open' },
+      stale: true,
+    });
+    // Row 1 wins: the anomaly is the Tiki-vs-GitHub disagreement, not the stall.
+    expect(out.anomaly).toMatch(/still open/i);
+  });
+
   it('closed-not-merged: in history + GitHub closed + merged=false → Completed, Closed badge, partial pipeline', () => {
     const out = deriveDisplayStatus({
       number: 77,
