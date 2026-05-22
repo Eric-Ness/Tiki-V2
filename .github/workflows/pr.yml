@@ -76,6 +76,9 @@ jobs:
       - name: Vitest (apps/desktop)
         run: pnpm -C apps/desktop test
 
+      - name: Tests (packages/framework)
+        run: pnpm -C packages/framework test
+
       - name: Cargo test
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 
