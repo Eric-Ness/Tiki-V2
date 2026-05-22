@@ -10,6 +10,15 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.7.2] — 2026-05-22
+
+Wave 3 (part 2, final) of the status-desync epic (#218) — completes the epic. The high-risk store-consolidation refactor held back from v0.7.1, verified live before ship. Full detail: [`.tiki/releases/v0.7.2-changelog.md`](.tiki/releases/v0.7.2-changelog.md).
+
+### Changed
+- **Single `activeWork` store** (#223). Collapsed the two hand-synced `activeWork` copies (React-local `App.state` vs `tikiStateStore`) — which let the sidebar and kanban diverge — onto `tikiStateStore` as the single source for sidebar, kanban, detail, and stale detection. The store seeds `activeWork` to a stable `{}` ref, removing the inline `?? {}` fallback that is the #210/#212 render-loop crash class (dead `EMPTY_ACTIVE_WORK` removed). Shipped after a live `tauri:dev` gate, since the failure mode is a runtime render loop unit tests don't catch.
+
+---
+
 ## [v0.7.1] — 2026-05-21
 
 Wave 3 (part 1) of the status-desync epic (#218) — write-integrity hardening, no UI changes. Full detail: [`.tiki/releases/v0.7.1-changelog.md`](.tiki/releases/v0.7.1-changelog.md).
