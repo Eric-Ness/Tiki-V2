@@ -1,0 +1,42 @@
+{
+  "issue": {
+    "number": 223,
+    "title": "E: Collapse the dual activeWork store (high risk)"
+  },
+  "successCriteria": [
+    { "id": "SC1", "description": "Every surface (Active Work sidebar, Kanban, detail, stale detection) reads activeWork from tikiStateStore — the React-local App.state.activeWork is no longer a render source" },
+    { "id": "SC2", "description": "Store activeWork selector returns a stable ref (store seeds {}), no inline ?? {} / ?? [] introduced in selector/hook-arg positions (guards the #210/#212 crash class)" },
+    { "id": "SC3", "description": "LIVE GATE: app boots and survives project-switch + empty-state in tauri:dev with NO render loop / blank screen" },
+    { "id": "SC4", "description": "pnpm build + desktop vitest green" }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [1],
+    "SC3": [2],
+    "SC4": [1]
+  },
+  "phases": [
+    {
+      "number": 1,
+      "title": "Route all surfaces to tikiStateStore.activeWork (single source)",
+      "content": "App.tsx: subscribe once via useTikiStateStore((s) => s.activeWork) and feed it to the three surface reads that previously used the React-local state.activeWork — staleFlags (useStaleWorkDetection), selectedIssueWork (detail), and StateSection (sidebar). KanbanBoard already reads the store. The store seeds activeWork to a stable {} ref so no inline ?? {} fallback is needed. Remove the now-dead EMPTY_ACTIVE_WORK constant. App-local `state` is retained only for the load guard + change-detection diffing (prevStateRef/currentState), not as a render source — eliminating the dual-source divergence.",
+      "verification": [
+        "grep: no remaining state.activeWork / state?.activeWork surface reads in App.tsx",
+        "EMPTY_ACTIVE_WORK removed (no unused-const build error)",
+        "pnpm build clean (tsc -b); desktop vitest 177 green"
+      ],
+      "status": "completed",
+      "summary": "App.tsx routes staleFlags + selectedIssueWork + StateSection to useTikiStateStore((s)=>s.activeWork); kanban already on the store. Dead EMPTY_ACTIVE_WORK removed. App-local state kept only for load guard + diffing. build clean, desktop 177."
+    },
+    {
+      "number": 2,
+      "title": "Live tauri:dev verification gate",
+      "content": "Run pnpm tauri:dev (Windows: from the x64 Native Tools Command Prompt for VS 2022). Confirm: (1) app boots to the normal UI, no blank screen / 'Maximum update depth exceeded'; (2) switching the active project re-renders sidebar+kanban+detail without a loop; (3) the empty-state (no active work) renders fine; (4) start/observe a piece of work so activeWork populates and all three surfaces show the SAME status. This is the gate static tests can't cover (the failure mode is a runtime render loop).",
+      "verification": [
+        "User confirms tauri:dev boots + survives project-switch + empty-state with no render loop",
+        "Sidebar, kanban, and detail show identical status for the same work item"
+      ],
+      "status": "pending"
+    }
+  ]
+}
