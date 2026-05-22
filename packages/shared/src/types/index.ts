@@ -7,6 +7,8 @@
 export type {
   WorkStatus,
   PhaseStatus,
+  PipelineStep,
+  PipelineStepRecord,
   Timestamp,
   IssueInfo,
   PhaseProgress,

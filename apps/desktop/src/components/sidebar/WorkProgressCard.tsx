@@ -51,8 +51,8 @@ function getPhaseSegmentStatus(
   } else if (phaseNumber === currentPhase) {
     // Current phase - use the phase.status to determine if running or failed
     if (phaseStatus === "failed") return "failed";
-    if (phaseStatus === "running" || phaseStatus === "executing") return "running";
-    if (phaseStatus === "completed") return "completed";
+    if (phaseStatus === "executing") return "running";
+    if (phaseStatus === "completed" || phaseStatus === "skipped") return "completed";
     return "pending";
   } else {
     return "pending";
@@ -157,10 +157,9 @@ export function WorkProgressCard({ work, workId, isStale }: WorkProgressCardProp
       : null;
   // Disable while a phase is actively running — re-sending the command mid-phase
   // would queue a duplicate /tiki:execute behind the live one. PhaseStatus
-  // "executing" (and legacy "running") both represent in-flight phases.
+  // "executing" represents an in-flight phase.
   const isActivelyRunning =
-    work.status === "executing" &&
-    (phaseStatus === "executing" || phaseStatus === "running");
+    work.status === "executing" && phaseStatus === "executing";
   const resumeDisabled = resumeAction === null || isActivelyRunning;
 
   const handleResume = async (e: React.MouseEvent) => {
