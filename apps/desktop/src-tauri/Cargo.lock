@@ -4609,7 +4609,7 @@ dependencies = [
 
 [[package]]
 name = "tiki-desktop"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "chrono",
  "dirs",

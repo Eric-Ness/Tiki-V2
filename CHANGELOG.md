@@ -10,6 +10,15 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v0.7.3] — 2026-05-22
+
+Release-tooling fix, dogfooded by its own release. Full detail: [`.tiki/releases/v0.7.3-changelog.md`](.tiki/releases/v0.7.3-changelog.md).
+
+### Changed
+- **`version-bump.mjs` now also bumps `.tiki/.framework-version`** (#229). The script skipped the 5th version file the release process tracks, so it went stale after every `pnpm version-bump` (v0.6.0 → v0.7.2) and was fixed by hand each release. Now a 5th entry in `files[]`; the file is plain text so its `update()` rewrites it wholesale (no trailing newline, no spurious diff). v0.7.3's own bump moved all 5 files in one invocation — the live acceptance test.
+
+---
+
 ## [v0.7.2] — 2026-05-22
 
 Wave 3 (part 2, final) of the status-desync epic (#218) — completes the epic. The high-risk store-consolidation refactor held back from v0.7.1, verified live before ship. Full detail: [`.tiki/releases/v0.7.2-changelog.md`](.tiki/releases/v0.7.2-changelog.md).
