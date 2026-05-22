@@ -3,19 +3,24 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 224,
-      "title": "F: Write integrity — state.mjs lock + watcher active-project repoint",
-      "completedAt": "2026-05-21T23:30:15.242Z"
+      "number": 223,
+      "title": "E: Collapse the dual activeWork store (high risk)",
+      "completedAt": "2026-05-22T12:28:31.813Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.7.1",
+      "version": "v0.7.2",
       "issues": [
-        224
+        223
       ],
-      "completedAt": "2026-05-21T23:36:49.459Z",
-      "tag": "v0.7.1"
+      "completedAt": "2026-05-22T12:28:32.066Z",
+      "tag": "v0.7.2"
     },
     "recentIssues": [
+      {
+        "number": 223,
+        "title": "E: Collapse the dual activeWork store (high risk)",
+        "completedAt": "2026-05-22T12:28:31.813Z"
+      },
       {
         "number": 224,
         "title": "F: Write integrity — state.mjs lock + watcher active-project repoint",
@@ -207,6 +212,14 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.7.2",
+        "issues": [
+          223
+        ],
+        "completedAt": "2026-05-22T12:28:32.066Z",
+        "tag": "v0.7.2"
+      },
       {
         "version": "v0.7.1",
         "issues": [
