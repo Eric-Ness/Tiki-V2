@@ -56,6 +56,13 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      # The desktop now imports types from @tiki/shared (since #231), and the
+      # tauri-action's beforeBuildCommand runs the desktop build standalone
+      # (apps/desktop: `tsc -b && vite build`), which does NOT build the shared
+      # package first. Build its dist/ here so tsc can resolve @tiki/shared.
+      - name: Build shared package
+        run: pnpm --filter @tiki/shared build
+
       - name: Sync version from tag
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
