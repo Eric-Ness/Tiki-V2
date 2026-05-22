@@ -140,7 +140,7 @@ Rules:
 **REQUIRED — run this FIRST, before analyzing the issue.** Record the `pending → reviewing` transition through the validated shim so the desktop pipeline advances to REVIEW immediately. Do NOT defer it to the end of the step or make it conditional on how this command was invoked — emit it unconditionally as the first action. The shim creates the `issue:{number}` entry if missing, updates status/`pipelineStep`/`lastActivity`, preserves `parentRelease`, and is a safe no-op if the step was already recorded.
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status reviewing --to-step REVIEW --issue-number {number} --issue-title "{title}"
 ```
 </state-management>

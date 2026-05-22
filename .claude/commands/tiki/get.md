@@ -26,7 +26,7 @@ Fetch a GitHub issue and display it in a readable format. This is typically the 
 **REQUIRED — run this immediately after fetching the issue (you now have the title), before displaying anything.** This creates the `issue:{number}` entry the desktop app tracks; skip it and the issue never appears in the pipeline. Re-running is a safe no-op. Canonical shape and parent-release detection: see `yolo.md` `<state-management>`.
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status pending --to-step GET --issue-number {number} --issue-title "{title}"
 ```
 

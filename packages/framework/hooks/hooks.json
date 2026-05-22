@@ -1,0 +1,25 @@
+{
+  "description": "Tiki reconciler — derives pipeline state from artifacts every turn so dropped /tiki transitions self-heal (epic #244). Applies when Tiki is loaded as a Claude Code plugin.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/reconcile-state.mjs\" --quiet"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/reconcile-state.mjs\" --quiet"
+          }
+        ]
+      }
+    ]
+  }
+}
