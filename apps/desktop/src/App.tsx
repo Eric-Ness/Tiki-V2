@@ -200,7 +200,7 @@ function App() {
   // bumpDetailRefresh are stable, so these effects re-subscribe only on
   // activeProject / settings change, preserving the original behavior.
   const advanceBulkYolo = useBulkYoloCascade();
-  useTikiFileSync({ activeProject, prevStateRef, setState, bumpDetailRefresh, onStateChange: advanceBulkYolo });
+  useTikiFileSync({ activeProjectPath: activeProject?.path ?? null, prevStateRef, setState, bumpDetailRefresh, onStateChange: advanceBulkYolo });
   useGithubFreshness(bumpDetailRefresh);
 
   const handleResetLayout = () => {
@@ -399,7 +399,11 @@ function App() {
         >
           <div className="detail-content">
             {selectedIssueData ? (
-              <IssueDetail issue={selectedIssueData} work={selectedIssueWork} />
+              <IssueDetail
+                issue={selectedIssueData}
+                work={selectedIssueWork}
+                stale={staleFlags?.[`issue:${selectedIssue}`] ?? false}
+              />
             ) : selectedPrData ? (
               <PullRequestDetail pr={selectedPrData} />
             ) : selectedReleaseData ? (

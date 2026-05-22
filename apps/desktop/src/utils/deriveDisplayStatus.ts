@@ -92,6 +92,14 @@ export interface DeriveDisplayStatusInput {
   githubState?: GithubStateLike | null;
   /** history.recentIssues + history.recentReleases. */
   history?: HistoryLike | null;
+  /**
+   * True when the item is in-flight but its tracked state has not advanced for a
+   * while (computed by the caller — this function stays pure and clockless). Used
+   * to surface a stale-tracking anomaly so a silently-frozen pipeline is visible
+   * rather than appearing stuck (#246 / epic #244). Only applied to active
+   * in-flight rows; never overrides a higher-priority anomaly.
+   */
+  stale?: boolean;
 }
 
 const STATUS_TO_COLUMN: Record<string, DisplayColumn> = {
@@ -135,7 +143,7 @@ function isInHistory(num: number, history: HistoryLike | null | undefined): bool
  * exact order of the #218 precedence table.
  */
 export function deriveDisplayStatus(input: DeriveDisplayStatusInput): DisplayStatus {
-  const { number, work, githubState, history } = input;
+  const { number, work, githubState, history, stale } = input;
   const gh = githubState?.state; // 'open' | 'closed' | undefined
   const ghBadge: DisplayBadge = gh === 'closed' ? 'Closed' : 'Open';
   const tikiStatus = work?.status;
@@ -179,6 +187,10 @@ export function deriveDisplayStatus(input: DeriveDisplayStatusInput): DisplaySta
         label: STATUS_LABEL[tikiStatus] ?? tikiStatus,
         pipelineState: 'active',
         badge: ghBadge,
+        // Surface a stalled pipeline (in-flight but not advancing) so a silent
+        // freeze is visible. The reconciler (#245) prevents most freezes; this
+        // is the safety net for a genuinely stuck run (#246).
+        ...(stale ? { anomaly: 'Pipeline stalled — no tracked progress recently' } : {}),
       };
     }
     // Unknown Tiki status — fall through to the history/GitHub rows.

@@ -241,7 +241,7 @@ All success criteria verified:
 </output>
 
 <state-management>
-Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the canonical shape and the parent-release contract.
+**REQUIRED — run the `shipping` transition FIRST, before committing/pushing**, then the completion writes after the issue is closed. Emit unconditionally regardless of how this command was invoked; re-running is a safe no-op. Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the canonical shape and the parent-release contract.
 
 ```bash
 # 1. Mark shipping:

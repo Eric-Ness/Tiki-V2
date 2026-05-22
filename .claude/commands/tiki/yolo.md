@@ -77,28 +77,13 @@ Phase 2 summary → Phase 3 context
 Final summary → SHIP context
 ```
 
-## CRITICAL: Sub-agent dispatch must not drop pipeline transitions
+## CRITICAL: Always emit the per-step transition from the parent
 
-When delegating REVIEW / PLAN / EXECUTE / SHIP to a sub-agent, the kanban board in the desktop app only reflects pipeline progress if `state.mjs transition` runs for each step. There are TWO acceptable patterns. **Pick one per dispatch; do not skip both.**
+The kanban board only reflects pipeline progress if `state.mjs transition` runs for each step. **Do NOT make emission conditional on how you dispatch the step** — that branch ("the skill will emit it, so I won't") is exactly how transitions get dropped and the board freezes.
 
-### Pattern A (recommended): invoke via Skill
+**The rule, with no exceptions:** BEFORE dispatching each step — whether via `Skill(...)`, a raw `Agent` / `Task`, or by doing the work inline — run the matching per-step shim block from `<state-management>` below from the parent context.
 
-Use the `Skill` tool with the matching tiki skill. The skill's own prompt body carries the `state.mjs transition` call automatically — you do not have to emit it from the parent.
-
-```
-Skill('tiki:review', '{number}')
-Skill('tiki:plan',   '{number}')
-Skill('tiki:execute','{number}')
-Skill('tiki:ship',   '{number}')
-```
-
-This is the preferred path because the transition stays co-located with the step that owns it. Use this whenever the skill exists.
-
-### Pattern B: emit the shim call from the parent
-
-If you dispatch via a raw `Agent` / `Task` (general-purpose) with a hand-crafted prompt — i.e. NOT via `Skill(...)` — the sub-agent's prompt will NOT contain the per-step transition. The parent MUST then emit the corresponding `node packages/framework/scripts/state.mjs transition` call BEFORE the dispatch (to mark the step as in-flight) and again AFTER the sub-agent returns (to mark completion / advance). Skip either call and the kanban board freezes on the prior step.
-
-See `<state-management>` below for the exact per-step shim invocations to run.
+Re-emitting a transition that a skill ALSO emits is a safe no-op: same-status transitions are always legal (`state.mjs` validates and idempotently rewrites). So "the parent emitted it and the skill emitted it again" is harmless; "neither emitted it" freezes the board. When in doubt, emit.
 </sub-agent-strategy>
 
 <output>
@@ -202,7 +187,7 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
   --to-status shipping --to-step SHIP
 ```
 
-If you delegated the step to a sub-agent via `Skill(...)` (Pattern A in `<sub-agent-strategy>`), the skill's own prose emits the transition and you do NOT need to emit it again from the parent. If you dispatched via raw `Agent` / `Task`, the parent MUST emit the shim call here.
+Run the matching block above before dispatching each step, **regardless of how you dispatch it** (Skill, raw Agent/Task, or inline). Double-emission is a safe no-op (same-status transitions are legal); omission freezes the kanban on the prior step. Never skip the parent emit on the assumption that something downstream will do it.
 
 ### Legacy: direct JSON
 

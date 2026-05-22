@@ -50,6 +50,8 @@ Procedure:
 <state-update-requirement>
 ## CRITICAL: Phase State Updates
 
+Run the transition below BEFORE **every** phase — not just the first. This loop is the single most common place the desktop pipeline freezes: when you are deep in a multi-phase run dispatching sub-agents, it is easy to skip the per-phase emit and the kanban stalls on an early phase while work continues. Emit it for phase 1, phase 2, … phase T, unconditionally. Re-running with the same values is a safe no-op.
+
 Update `.tiki/state.json` BEFORE each phase. On failure, set `phase.status: "failed"` and do NOT advance `current`. When all phases finish, transition to `shipping`. (Canonical shape: see `yolo.md`.)
 
 ```bash

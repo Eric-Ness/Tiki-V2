@@ -333,8 +333,16 @@ function sleepSync(ms) {
 /**
  * Run `fn` while holding an exclusive lock on `<tikiPath>/state.json.lock`.
  * `fn` performs the read-modify-write; serializing it prevents lost updates.
+ *
+ * `opts.lenient` (default false): when a lock cannot be acquired (open error or
+ * acquisition timeout), return `undefined` WITHOUT running `fn` instead of
+ * `die(2)`. The state reconciler (reconcile-state.mjs) runs as a Claude Code
+ * Stop/SubagentStop hook that must never block the user's turn, so it opts in to
+ * lenient locking — a missed reconcile pass is harmless (the next turn retries),
+ * a blocking exit is not. The default (non-lenient) behavior is unchanged.
  */
-function withStateLock(tikiPath, fn) {
+function withStateLock(tikiPath, fn, opts = {}) {
+  const lenient = opts.lenient === true;
   if (!fs.existsSync(tikiPath)) {
     fs.mkdirSync(tikiPath, { recursive: true });
   }
@@ -351,6 +359,7 @@ function withStateLock(tikiPath, fn) {
       break;
     } catch (e) {
       if (e.code !== "EEXIST") {
+        if (lenient) return undefined;
         die(2, `failed to acquire state lock ${lockPath}: ${e.message}`);
       }
       // Lock is held. Steal it if the holder died and left it stale.
@@ -369,6 +378,7 @@ function withStateLock(tikiPath, fn) {
         continue;
       }
       if (Date.now() - start > MAX_WAIT_MS) {
+        if (lenient) return undefined;
         die(2, `timed out after ${MAX_WAIT_MS}ms waiting for state lock ${lockPath}`);
       }
       sleepSync(RETRY_MS);
@@ -846,6 +856,14 @@ if (isCliEntry) {
 }
 
 // Named exports for test/programmatic use. The CLI entry point above is
-// unaffected by these — they exist purely so tests can import the
-// resolver directly without spawning a subprocess for every assertion.
-export { resolveTikiPath };
+// unaffected by these — they exist purely so tests and the state reconciler
+// (reconcile-state.mjs, epic #244) can reuse the validated transition logic
+// in-process instead of duplicating the legal-transition table a fourth time.
+export {
+  resolveTikiPath,
+  readState,
+  writeStateAtomic,
+  withStateLock,
+  applyTransition,
+  isLegalTransition,
+};
