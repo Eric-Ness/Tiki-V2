@@ -103,6 +103,14 @@ export interface TikiPlan {
   phases: Phase[];
   /** Maps success criteria IDs to the phases that address them */
   coverageMatrix?: CoverageMatrix;
+  /**
+   * True once AUDIT passed for this plan. The on-disk artifact the state
+   * reconciler uses to distinguish AUDIT from PLAN (audit emits no other
+   * durable signal). Written by /tiki:audit on PASS.
+   */
+  audited?: boolean;
+  /** When AUDIT last passed for this plan */
+  auditedAt?: Timestamp;
   /** Research documents referenced during planning */
   research?: string[];
   /** Additional planning notes or context */

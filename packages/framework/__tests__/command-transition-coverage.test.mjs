@@ -96,6 +96,40 @@ test("every command file retains its expected state.mjs transition --to-step pai
   );
 });
 
+// Regression assertion for issue #247: yolo.md must NOT reintroduce the
+// conditional "the skill will emit it, so the parent won't" dispatch trap. That
+// branch (formerly "Pattern A / Pattern B") is exactly how intermediate
+// transitions get dropped and the kanban freezes mid-pipeline. The contract is
+// now unconditional: always emit the per-step transition from the parent.
+test("yolo.md does not reintroduce the conditional-emit (Pattern A/B) trap", () => {
+  const filePath = path.join(COMMANDS_DIR, "yolo.md");
+  const content = fs.readFileSync(filePath, "utf-8");
+
+  const forbidden = [
+    /Pattern A/,
+    /Pattern B/,
+    /do NOT need to emit/i,
+    /you do not have to emit/i,
+  ];
+  const offenders = forbidden.filter((re) => re.test(content)).map((re) => re.source);
+
+  assert.equal(
+    offenders.length,
+    0,
+    `yolo.md reintroduced conditional transition-emit language [${offenders.join(", ")}]. ` +
+    `Transition emission must be UNCONDITIONAL — always emit the per-step shim call from ` +
+    `the parent regardless of dispatch (Skill / Agent / Task / inline). Double-emit is a ` +
+    `safe no-op; the conditional branch is what drops transitions (issue #247).`
+  );
+
+  // And positively assert the unconditional rule is present.
+  assert.match(
+    content,
+    /unconditional|regardless of how you dispatch/i,
+    `yolo.md must state the unconditional-emit rule (issue #247).`
+  );
+});
+
 // Regression assertion for issue #219: the release teardown must append each
 // child issue to history.recentIssues (`append-history issue`). Without it, the
 // desktop Kanban "Completed" column — which reads only recentIssues — drops

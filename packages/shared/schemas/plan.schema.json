@@ -56,6 +56,15 @@
       "format": "date-time",
       "description": "When this plan was last modified"
     },
+    "audited": {
+      "type": "boolean",
+      "description": "True once AUDIT passed for this plan. This is the on-disk artifact that lets the state reconciler distinguish AUDIT from PLAN (audit emits no other durable signal). Written by /tiki:audit on PASS."
+    },
+    "auditedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When AUDIT last passed for this plan"
+    },
     "successCriteria": {
       "type": "array",
       "description": "What needs to be true for this issue to be considered complete",

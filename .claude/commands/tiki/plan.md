@@ -161,7 +161,7 @@ Rules:
 </research-capture>
 
 <early-state-update>
-Before planning, set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` (shim; see `yolo.md` for the legacy direct-write shape):
+**REQUIRED — run this FIRST, before designing any phases.** Set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` so the desktop pipeline advances to PLAN immediately. Emit it unconditionally as the first action regardless of how this command was invoked; it is a safe no-op if already recorded (shim; see `yolo.md` for the legacy direct-write shape):
 
 ```bash
 node packages/framework/scripts/state.mjs transition issue:{number} \

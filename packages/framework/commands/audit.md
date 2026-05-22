@@ -2,7 +2,7 @@
 name: audit
 description: Validate a plan before execution
 argument: <issue-number>
-tools: Read, Glob, Grep, AskUserQuestion
+tools: Bash, Read, Glob, Grep, AskUserQuestion
 ---
 
 # Audit Plan
@@ -137,12 +137,15 @@ If any phase has no `dependencies` field, treat it as an empty list (no deps).
 </output>
 
 <state-management>
-Set `pipelineStep: "AUDIT"`. PASS → `status: "executing"`; WARN/FAIL → keep `planning`.
+**REQUIRED — run the matching transition as the first thing after you reach a verdict, unconditionally** (regardless of how this command was invoked). Set `pipelineStep: "AUDIT"`. PASS → `status: "executing"`; WARN/FAIL → keep `planning`. Re-running is a safe no-op.
+
+**On PASS, ALSO write the AUDIT artifact to the plan file** (before or after the transition). AUDIT produces no other durable on-disk signal — `coverageMatrix` is written by PLAN — so without this, the state reconciler cannot tell AUDIT from PLAN when the transition above is dropped:
 
 ```bash
-# PASS:
+# PASS — record the verdict AND the durable artifact:
+node packages/framework/scripts/mark-audited.mjs {number}
 node packages/framework/scripts/state.mjs transition issue:{number} --to-status executing --to-step AUDIT
-# WARN or FAIL:
+# WARN or FAIL — do NOT mark audited; keep planning:
 node packages/framework/scripts/state.mjs transition issue:{number} --to-status planning --to-step AUDIT
 ```
 </state-management>

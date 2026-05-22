@@ -518,6 +518,12 @@ pub struct TikiPlan {
     pub phases: Vec<Phase>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coverage_matrix: Option<HashMap<String, Vec<u32>>>,
+    /// True once AUDIT passed. The on-disk artifact the state reconciler uses to
+    /// distinguish AUDIT from PLAN (audit emits no other durable signal).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audited: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audited_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
