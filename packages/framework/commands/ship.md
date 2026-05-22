@@ -133,12 +133,12 @@ SHIP fires two lifecycle hooks via the hook runner. Hooks are **opt-in** — the
 
 ```bash
 # BEFORE staging/committing (after pre-ship tests pass):
-node packages/framework/scripts/run-hook.mjs pre-ship \
+node .claude/tiki/scripts/run-hook.mjs pre-ship \
   --env TIKI_ISSUE={number} --env TIKI_TITLE="{issue title}"
 
 # AFTER a successful push (capture the commit SHA first):
 SHA=$(git rev-parse HEAD)
-node packages/framework/scripts/run-hook.mjs post-ship \
+node .claude/tiki/scripts/run-hook.mjs post-ship \
   --env TIKI_ISSUE={number} --env TIKI_COMMIT_SHA="$SHA"
 ```
 
@@ -245,13 +245,13 @@ All success criteria verified:
 
 ```bash
 # 1. Mark shipping:
-node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
+node .claude/tiki/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
 # 2a. Release child (entry stays in activeWork; parentRelease preserved):
-node packages/framework/scripts/state.mjs transition issue:{number} --to-status completed --to-step SHIP
+node .claude/tiki/scripts/state.mjs transition issue:{number} --to-status completed --to-step SHIP
 # 2b. Standalone: remove the issue:{number} key from activeWork:
-node packages/framework/scripts/state.mjs remove issue:{number}
+node .claude/tiki/scripts/state.mjs remove issue:{number}
 # 3. In both cases, append the completion record to history:
-node packages/framework/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
+node .claude/tiki/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
 ```
 
 The plan file at `.tiki/plans/issue-{number}.json` is moved to `.tiki/plans/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation).

@@ -14,6 +14,12 @@ use tauri_plugin_dialog::DialogExt;
 /// project's `.claude/commands/tiki/` directory offline.
 static FRAMEWORK_COMMANDS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../../packages/framework/commands");
 
+/// Framework scripts embedded at compile time (state.mjs / reconcile-state.mjs /
+/// mark-audited.mjs / run-hook.mjs). Installed into `<project>/.claude/tiki/scripts/`
+/// so command bodies and the reconciler hook can run them in any project, not just
+/// the monorepo (#251 / epic #244).
+static FRAMEWORK_SCRIPTS: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../../packages/framework/scripts");
+
 /// Action to apply to a work item via `update_work_status`.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -657,18 +663,103 @@ pub fn install_framework(app: AppHandle, project_path: String) -> Result<String,
         installed += 1;
     }
 
+    // Install the scripts the commands + reconciler hook depend on (#251).
+    let scripts_dir = project.join(".claude").join("tiki").join("scripts");
+    std::fs::create_dir_all(&scripts_dir).map_err(|e| e.to_string())?;
+    let mut scripts_installed = 0;
+    for file in FRAMEWORK_SCRIPTS.files() {
+        let name = file
+            .path()
+            .file_name()
+            .ok_or_else(|| "embedded framework script missing name".to_string())?;
+        std::fs::write(scripts_dir.join(name), file.contents()).map_err(|e| e.to_string())?;
+        scripts_installed += 1;
+    }
+
+    // Register the reconciler Stop/SubagentStop hooks so pipeline state self-heals
+    // even when an imperative transition is dropped (epic #244).
+    ensure_reconciler_hook(&project)?;
+
     let version = app.package_info().version.to_string();
     let tiki_dir = project.join(".tiki");
     std::fs::create_dir_all(&tiki_dir).map_err(|e| e.to_string())?;
     std::fs::write(tiki_dir.join(".framework-version"), &version).map_err(|e| e.to_string())?;
 
     log::info!(
-        "Installed {} framework commands to {:?} (version {})",
+        "Installed {} framework commands + {} scripts to {:?} (version {})",
         installed,
+        scripts_installed,
         commands_dir,
         version
     );
     Ok(version)
+}
+
+/// Ensure the reconciler Stop/SubagentStop hooks exist in the project's
+/// `.claude/settings.json` without clobbering other settings or other hooks.
+/// Idempotent AND migration-aware: any prior hook entry whose command mentions
+/// `reconcile-state.mjs` is removed before the canonical entry is re-added.
+/// Mirrors `ensureReconcilerHook` in packages/framework/install.js.
+fn ensure_reconciler_hook(project: &Path) -> Result<(), String> {
+    const CMD: &str = "node .claude/tiki/scripts/reconcile-state.mjs --quiet";
+    let settings_path = project.join(".claude").join("settings.json");
+
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        std::fs::read_to_string(&settings_path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+    if !settings.is_object() {
+        settings = serde_json::json!({});
+    }
+
+    let obj = settings.as_object_mut().unwrap();
+    let hooks = obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+    if !hooks.is_object() {
+        *hooks = serde_json::json!({});
+    }
+    let hooks_obj = hooks.as_object_mut().unwrap();
+
+    for event in ["Stop", "SubagentStop"] {
+        let existing = hooks_obj
+            .get(event)
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        // Drop any prior reconcile-state hook group (idempotent + path migration).
+        let mut cleaned: Vec<serde_json::Value> = existing
+            .into_iter()
+            .filter(|group| {
+                let mentions = group
+                    .get("hooks")
+                    .and_then(|h| h.as_array())
+                    .map(|inner| {
+                        inner.iter().any(|h| {
+                            h.get("command")
+                                .and_then(|c| c.as_str())
+                                .map(|c| c.contains("reconcile-state.mjs"))
+                                .unwrap_or(false)
+                        })
+                    })
+                    .unwrap_or(false);
+                !mentions
+            })
+            .collect();
+        cleaned.push(serde_json::json!({
+            "hooks": [ { "type": "command", "command": CMD } ]
+        }));
+        hooks_obj.insert(event.to_string(), serde_json::Value::Array(cleaned));
+    }
+
+    std::fs::create_dir_all(settings_path.parent().unwrap()).map_err(|e| e.to_string())?;
+    let pretty = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    std::fs::write(&settings_path, pretty + "\n").map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Read the installed framework version from `<project>/.tiki/.framework-version`,
@@ -683,4 +774,98 @@ pub fn read_framework_version(project_path: String) -> Result<Option<String>, St
     }
     let contents = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     Ok(Some(contents.trim().to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_project(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("tiki-hook-{}-{}", tag, nanos));
+        std::fs::create_dir_all(dir.join(".claude")).unwrap();
+        dir
+    }
+
+    fn read_settings(project: &Path) -> serde_json::Value {
+        let s = std::fs::read_to_string(project.join(".claude").join("settings.json")).unwrap();
+        serde_json::from_str(&s).unwrap()
+    }
+
+    fn reconcile_groups(settings: &serde_json::Value, event: &str) -> usize {
+        settings["hooks"][event]
+            .as_array()
+            .map(|groups| {
+                groups
+                    .iter()
+                    .filter(|g| {
+                        g["hooks"]
+                            .as_array()
+                            .map(|hs| {
+                                hs.iter().any(|h| {
+                                    h["command"]
+                                        .as_str()
+                                        .map(|c| c.contains("reconcile-state.mjs"))
+                                        .unwrap_or(false)
+                                })
+                            })
+                            .unwrap_or(false)
+                    })
+                    .count()
+            })
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn ensure_reconciler_hook_preserves_other_settings_and_is_idempotent() {
+        let project = temp_project("idem");
+        // Pre-existing settings: an unrelated plugin, an OLD reconcile hook at a
+        // different path, and an unrelated PreToolUse hook.
+        let initial = serde_json::json!({
+            "enabledPlugins": { "understand-anything@understand-anything": true },
+            "hooks": {
+                "Stop": [
+                    { "hooks": [ { "type": "command", "command": "node packages/framework/scripts/reconcile-state.mjs --quiet" } ] }
+                ],
+                "PreToolUse": [
+                    { "hooks": [ { "type": "command", "command": "echo unrelated" } ] }
+                ]
+            }
+        });
+        std::fs::write(
+            project.join(".claude").join("settings.json"),
+            serde_json::to_string_pretty(&initial).unwrap(),
+        )
+        .unwrap();
+
+        // Run twice — must converge (idempotent).
+        ensure_reconciler_hook(&project).unwrap();
+        ensure_reconciler_hook(&project).unwrap();
+
+        let s = read_settings(&project);
+        // Unrelated settings preserved.
+        assert_eq!(s["enabledPlugins"]["understand-anything@understand-anything"], serde_json::json!(true));
+        assert_eq!(s["hooks"]["PreToolUse"].as_array().unwrap().len(), 1);
+        // Exactly one reconcile group per event (old path removed, no duplicate).
+        assert_eq!(reconcile_groups(&s, "Stop"), 1);
+        assert_eq!(reconcile_groups(&s, "SubagentStop"), 1);
+        // New canonical path is what's present.
+        let cmd = s["hooks"]["Stop"][0]["hooks"][0]["command"].as_str().unwrap();
+        assert_eq!(cmd, "node .claude/tiki/scripts/reconcile-state.mjs --quiet");
+
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    #[test]
+    fn ensure_reconciler_hook_creates_settings_when_absent() {
+        let project = temp_project("absent");
+        ensure_reconciler_hook(&project).unwrap();
+        let s = read_settings(&project);
+        assert_eq!(reconcile_groups(&s, "Stop"), 1);
+        assert_eq!(reconcile_groups(&s, "SubagentStop"), 1);
+        std::fs::remove_dir_all(&project).ok();
+    }
 }

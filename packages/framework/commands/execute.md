@@ -56,10 +56,10 @@ Update `.tiki/state.json` BEFORE each phase. On failure, set `phase.status: "fai
 
 ```bash
 # Before phase N:
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status executing --to-step EXECUTE --phase-current {N} --phase-total {T} --phase-status executing
 # All phases done:
-node packages/framework/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
+node .claude/tiki/scripts/state.mjs transition issue:{number} --to-status shipping --to-step SHIP
 ```
 </state-update-requirement>
 
@@ -72,19 +72,19 @@ EXECUTE fires four lifecycle hooks via the hook runner. Hooks are **opt-in** —
 
 ```bash
 # Once, BEFORE the first phase (after computing the total phase count):
-node packages/framework/scripts/run-hook.mjs pre-execute \
+node .claude/tiki/scripts/run-hook.mjs pre-execute \
   --env TIKI_ISSUE={number} --env TIKI_TITLE="{issue title}" --env TIKI_TOTAL_PHASES={T}
 
 # Immediately BEFORE starting each phase N (after the state.mjs transition):
-node packages/framework/scripts/run-hook.mjs phase-start \
+node .claude/tiki/scripts/run-hook.mjs phase-start \
   --env TIKI_ISSUE={number} --env TIKI_PHASE={N} --env TIKI_PHASE_TITLE="{phase title}"
 
 # Immediately AFTER each phase N returns (status is "completed" | "failed" | "skipped"):
-node packages/framework/scripts/run-hook.mjs phase-complete \
+node .claude/tiki/scripts/run-hook.mjs phase-complete \
   --env TIKI_ISSUE={number} --env TIKI_PHASE={N} --env TIKI_PHASE_STATUS="{phase status}"
 
 # Once, AFTER all phases finish (before the shipping transition):
-node packages/framework/scripts/run-hook.mjs post-execute \
+node .claude/tiki/scripts/run-hook.mjs post-execute \
   --env TIKI_ISSUE={number} --env TIKI_PHASES_COMPLETED={count of completed phases}
 ```
 

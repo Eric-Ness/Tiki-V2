@@ -143,10 +143,10 @@ If any phase has no `dependencies` field, treat it as an empty list (no deps).
 
 ```bash
 # PASS — record the verdict AND the durable artifact:
-node packages/framework/scripts/mark-audited.mjs {number}
-node packages/framework/scripts/state.mjs transition issue:{number} --to-status executing --to-step AUDIT
+node .claude/tiki/scripts/mark-audited.mjs {number}
+node .claude/tiki/scripts/state.mjs transition issue:{number} --to-status executing --to-step AUDIT
 # WARN or FAIL — do NOT mark audited; keep planning:
-node packages/framework/scripts/state.mjs transition issue:{number} --to-status planning --to-step AUDIT
+node .claude/tiki/scripts/state.mjs transition issue:{number} --to-status planning --to-step AUDIT
 ```
 </state-management>
 

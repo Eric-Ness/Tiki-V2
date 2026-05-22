@@ -141,10 +141,12 @@ The desktop kanban board reads `.tiki/state.json` to render pipeline progress. I
 
 Run the matching block BEFORE dispatching that step. The shim validates transitions, atomic-writes, and preserves `parentRelease`.
 
+**If the shim path does not resolve** (e.g. a plugin-only project where `.claude/tiki/scripts/` was not installed, so `node .claude/tiki/scripts/state.mjs` errors with "Cannot find module"), DO NOT skip the state update — fall back to the direct-JSON write in **Legacy: direct JSON** below. (The reconciler hook still corrects state from artifacts, but emitting the transition keeps the kanban live mid-step.)
+
 **Before GET** (fresh issue — initializes the entry; pass `--issue-number` + `--issue-title` so the work item materializes):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status pending --to-step GET \
   --issue-number {number} --issue-title "{title}"
 ```
@@ -152,14 +154,14 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 **Before REVIEW**:
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status reviewing --to-step REVIEW
 ```
 
 **Before PLAN** (phase total `N` is provisional — re-emit after plan.md writes the real count):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step PLAN \
   --phase-current 1 --phase-total {N} --phase-status pending
 ```
@@ -167,7 +169,7 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 **Before AUDIT** (same `status: planning`, but `pipelineStep` advances to `AUDIT`):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step AUDIT \
   --phase-current 1 --phase-total {N} --phase-status pending
 ```
@@ -175,7 +177,7 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 **Before EXECUTE** (each phase — `{current}` is the phase about to run, `{total}` is the plan's phase count):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status executing --to-step EXECUTE \
   --phase-current {current} --phase-total {total} --phase-status executing
 ```
@@ -183,7 +185,7 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 **Before SHIP** (after all phases pass):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status shipping --to-step SHIP
 ```
 

@@ -164,7 +164,7 @@ Rules:
 **REQUIRED — run this FIRST, before designing any phases.** Set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` so the desktop pipeline advances to PLAN immediately. Emit it unconditionally as the first action regardless of how this command was invoked; it is a safe no-op if already recorded (shim; see `yolo.md` for the legacy direct-write shape):
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step PLAN --issue-number {number} --issue-title "{title}"
 ```
 </early-state-update>
@@ -221,7 +221,7 @@ node packages/framework/scripts/state.mjs transition issue:{number} \
 After writing the plan, set phase progress (`current: 1`, `total: N`, `status: "pending"`). Keep work `status: "planning"` until audit passes.
 
 ```bash
-node packages/framework/scripts/state.mjs transition issue:{number} \
+node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step PLAN --phase-current 1 --phase-total {total} --phase-status pending
 ```
 </state-management>

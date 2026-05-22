@@ -154,7 +154,7 @@ For each issue, derive a likely-touched-files set from its body using these sign
   - `sidebar` → `apps/desktop/src/components/sidebar/**`
   - `footer` / `header` → `apps/desktop/src/components/Header.*`
   - `github API`, `gh CLI`, `rate limit` → `apps/desktop/src-tauri/src/github.rs`
-  - `state.json`, `state shim`, `transition` → `packages/framework/scripts/state.mjs` and `apps/desktop/src-tauri/src/state*.rs`
+  - `state.json`, `state shim`, `transition` → `.claude/tiki/scripts/state.mjs` and `apps/desktop/src-tauri/src/state*.rs`
   - `release.md`, `yolo.md`, `framework command` → `packages/framework/commands/**`
   - `detail panel`, `issue detail` → `apps/desktop/src/components/detail/**`
 - **GitHub labels** — `desktop` widens scope to `apps/desktop/**`, `rust` narrows to `apps/desktop/src-tauri/**`, `framework` narrows to `packages/framework/**`.
@@ -248,14 +248,14 @@ Release lifecycle: **start** → **per-wave** → **ship**. See `yolo.md` `<stat
 
 ```bash
 # Start:
-node packages/framework/scripts/state.mjs transition release:{version} \
+node .claude/tiki/scripts/state.mjs transition release:{version} \
   --to-status executing --to-step EXECUTE --release-version {version} --release-issues "41,42,43"
 # Per wave: update release.currentIssues (array; direct JSON write — shim does not edit nested release.* fields),
 # spawn one Agent per issue with isolation: 'worktree', wait for the wave to drain, then
 # append each completed issue number to release.completedIssues and each worktree branch
 # name to release.completedBranches (also direct JSON writes).
 # Ship:
-node packages/framework/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
+node .claude/tiki/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
 ```
 
 **Release state shape** (additive — `currentIssue` retained for back-compat with serial mode and is ignored when `currentIssues` is set):
@@ -279,17 +279,17 @@ After shipping:
 
 ```bash
 # Remove the release entry from activeWork:
-node packages/framework/scripts/state.mjs remove release:{version}
+node .claude/tiki/scripts/state.mjs remove release:{version}
 # For EACH child issue with parentRelease == {version} (run the next two lines
 # once per child): append it to history.recentIssues FIRST (so the desktop
 # Kanban "Completed" column, which reads recentIssues, shows release-shipped
 # issues — mirrors ship.md), THEN remove it from activeWork. append-history is
 # idempotent on issue number, so this is safe even if ship.md already appended
 # the child during the cascade.
-node packages/framework/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
-node packages/framework/scripts/state.mjs remove issue:{number}
+node .claude/tiki/scripts/state.mjs append-history issue --number {number} --title "{issue title}"
+node .claude/tiki/scripts/state.mjs remove issue:{number}
 # Append the release completion record to history:
-node packages/framework/scripts/state.mjs append-history release --version {version} --issues "41,42,43" --tag {version}
+node .claude/tiki/scripts/state.mjs append-history release --version {version} --issues "41,42,43" --tag {version}
 ```
 
 Then move the release file to `.tiki/releases/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation).
