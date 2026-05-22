@@ -50,6 +50,16 @@ const files = [
       return JSON.stringify(json, null, 2) + "\n";
     },
   },
+  {
+    // Plain-text file whose entire contents are the version string, with no
+    // trailing newline (#229). Unlike the others there is nothing to parse —
+    // rewrite it wholesale and preserve the no-newline format to avoid a
+    // spurious diff.
+    path: resolve(root, ".tiki/.framework-version"),
+    update() {
+      return cleanVersion;
+    },
+  },
 ];
 
 for (const file of files) {
