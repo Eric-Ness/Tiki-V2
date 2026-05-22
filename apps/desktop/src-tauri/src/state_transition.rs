@@ -636,4 +636,57 @@ mod tests {
         let err = apply_transition(&mut state, input).expect_err("must reject");
         assert!(err.contains("invalid work_id"));
     }
+
+    /// Drop the volatile `lastActivity` field (both impls set it to "now") and
+    /// any null-valued keys so the two languages' serializations compare equal.
+    fn normalize_entry(v: &mut serde_json::Value) {
+        if let Some(obj) = v.as_object_mut() {
+            obj.remove("lastActivity");
+            obj.retain(|_, val| !val.is_null());
+        }
+    }
+
+    /// Behavioral-parity guard for the transition mutation BODY (#232).
+    ///
+    /// Consumes the SAME fixtures as the state.mjs CLI test
+    /// (packages/framework/__tests__/transition-mutation-parity.test.mjs):
+    /// `packages/shared/fixtures/transition-mutations.json`. Each fixture's
+    /// `before` state + `transition` is run through `apply_transition`, and the
+    /// resulting entry must equal the fixture's `expectedEntry`. If this Rust
+    /// impl drifts from the shared expectation (phase-clear-on-completion,
+    /// parallelExecution-clear, parentRelease preservation), this test fails;
+    /// if the Node impl drifts, the Node test fails. Together they keep the two
+    /// mirrors in lockstep beyond just the transition table.
+    #[test]
+    fn mutation_body_parity_fixtures() {
+        let raw =
+            include_str!("../../../../packages/shared/fixtures/transition-mutations.json");
+        let doc: serde_json::Value = serde_json::from_str(raw).expect("fixtures parse");
+        let cases = doc["cases"].as_array().expect("`cases` array");
+        assert!(!cases.is_empty(), "expected at least one parity fixture");
+
+        for case in cases {
+            let name = case["name"].as_str().unwrap_or("<unnamed>");
+            let work_id = case["workId"].as_str().expect("workId");
+
+            let mut state: TikiState = serde_json::from_value(case["before"].clone())
+                .unwrap_or_else(|e| panic!("[{}] before deserialize: {}", name, e));
+            let input: TransitionInput = serde_json::from_value(case["transition"].clone())
+                .unwrap_or_else(|e| panic!("[{}] transition deserialize: {}", name, e));
+
+            apply_transition(&mut state, input)
+                .unwrap_or_else(|e| panic!("[{}] apply_transition: {}", name, e));
+
+            let entry = state
+                .active_work
+                .get(work_id)
+                .unwrap_or_else(|| panic!("[{}] entry {} missing after transition", name, work_id));
+            let mut actual = serde_json::to_value(entry).expect("serialize entry");
+            let mut expected = case["expectedEntry"].clone();
+            normalize_entry(&mut actual);
+            normalize_entry(&mut expected);
+
+            assert_eq!(actual, expected, "mutation-body parity drift in case '{}'", name);
+        }
+    }
 }

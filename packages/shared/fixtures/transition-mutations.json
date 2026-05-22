@@ -1,0 +1,113 @@
+{
+  "_comment": "Shared behavioral-parity fixtures for the state-transition mutation BODY (#232). The transition TABLE is already guarded by transitions-parity.test.ts; this guards the apply logic that surrounds it: phase-clear-on-completion, parallelExecution-clear-on-shipping/completion, and parentRelease preservation. BOTH implementations consume these fixtures — apply_transition() in apps/desktop/src-tauri/src/state_transition.rs (Rust unit test) and the state.mjs CLI (packages/framework/__tests__/transition-mutation-parity.test.mjs). If either impl drifts from the shared expectation, that side's test fails. Comparison normalizes away `lastActivity` (both set it to now) and treats null-valued fields as absent. NOTE: transitions here never SET parallelExecution via the input, because the state.mjs CLI does not expose it (line ~614: 'Rust IPC is canonical for parallel groups'); we only test clearing an existing parallelExecution, which both paths do.",
+  "cases": [
+    {
+      "name": "executing->completed clears phase",
+      "workId": "issue:42",
+      "before": {
+        "schemaVersion": 1,
+        "activeWork": {
+          "issue:42": {
+            "type": "issue",
+            "issue": { "number": 42, "title": "Alpha" },
+            "status": "executing",
+            "pipelineStep": "EXECUTE",
+            "phase": { "current": 2, "total": 5, "status": "executing" },
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "lastActivity": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      },
+      "transition": { "workId": "issue:42", "toStatus": "completed", "toStep": "SHIP" },
+      "expectedEntry": {
+        "type": "issue",
+        "issue": { "number": 42, "title": "Alpha" },
+        "status": "completed",
+        "pipelineStep": "SHIP",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "executing->shipping clears parallelExecution but keeps phase",
+      "workId": "issue:43",
+      "before": {
+        "schemaVersion": 1,
+        "activeWork": {
+          "issue:43": {
+            "type": "issue",
+            "issue": { "number": 43, "title": "Beta" },
+            "status": "executing",
+            "pipelineStep": "EXECUTE",
+            "phase": { "current": 3, "total": 6, "status": "executing" },
+            "parallelExecution": { "phases": [3, 4], "completedInGroup": [], "totalInGroup": 2, "startedAt": "2026-01-01T00:00:00.000Z" },
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "lastActivity": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      },
+      "transition": { "workId": "issue:43", "toStatus": "shipping", "toStep": "SHIP" },
+      "expectedEntry": {
+        "type": "issue",
+        "issue": { "number": 43, "title": "Beta" },
+        "status": "shipping",
+        "pipelineStep": "SHIP",
+        "phase": { "current": 3, "total": 6, "status": "executing" },
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "transition preserves existing parentRelease when none passed",
+      "workId": "issue:44",
+      "before": {
+        "schemaVersion": 1,
+        "activeWork": {
+          "issue:44": {
+            "type": "issue",
+            "issue": { "number": 44, "title": "Gamma" },
+            "status": "executing",
+            "pipelineStep": "EXECUTE",
+            "parentRelease": "v0.8.0",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "lastActivity": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      },
+      "transition": { "workId": "issue:44", "toStatus": "shipping", "toStep": "SHIP" },
+      "expectedEntry": {
+        "type": "issue",
+        "issue": { "number": 44, "title": "Gamma" },
+        "status": "shipping",
+        "pipelineStep": "SHIP",
+        "parentRelease": "v0.8.0",
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "same-state executing->executing updates phase progress",
+      "workId": "issue:45",
+      "before": {
+        "schemaVersion": 1,
+        "activeWork": {
+          "issue:45": {
+            "type": "issue",
+            "issue": { "number": 45, "title": "Delta" },
+            "status": "executing",
+            "pipelineStep": "EXECUTE",
+            "phase": { "current": 1, "total": 5, "status": "executing" },
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "lastActivity": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      },
+      "transition": { "workId": "issue:45", "toStatus": "executing", "toStep": "EXECUTE", "phase": { "current": 3, "total": 5, "status": "executing" } },
+      "expectedEntry": {
+        "type": "issue",
+        "issue": { "number": 45, "title": "Delta" },
+        "status": "executing",
+        "pipelineStep": "EXECUTE",
+        "phase": { "current": 3, "total": 5, "status": "executing" },
+        "createdAt": "2026-01-01T00:00:00.000Z"
+      }
+    }
+  ]
+}
