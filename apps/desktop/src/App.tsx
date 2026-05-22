@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
-import { listen } from "@tauri-apps/api/event";
 import { Panel, Separator, Group } from "react-resizable-panels";
 import { MotionConfig } from "framer-motion";
 import { checkForAppUpdates } from "./utils/updater";
@@ -22,131 +21,14 @@ import { ToastContainer } from "./components/ui/ToastContainer";
 import { BulkActionToolbar } from "./components/BulkActionToolbar";
 import { BulkYoloDialog } from "./components/BulkYoloDialog";
 import { CommandPalette, ErrorBoundary, KeyboardShortcuts } from "./components/ui";
-import { useCommandActions, useStaleWorkDetection } from "./hooks";
+import { useCommandActions, useStaleWorkDetection, useTikiFileSync, useGithubFreshness, useBulkYoloCascade } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
-import type { WorkContext } from "./components/work";
-import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, useToastStore, usePullRequestsStore, useCommandPaletteStore, useResearchStore, useSettingsStore, useBulkYoloStore, type CompletedRelease } from "./stores";
-import type { GitHubIssue, ResearchDocMeta, TikiRelease } from "./stores";
+import { useLayoutStore, useDetailStore, useIssuesStore, useReleasesStore, useProjectsStore, useTikiReleasesStore, useTikiStateStore, useTerminalStore, usePullRequestsStore, useCommandPaletteStore, useSettingsStore } from "./stores";
+import type { GitHubIssue } from "./stores";
 import { terminalFocusRegistry } from "./stores/terminalStore";
-import { detectGithubRefreshTriggers } from "./utils/githubRefreshTriggers";
-import { dispatchNextBulkYolo } from "./utils/bulkYoloDispatch";
-import { shouldRefreshOnVisibility, canIntervalPoll, effectiveIntervalMs } from "./utils/githubFreshness";
-import type { RateLimitStatus } from "./components/RateLimitIndicator";
+import { syncTikiStateStore, type TikiState } from "./utils/tikiStateSync";
 import "./App.css";
 import "./components/layout/layout.css";
-
-// Per-surface trailing-edge debounce for GitHub re-fetches triggered by
-// state.json transitions. The watcher already coalesces filesystem-level
-// events, but logical events (e.g. shipping a 5-issue release writes
-// state.json many times in quick succession) still produce N triggers per
-// surface. 500ms trailing-edge collapses that to one fetch per surface.
-type RefreshSurface = 'issues' | 'prs' | 'releases';
-const pendingRefreshTriggers: Map<RefreshSurface, ReturnType<typeof setTimeout>> = new Map();
-const REFRESH_DEBOUNCE_MS = 500;
-
-function scheduleRefresh(surface: RefreshSurface, fire: () => void): void {
-  const existing = pendingRefreshTriggers.get(surface);
-  if (existing) clearTimeout(existing);
-  pendingRefreshTriggers.set(
-    surface,
-    setTimeout(() => {
-      pendingRefreshTriggers.delete(surface);
-      fire();
-    }, REFRESH_DEBOUNCE_MS),
-  );
-}
-
-// Stable empty-fallback constants. Prevent fresh-object allocations in
-// hook arguments that would otherwise trigger infinite re-render loops
-// via useEffect dep instability (same bug class as #210 — see #212).
-// (activeWork now reads straight from tikiStateStore, whose initial value is
-// already a stable {} — so no EMPTY_ACTIVE_WORK fallback is needed here, #223.)
-const EMPTY_RECENT_ISSUES: Array<{ number: number; title?: string; completedAt: string }> = [];
-const EMPTY_RECENT_RELEASES: CompletedRelease[] = [];
-
-// Normalize raw history.recentReleases (where `issues` may be absent) into the
-// store's CompletedRelease shape (`issues: number[]`). Returns the stable
-// EMPTY_RECENT_RELEASES const when there is nothing, so consumers never see a
-// fresh empty-array ref (same fresh-ref bug class as #210/#212).
-function normalizeRecentReleases(
-  raw: Array<{ version: string; issues?: number[]; completedAt: string; tag?: string }> | undefined,
-): CompletedRelease[] {
-  if (!raw || raw.length === 0) return EMPTY_RECENT_RELEASES;
-  return raw.map((r) => ({
-    version: r.version,
-    issues: r.issues ?? [],
-    completedAt: r.completedAt,
-    ...(r.tag !== undefined ? { tag: r.tag } : {}),
-  }));
-}
-
-// Types matching Rust state structures
-interface TikiState {
-  schemaVersion: number;
-  activeWork: Record<string, WorkContext>;
-  history?: {
-    lastCompletedIssue?: { number: number; title?: string; completedAt: string };
-    lastCompletedRelease?: { version: string; completedAt: string };
-    recentIssues?: Array<{ number: number; title?: string; completedAt: string }>;
-    recentReleases?: Array<{ version: string; issues?: number[]; completedAt: string; tag?: string }>;
-  };
-}
-
-interface FileEvent {
-  type: "stateChanged" | "planChanged" | "releaseChanged" | "researchChanged";
-  issueNumber?: number;
-  version?: string;
-  filename?: string;
-}
-
-function detectStateChanges(
-  oldState: TikiState | null,
-  newState: TikiState | null,
-) {
-  if (!oldState || !newState) return;
-  const addToast = useToastStore.getState().addToast;
-  const oldWork = oldState.activeWork;
-  const newWork = newState.activeWork;
-
-  for (const [workId, newItem] of Object.entries(newWork)) {
-    const oldItem = oldWork[workId];
-    if (!oldItem) continue;
-
-    // Detect status changes
-    if (oldItem.status !== newItem.status) {
-      if (newItem.status === 'completed' && newItem.type === 'issue') {
-        addToast(`Issue #${newItem.issue.number} completed`, 'success', 5000);
-      } else if (newItem.status === 'failed' && newItem.type === 'issue') {
-        addToast(`Issue #${newItem.issue.number} failed`, 'error', 8000);
-      } else if (newItem.status === 'shipping' && newItem.type === 'issue') {
-        addToast(`Shipping issue #${newItem.issue.number}...`, 'info', 3000);
-      }
-    }
-
-    // Detect phase completion for issues
-    if (newItem.type === 'issue' && oldItem.type === 'issue') {
-      const oldPhase = oldItem.phase;
-      const newPhase = newItem.phase;
-      if (oldPhase && newPhase && oldPhase.current !== newPhase.current && newPhase.current > oldPhase.current) {
-        addToast(`Phase ${newPhase.current}/${newPhase.total} completed`, 'success', 4000);
-      }
-    }
-
-    // Detect pipeline step transitions
-    if (oldItem.pipelineStep !== newItem.pipelineStep) {
-      if (oldItem.pipelineStep === 'AUDIT' && newItem.pipelineStep === 'EXECUTE') {
-        addToast('Audit passed', 'success', 3000);
-      }
-    }
-  }
-
-  // Detect work removed from activeWork (completed and moved to history)
-  for (const [workId, oldItem] of Object.entries(oldWork)) {
-    if (!newWork[workId] && oldItem.type === 'issue') {
-      addToast(`Issue #${oldItem.issue.number} shipped`, 'success', 5000);
-    }
-  }
-}
 
 function App() {
   const [state, setState] = useState<TikiState | null>(null);
@@ -219,6 +101,9 @@ function App() {
   // Bumped on every state.json change so the on-demand issue fetch below
   // re-runs and the detail GitHub badge updates without a reselection (#220).
   const [detailRefreshNonce, setDetailRefreshNonce] = useState(0);
+  // Stable bump for the detail nonce — passed to the file-sync and
+  // github-freshness hooks so their effects don't re-subscribe each render (#234).
+  const bumpDetailRefresh = useCallback(() => setDetailRefreshNonce((n) => n + 1), []);
   const issueFromStore = selectedIssue
     ? issues.find((i) => i.number === selectedIssue) ?? null
     : null;
@@ -273,13 +158,8 @@ function App() {
         prevStateRef.current = currentState;
         setState(currentState);
         setRecoveryError(null);
-        // Sync to tikiStateStore for Kanban
-        if (currentState?.activeWork) {
-          useTikiStateStore.getState().setActiveWork(currentState.activeWork);
-        }
-        // Sync recentIssues + recentReleases for Completed column
-        useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
-        useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
+        // Sync parsed state into tikiStateStore (Kanban / Completed column).
+        syncTikiStateStore(currentState);
       } catch (e) {
         console.error("Error loading state:", e);
         setError(String(e));
@@ -301,13 +181,8 @@ function App() {
       prevStateRef.current = currentState;
       setState(currentState);
       setRecoveryError(null);
-      // Sync to tikiStateStore for Kanban
-      if (currentState?.activeWork) {
-        useTikiStateStore.getState().setActiveWork(currentState.activeWork);
-      }
-      // Sync recentIssues + recentReleases for Completed column
-      useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
-      useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
+      // Sync parsed state into tikiStateStore (Kanban / Completed column).
+      syncTikiStateStore(currentState);
     } catch (e) {
       console.error("Error loading state:", e);
       setError(String(e));
@@ -320,150 +195,13 @@ function App() {
     void loadState();
   }, [loadState]);
 
-  // GitHub freshness (#221): the watcher only watches .tiki/, so issues/PRs/
-  // releases closed outside the app stay stale. Re-sync on window focus / tab
-  // visibility (default on) and, optionally, on a rate-limit-gated interval
-  // (off by default).
-  const githubFocusRefresh = useSettingsStore((s) => s.github.focusRefresh);
-  const githubPollSeconds = useSettingsStore((s) => s.github.pollIntervalSeconds);
-  useEffect(() => {
-    const refreshAll = () => {
-      scheduleRefresh('issues', () => useIssuesStore.getState().triggerRefetch());
-      scheduleRefresh('prs', () => usePullRequestsStore.getState().triggerRefetch());
-      scheduleRefresh('releases', () => useReleasesStore.getState().triggerRefetch());
-      // Invalidate the detail single-issue cache too (pairs with #220).
-      setDetailRefreshNonce((n) => n + 1);
-    };
-
-    const onVisibility = () => {
-      if (shouldRefreshOnVisibility(githubFocusRefresh ?? true, document.visibilityState)) {
-        refreshAll();
-      }
-    };
-    window.addEventListener('focus', onVisibility);
-    document.addEventListener('visibilitychange', onVisibility);
-
-    // Optional periodic poll — off by default, rate-limit-gated when enabled.
-    const intervalMs = effectiveIntervalMs(githubPollSeconds);
-    let timer: number | null = null;
-    if (intervalMs !== null) {
-      timer = window.setInterval(() => {
-        void invoke<RateLimitStatus>('fetch_rate_limit_status', { projectPath: null })
-          .then((status) => { if (canIntervalPoll(status)) refreshAll(); })
-          .catch(() => { if (canIntervalPoll(null)) refreshAll(); });
-      }, intervalMs);
-    }
-
-    return () => {
-      window.removeEventListener('focus', onVisibility);
-      document.removeEventListener('visibilitychange', onVisibility);
-      if (timer !== null) window.clearInterval(timer);
-    };
-  }, [githubFocusRefresh, githubPollSeconds]);
-
-  // Listen for file changes
-  useEffect(() => {
-    const unlisten = listen<FileEvent>("tiki-file-changed", async (event) => {
-      console.log("File changed:", event.payload);
-      if (event.payload.type === "stateChanged") {
-        try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
-          const currentState = await invoke<TikiState | null>("get_state", {
-            tikiPath: projectTikiPath,
-          });
-          console.log("State reloaded, activeWork keys:", currentState?.activeWork ? Object.keys(currentState.activeWork) : 'none');
-          const prev = prevStateRef.current;
-          detectStateChanges(prev, currentState);
-          // Re-fetch the open detail issue's GitHub state on every state
-          // change so a close-elsewhere (e.g. release-child ship) updates the
-          // badge without reselection (#220, pairs with deriveDisplayStatus).
-          setDetailRefreshNonce((n) => n + 1);
-          // Detect activeWork → history transitions to drive sidebar GitHub re-fetches
-          // (issue close, release ship). Debounced per-surface to coalesce bursts.
-          if (prev && currentState) {
-            const triggers = detectGithubRefreshTriggers(prev, currentState);
-            if (triggers.issuesRefresh) {
-              scheduleRefresh('issues', () => useIssuesStore.getState().triggerRefetch());
-            }
-            if (triggers.prsRefresh) {
-              scheduleRefresh('prs', () => usePullRequestsStore.getState().triggerRefetch());
-            }
-            if (triggers.releasesRefresh) {
-              scheduleRefresh('releases', () => useReleasesStore.getState().triggerRefetch());
-            }
-
-            // Bulk YOLO cascade: when state.json transitions the run's
-            // current issue from activeWork into history, advance the
-            // queue and dispatch the next /tiki:yolo. Detect failure
-            // (activeWork[issue].status === 'failed') and pause + toast.
-            const projectId =
-              useProjectsStore.getState().activeProjectId ?? 'default';
-            const bulkRun =
-              useBulkYoloStore.getState().runByProject[projectId] ?? null;
-            if (bulkRun && bulkRun.status === 'running') {
-              const currentIssue = bulkRun.queue[bulkRun.currentIndex];
-              if (currentIssue !== undefined) {
-                const wasActive =
-                  `issue:${currentIssue}` in (prev.activeWork ?? {});
-                const nowDone = (
-                  currentState.history?.recentIssues ?? EMPTY_RECENT_ISSUES
-                ).some((i) => i.number === currentIssue);
-                const nowFailed =
-                  currentState.activeWork?.[`issue:${currentIssue}`]
-                    ?.status === 'failed';
-
-                if (wasActive && nowDone) {
-                  // Issue shipped — advance the queue and dispatch the next.
-                  useBulkYoloStore.getState().advance();
-                  void dispatchNextBulkYolo(projectId);
-                } else if (nowFailed) {
-                  useBulkYoloStore
-                    .getState()
-                    .recordFailure(`Issue #${currentIssue} pipeline failed`);
-                  useToastStore.getState().addToast(
-                    `Bulk YOLO paused: issue #${currentIssue} failed. Fix and resume from the dialog.`,
-                    'error',
-                  );
-                }
-              }
-            }
-          }
-          prevStateRef.current = currentState;
-          setState(currentState);
-          // Sync to tikiStateStore for Kanban
-          if (currentState?.activeWork) {
-            console.log("Syncing to tikiStateStore:", Object.entries(currentState.activeWork).map(([k, v]) => `${k}: ${v.status}`));
-            useTikiStateStore.getState().setActiveWork(currentState.activeWork);
-          }
-          // Sync recentIssues + recentReleases for Completed column
-          useTikiStateStore.getState().setRecentIssues(currentState?.history?.recentIssues ?? EMPTY_RECENT_ISSUES);
-          useTikiStateStore.getState().setRecentReleases(normalizeRecentReleases(currentState?.history?.recentReleases));
-        } catch (e) {
-          console.error("Failed to reload state:", e);
-        }
-      } else if (event.payload.type === "releaseChanged") {
-        try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
-          const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath: projectTikiPath });
-          useTikiReleasesStore.getState().setReleases(loadedReleases);
-        } catch (e) {
-          console.error("Failed to reload releases:", e);
-        }
-      } else if (event.payload.type === "researchChanged") {
-        try {
-          const projectTikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
-          const loadedDocs = await invoke<ResearchDocMeta[]>("list_research_docs", { tikiPath: projectTikiPath });
-          useResearchStore.getState().setDocs(loadedDocs);
-        } catch (e) {
-          console.error("Failed to reload research docs:", e);
-        }
-      }
-    });
-
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [activeProject]);
+  // Watcher → frontend sync, GitHub freshness, and the bulk-YOLO cascade —
+  // extracted from inline effects into hooks (#234). The cascade callback and
+  // bumpDetailRefresh are stable, so these effects re-subscribe only on
+  // activeProject / settings change, preserving the original behavior.
+  const advanceBulkYolo = useBulkYoloCascade();
+  useTikiFileSync({ activeProject, prevStateRef, setState, bumpDetailRefresh, onStateChange: advanceBulkYolo });
+  useGithubFreshness(bumpDetailRefresh);
 
   const handleResetLayout = () => {
     useLayoutStore.getState().resetLayout();

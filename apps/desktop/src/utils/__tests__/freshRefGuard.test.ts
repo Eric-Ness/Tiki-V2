@@ -36,6 +36,10 @@ const GUARDED_FILES = [
   'stores/kanbanStore.ts',
   'components/kanban/KanbanBoard.tsx',
   'components/detail/IssueDetail.tsx',
+  // Hooks extracted from App.tsx (#234) — they carry useEffect dep arrays in
+  // the #210/#212 crash-sensitive path, so guard them too.
+  'hooks/useTikiFileSync.ts',
+  'hooks/useGithubFreshness.ts',
 ];
 
 /** Matches `?? []`, `?? {}`, `|| []`, `|| {}` (the fresh-allocation fallbacks). */
