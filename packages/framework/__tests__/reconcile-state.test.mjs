@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { reconcile } from "../scripts/reconcile-state.mjs";
+import { reconcile, buildReport } from "../scripts/reconcile-state.mjs";
 
 function makeTiki(state, plans = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tiki-reconcile-"));
@@ -234,4 +234,54 @@ test("--dry-run computes changes without writing", () => {
   assert.equal(r.changes.length, 1);
   // Disk unchanged.
   assert.equal(readBack(tikiPath).activeWork["issue:19"].pipelineStep, "REVIEW");
+});
+
+test("--print report: flags drift and is strictly read-only (issue #253)", () => {
+  // issue:50 recorded at EXECUTE 1/3 (its phase-2 transition was dropped), but
+  // the plan artifact shows phase 2 in flight. issue:51 is in sync at 2/3.
+  const tikiPath = makeTiki(
+    {
+      schemaVersion: 1,
+      activeWork: {
+        "issue:50": issueEntry(50, { status: "executing", pipelineStep: "EXECUTE", phase: { current: 1, total: 3, status: "executing" } }),
+        "issue:51": issueEntry(51, { status: "executing", pipelineStep: "EXECUTE", phase: { current: 2, total: 3, status: "executing" } }),
+      },
+      history: {},
+    },
+    {
+      50: plan(50, ["completed", "executing", "pending"], { audited: true }),
+      51: plan(51, ["completed", "executing", "pending"], { audited: true }),
+    }
+  );
+
+  const before = fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8");
+  const rows = buildReport(readBack(tikiPath), tikiPath);
+  const after = fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8");
+
+  // Read-only: buildReport must not touch state.json on disk.
+  assert.equal(before, after);
+
+  const r50 = rows.find((x) => x.workId === "issue:50");
+  const r51 = rows.find((x) => x.workId === "issue:51");
+
+  // Drift detected for the dropped-transition entry, with the artifact-derived target.
+  assert.equal(r50.drift, true);
+  assert.equal(r50.recordedPhase.current, 1);
+  assert.equal(r50.derivedStep, "EXECUTE");
+  assert.equal(r50.derivedPhase.current, 2);
+
+  // In-sync entry is not flagged.
+  assert.equal(r51.drift, false);
+  assert.equal(r51.derivedPhase.current, 2);
+});
+
+test("--print report: a frozen (paused) entry is reported in-sync, never as drift", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:60": issueEntry(60, { status: "paused", pipelineStep: "EXECUTE", phase: { current: 1, total: 3, status: "executing" } }) }, history: {} },
+    { 60: plan(60, ["completed", "completed", "completed"], { audited: true }) }
+  );
+  const rows = buildReport(readBack(tikiPath), tikiPath);
+  const r = rows.find((x) => x.workId === "issue:60");
+  assert.equal(r.drift, false); // reconciler never touches paused → doctor shows no actionable drift
+  assert.match(r.note, /frozen/);
 });

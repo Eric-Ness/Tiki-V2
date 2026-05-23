@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 253,
+    "title": "reconciler doctor: `reconcile-state.mjs --print` shows recorded-vs-derived pipeline step per active issue",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/253"
+  },
+  "createdAt": "2026-05-23T13:34:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "node reconcile-state.mjs --print lists every activeWork issue with its recorded step/status and the step/status derived from artifacts"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Drift between recorded and derived state is visibly flagged"
+    },
+    {
+      "id": "SC3",
+      "category": "safety",
+      "description": "--print is strictly read-only and never mutates state.json"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pure report helpers (recorded-vs-derived rows)",
+      "status": "completed",
+      "completedAt": "2026-05-23T13:35:30.000Z",
+      "summary": "Added phaseEqual, buildReport (pure, read-only) and formatReport to packages/framework/scripts/reconcile-state.mjs, reusing deriveTarget/derivePhase/inHistory. node --check passes.",
+      "content": "Add a pure function buildReport(state, tikiPath) to reconcile-state.mjs that, for each issue:* entry in activeWork, computes a row { workId, number, recordedStatus, recordedStep, recordedPhase, derivedStatus, derivedStep, derivedPhase, drift } using the existing deriveTarget/derivePhase/inHistory helpers. drift is true when the derived (status, step, phase) differs from the recorded values. Also add formatReport(rows) returning a human-readable table string. Export both for testing. No CLI wiring yet, no writes.",
+      "verification": [
+        "buildReport is a pure function that performs no filesystem writes",
+        "buildReport reuses deriveTarget/derivePhase/inHistory rather than duplicating logic",
+        "formatReport returns a string with one row per active issue"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Wire the --print CLI flag (both copies)",
+      "status": "completed",
+      "completedAt": "2026-05-23T13:37:00.000Z",
+      "summary": "Wired the read-only --print branch in main() (exits before reconcile()); mirrored both reconcile-state.mjs copies byte-identical. Drop/heal verified live: dropped phase-2 transition left state at EXECUTE 1/3; the wired hook command self-healed it to EXECUTE 2/3 from the plan artifact.",
+      "content": "In main(), when args.print is set, run buildReport against the resolved tiki path and write formatReport(rows) to stdout, then exit 0 WITHOUT calling reconcile() (strictly read-only). Mirror the entire change into the byte-identical installed copy at .claude/tiki/scripts/reconcile-state.mjs so the two stay in sync.",
+      "verification": [
+        "node packages/framework/scripts/reconcile-state.mjs --print prints the table",
+        "--print does not modify state.json (mtime/content unchanged)",
+        "both reconcile-state.mjs copies remain byte-identical"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        ".claude/tiki/scripts/reconcile-state.mjs"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Test the report against a drift fixture",
+      "status": "completed",
+      "completedAt": "2026-05-23T13:38:00.000Z",
+      "summary": "Added two node:test cases to reconcile-state.test.mjs: drift detection (recorded EXECUTE 1/3 vs artifact-derived 2/3) with read-only assertion, and a frozen/paused entry reported in-sync. Full suite: 16/16 pass.",
+      "content": "Add a node:test case to reconcile-state.test.mjs that builds a fixture where state.json records EXECUTE 1/3 but the plan artifact shows phase 2 executing, calls buildReport, and asserts the row is flagged drift=true with derivedStep EXECUTE and derivedPhase.current 2. Also assert a non-drift case yields drift=false and that buildReport leaves state.json byte-identical on disk.",
+      "verification": [
+        "node --test packages/framework/__tests__/reconcile-state.test.mjs passes including the new case",
+        "the new test asserts drift detection AND read-only behavior"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/__tests__/reconcile-state.test.mjs"
+      ]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2
+    ],
+    "SC2": [
+      1,
+      2,
+      3
+    ],
+    "SC3": [
+      2,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-23T13:34:57.428Z"
+}

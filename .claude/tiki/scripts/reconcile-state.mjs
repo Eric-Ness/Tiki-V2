@@ -171,6 +171,135 @@ function deriveTarget(plan) {
   return { status: "planning", step: "PLAN" };
 }
 
+/** Structural equality for a { current, total, status } phase (null-safe). */
+function phaseEqual(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.current === b.current && a.total === b.total && a.status === b.status;
+}
+
+/**
+ * Build a recorded-vs-derived report for every issue:* entry in activeWork.
+ *
+ * PURE / READ-ONLY: reads plan files but never mutates state. This powers the
+ * `--print` "reconciler doctor" — a human-readable snapshot of what state.json
+ * RECORDS versus what the on-disk artifacts IMPLY, so a dropped /tiki transition
+ * (the freeze class from epic #244) is visible at a glance. `drift: true` marks a
+ * row the reconciler WOULD advance on its next pass.
+ *
+ * Mirrors reconcileEntry's decision sources without applying them:
+ *   - frozen status (failed | paused | completed) → derived == recorded (the
+ *     reconciler never touches these), so drift is false by construction.
+ *   - in history → derived is SHIP (completed for a release child, otherwise the
+ *     entry would be removed).
+ *   - otherwise → deriveTarget(plan); a null target (pre-PLAN) is left as-is.
+ */
+export function buildReport(state, tikiPath) {
+  const rows = [];
+  const activeWork = (state && state.activeWork) || {};
+  const history = (state && state.history) || {};
+
+  for (const [workId, entry] of Object.entries(activeWork)) {
+    if (!workId.startsWith("issue:")) continue;
+    if (!entry || entry.type !== "issue" || !entry.issue) continue;
+    const number = entry.issue.number;
+
+    const recordedStatus = entry.status ?? null;
+    const recordedStep = entry.pipelineStep ?? null;
+    const recordedPhase = entry.phase
+      ? {
+          current: entry.phase.current ?? null,
+          total: entry.phase.total ?? null,
+          status: entry.phase.status ?? null,
+        }
+      : null;
+
+    let derivedStatus = recordedStatus;
+    let derivedStep = recordedStep;
+    let derivedPhase = recordedPhase;
+    let note = "";
+
+    if (FROZEN_STATUSES.has(recordedStatus)) {
+      note = `frozen (${recordedStatus})`;
+    } else if (typeof number === "number" && inHistory(history, number)) {
+      derivedStatus = entry.parentRelease ? "completed" : "(shipped → remove)";
+      derivedStep = "SHIP";
+      derivedPhase = null;
+      note = "in history";
+    } else {
+      const plan = readPlanSafe(tikiPath, number);
+      const target = deriveTarget(plan);
+      if (target) {
+        derivedStatus = target.status;
+        derivedStep = target.step;
+        derivedPhase = target.phase ?? null;
+      } else {
+        note = plan ? "plan has no phases" : "no plan (pre-PLAN, see #247)";
+      }
+    }
+
+    const drift =
+      derivedStatus !== recordedStatus ||
+      derivedStep !== recordedStep ||
+      !phaseEqual(recordedPhase, derivedPhase);
+
+    rows.push({
+      workId,
+      number,
+      recordedStatus,
+      recordedStep,
+      recordedPhase,
+      derivedStatus,
+      derivedStep,
+      derivedPhase,
+      drift,
+      note,
+    });
+  }
+
+  return rows;
+}
+
+/** Render one report row's (status, step, phase) triple compactly. */
+function fmtCell(status, step, phase) {
+  const p = phase ? ` ${phase.current ?? "?"}/${phase.total ?? "?"}` : "";
+  return `${status ?? "-"}/${step ?? "-"}${p}`;
+}
+
+/** Render buildReport() rows as a human-readable, ASCII-only table. */
+export function formatReport(rows) {
+  if (!rows || rows.length === 0) {
+    return "Reconciler doctor: no active issues to report.";
+  }
+  const lines = [
+    `Reconciler doctor — ${rows.length} active issue${rows.length === 1 ? "" : "s"}`,
+    "",
+  ];
+  for (const r of rows) {
+    const marker = r.drift ? "<-- DRIFT" : "ok";
+    const noteStr = r.note ? `  [${r.note}]` : "";
+    lines.push(
+      `  ${r.workId.padEnd(12)} recorded: ${fmtCell(
+        r.recordedStatus,
+        r.recordedStep,
+        r.recordedPhase
+      ).padEnd(26)} derived: ${fmtCell(
+        r.derivedStatus,
+        r.derivedStep,
+        r.derivedPhase
+      ).padEnd(26)} ${marker}${noteStr}`
+    );
+  }
+  const driftCount = rows.filter((r) => r.drift).length;
+  lines.push("");
+  lines.push(
+    driftCount === 0
+      ? "All active issues are in sync with their artifacts."
+      : `${driftCount} issue${driftCount === 1 ? "" : "s"} drifted — the reconciler will heal on its next pass.`
+  );
+  return lines.join("\n");
+}
+
 /**
  * Reconcile a single issue entry in place. Returns a small change record or null
  * if nothing changed. Mutates `state` only via guarded applyTransition / delete.
@@ -287,6 +416,16 @@ function main() {
 
   try {
     const tikiPath = resolveTikiPath(args["tiki-path"]);
+
+    // --print: read-only "reconciler doctor". Snapshot recorded-vs-derived
+    // state and exit WITHOUT reconciling (never mutates state.json).
+    if (args.print === true) {
+      const state = readStateSafe(tikiPath);
+      const rows = state ? buildReport(state, tikiPath) : [];
+      process.stdout.write(formatReport(rows) + "\n");
+      process.exit(0);
+    }
+
     const result = reconcile(tikiPath, { dryRun });
     if (!quiet) {
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
