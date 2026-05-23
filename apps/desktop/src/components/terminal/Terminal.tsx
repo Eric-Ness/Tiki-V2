@@ -6,6 +6,7 @@ import { SearchAddon } from "@xterm/addon-search";
 import { TerminalSearch } from "./TerminalSearch";
 import { ResumeBanner } from "./ResumeBanner";
 import { useTerminal } from "./useTerminal";
+import { isViewportAtBottom } from "./viewportSync";
 import { findLeafByTerminalId } from "../../stores/splitTree";
 import { terminalFocusRegistry, terminalActionsRegistry, useTerminalStore } from "../../stores/terminalStore";
 import { useSettingsStore } from "../../stores";
@@ -88,6 +89,7 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const fitRafRef = useRef<number | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const searchQueryRef = useRef<string>("");
   const isSearchOpenRef = useRef(false);
@@ -129,7 +131,18 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
 
   // Callbacks for terminal output and exit
   const handleOutput = useCallback((data: string) => {
-    xtermRef.current?.write(data);
+    const xterm = xtermRef.current;
+    if (xterm) {
+      // #254: re-pin to the bottom after output, but ONLY when the user is
+      // already parked there — otherwise reading scrollback would be yanked
+      // away. The buffer is settled inside the write callback. This mirrors the
+      // scrollOnUserInput behavior that made a keystroke "fix" a stranded row.
+      const buffer = xterm.buffer.active;
+      const atBottom = isViewportAtBottom(buffer.viewportY, buffer.baseY);
+      xterm.write(data, () => {
+        if (atBottom) xterm.scrollToBottom();
+      });
+    }
 
     // Signal busy status on output, debounce to idle
     onStatusChangeRef.current?.('busy');
@@ -139,6 +152,23 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
     idleTimeoutRef.current = setTimeout(() => {
       onStatusChangeRef.current?.('idle');
     }, 500);
+  }, []);
+
+  // #254: fit, then force the viewport/render to the bottom. fitAddon.fit()
+  // resizes the buffer and SIGWINCHes the PTY, but in the WebView2 DOM renderer
+  // the painted viewport can lag the new geometry until the next write — leaving
+  // the bottom row (the prompt) clipped below the viewport. scrollToBottom() +
+  // refresh() re-sync it immediately. Stable (reads refs) so resize handlers can
+  // depend on it without re-subscribing.
+  const fitAndSync = useCallback(() => {
+    const xterm = xtermRef.current;
+    const fitAddon = fitAddonRef.current;
+    const container = terminalRef.current;
+    if (!xterm || !fitAddon || !container) return;
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+    fitAddon.fit();
+    xterm.scrollToBottom();
+    xterm.refresh(0, xterm.rows - 1);
   }, []);
 
   const handleExit = useCallback((exitCode: number | null) => {
@@ -203,16 +233,27 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
       if (hasSize && !isVisible) {
         setIsVisible(true);
       }
-      // Fit existing terminal if it exists
+      // #254: coalesce resize bursts to one fit per frame, then sync the
+      // viewport so the bottom row is never left stranded below the fold.
       if (hasSize && xtermRef.current) {
-        fitAddonRef.current?.fit();
+        if (fitRafRef.current !== null) cancelAnimationFrame(fitRafRef.current);
+        fitRafRef.current = requestAnimationFrame(() => {
+          fitRafRef.current = null;
+          fitAndSync();
+        });
       }
     });
 
     observer.observe(container);
 
-    return () => observer.disconnect();
-  }, [isVisible]);
+    return () => {
+      observer.disconnect();
+      if (fitRafRef.current !== null) {
+        cancelAnimationFrame(fitRafRef.current);
+        fitRafRef.current = null;
+      }
+    };
+  }, [isVisible, fitAndSync]);
 
   // Initialize xterm.js and connect to PTY when visible
   useEffect(() => {
@@ -285,11 +326,9 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
         // runs before the event reaches xterm's helper textarea.
         container.addEventListener('paste', suppressNativePaste, true);
 
-        // Fit after a small delay to ensure rendering is complete
+        // Fit after a small delay to ensure rendering is complete (#254: fit+sync)
         setTimeout(() => {
-          if (!cancelled && container.offsetWidth > 0 && container.offsetHeight > 0) {
-            fitAddon.fit();
-          }
+          if (!cancelled) fitAndSync();
         }, 10);
 
         // Store refs
@@ -382,17 +421,17 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
             const current = xterm.options.fontSize ?? terminalSettings.fontSize;
             if (e.key === '=' || e.key === '+') {
               xterm.options.fontSize = Math.min(FONT_MAX, current + 1);
-              fitAddon.fit();
+              fitAndSync();
               return false;
             }
             if (e.key === '-') {
               xterm.options.fontSize = Math.max(FONT_MIN, current - 1);
-              fitAddon.fit();
+              fitAndSync();
               return false;
             }
             if (e.key === '0') {
               xterm.options.fontSize = terminalSettings.fontSize;
-              fitAddon.fit();
+              fitAndSync();
               return false;
             }
           }
@@ -431,13 +470,11 @@ export function Terminal({ className = "", cwd, shell, terminalId, onStatusChang
           resizeTerminalRef.current(rows, cols);
         });
 
-        // Handle window resize
-        const handleWindowResize = () => {
-          if (container.offsetWidth > 0 && container.offsetHeight > 0) {
-            fitAddon.fit();
-          }
-        };
-        window.addEventListener("resize", handleWindowResize);
+        // #254: the ResizeObserver above already refits on every container size
+        // change (window resizes included), so a separate window "resize"
+        // listener was a redundant double-fit — and it was never removed in
+        // cleanup (a listener leak). Dropped; the observer is the single refit
+        // path, and it routes through fitAndSync().
 
         // Create the PTY session
         createTerminalRef.current().then(() => {

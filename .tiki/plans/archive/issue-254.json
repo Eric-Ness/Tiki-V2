@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 254,
+    "title": "Bug: Terminal bottom row (prompt) renders below the viewport until a keystroke — output path never re-syncs scroll",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/254"
+  },
+  "createdAt": "2026-05-23T22:13:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "With a full terminal at the prompt, the bottom row stays visible after output settles without a keystroke"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Scrolling up to read history during active output does NOT auto-jump to the bottom"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Resize, font-size change, split panes, and tab switches keep the bottom row visible"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "The extracted viewport-sync helper has a unit test; desktop vitest suite and pnpm build stay green"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pin to bottom after output (the core fix)",
+      "status": "completed",
+      "completedAt": "2026-05-23T22:14:10.000Z",
+      "summary": "Added pure isViewportAtBottom() in viewportSync.ts; handleOutput now captures atBottom before write and re-pins via the write callback only when already at bottom (preserves scroll-up-to-read).",
+      "content": "Extract a pure helper isViewportAtBottom(viewportY, baseY) into a new apps/desktop/src/components/terminal/viewportSync.ts. In Terminal.tsx handleOutput, capture atBottom = isViewportAtBottom(buffer.active.viewportY, buffer.active.baseY) BEFORE writing, then use the write callback form: xterm.write(data, () => { if (atBottom) xterm.scrollToBottom(); }). This mirrors xterm's scrollOnUserInput behavior (why a keystroke fixes it) and preserves scroll-up-to-read because it only re-pins when the user is already at the bottom.",
+      "verification": [
+        "handleOutput captures atBottom before write and re-pins only when atBottom",
+        "isViewportAtBottom is a pure, exported function",
+        "no scroll jump occurs when the user has scrolled up (atBottom false)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.tsx",
+        "apps/desktop/src/components/terminal/viewportSync.ts"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Harden resize/fit paths",
+      "status": "completed",
+      "completedAt": "2026-05-23T22:15:00.000Z",
+      "summary": "Added stable fitAndSync() (fit → scrollToBottom → refresh); RAF-debounced the ResizeObserver and routed init + font-size shortcuts through it; removed the redundant window-resize listener (also fixed its cleanup leak).",
+      "content": "Add a fitAndSync() helper in Terminal.tsx that runs fitAddon.fit() then xterm.scrollToBottom() and xterm.refresh(0, xterm.rows - 1) (guarded on dimensions). Route the ResizeObserver, window-resize, initial mount, and font-size (Ctrl +/-/0) paths through it. Debounce the ResizeObserver via requestAnimationFrame (cancel a pending frame before scheduling a new one) and drop the redundant double-fit (the window-resize listener fires the same ResizeObserver, so consolidate). This covers the resize-stale-render variant and the Math.floor(rows) sub-cell residue that makes it intermittent.",
+      "verification": [
+        "all fit() call sites route through fitAndSync()",
+        "ResizeObserver fit is RAF-debounced (no synchronous fit storm)",
+        "font-size shortcuts still reflow and keep the bottom visible"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/terminal/Terminal.tsx"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Unit test the helper + run the gates",
+      "status": "completed",
+      "completedAt": "2026-05-23T22:18:00.000Z",
+      "summary": "Added viewportSync.test.ts (3 cases). Desktop vitest 187/187 green; pnpm build (tsc -b + vite) clean.",
+      "content": "Add apps/desktop/src/components/terminal/__tests__/viewportSync.test.ts asserting isViewportAtBottom returns true at/over baseY and false when scrolled up. Run the full desktop vitest suite and pnpm build (tsc -b) as the regression gate.",
+      "verification": [
+        "viewportSync.test.ts passes",
+        "pnpm --filter @tiki/desktop test green",
+        "pnpm build green"
+      ],
+      "addressesCriteria": [
+        "SC4",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/terminal/__tests__/viewportSync.test.ts"
+      ]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2
+    ],
+    "SC2": [
+      1,
+      3
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-23T22:13:39.415Z"
+}
