@@ -1,0 +1,11 @@
+{
+  "version": "v0.7.7",
+  "status": "active",
+  "issues": [
+    {
+      "number": 254,
+      "title": "Bug: Terminal bottom row (prompt) renders below the viewport until a keystroke — output path never re-syncs scroll"
+    }
+  ],
+  "createdAt": "2026-05-23T22:02:09.903Z"
+}

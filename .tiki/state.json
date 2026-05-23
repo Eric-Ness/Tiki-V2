@@ -3,19 +3,24 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 253,
-      "title": "reconciler doctor: `reconcile-state.mjs --print` shows recorded-vs-derived pipeline step per active issue",
-      "completedAt": "2026-05-23T13:42:25.311Z"
+      "number": 254,
+      "title": "Bug: Terminal bottom row (prompt) renders below the viewport until a keystroke — output path never re-syncs scroll",
+      "completedAt": "2026-05-23T22:20:40.096Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.7.6",
+      "version": "v0.7.7",
       "issues": [
-        251
+        254
       ],
-      "completedAt": "2026-05-22T20:30:11.023Z",
-      "tag": "v0.7.6"
+      "completedAt": "2026-05-23T22:23:22.166Z",
+      "tag": "v0.7.7"
     },
     "recentIssues": [
+      {
+        "number": 254,
+        "title": "Bug: Terminal bottom row (prompt) renders below the viewport until a keystroke — output path never re-syncs scroll",
+        "completedAt": "2026-05-23T22:20:40.096Z"
+      },
       {
         "number": 253,
         "title": "reconciler doctor: `reconcile-state.mjs --print` shows recorded-vs-derived pipeline step per active issue",
@@ -222,6 +227,14 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.7.7",
+        "issues": [
+          254
+        ],
+        "completedAt": "2026-05-23T22:23:22.166Z",
+        "tag": "v0.7.7"
+      },
       {
         "version": "v0.7.6",
         "issues": [
