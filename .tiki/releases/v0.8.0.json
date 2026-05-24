@@ -1,0 +1,15 @@
+{
+  "version": "v0.8.0",
+  "status": "active",
+  "issues": [
+    {
+      "number": 256,
+      "title": "Dependency graph: show durable phase progress (N/M) on every node"
+    },
+    {
+      "number": 257,
+      "title": "Dependency graph: click a node to open a live success-criteria panel"
+    }
+  ],
+  "createdAt": "2026-05-24T18:45:00.000Z"
+}
