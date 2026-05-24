@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 259,
-      "title": "Shipped releases show stale 'active' badge — archived flag stripped from IPC (#259)",
-      "completedAt": "2026-05-24T22:22:13.980Z"
+      "number": 261,
+      "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health",
+      "completedAt": "2026-05-24T23:49:20.748Z"
     },
     "lastCompletedRelease": {
       "version": "v0.8.2",
@@ -16,6 +16,11 @@
       "tag": "v0.8.2"
     },
     "recentIssues": [
+      {
+        "number": 261,
+        "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health",
+        "completedAt": "2026-05-24T23:49:20.748Z"
+      },
       {
         "number": 259,
         "title": "Shipped releases show stale 'active' badge — archived flag stripped from IPC (#259)",
