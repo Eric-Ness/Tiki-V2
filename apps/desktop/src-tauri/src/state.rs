@@ -629,3 +629,44 @@ pub enum TikiReleaseStatus {
     Shipped,
     NotPlanned,
 }
+
+/// Read-only health report for a `.tiki/` workspace, produced by the `tiki_doctor`
+/// command. Surfaces drift like the #259 archived/status class so it is visible
+/// in-app instead of discovered by eye. Gathered without mutating any state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticsReport {
+    /// Contents of `.tiki/.framework-version`, or `None` if the file is absent.
+    pub framework_version: Option<String>,
+    /// Whether `.tiki/state.json` parses as `TikiState`.
+    pub state_valid: bool,
+    /// `schemaVersion` from `state.json`, or `None` if it did not parse.
+    pub schema_version: Option<u32>,
+    /// Number of entries in `state.json` `activeWork`.
+    pub active_work_count: usize,
+    /// One entry per release JSON under `releases/` and `releases/archive/`.
+    pub release_checks: Vec<ReleaseCheck>,
+    /// Versions in `state.json` `history.recentReleases` that have no matching
+    /// JSON file in either `releases/` or `releases/archive/` (a parity gap).
+    pub recent_releases_missing_json: Vec<String>,
+    /// Whether `.claude/settings.json` registers `reconcile-state.mjs` in a
+    /// `Stop` / `SubagentStop` hook.
+    pub reconciler_hook_installed: bool,
+}
+
+/// One release file's consistency check within a `DiagnosticsReport`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseCheck {
+    pub version: String,
+    /// `"active"` (read from `releases/`) or `"archive"` (read from `releases/archive/`).
+    pub location: String,
+    /// The release JSON's own `status` field, lowercased (e.g. `"active"`, `"shipped"`).
+    pub status: String,
+    /// `true` when a file under `archive/` still has `status: "active"`. NOTE: this is
+    /// the *normal resting state* for every shipped release — the ship teardown `mv`s a
+    /// release into `archive/` without flipping `status`, and #259 made the file's
+    /// location (not `status`) the source of truth. So it is `true` for ALL archived
+    /// releases here; it is informational, not necessarily a problem to fix.
+    pub archived_but_active: bool,
+}

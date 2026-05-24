@@ -66,6 +66,7 @@ pub fn run() {
             commands::read_research_doc,
             commands::install_framework,
             commands::read_framework_version,
+            commands::tiki_doctor,
             config::read_tiki_config,
             config::save_tiki_config,
             state_transition::state_transition,

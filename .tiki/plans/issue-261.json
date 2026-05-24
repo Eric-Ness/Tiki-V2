@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 261,
+    "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health (state, release drift, reconciler hook)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/261"
+  },
+  "createdAt": "2026-05-24T22:43:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "tiki_doctor returns a DiagnosticsReport for a valid .tiki/ directory without error",
+      "verified": true,
+      "verifiedAt": "2026-05-24T23:38:38.868Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "An archive/ release whose JSON says status:\"active\" is reported with archivedButActive: true",
+      "verified": true,
+      "verifiedAt": "2026-05-24T23:39:47.557Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "A recentReleases entry with no matching JSON file appears in recentReleasesMissingJson",
+      "verified": true,
+      "verifiedAt": "2026-05-24T23:39:47.557Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "reconcilerHookInstalled is true when a Stop/SubagentStop hook runs reconcile-state.mjs, false otherwise",
+      "verified": true,
+      "verifiedAt": "2026-05-24T23:41:27.066Z"
+    },
+    {
+      "id": "SC5",
+      "category": "quality",
+      "description": "Command registered in invoke_handler; cargo test --lib and cargo clippy -- --deny warnings are clean",
+      "verified": true,
+      "verifiedAt": "2026-05-24T23:41:27.066Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "DiagnosticsReport types + command shell (framework/state checks) + register",
+      "status": "completed",
+      "content": "Foundation phase. In apps/desktop/src-tauri/src/state.rs, add a DiagnosticsReport struct and a nested ReleaseCheck struct, both with #[derive(Debug, Clone, Serialize, Deserialize)] + #[serde(rename_all = \"camelCase\")] (uniform with every other struct in the file). Fields on DiagnosticsReport: framework_version: Option<String>, state_valid: bool, schema_version: Option<u32>, active_work_count: usize, release_checks: Vec<ReleaseCheck>, recent_releases_missing_json: Vec<String>, reconciler_hook_installed: bool. Fields on ReleaseCheck: version: String, location: String (\"active\" | \"archive\"), status: String, archived_but_active: bool.\n\nIn apps/desktop/src-tauri/src/commands.rs, add the command: #[tauri::command] pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, String>. Resolve tiki_path defaulting to cwd/.tiki exactly like load_tiki_releases (commands.rs:232-238). In THIS phase, implement only: framework_version (reuse the read logic from read_framework_version, commands.rs:816 — read <tiki>/.framework-version, trim, None if absent), state_valid + schema_version + active_work_count (read <tiki>/state.json, parse into TikiState; state_valid = parse Ok, schema_version from the parsed field, active_work_count = activeWork.len(); on parse failure state_valid=false and the rest default). Leave release_checks = vec![], recent_releases_missing_json = vec![], reconciler_hook_installed = false as TODO placeholders to be filled in phases 2 and 3 (add a // TODO(phase 2)/(phase 3) comment at each).\n\nRegister tiki_doctor in the Tauri invoke_handler (generate_handler! macro) so the command is callable immediately — #262 depends on this. Add one #[cfg(test)] test asserting tiki_doctor returns Ok for a valid temp .tiki (use the existing temp-dir helpers in the tests module as a model). NOTE FOR PHASES 2/3: both will edit the tiki_doctor body (the placeholder lines) and the tests module — coordinate so edits don't collide.",
+      "verification": [
+        "DiagnosticsReport + ReleaseCheck structs exist in state.rs with camelCase serde",
+        "tiki_doctor is registered in invoke_handler",
+        "cargo build -p tiki-desktop compiles (command returns a report with framework/state fields populated, release/hook fields stubbed)",
+        "Phase-1 test: tiki_doctor returns Ok for a valid temp .tiki"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-24T23:38:38.868Z",
+      "summary": "Added DiagnosticsReport + ReleaseCheck structs (state.rs, camelCase serde); implemented tiki_doctor command with framework_version + state_valid/schema_version/active_work_count live, release/hook fields stubbed (TODO phase 2/3); registered in lib.rs invoke_handler; SC1 test passes (cargo test --lib)."
+    },
+    {
+      "number": 2,
+      "title": "Release consistency checks (releaseChecks + recentReleasesMissingJson)",
+      "status": "completed",
+      "content": "Fill the release_checks and recent_releases_missing_json fields in tiki_doctor.\n\nrelease_checks: scan <tiki>/releases/*.json (location \"active\") and <tiki>/releases/archive/*.json (location \"archive\"). For each, parse enough to read version + status (reuse the TikiRelease parse / read_release_dir pattern at commands.rs:329; a lightweight serde struct reading just {version, status} is also fine). Set archived_but_active = (location == \"archive\" && status == \"active\"). Push one ReleaseCheck per file. IMPORTANT (from review): in this repo every archived release legitimately keeps status:\"active\" (ship mv's without flipping status; #259 made location the source of truth), so archived_but_active will be true for ALL archived releases — that is correct/expected here. Compute it faithfully; whether it is a 'warning' is #262's concern, not this command's.\n\nrecent_releases_missing_json: read <tiki>/state.json history.recentReleases[].version, build the set of versions that have a JSON file in releases/ OR releases/archive/, and report versions present in recentReleases but absent from that set (sorted). This adapts check_release_json_parity (commands.rs:272) but compares state-history -> JSON instead of changelog -> JSON.\n\nAdd #[cfg(test)] tests: (SC2) build a temp .tiki with an archive/ release whose JSON says status:\"active\" and assert that ReleaseCheck has archived_but_active=true — the existing temp_tiki_with_releases helper (commands.rs:922) already creates exactly this fixture; reuse or extend it. (SC3) a temp state.json recentReleases entry with no matching JSON file appears in recent_releases_missing_json. Edits the tiki_doctor body + tests module — see Phase 1 note re: overlap with Phase 3.",
+      "verification": [
+        "release_checks populated: one entry per release JSON across releases/ and releases/archive/ with correct location/status",
+        "archived_but_active true for an archive/ file with status:active (SC2 test passes)",
+        "recent_releases_missing_json reports recentReleases versions with no JSON file (SC3 test passes)",
+        "cargo test --lib clean"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-05-24T23:39:47.557Z",
+      "summary": "Filled release_checks (reuses load_tiki_releases with include_archived; per-file version/location/status/archived_but_active) and recent_releases_missing_json (new compute_recent_releases_missing_json: state history.recentReleases minus JSON files in releases/ + archive/). SC2 + SC3 tests pass."
+    },
+    {
+      "number": 3,
+      "title": "Reconciler-hook detection + final test/clippy gate",
+      "status": "completed",
+      "content": "Fill the reconciler_hook_installed field. Promote the existing reconcile_groups test helper (commands.rs:846, currently inside #[cfg(test)]) into a real (non-test) function — e.g. fn reconciler_hook_installed(project: &Path) -> bool that reads <project>/.claude/settings.json, and returns true if any group under hooks.Stop OR hooks.SubagentStop has a hooks[].command containing \"reconcile-state.mjs\". Be robust to a missing/unparseable settings.json (return false, do not error). Note the tiki_path passed to tiki_doctor points at <project>/.tiki, so derive the project root (parent of tiki_path) to locate .claude/settings.json. Wire reconciler_hook_installed into the tiki_doctor report.\n\nAdd #[cfg(test)] tests for SC4: a temp project whose .claude/settings.json registers reconcile-state.mjs under a Stop hook -> reconciler_hook_installed true; a project with no such hook -> false. The existing temp_project()/read_settings() helpers model the fixture.\n\nFinal gate for SC5: run cargo test --lib (all green) and cargo clippy -- --deny warnings (clean). If the running desktop app holds an exe lock, use cargo test --lib (not the full bin build) per the known Windows lock gotcha. Edits the tiki_doctor body + tests module — see Phase 1 note re: overlap with Phase 2.",
+      "verification": [
+        "reconciler_hook_installed function exists outside #[cfg(test)] and is wired into tiki_doctor",
+        "SC4 tests pass: true with a Stop/SubagentStop reconcile hook, false without",
+        "cargo test --lib clean",
+        "cargo clippy -- --deny warnings clean"
+      ],
+      "addressesCriteria": [
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [
+        1,
+        2
+      ],
+      "completedAt": "2026-05-24T23:41:27.066Z",
+      "summary": "Promoted hook detection to real fn reconciler_hook_installed(project) (robust to missing/unparseable settings.json); wired into tiki_doctor via path.parent(). SC4 test covers Stop + SubagentStop + unrelated + missing. Final gate: cargo test --lib 52 passed; cargo clippy --lib -- -D warnings clean."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      3
+    ],
+    "SC5": [
+      1,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-24T22:46:51.084Z"
+}

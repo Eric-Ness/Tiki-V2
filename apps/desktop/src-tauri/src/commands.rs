@@ -1,5 +1,8 @@
 use crate::fs_utils::{self, BackupInfo};
-use crate::state::{TikiPlan, TikiRelease, TikiState, WorkContext, WorkStatus};
+use crate::state::{
+    DiagnosticsReport, ReleaseCheck, TikiPlan, TikiRelease, TikiReleaseStatus, TikiState,
+    WorkContext, WorkStatus,
+};
 use crate::watcher;
 use include_dir::{include_dir, Dir};
 use serde::{Deserialize, Serialize};
@@ -824,6 +827,174 @@ pub fn read_framework_version(project_path: String) -> Result<Option<String>, St
     Ok(Some(contents.trim().to_string()))
 }
 
+/// Read-only diagnostics over a `.tiki/` workspace — see `DiagnosticsReport`.
+/// Reports framework version, `state.json` validity, per-release location/status
+/// drift (`archivedButActive`), history↔JSON parity gaps, and reconciler-hook
+/// presence. Pure inspection: mutates nothing and never returns Err for a merely
+/// degraded workspace (a missing/invalid file is reported in a field, not raised).
+///
+/// `tiki_path` defaults to `<cwd>/.tiki` like `load_tiki_releases`.
+#[tauri::command]
+pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    // framework_version: <tiki>/.framework-version, trimmed; None if absent.
+    let framework_version = {
+        let fv = path.join(".framework-version");
+        if fv.exists() {
+            std::fs::read_to_string(&fv)
+                .ok()
+                .map(|s| s.trim().to_string())
+        } else {
+            None
+        }
+    };
+
+    // state.json validity + schemaVersion + activeWork count. A read/parse failure
+    // is reported as state_valid=false rather than raised — diagnostics must work
+    // even on a broken workspace.
+    let (state_valid, schema_version, active_work_count) = match std::fs::read_to_string(
+        path.join("state.json"),
+    ) {
+        Ok(content) => match serde_json::from_str::<TikiState>(&content) {
+            Ok(state) => (true, Some(state.schema_version), state.active_work.len()),
+            Err(_) => (false, None, 0),
+        },
+        Err(_) => (false, None, 0),
+    };
+
+    // release_checks: reuse the location-derived loader (archive/ => archived=true),
+    // so this stays consistent with how the sidebar derives "completed".
+    let mut release_checks = Vec::new();
+    if let Ok(releases) =
+        load_tiki_releases(Some(path.to_string_lossy().to_string()), Some(true))
+    {
+        for r in releases {
+            let location = if r.archived { "archive" } else { "active" }.to_string();
+            let status = match r.status {
+                TikiReleaseStatus::Active => "active",
+                TikiReleaseStatus::Completed => "completed",
+                TikiReleaseStatus::Shipped => "shipped",
+                TikiReleaseStatus::NotPlanned => "not_planned",
+            }
+            .to_string();
+            // archived_but_active is the expected resting state for shipped releases
+            // (see ReleaseCheck doc); computed faithfully, judged by the UI (#262).
+            let archived_but_active = r.archived && r.status == TikiReleaseStatus::Active;
+            release_checks.push(ReleaseCheck {
+                version: r.version,
+                location,
+                status,
+                archived_but_active,
+            });
+        }
+    }
+
+    let recent_releases_missing_json = compute_recent_releases_missing_json(&path);
+
+    Ok(DiagnosticsReport {
+        framework_version,
+        state_valid,
+        schema_version,
+        active_work_count,
+        release_checks,
+        recent_releases_missing_json,
+        // tiki_path points at <project>/.tiki, so .claude/settings.json lives in its parent.
+        reconciler_hook_installed: path
+            .parent()
+            .map(reconciler_hook_installed)
+            .unwrap_or(false),
+    })
+}
+
+/// Versions listed in `<tiki>/state.json` `history.recentReleases` that have no
+/// matching `{version}.json` in either `releases/` or `releases/archive/`. A parity
+/// gap — the release shipped (it's in history) but its definition file is gone.
+///
+/// Distinct from `check_release_json_parity`, which compares changelogs↔JSON; this
+/// compares state-history↔JSON. Returns sorted versions; empty on any read failure.
+fn compute_recent_releases_missing_json(tiki_path: &Path) -> Vec<String> {
+    use std::collections::HashSet;
+
+    // History versions from state.json.
+    let history_versions: Vec<String> = match std::fs::read_to_string(tiki_path.join("state.json"))
+    {
+        Ok(content) => match serde_json::from_str::<TikiState>(&content) {
+            Ok(state) => state
+                .history
+                .and_then(|h| h.recent_releases)
+                .map(|rs| rs.into_iter().map(|r| r.version).collect())
+                .unwrap_or_default(),
+            Err(_) => return Vec::new(),
+        },
+        Err(_) => return Vec::new(),
+    };
+
+    // Set of versions that have a JSON file in releases/ or releases/archive/.
+    let releases_dir = tiki_path.join("releases");
+    let mut present: HashSet<String> = HashSet::new();
+    for dir in [releases_dir.clone(), releases_dir.join("archive")] {
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if let Some(v) = name.to_string_lossy().strip_suffix(".json") {
+                    present.insert(v.to_string());
+                }
+            }
+        }
+    }
+
+    let mut missing: Vec<String> = history_versions
+        .into_iter()
+        .filter(|v| !present.contains(v))
+        .collect();
+    missing.sort();
+    missing.dedup();
+    missing
+}
+
+/// Whether `<project>/.claude/settings.json` registers the reconciler
+/// (`reconcile-state.mjs`) under a `Stop` or `SubagentStop` hook. Robust to a
+/// missing or unparseable settings file — returns `false`, never errors. Mirrors
+/// the `reconcile_groups` test helper's traversal but answers a yes/no question.
+fn reconciler_hook_installed(project: &Path) -> bool {
+    let settings_path = project.join(".claude").join("settings.json");
+    let settings: serde_json::Value = match std::fs::read_to_string(&settings_path) {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => return false,
+        },
+        Err(_) => return false,
+    };
+
+    ["Stop", "SubagentStop"].iter().any(|event| {
+        settings["hooks"][event]
+            .as_array()
+            .map(|groups| {
+                groups.iter().any(|g| {
+                    g["hooks"]
+                        .as_array()
+                        .map(|hs| {
+                            hs.iter().any(|h| {
+                                h["command"]
+                                    .as_str()
+                                    .map(|c| c.contains("reconcile-state.mjs"))
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,5 +1205,170 @@ mod tests {
         assert!(missing.is_none());
 
         std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// Phase 1 (SC1): tiki_doctor returns Ok for a valid `.tiki` and reports the
+    /// framework version, state validity, schemaVersion, and activeWork count.
+    /// The release/hook fields are populated in later phases.
+    #[test]
+    fn tiki_doctor_reports_framework_and_state_for_valid_tiki() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-doctor-basic-{}", nanos));
+        std::fs::create_dir_all(&tiki).unwrap();
+        std::fs::write(tiki.join(".framework-version"), "9.9.9\n").unwrap();
+        let state = serde_json::json!({
+            "schemaVersion": 1,
+            "activeWork": {}
+        });
+        std::fs::write(tiki.join("state.json"), state.to_string()).unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert_eq!(report.framework_version.as_deref(), Some("9.9.9"));
+        assert!(report.state_valid, "valid state.json must parse");
+        assert_eq!(report.schema_version, Some(1));
+        assert_eq!(report.active_work_count, 0);
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// Phase 2 (SC2): an `archive/` release whose JSON says `status:"active"` is
+    /// reported with `archived_but_active = true`; the top-level release is not.
+    #[test]
+    fn tiki_doctor_flags_archived_but_active_release() {
+        let tiki = temp_tiki_with_releases("doctor-archived");
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+
+        let shipped = report
+            .release_checks
+            .iter()
+            .find(|c| c.version == "v9.9.8")
+            .expect("archived release must appear in release_checks");
+        assert_eq!(shipped.location, "archive");
+        assert_eq!(shipped.status, "active");
+        assert!(
+            shipped.archived_but_active,
+            "an archive/ file with status active must be flagged archived_but_active"
+        );
+
+        let live = report
+            .release_checks
+            .iter()
+            .find(|c| c.version == "v9.9.9")
+            .expect("top-level release must appear in release_checks");
+        assert_eq!(live.location, "active");
+        assert!(
+            !live.archived_but_active,
+            "a top-level release must not be flagged archived_but_active"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// Phase 2 (SC3): a `recentReleases` entry with no matching JSON file appears in
+    /// `recent_releases_missing_json`; one with a JSON file does not.
+    #[test]
+    fn tiki_doctor_reports_recent_release_missing_json() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-doctor-missing-{}", nanos));
+        let releases = tiki.join("releases");
+        std::fs::create_dir_all(&releases).unwrap();
+        // v1.0.0 has a JSON on disk; v0.9.0 is in history but has NO JSON file.
+        std::fs::write(
+            releases.join("v1.0.0.json"),
+            serde_json::json!({
+                "version": "v1.0.0", "status": "active", "issues": [],
+                "createdAt": "2026-01-01T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let state = serde_json::json!({
+            "schemaVersion": 1,
+            "activeWork": {},
+            "history": {
+                "recentReleases": [
+                    { "version": "v1.0.0", "completedAt": "2026-01-01T00:00:00Z" },
+                    { "version": "v0.9.0", "completedAt": "2026-01-01T00:00:00Z" }
+                ]
+            }
+        });
+        std::fs::write(tiki.join("state.json"), state.to_string()).unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert!(
+            report
+                .recent_releases_missing_json
+                .contains(&"v0.9.0".to_string()),
+            "v0.9.0 is in history with no JSON and must be reported, got {:?}",
+            report.recent_releases_missing_json
+        );
+        assert!(
+            !report
+                .recent_releases_missing_json
+                .contains(&"v1.0.0".to_string()),
+            "v1.0.0 has a JSON file and must not be reported"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// Phase 3 (SC4): reconciler_hook_installed is true when a Stop OR SubagentStop
+    /// hook runs reconcile-state.mjs, and false for unrelated hooks or a missing file.
+    #[test]
+    fn reconciler_hook_installed_detects_stop_and_subagent_hooks() {
+        let reconcile_cmd = "node .claude/tiki/scripts/reconcile-state.mjs --quiet";
+
+        // Present under Stop.
+        let p1 = temp_project("recon-stop");
+        std::fs::write(
+            p1.join(".claude").join("settings.json"),
+            serde_json::json!({
+                "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": reconcile_cmd } ] } ] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(reconciler_hook_installed(&p1), "Stop reconcile hook must be detected");
+        std::fs::remove_dir_all(&p1).ok();
+
+        // Present under SubagentStop only.
+        let p2 = temp_project("recon-subagent");
+        std::fs::write(
+            p2.join(".claude").join("settings.json"),
+            serde_json::json!({
+                "hooks": { "SubagentStop": [ { "hooks": [ { "type": "command", "command": reconcile_cmd } ] } ] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(reconciler_hook_installed(&p2), "SubagentStop reconcile hook must be detected");
+        std::fs::remove_dir_all(&p2).ok();
+
+        // Unrelated hooks only -> false.
+        let p3 = temp_project("recon-unrelated");
+        std::fs::write(
+            p3.join(".claude").join("settings.json"),
+            serde_json::json!({
+                "hooks": { "PreToolUse": [ { "hooks": [ { "type": "command", "command": "echo hi" } ] } ] }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(!reconciler_hook_installed(&p3), "unrelated hooks must not count");
+        std::fs::remove_dir_all(&p3).ok();
+
+        // Missing settings.json entirely -> false, no panic.
+        let p4 = temp_project("recon-missing");
+        assert!(
+            !reconciler_hook_installed(&p4),
+            "absent settings.json must yield false, not error"
+        );
+        std::fs::remove_dir_all(&p4).ok();
     }
 }
