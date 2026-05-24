@@ -55,6 +55,14 @@ export function IssueNode({ data }: NodeProps<IssueNodeType>) {
       <Handle type="target" position={Position.Top} />
       <div className="issue-node-header">
         <span className="issue-node-number">#{data.issueNumber}</span>
+        {data.phaseProgress && (
+          <span
+            className={`issue-node-phasecount issue-node-phasecount-${data.status}`}
+            title={`Phase ${data.phaseProgress.current} of ${data.phaseProgress.total}`}
+          >
+            {data.phaseProgress.current}/{data.phaseProgress.total}
+          </span>
+        )}
         <span className={`issue-node-status issue-node-status-${data.status}`}>
           {STATUS_LABELS[data.status] ?? data.status}
         </span>

@@ -13,6 +13,7 @@ import {
   useReleasesStore,
   useTikiReleasesStore,
   useResearchStore,
+  useTikiStateStore,
   type ResearchDocMeta,
   type TikiRelease,
 } from "../stores";
@@ -110,6 +111,18 @@ export function useTikiFileSync({
           useResearchStore.getState().setDocs(loadedDocs);
         } catch (e) {
           console.error("Failed to reload research docs:", e);
+        }
+      } else if (event.payload.type === "planChanged") {
+        // #256: the Rust watcher fires planChanged per issue when a
+        // .tiki/plans/issue-N.json file is written, but this listener
+        // previously had no branch for it, so plan edits were silently
+        // dropped. Bump a per-issue nonce so the dependency graph re-derives
+        // plan-based phase progress (and #257's criteria panel) live, without
+        // a full release re-fetch. EXECUTE writes the plan file as each phase
+        // completes, so this is the live tick source for plan-derived UI.
+        const planIssue = event.payload.issueNumber;
+        if (typeof planIssue === "number") {
+          useTikiStateStore.getState().bumpPlanNonce(planIssue);
         }
       }
     });

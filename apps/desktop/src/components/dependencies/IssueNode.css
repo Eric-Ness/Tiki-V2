@@ -81,6 +81,30 @@
   color: #ef4444;
 }
 
+/* Textual phase counter (N/M) in the header. Sits between the issue number and
+   the status pill; adds no node height (#256). Muted by default so a pending
+   0/N reads as "not started", not as an error; colored to echo node status. */
+.issue-node-phasecount {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #888);
+  letter-spacing: 0.2px;
+}
+
+.issue-node-phasecount-executing {
+  color: #60a5fa;
+}
+
+.issue-node-phasecount-completed,
+.issue-node-phasecount-closed {
+  color: #22c55e;
+}
+
+.issue-node-phasecount-failed {
+  color: #ef4444;
+}
+
 .issue-node-title {
   font-size: 13px;
   font-weight: 500;

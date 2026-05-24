@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 256,
+    "title": "Dependency graph: show durable phase progress (N/M) on every node",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/256"
+  },
+  "createdAt": "2026-05-24T17:59:44.241Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Phase progress is derived durably from the on-disk plan's per-phase status: a pending/planned node shows 0/N, mid-execution shows k/N, a completed/shipped node shows N/N — all without the issue being the currently-active work entry.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:12:18.202Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "The phase indicator updates live as phases complete, driven by a now-handled planChanged file-watch event (currently dead code on the frontend).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:12:18.202Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "A textual \"N/M\" phase label is rendered on each node (in addition to / replacing the unlabeled bar).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:13:55.543Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functional",
+      "description": "Dagre layout shows no node overlap after any node-height change: both hand-mirrored height functions (computeNodeHeight and nodeHeightFor) stay in sync.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:13:55.543Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "Pure derivation logic is unit-tested, and no React 19 useSyncExternalStore render-loop regression is introduced (no inline ?? {} / ?? [] in new selectors; existing freshRef guard tests stay green; pnpm build clean).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:13:55.543Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pure plan-derived phase-progress helper + unit tests",
+      "status": "completed",
+      "content": "Create a pure, React-free helper that derives durable phase progress from a plan's per-phase statuses, mirroring the existing pattern used by apps/desktop/src/utils/criteriaVerification.ts.\n\nAdd a new file apps/desktop/src/components/dependencies/phaseProgress.ts exporting:\n\n- A minimal local type, e.g. `interface PhaseLike { status: string }` (the desktop app does NOT import @tiki/shared at runtime — keep a local mirror).\n- `export function derivePhaseProgressFromPlan(phases: PhaseLike[] | undefined): { current: number; total: number } | undefined`.\n  - Returns `undefined` when phases is undefined or empty (no plan → no indicator).\n  - `total` = phases.length.\n  - `current` = count of phases whose status is 'completed' OR 'skipped' (skipped counts as done for progress purposes).\n  - Do NOT special-case 'failed' here (a failed phase is simply not yet completed); failure styling is handled by node status, not this counter.\n\nAdd apps/desktop/src/components/dependencies/__tests__/phaseProgress.test.ts (vitest) covering: undefined/empty → undefined; all pending → 0/N; some completed → k/N; mix of completed+skipped → counts both; all completed → N/N; a single-phase plan → 0/1 then 1/1.\n\nThis phase is intentionally standalone and side-effect-free so it can be executed and verified with fresh context. No existing files are modified.",
+      "verification": [
+        "apps/desktop/src/components/dependencies/phaseProgress.ts exists and exports derivePhaseProgressFromPlan",
+        "New vitest file passes: pnpm --filter tiki-desktop test (or the repo's desktop test command) — all phaseProgress cases green",
+        "pnpm build is clean (tsc -b) with the new file",
+        "Empty/undefined phases returns undefined (not 0/0)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/phaseProgress.ts",
+        "apps/desktop/src/components/dependencies/__tests__/phaseProgress.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-24T18:08:06.920Z",
+      "summary": "Created apps/desktop/src/components/dependencies/phaseProgress.ts exporting pure derivePhaseProgressFromPlan(phases): returns undefined for missing/empty, else {current=count(completed||skipped), total=phases.length}; failed not counted. Added __tests__/phaseProgress.test.ts (9 vitest cases, all green)."
+    },
+    {
+      "number": 2,
+      "title": "Store plumbing: per-issue plan nonce in tikiStateStore",
+      "status": "completed",
+      "content": "Add a plan-change signal channel to the Zustand state store so a plan-file write can notify the dependency graph to re-read that plan, without re-fetching GitHub data.\n\nIn apps/desktop/src/stores/tikiStateStore.ts:\n- Add `planNonces: Record<number, number>` to TikiStateState (initial value: a single stable `{}` reference defined in initialState — do NOT allocate a fresh object in a selector).\n- Add action `bumpPlanNonce: (issueNumber: number) => void` to TikiStateActions. Implementation increments that issue's counter immutably: `set((s) => ({ planNonces: { ...s.planNonces, [issueNumber]: (s.planNonces[issueNumber] ?? 0) + 1 } }))`.\n\nNo consumers yet — this phase leaves the app fully working (additive store change only). Keep the existing actions untouched.\n\nGotcha: consumers in later phases must select the whole `planNonces` map object (stable ref) or a specific numeric value, never an inline-allocated fallback, to avoid the React 19 useSyncExternalStore fresh-ref render-loop class (#210/#212).",
+      "verification": [
+        "tikiStateStore exposes planNonces (Record<number,number>) and bumpPlanNonce",
+        "initialState.planNonces is a single stable {} (not allocated per-call)",
+        "pnpm build clean; existing tikiStateStore consumers still typecheck",
+        "bumpPlanNonce increments only the targeted issue's counter (immutable update)"
+      ],
+      "addressesCriteria": [
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/stores/tikiStateStore.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-24T18:08:06.920Z",
+      "summary": "Extended tikiStateStore.ts: added planNonces: Record<number,number> (stable {} in initialState) and bumpPlanNonce(issueNumber) immutable per-issue increment. Additive; desktop tsc --noEmit clean."
+    },
+    {
+      "number": 3,
+      "title": "Handle the dead planChanged file-watch event",
+      "status": "completed",
+      "content": "Wire up the planChanged event that the Rust watcher already emits but the frontend silently drops.\n\nContext: apps/desktop/src-tauri/src/watcher.rs emits TikiFileEvent::PlanChanged { issue_number } (serialized camelCase as { type: \"planChanged\", issueNumber }) when a .tiki/plans/issue-N.json file changes. The frontend FileEvent union in apps/desktop/src/hooks/useTikiFileSync.ts already declares \"planChanged\" and issueNumber?, but the listener has branches only for stateChanged / releaseChanged / researchChanged — planChanged falls through and is dropped.\n\nIn apps/desktop/src/hooks/useTikiFileSync.ts:\n- Add an `else if (event.payload.type === \"planChanged\")` branch after the researchChanged branch.\n- Guard that issueNumber is present (`typeof event.payload.issueNumber === 'number'`).\n- Call `useTikiStateStore.getState().bumpPlanNonce(event.payload.issueNumber)` (import useTikiStateStore from ../stores).\n- Add a short comment explaining this closes the previously-dead planChanged path (#256) and that the dependency graph re-derives plan-based phase progress off the nonce.\n\nThis is a minimal, targeted addition. Do not alter the existing stateChanged refresh path.",
+      "verification": [
+        "useTikiFileSync.ts has a planChanged branch that calls bumpPlanNonce with the event's issueNumber",
+        "issueNumber presence is guarded before calling bumpPlanNonce",
+        "useTikiStateStore is imported (no unused-import or missing-import errors)",
+        "pnpm build clean; the listener still handles stateChanged/releaseChanged/researchChanged unchanged"
+      ],
+      "addressesCriteria": [
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/hooks/useTikiFileSync.ts"
+      ],
+      "dependencies": [
+        2
+      ],
+      "completedAt": "2026-05-24T18:09:22.434Z",
+      "summary": "Wired the previously-dead planChanged event in useTikiFileSync.ts: added useTikiStateStore import + an else-if planChanged branch that guards issueNumber and calls bumpPlanNonce(n). Existing stateChanged/releaseChanged/researchChanged paths untouched. tsc -b clean."
+    },
+    {
+      "number": 4,
+      "title": "Feed plan phase statuses into the graph + live refresh",
+      "status": "completed",
+      "content": "Make the dependency graph keep per-phase plan data and derive durable phase progress from it, refreshing live on planChanged.\n\nIn apps/desktop/src/components/dependencies/useDependencyGraph.ts:\n\n1. Widen retained plan data. The existing get_plan invoke (~line 107) is typed `{ phases?: unknown[] } | null` and only `phases.length` is kept. Change it to retain per-phase status. Extend the local FetchedIssue interface with `phases?: { status: string }[]`. For #257's shared foundation, ALSO retain `successCriteria` and `coverageMatrix` on FetchedIssue (this phase does not consume them — phase progress only needs statuses — but keeping them now means #257 becomes pure UI). Keep `phaseCount` derived from phases.length as today (still used by computeNodeHeight).\n\n2. Derive plan-based progress. Import derivePhaseProgressFromPlan from ./phaseProgress (Phase 1). Update the node builder so phaseProgress is resolved as: live override first — if activeWork[issue:N].phase exists with status 'executing' and valid current/total, use resolvePhaseProgress() (existing); otherwise fall back to derivePhaseProgressFromPlan(issue.phases). Net effect: pending shows 0/N, executing shows live k/N, completed/shipped shows N/N from the plan even with no activeWork entry.\n\n3. Live refresh without re-hitting GitHub. Subscribe to planNonces from useTikiStateStore (select the whole map: `const planNonces = useTikiStateStore((s) => s.planNonces)`). Add a SEPARATE useEffect (do NOT touch the main fetch effect's deps — adding fetchedIssues there infinite-loops) that, when a planNonce changes for an issue in the current release, re-invokes only get_plan for that issue and patches that one entry in fetchedIssues (map over prev, replace matching number's phases/successCriteria/coverageMatrix/phaseCount). This keeps GitHub issue details cached and only re-reads the local plan file.\n\n4. Ensure the node-builder useMemo recomputes when fetchedIssues changes (it already depends on fetchedIssues) so the patched plan data flows to nodes.\n\nKeep all changes in this one file. Mind the fresh-ref rule on the new planNonces selector.",
+      "verification": [
+        "FetchedIssue carries per-phase status (and successCriteria + coverageMatrix retained for #257)",
+        "Node phaseProgress falls back to derivePhaseProgressFromPlan when activeWork has no live phase; live activeWork phase still overrides during execution",
+        "A completed/closed issue with no activeWork entry shows N/N derived from the plan",
+        "Editing a .tiki/plans/issue-N.json phase status updates that node live without a full release re-fetch (planNonce-driven targeted refresh)",
+        "No infinite re-fetch loop (main fetch effect deps unchanged); pnpm build clean; desktop vitest green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": [
+        1,
+        2,
+        3
+      ],
+      "completedAt": "2026-05-24T18:12:18.202Z",
+      "summary": "useDependencyGraph.ts: widened get_plan retention (added PlanShape type; FetchedIssue now carries phases[].status + successCriteria + coverageMatrix — last two retained for #257). Node phaseProgress = live resolvePhaseProgress (now gated on phase.status===executing) ?? derivePhaseProgressFromPlan(issue.phases), so pending=0/N, executing=live k/N, completed/shipped=N/N with no activeWork entry. Added a planNonces-keyed effect (refs for release/path, prev-nonce diff) that re-reads ONLY changed plans via get_plan and patches fetchedIssues — live tick, no GitHub re-fetch, no main-effect dep loop. Gate: tsc -b clean; desktop vitest 196/196."
+    },
+    {
+      "number": 5,
+      "title": "Node UI: textual N/M label + height-mirror sync",
+      "status": "completed",
+      "content": "Render the phase count as text on the node and keep the dagre height allocation correct.\n\nIn apps/desktop/src/components/dependencies/IssueNode.tsx:\n- Add a compact textual phase label showing `{current}/{total}` sourced from data.phaseProgress. Prefer placing it where it does not force extra node height (e.g. a small badge in the header row next to the status pill, or inline at the left of the existing progress bar). Render it only when data.phaseProgress is defined.\n- Revisit the showProgress gate (currently `isDone || phaseProgress !== undefined`). With Phase 4 always providing plan-derived progress, ensure a pending 0/N reads as 'not started', not as failure: keep the bar empty (0%) and the label muted for open/pending; do not color it like a failed/error state.\n- Keep aria-hidden semantics consistent with the existing bar, or add an accessible title like `Phase {current} of {total}`.\n\nHeight-mirror gotcha (SC4): nodeHeightFor() in IssueNode.tsx and computeNodeHeight() in useDependencyGraph.ts are hand-mirrored twins consumed by the dagre layout. If the label increases the rendered node height, you MUST update BOTH functions identically, or dagre will allocate the old height and nodes will overlap. If you keep the label within the current height envelope, no height change is needed — state which you did.\n\nIn apps/desktop/src/components/dependencies/IssueNode.css:\n- Style the label (small, muted, monospace-ish for digits). Ensure it does not clip given the node's overflow/min-height.\n\nVerify visually that pending/executing/completed/shipped nodes all show the correct N/M and that no nodes overlap after layout.",
+      "verification": [
+        "Each node with a plan shows a textual N/M label (pending 0/N, executing k/N, completed N/N)",
+        "Pending 0/N does not render as a failed/error style",
+        "If node height changed, BOTH nodeHeightFor (IssueNode.tsx) and computeNodeHeight (useDependencyGraph.ts) were updated identically; otherwise label fits existing height — no dagre overlap either way",
+        "pnpm build clean; existing freshRef guard / dependency-graph tests still green",
+        "Manual: open the Dependency Graph, confirm labels and no overlapping nodes across a multi-issue release"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC5",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/IssueNode.tsx",
+        "apps/desktop/src/components/dependencies/IssueNode.css",
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": [
+        4
+      ],
+      "completedAt": "2026-05-24T18:13:55.543Z",
+      "summary": "IssueNode.tsx: added a textual N/M phase label in the header (between #number and status pill), rendered only when phaseProgress is defined, with title=\"Phase X of Y\". IssueNode.css: .issue-node-phasecount (muted, tabular-nums) + status-colored variants (executing blue / completed+closed green / failed red); pending 0/N stays muted (not error-styled). Label sits in the existing header row => NO node-height change, so computeNodeHeight/nodeHeightFor mirrors were intentionally left untouched (no dagre overlap by construction). Gate: tsc -b clean; vitest 196/196. Live visual spot-check left to user."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      4
+    ],
+    "SC2": [
+      2,
+      3,
+      4
+    ],
+    "SC3": [
+      5
+    ],
+    "SC4": [
+      5
+    ],
+    "SC5": [
+      1,
+      4,
+      5
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-24T18:05:12.761Z",
+  "updatedAt": "2026-05-24T18:13:55.543Z"
+}

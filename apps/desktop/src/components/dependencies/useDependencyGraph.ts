@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { MarkerType, type Node, type Edge } from '@xyflow/react';
 import dagre from 'dagre';
 import { useProjectsStore, useTikiStateStore, type TikiRelease } from '../../stores';
 import { parseDependencies } from './parseDependencies';
+import { derivePhaseProgressFromPlan } from './phaseProgress';
 import type { IssueNodeData } from './IssueNode';
 
 type IssueNodeType = Node<IssueNodeData, 'issue'>;
@@ -15,6 +16,23 @@ interface FetchedIssue {
   state: string;
   phaseCount?: number;
   labels?: { name: string; color: string }[];
+  /** Per-phase status from the on-disk plan — the DURABLE source for phase
+   *  progress (survives completion, unlike activeWork[issue:N].phase). */
+  phases?: { status: string }[];
+  /** Retained from the plan for #257's success-criteria panel. #256 keeps these
+   *  in hand (the get_plan call already returns them) so #257 is pure UI; phase
+   *  progress itself does not consume them. */
+  successCriteria?: { id: string; description: string; category?: string }[];
+  coverageMatrix?: Record<string, number[]>;
+}
+
+/** Subset of the camelCase TikiPlan JSON returned by the get_plan IPC command
+ *  that the graph cares about (mirrors apps/desktop/src/components/detail
+ *  /IssueDetail.tsx's TikiPlan interface — desktop keeps local type mirrors). */
+interface PlanShape {
+  phases?: { status: string }[];
+  successCriteria?: { id: string; description: string; category?: string }[];
+  coverageMatrix?: Record<string, number[]>;
 }
 
 // Maps plan phase count to a node visual height. Undefined = no plan yet
@@ -104,14 +122,19 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
             state: 'open',
             labels: [],
           })),
-          invoke<{ phases?: unknown[] } | null>('get_plan', {
+          invoke<PlanShape | null>('get_plan', {
             issueNumber: issue.number,
             tikiPath,
           }).catch(() => null),
         ]);
+        const ph = plan?.phases;
+        const phases = Array.isArray(ph) ? ph : undefined;
         return {
           ...details,
-          phaseCount: Array.isArray(plan?.phases) ? plan.phases.length : undefined,
+          phaseCount: phases ? phases.length : undefined,
+          phases: phases ? phases.map((p) => ({ status: p.status })) : undefined,
+          successCriteria: plan?.successCriteria,
+          coverageMatrix: plan?.coverageMatrix,
         };
       })
     )
@@ -132,6 +155,68 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
       cancelled = true;
     };
   }, [release, activeProject?.path]);
+
+  // Live plan refresh (#256). When a plan file is written, the Rust watcher
+  // fires planChanged → useTikiFileSync bumps that issue's planNonce. Re-read
+  // ONLY the changed plans (local get_plan, NO GitHub re-fetch) and patch the
+  // matching fetchedIssues entries so plan-derived phase progress ticks live as
+  // EXECUTE completes phases. Keyed solely on planNonces; release/path are read
+  // through refs so this never re-fires on release change (the main effect owns
+  // that) and never double-fetches GitHub. Adding fetchedIssues to the main
+  // effect's deps instead would infinite-loop — hence this separate path.
+  const planNonces = useTikiStateStore((s) => s.planNonces);
+  const releaseRef = useRef(release);
+  releaseRef.current = release;
+  const projectPathRef = useRef(activeProject?.path);
+  projectPathRef.current = activeProject?.path;
+  const prevNoncesRef = useRef(planNonces);
+  useEffect(() => {
+    const prev = prevNoncesRef.current;
+    prevNoncesRef.current = planNonces;
+    // Diff against the previous map; on mount prev === planNonces so this is
+    // empty and we no-op (the main effect already loaded plans).
+    const changed = Object.keys(planNonces)
+      .map(Number)
+      .filter((n) => planNonces[n] !== prev[n]);
+    if (changed.length === 0) return;
+
+    const rel = releaseRef.current;
+    if (!rel) return;
+    const relevant = changed.filter((n) => rel.issues.some((i) => i.number === n));
+    if (relevant.length === 0) return;
+
+    const path = projectPathRef.current;
+    const tikiPath = path ? `${path}/.tiki` : undefined;
+    let cancelled = false;
+    Promise.all(
+      relevant.map((n) =>
+        invoke<PlanShape | null>('get_plan', { issueNumber: n, tikiPath })
+          .catch(() => null)
+          .then((plan) => ({ number: n, plan }))
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const byNum = new Map(results.map((r) => [r.number, r.plan]));
+      setFetchedIssues((prevIssues) =>
+        prevIssues.map((fi) => {
+          if (!byNum.has(fi.number)) return fi;
+          const plan = byNum.get(fi.number) ?? null;
+          const ph = plan?.phases;
+          const phases = Array.isArray(ph) ? ph : undefined;
+          return {
+            ...fi,
+            phaseCount: phases ? phases.length : fi.phaseCount,
+            phases: phases ? phases.map((p) => ({ status: p.status })) : fi.phases,
+            successCriteria: plan?.successCriteria ?? fi.successCriteria,
+            coverageMatrix: plan?.coverageMatrix ?? fi.coverageMatrix,
+          };
+        })
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [planNonces]);
 
   // Resolve issue status from Tiki state, falling back to GitHub state
   const resolveStatus = (issue: FetchedIssue): IssueNodeData['status'] => {
@@ -154,14 +239,24 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
     return issue.state === 'closed' ? 'closed' : 'open';
   };
 
-  // Surface live phase progress for executing issues so the graph node can
-  // render a progress bar reflecting current/total phases.
+  // Live phase progress for the issue that is ACTIVELY executing right now.
+  // Gated on phase.status === 'executing' so a planning/pending entry (which
+  // also carries a phase object, e.g. {current:1,total:5,status:'pending'})
+  // does not overcount — those fall through to the durable plan-derived count.
   const resolvePhaseProgress = (
     issue: FetchedIssue
   ): IssueNodeData['phaseProgress'] => {
     const work = activeWork[`issue:${issue.number}`];
-    const phase = (work as { phase?: { current?: number; total?: number } } | undefined)?.phase;
-    if (phase && typeof phase.current === 'number' && typeof phase.total === 'number' && phase.total > 0) {
+    const phase = (
+      work as { phase?: { current?: number; total?: number; status?: string } } | undefined
+    )?.phase;
+    if (
+      phase &&
+      phase.status === 'executing' &&
+      typeof phase.current === 'number' &&
+      typeof phase.total === 'number' &&
+      phase.total > 0
+    ) {
       return { current: phase.current, total: phase.total };
     }
     return undefined;
@@ -188,7 +283,10 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
           issueNumber: issue.number,
           title: issue.title,
           status: resolveStatus(issue),
-          phaseProgress: resolvePhaseProgress(issue),
+          // Live executing override first; otherwise durable plan-derived count
+          // (0/N pending, N/N completed/shipped) even with no activeWork entry.
+          phaseProgress:
+            resolvePhaseProgress(issue) ?? derivePhaseProgressFromPlan(issue.phases),
           phaseCount: issue.phaseCount,
           labels: issue.labels ?? [],
         },

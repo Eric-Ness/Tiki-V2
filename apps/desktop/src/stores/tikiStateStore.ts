@@ -18,6 +18,7 @@ interface TikiStateState {
   activeWork: Record<string, WorkContext>;
   recentIssues: CompletedIssue[];
   recentReleases: CompletedRelease[];
+  planNonces: Record<number, number>;
 }
 
 interface TikiStateActions {
@@ -25,6 +26,7 @@ interface TikiStateActions {
   setRecentIssues: (recentIssues: CompletedIssue[]) => void;
   setRecentReleases: (recentReleases: CompletedRelease[]) => void;
   getIssueWorkStatus: (issueNumber: number) => string | null;
+  bumpPlanNonce: (issueNumber: number) => void;
 }
 
 type TikiStateStore = TikiStateState & TikiStateActions;
@@ -33,6 +35,7 @@ const initialState: TikiStateState = {
   activeWork: {},
   recentIssues: [],
   recentReleases: [],
+  planNonces: {},
 };
 
 export const useTikiStateStore = create<TikiStateStore>()((set, get) => ({
@@ -43,6 +46,15 @@ export const useTikiStateStore = create<TikiStateStore>()((set, get) => ({
   setRecentIssues: (recentIssues) => set({ recentIssues }),
 
   setRecentReleases: (recentReleases) => set({ recentReleases }),
+
+  // Bump the plan-change nonce for a specific issue (immutable per-issue increment)
+  bumpPlanNonce: (issueNumber) =>
+    set((s) => ({
+      planNonces: {
+        ...s.planNonces,
+        [issueNumber]: (s.planNonces[issueNumber] ?? 0) + 1,
+      },
+    })),
 
   // Get the work status for a specific issue
   getIssueWorkStatus: (issueNumber) => {
