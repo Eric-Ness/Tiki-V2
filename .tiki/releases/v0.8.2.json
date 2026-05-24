@@ -1,0 +1,11 @@
+{
+  "version": "v0.8.2",
+  "status": "active",
+  "issues": [
+    {
+      "number": 259,
+      "title": "Shipped releases show stale 'active' badge — archived flag stripped from IPC by skip_serializing (true root cause behind #255/#258)"
+    }
+  ],
+  "createdAt": "2026-05-24T21:56:20.255Z"
+}
