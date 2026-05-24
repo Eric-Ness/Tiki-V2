@@ -158,6 +158,28 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* Key/value metadata rows (e.g. completed release Timeline) */
+.detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.detail-meta-label {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.detail-meta-value {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 /* Labels */
 .detail-labels {
   display: flex;

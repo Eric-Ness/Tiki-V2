@@ -14,6 +14,12 @@ export interface TikiRelease {
   issues: TikiReleaseIssue[];
   createdAt: string;
   updatedAt?: string;
+  /**
+   * True when the backend loaded this release from `.tiki/releases/archive/`
+   * (i.e. it has shipped). Derived from file location by `load_tiki_releases`,
+   * never persisted — the JSON's own `status` is unreliable for archived files.
+   */
+  archived?: boolean;
 }
 
 interface TikiReleasesState {

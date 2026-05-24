@@ -192,7 +192,14 @@ export function ReleasesSection() {
   const loadTikiReleases = useCallback(async () => {
     try {
       const tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined;
-      const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath });
+      // includeArchived:true so SHIPPED releases (whose def file was moved to
+      // releases/archive/ on ship) stay visible and route to the rich
+      // TikiReleaseDetail instead of the near-empty GitHub view (#255). This also
+      // closes the vanish-gap between ship-archive and the CI GitHub-release publish.
+      const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", {
+        tikiPath,
+        includeArchived: true,
+      });
       setTikiReleases(loadedReleases);
     } catch (err) {
       console.error("Failed to load Tiki releases:", err);
@@ -283,11 +290,16 @@ export function ReleasesSection() {
       });
     }
 
-    // Overlay tiki data (or add tiki-only releases). 'shipped' collapses to
-    // 'completed' for display so legacy data renders consistently.
+    // Overlay tiki data (or add tiki-only releases). 'shipped'/'completed' and
+    // any archived record collapse to 'completed' for display. Archived is the
+    // reliable completed-signal because the ship teardown moves the def file to
+    // archive/ without flipping its status (so an archived file can still say
+    // 'active') — see TikiRelease.archived.
     for (const tiki of tikiReleases) {
       const tikiDisplay: MergedRelease["displayStatus"] =
-        tiki.status === "shipped" ? "completed" : tiki.status;
+        tiki.archived || tiki.status === "shipped" || tiki.status === "completed"
+          ? "completed"
+          : tiki.status;
       const existing = map.get(tiki.version);
       if (existing) {
         existing.status = tiki.status;

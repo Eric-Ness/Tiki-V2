@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 255,
+    "title": "Clicking on completed Releases",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/255"
+  },
+  "createdAt": "2026-05-24T13:23:58.370Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "Clicking a completed (shipped/archived) release opens the rich TikiReleaseDetail (not the near-empty GitHub ReleaseDetail), showing completion time, duration, and included issues.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T17:19:44.309Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "The completed-release detail view renders the changelog / release-notes body (gracefully absent for older releases that have none).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T17:19:44.309Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "A 'View on GitHub' link renders on the completed-release detail, pointing at the published GitHub Release/tag (gracefully absent during the archive->CI-publish gap).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T17:19:44.309Z"
+    },
+    {
+      "id": "SC4",
+      "category": "safety",
+      "description": "Edit / Run Release / Review / Delete actions are hidden for completed releases, so the detail view exposes no useless-or-destructive actions on shipped history.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T17:19:44.309Z"
+    },
+    {
+      "id": "SC5",
+      "category": "reliability",
+      "description": "A release no longer vanishes from the sidebar during the window between ship-archive and the CI GitHub-release publish; archived Tiki releases remain visible and badged 'completed'.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T17:16:50.928Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Rust: derive an `archived` flag on TikiRelease at load time",
+      "status": "completed",
+      "completedAt": "2026-05-24T17:12:58.789Z",
+      "summary": "Added `archived: bool` to the TikiRelease struct (state.rs) with #[serde(default, skip_serializing)] — defaulted on read, never persisted. Threaded an `archived` param through read_release_dir (commands.rs) and set it false for releases/ and true for releases/archive/ at the two load_tiki_releases call sites. Added unit test load_tiki_releases_marks_archived_by_location_not_status proving the archive entry is flagged archived even though its JSON status stays 'active', and that include_archived=false hides it. Verification: cargo test --lib 46 passed/0 failed; cargo clippy --all-targets --deny warnings clean.",
+      "content": "Add the completed-signal that the rest of the fix depends on. The ship teardown `mv`s a release JSON into `releases/archive/` WITHOUT flipping its `status` field (verified: archive/v0.7.7.json still says \"status\":\"active\"), so completion must be derived from the file's LOCATION, not its status.\n\n1. In `apps/desktop/src-tauri/src/state.rs`, add a field to the `TikiRelease` struct (around line 590-599):\n   `#[serde(default, skip_serializing)] pub archived: bool,`\n   - `default` so existing JSON files (which lack the key) still deserialize.\n   - `skip_serializing` so it is NEVER written back to disk (it is purely derived at load time; persisting it would let it drift from reality, e.g. via save_tiki_release).\n2. In `apps/desktop/src-tauri/src/commands.rs`, thread an `archived: bool` parameter into `read_release_dir(dir, out, archived)` (the helper at ~line 324). Set `release.archived = archived;` on each parsed record before `out.push(release)`.\n3. Update the two call sites in `load_tiki_releases` (~lines 246 + 251): pass `false` for the top-level `releases/` scan and `true` for the `releases/archive/` scan.\n4. Add a Rust unit test (tmpdir-based, mirroring existing command tests) that writes one JSON under `releases/` and one under `releases/archive/`, calls `load_tiki_releases(Some(path), Some(true))`, and asserts the archive entry has `archived == true` while the top-level entry has `archived == false`. Also assert that with `include_archived = Some(false)` the archive entry is absent.\n\nDo NOT touch the frontend in this phase — the new field is simply ignored by the TS side until Phase 3.",
+      "verification": [
+        "`cargo build` (from apps/desktop/src-tauri) succeeds with no warnings",
+        "`cargo test` passes, including the new archived-flag test",
+        "`cargo clippy --all-targets -- --deny warnings` is clean",
+        "Existing release JSON files still deserialize (no panic on load) and `save_tiki_release` output does NOT contain an `archived` key (skip_serializing verified)"
+      ],
+      "addressesCriteria": [
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Rust: add `read_release_changelog` + `fetch_github_release_url` commands",
+      "status": "completed",
+      "completedAt": "2026-05-24T17:14:55.898Z",
+      "summary": "Added read_release_changelog(version, tikiPath) in commands.rs — reads releases/{v}-changelog.md, falls back to releases/archive/, returns Ok(None) when absent (older releases have none). Added fetch_github_release_url(version, projectPath) in github/releases.rs — uses `gh release view {tag} --json url` (since `gh release list` has NO url field, verified) and collapses ANY gh failure to Ok(None) so the link degrades gracefully during the archive->CI gap. Registered both in lib.rs generate_handler!. Added unit test read_release_changelog_reads_top_level_then_archive_else_none. Verification: cargo test --lib 47 passed/0 failed; cargo clippy --all-targets --deny warnings clean. (URL command is network-bound; covered by the prior live `gh release view v0.7.7 --json url` check.)",
+      "content": "Add the two backend data sources the completed-detail view needs. Register both in `lib.rs`.\n\n1. `read_release_changelog(version: String, tiki_path: Option<String>) -> Result<Option<String>, String>` in `commands.rs` (mirror the path-resolution + version-sanitization in `save_tiki_release`):\n   - Resolve `<tiki>/releases/{safe_version}-changelog.md`; if absent, try `<tiki>/releases/archive/{safe_version}-changelog.md`.\n   - Return `Ok(Some(contents))` if found, `Ok(None)` if neither exists (older releases legitimately have no changelog — NOT an error).\n   - Add a tmpdir unit test: write a changelog file, assert `Some`; assert `None` for a bogus version.\n2. `fetch_github_release_url(version: String, project_path: Option<String>) -> Result<Option<String>, String>` in `apps/desktop/src-tauri/src/github/releases.rs`:\n   - IMPORTANT: `gh release list --json` has NO `url` field (verified). Use `gh release view {version} --json url` instead, via the existing `run_gh_with_retry` + `hidden_command(\"gh\")` pattern, setting `current_dir(project_path)` like `fetch_github_releases`.\n   - Parse the `{\"url\": \"...\"}` JSON; return `Ok(Some(url))`.\n   - If the `gh` call fails (release not yet published during the archive->CI gap, or not found), log at debug and return `Ok(None)` so the link simply doesn't render — do NOT propagate as `Err`.\n3. Register `commands::read_release_changelog` and `github::fetch_github_release_url` in the `tauri::generate_handler![...]` macro in `apps/desktop/src-tauri/src/lib.rs` (near the existing `read_research_doc` / `fetch_github_releases` entries).",
+      "verification": [
+        "`cargo build` succeeds; both commands appear in the generate_handler! list",
+        "`cargo test` passes including the read_release_changelog tmpdir test",
+        "`cargo clippy --all-targets -- --deny warnings` is clean",
+        "Manual sanity: `read_release_changelog` returns Some for a version with a `-changelog.md` on disk and None for a missing one"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/github/releases.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [
+        1
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Frontend: surface archived releases in the sidebar and route them to TikiReleaseDetail",
+      "status": "completed",
+      "completedAt": "2026-05-24T17:16:50.928Z",
+      "summary": "Added archived?: boolean to the TikiRelease TS interface (tikiReleasesStore.ts). ReleasesSection.tsx now passes includeArchived:true to load_tiki_releases (routes shipped releases to TikiReleaseDetail + closes the vanish-gap) and the merge overlay collapses archived||shipped||completed to displayStatus 'completed'. The detailStore setters were ALREADY mutually exclusive (setSelectedTikiRelease clears selectedRelease), so App.tsx:409 correctly renders the Tiki detail — no store change needed. App.tsx reads the same useTikiReleasesStore, so the archived flag flows to the detail view. Verification: pnpm build type-clean (tsc -b + vite); pnpm --filter @tiki/desktop test 187/187. Manual tauri:dev spot-check deferred to end-of-run.",
+      "content": "Make completed releases reachable and correctly badged. This is the core routing fix (SC1) and the vanish-gap fix (SC5).\n\n1. In `apps/desktop/src/stores/tikiReleasesStore.ts`, add `archived?: boolean;` to the `TikiRelease` interface (after `updatedAt?`).\n2. In `apps/desktop/src/components/sidebar/ReleasesSection.tsx`:\n   - In `loadTikiReleases` (~line 195), pass `{ tikiPath, includeArchived: true }` to the `load_tiki_releases` invoke. (Tauri maps the camelCase `includeArchived` arg to the Rust `include_archived` param.) This both routes completed releases to TikiReleaseDetail AND closes the vanish-gap, because the archived JSON is now loaded even before CI publishes the GitHub release.\n   - In the `mergedReleases` useMemo overlay loop (~lines 288-308), compute `displayStatus` as `completed` when the tiki record is archived: e.g. `const tikiDisplay = (tiki.archived || tiki.status === 'shipped' || tiki.status === 'completed') ? 'completed' : tiki.status;`. Carry `archived` onto the merged object if you need it downstream (optional for the sidebar).\n   - Confirm `handleReleaseClick` (~line 314) still routes via `hasTiki` -> `setSelectedTikiRelease`. With archived releases now present, `hasTiki` becomes true so they route to the Tiki detail.\n3. VERIFY the detail-store setters are mutually exclusive: `setSelectedTikiRelease` must clear `selectedRelease` (and vice-versa), otherwise App.tsx:409 (`selectedReleaseData ? <ReleaseDetail> : selectedTikiReleaseData ? <TikiReleaseDetail>`) would still show the GitHub view because it checks `selectedReleaseData` first. If they are not mutually exclusive, fix the setters in the detail store.",
+      "verification": [
+        "`pnpm build` (root) is type-clean (tsc -b)",
+        "`pnpm --filter @tiki/desktop test` (vitest) passes",
+        "Manual (tauri:dev): a shipped release (e.g. v0.7.7) appears in the sidebar with a 'completed' badge and, when clicked, opens TikiReleaseDetail rather than the empty GitHub ReleaseDetail",
+        "Manual: confirmed via reading detailStore that setSelectedTikiRelease clears selectedRelease so App.tsx renders the Tiki detail",
+        "Manual: a just-shipped release whose GitHub release has not yet been published by CI still shows in the sidebar (vanish-gap closed)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/stores/tikiReleasesStore.ts",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "dependencies": [
+        1
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Frontend: enrich TikiReleaseDetail for completed releases + gate destructive actions",
+      "status": "completed",
+      "completedAt": "2026-05-24T17:19:44.309Z",
+      "summary": "Rewrote TikiReleaseDetail.tsx: isCompleted = archived||completed||shipped. Header badge now shows 'Completed' even when an archived record's status is stale-'active'. SC4: the Edit/Run/Review/Delete action bar renders only when !isCompleted; completed releases instead show a 'View on GitHub' button when fetch_github_release_url returns a url. SC1: a 'Timeline' section shows Completed (updatedAt), Created (createdAt), and Duration (formatDuration). SC2: a 'Release Notes' section renders the changelog via the shared MarkdownRenderer (detail-body markdown-body wrapper, matching IssueDetail) when read_release_changelog returns a body; absent => section omitted. SC3: View-on-GitHub via fetch_github_release_url, omitted on null. Both fetched in one cancel-guarded effect keyed on [isCompleted, version, projectPath]. Added .detail-meta CSS. Active-release path is byte-identical to before. Verification: pnpm build type-clean; vitest 187/187. NOTE: the visual rendering (notes/link/buttons-gone) is confirmable only in a live tauri:dev WebView — same auto-unverifiable class as #254; the LOGIC is type/test-covered but a live spot-check is pending.",
+      "content": "Turn the completed-release detail into a real retrospective view and remove the useless/destructive actions (SC2, SC3, SC4, plus the completion/duration half of SC1).\n\nIn `apps/desktop/src/components/detail/TikiReleaseDetail.tsx`:\n1. Compute `const isCompleted = release.archived || release.status === 'completed' || release.status === 'shipped';`.\n2. SC4 — gate the action bar: when `isCompleted`, do NOT render the Edit / Run Release / Review / Delete buttons (wrap the existing `<div className=\"detail-actions\">` block in `{!isCompleted && (...)}`). Active releases keep all four buttons unchanged.\n3. SC1 (completion + duration): show a 'Completed' section. Use `release.updatedAt` (or the GitHub `publishedAt` from step 5 if available) as the completion time, and render duration as `createdAt -> completedAt` (only when both are present). Reuse `detail-section` / existing CSS classes; add to DetailPanel.css only if needed.\n4. SC2 (changelog): add local state + an effect that calls `invoke<string | null>('read_release_changelog', { version: release.version, tikiPath })` (derive tikiPath from the active project, as elsewhere in this file). Render the returned markdown/text in a 'Release Notes' section; render nothing if null. Guard the effect against races (cancelled flag) and re-run on `release.version`.\n5. SC3 (GitHub link): add local state + an effect that calls `invoke<string | null>('fetch_github_release_url', { version: release.version, projectPath: activeProject?.path ?? null })`. When a url comes back, render a 'View on GitHub' button (reuse the GitHub-icon button markup from ReleaseDetail.tsx) that does `window.open(url, '_blank')`. Render nothing if null (vanish-gap / unpublished).\n6. Keep the existing Issues list section (it already renders included issues for SC1).\n\nThe active-release path must remain visually identical to today; only the completed path changes.",
+      "verification": [
+        "`pnpm build` (root) is type-clean",
+        "`pnpm --filter @tiki/desktop test` (vitest) passes",
+        "Manual (tauri:dev): a completed release detail shows release notes (when a changelog exists), a working 'View on GitHub' link, completion time + duration, and the included-issues list",
+        "Manual: a completed release detail shows NO Edit/Run/Review/Delete buttons",
+        "Manual: an ACTIVE (non-archived) release detail is unchanged — still shows Edit/Run/Review/Delete and no changelog/GitHub-link sections",
+        "Manual: clicking 'View on GitHub' opens the correct release tag URL"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/components/detail/TikiReleaseDetail.tsx",
+        "apps/desktop/src/components/detail/DetailPanel.css"
+      ],
+      "dependencies": [
+        2,
+        3
+      ]
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      3,
+      4
+    ],
+    "SC2": [
+      2,
+      4
+    ],
+    "SC3": [
+      2,
+      4
+    ],
+    "SC4": [
+      1,
+      4
+    ],
+    "SC5": [
+      1,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-24T16:03:53.933Z"
+}

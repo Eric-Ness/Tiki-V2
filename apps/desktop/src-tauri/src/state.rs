@@ -596,6 +596,13 @@ pub struct TikiRelease {
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
+    /// True when this release was loaded from `releases/archive/` (i.e. shipped).
+    /// Derived from file LOCATION at load time, never from the JSON: the ship
+    /// teardown `mv`s a release into `archive/` without flipping `status`, so an
+    /// archived file can still say `"status":"active"`. `skip_serializing` keeps
+    /// this purely derived — it is never written back to disk.
+    #[serde(default, skip_serializing)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -243,12 +243,12 @@ pub fn load_tiki_releases(
     }
 
     let mut releases = Vec::new();
-    read_release_dir(&releases_dir, &mut releases);
+    read_release_dir(&releases_dir, &mut releases, false);
 
     if include_archived.unwrap_or(false) {
         let archive_dir = releases_dir.join("archive");
         if archive_dir.exists() {
-            read_release_dir(&archive_dir, &mut releases);
+            read_release_dir(&archive_dir, &mut releases, true);
         }
     }
 
@@ -321,7 +321,11 @@ fn check_release_json_parity(releases_dir: &Path) {
 /// non-JSON entries are skipped. The `archive/` subdirectory itself is skipped
 /// when scanning the top-level `releases/` directory (it's traversed separately
 /// only when `include_archived` is true).
-fn read_release_dir(dir: &Path, out: &mut Vec<TikiRelease>) {
+///
+/// `archived` is stamped onto every record read from `dir` — pass `true` for the
+/// `archive/` subdirectory so completed releases carry the derived completed-signal
+/// (the JSON's own `status` is unreliable; see `TikiRelease::archived`).
+fn read_release_dir(dir: &Path, out: &mut Vec<TikiRelease>, archived: bool) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(e) => {
@@ -343,7 +347,10 @@ fn read_release_dir(dir: &Path, out: &mut Vec<TikiRelease>) {
             }
         };
         match serde_json::from_str::<TikiRelease>(&content) {
-            Ok(release) => out.push(release),
+            Ok(mut release) => {
+                release.archived = archived;
+                out.push(release);
+            }
             Err(e) => {
                 log::warn!("Failed to parse release file {:?}: {}", file_path, e);
             }
@@ -378,6 +385,46 @@ pub fn save_tiki_release(release: TikiRelease, tiki_path: Option<String>) -> Res
 
     log::info!("Saved release {} to {:?}", release.version, file_path);
     Ok(())
+}
+
+/// Read a release's changelog markdown (`{version}-changelog.md`) from
+/// `.tiki/releases/`, falling back to `releases/archive/`.
+///
+/// Returns `Ok(None)` when neither file exists — older releases legitimately have
+/// no changelog, so absence is not an error. The local file is preferred over the
+/// GitHub release body because it is instant/offline and present immediately after
+/// ship (it survives the archive->CI-publish gap, and the GitHub body is generated
+/// from it anyway).
+#[tauri::command]
+pub fn read_release_changelog(
+    version: String,
+    tiki_path: Option<String>,
+) -> Result<Option<String>, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let releases_dir = path.join("releases");
+    // Sanitize identically to save_tiki_release so the filename matches on disk.
+    let safe_version = version.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let file_name = format!("{}-changelog.md", safe_version);
+
+    for candidate in [
+        releases_dir.join(&file_name),
+        releases_dir.join("archive").join(&file_name),
+    ] {
+        if candidate.exists() {
+            return std::fs::read_to_string(&candidate)
+                .map(Some)
+                .map_err(|e| format!("Failed to read changelog {:?}: {}", candidate, e));
+        }
+    }
+
+    Ok(None)
 }
 
 /// Delete a Tiki release file
@@ -867,5 +914,85 @@ mod tests {
         assert_eq!(reconcile_groups(&s, "Stop"), 1);
         assert_eq!(reconcile_groups(&s, "SubagentStop"), 1);
         std::fs::remove_dir_all(&project).ok();
+    }
+
+    /// Build a temp `.tiki` dir with one active release under `releases/` and one
+    /// under `releases/archive/`, then return its path.
+    fn temp_tiki_with_releases(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-rel-{}-{}", tag, nanos));
+        let releases = tiki.join("releases");
+        let archive = releases.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        // Note: the archived file deliberately still says "status":"active" —
+        // this mirrors the real ship teardown, which `mv`s without flipping status.
+        let live = serde_json::json!({
+            "version": "v9.9.9",
+            "status": "active",
+            "issues": [],
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        });
+        let shipped = serde_json::json!({
+            "version": "v9.9.8",
+            "status": "active",
+            "issues": [],
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        });
+        std::fs::write(releases.join("v9.9.9.json"), live.to_string()).unwrap();
+        std::fs::write(archive.join("v9.9.8.json"), shipped.to_string()).unwrap();
+        tiki
+    }
+
+    #[test]
+    fn load_tiki_releases_marks_archived_by_location_not_status() {
+        let tiki = temp_tiki_with_releases("archived");
+        let tiki_str = tiki.to_string_lossy().to_string();
+
+        // include_archived = true: both releases load; archived flag tracks the
+        // file LOCATION, not the (stale) status field.
+        let with_archive = load_tiki_releases(Some(tiki_str.clone()), Some(true)).unwrap();
+        let live = with_archive.iter().find(|r| r.version == "v9.9.9").unwrap();
+        let shipped = with_archive.iter().find(|r| r.version == "v9.9.8").unwrap();
+        assert!(!live.archived, "top-level release must not be archived");
+        assert!(shipped.archived, "archive/ release must be archived even though its status says active");
+        assert_eq!(shipped.status, crate::state::TikiReleaseStatus::Active);
+
+        // include_archived = false (the #142 sidebar behavior): archive entry hidden.
+        let without_archive = load_tiki_releases(Some(tiki_str), Some(false)).unwrap();
+        assert!(without_archive.iter().all(|r| r.version != "v9.9.8"));
+        assert!(without_archive.iter().any(|r| r.version == "v9.9.9"));
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    #[test]
+    fn read_release_changelog_reads_top_level_then_archive_else_none() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-changelog-{}", nanos));
+        let releases = tiki.join("releases");
+        let archive = releases.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        std::fs::write(releases.join("v1.0.0-changelog.md"), "# v1.0.0\nlive notes").unwrap();
+        std::fs::write(archive.join("v0.9.0-changelog.md"), "# v0.9.0\narchived notes").unwrap();
+        let tiki_str = tiki.to_string_lossy().to_string();
+
+        // Top-level changelog.
+        let live = read_release_changelog("v1.0.0".to_string(), Some(tiki_str.clone())).unwrap();
+        assert_eq!(live.as_deref(), Some("# v1.0.0\nlive notes"));
+        // Archive fallback.
+        let arch = read_release_changelog("v0.9.0".to_string(), Some(tiki_str.clone())).unwrap();
+        assert_eq!(arch.as_deref(), Some("# v0.9.0\narchived notes"));
+        // Missing changelog is Ok(None), not an error.
+        let missing = read_release_changelog("v9.9.9".to_string(), Some(tiki_str)).unwrap();
+        assert!(missing.is_none());
+
+        std::fs::remove_dir_all(&tiki).ok();
     }
 }

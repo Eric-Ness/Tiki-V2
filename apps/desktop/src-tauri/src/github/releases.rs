@@ -47,6 +47,51 @@ pub fn fetch_github_releases(
     serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse releases: {}", e))
 }
 
+/// Fetch the canonical GitHub Release URL for a tag, or `None` when the release
+/// is not (yet) published.
+///
+/// `gh release list --json` does NOT expose a `url` field — only `gh release view`
+/// does — so completed releases routed to the Tiki detail view fetch their link
+/// here. ANY `gh` failure (release not found during the archive->CI-publish gap,
+/// auth, rate limit) collapses to `Ok(None)` so the "View on GitHub" link simply
+/// doesn't render rather than surfacing an error on an otherwise-complete view.
+///
+/// - version: the release tag (e.g. "v0.7.7")
+/// - project_path: optional project dir; sets the cwd so `gh` resolves the repo.
+#[tauri::command]
+pub fn fetch_github_release_url(
+    version: String,
+    project_path: Option<String>,
+) -> Result<Option<String>, String> {
+    let output = match run_gh_with_retry(|| {
+        let mut cmd = hidden_command("gh");
+        cmd.args(["release", "view", &version, "--json", "url"]);
+        if let Some(ref path) = project_path {
+            cmd.current_dir(path);
+        }
+        cmd
+    }) {
+        Ok(o) => o,
+        Err(e) => {
+            log::debug!(
+                "fetch_github_release_url({}): no link (gh failed: {})",
+                version,
+                e
+            );
+            return Ok(None);
+        }
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse release url: {}", e))?;
+    Ok(parsed
+        .get("url")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
