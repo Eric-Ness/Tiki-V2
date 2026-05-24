@@ -3,20 +3,24 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 257,
-      "title": "Dependency graph: click a node to open a live success-criteria panel",
-      "completedAt": "2026-05-24T18:38:17.126Z"
+      "number": 258,
+      "title": "Watcher-driven release reload drops archived releases (#258)",
+      "completedAt": "2026-05-24T19:25:24.766Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.8.0",
+      "version": "v0.8.1",
       "issues": [
-        256,
-        257
+        258
       ],
-      "completedAt": "2026-05-24T18:48:58.359Z",
-      "tag": "v0.8.0"
+      "completedAt": "2026-05-24T19:25:25.006Z",
+      "tag": "v0.8.1"
     },
     "recentIssues": [
+      {
+        "number": 258,
+        "title": "Watcher-driven release reload drops archived releases (#258)",
+        "completedAt": "2026-05-24T19:25:24.766Z"
+      },
       {
         "number": 257,
         "title": "Dependency graph: click a node to open a live success-criteria panel",
@@ -243,6 +247,14 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.8.1",
+        "issues": [
+          258
+        ],
+        "completedAt": "2026-05-24T19:25:25.006Z",
+        "tag": "v0.8.1"
+      },
       {
         "version": "v0.8.0",
         "issues": [

@@ -7,5 +7,7 @@
       "title": "Watcher-driven release reload drops archived releases (incomplete #255 fix) — shipped releases show stale 'active' badge"
     }
   ],
-  "createdAt": "2026-05-24T19:22:49.461Z"
+  "createdAt": "2026-05-24T19:22:49.461Z",
+  "completedAt": "2026-05-24T19:25:25.006Z",
+  "shipped": true
 }
