@@ -17,8 +17,10 @@ interface FetchedIssue {
   phaseCount?: number;
   labels?: { name: string; color: string }[];
   /** Per-phase status from the on-disk plan — the DURABLE source for phase
-   *  progress (survives completion, unlike activeWork[issue:N].phase). */
-  phases?: { status: string }[];
+   *  progress (survives completion, unlike activeWork[issue:N].phase). Phase
+   *  `number` is retained for #257's success-criteria checklist, which matches
+   *  coverageMatrix phase numbers against phases[].number. */
+  phases?: { number: number; status: string }[];
   /** Retained from the plan for #257's success-criteria panel. #256 keeps these
    *  in hand (the get_plan call already returns them) so #257 is pure UI; phase
    *  progress itself does not consume them. */
@@ -30,7 +32,7 @@ interface FetchedIssue {
  *  that the graph cares about (mirrors apps/desktop/src/components/detail
  *  /IssueDetail.tsx's TikiPlan interface — desktop keeps local type mirrors). */
 interface PlanShape {
-  phases?: { status: string }[];
+  phases?: { number: number; status: string }[];
   successCriteria?: { id: string; description: string; category?: string }[];
   coverageMatrix?: Record<string, number[]>;
 }
@@ -132,7 +134,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
         return {
           ...details,
           phaseCount: phases ? phases.length : undefined,
-          phases: phases ? phases.map((p) => ({ status: p.status })) : undefined,
+          phases: phases ? phases.map((p) => ({ number: p.number, status: p.status })) : undefined,
           successCriteria: plan?.successCriteria,
           coverageMatrix: plan?.coverageMatrix,
         };
@@ -206,7 +208,7 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
           return {
             ...fi,
             phaseCount: phases ? phases.length : fi.phaseCount,
-            phases: phases ? phases.map((p) => ({ status: p.status })) : fi.phases,
+            phases: phases ? phases.map((p) => ({ number: p.number, status: p.status })) : fi.phases,
             successCriteria: plan?.successCriteria ?? fi.successCriteria,
             coverageMatrix: plan?.coverageMatrix ?? fi.coverageMatrix,
           };
@@ -263,12 +265,45 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
   };
 
   // Build nodes and edges from fetched issues
-  const { nodes, edges, hasEdges } = useMemo(() => {
+  const { nodes, edges, hasEdges, planByIssue } = useMemo(() => {
     if (!release || fetchedIssues.length === 0) {
-      return { nodes: [] as IssueNodeType[], edges: [] as Edge[], hasEdges: false };
+      return {
+        nodes: [] as IssueNodeType[],
+        edges: [] as Edge[],
+        hasEdges: false,
+        planByIssue: {} as Record<
+          number,
+          {
+            successCriteria?: { id: string; description: string; category?: string }[];
+            coverageMatrix?: Record<string, number[]>;
+            phases?: { number: number; status: string }[];
+          }
+        >,
+      };
     }
 
     const issueNumbers = new Set(release.issues.map((i) => i.number));
+
+    // Plan data keyed by issue number for downstream panels (#257 success-
+    // criteria checklist). Only populated when the plan actually carried any
+    // of the three fields, so the lookup stays empty for plan-less issues.
+    const planByIssue: Record<
+      number,
+      {
+        successCriteria?: { id: string; description: string; category?: string }[];
+        coverageMatrix?: Record<string, number[]>;
+        phases?: { number: number; status: string }[];
+      }
+    > = {};
+    for (const issue of fetchedIssues) {
+      if (issue.successCriteria || issue.coverageMatrix || issue.phases) {
+        planByIssue[issue.number] = {
+          successCriteria: issue.successCriteria,
+          coverageMatrix: issue.coverageMatrix,
+          phases: issue.phases,
+        };
+      }
+    }
 
     // Build nodes + capture per-node heights for the dagre layout.
     const heights = new Map<string, number>();
@@ -323,8 +358,8 @@ export function useDependencyGraph(releaseVersion: string | null, releases: Tiki
     });
 
     const layouted = layoutGraph(nodes, edges, heights);
-    return { ...layouted, hasEdges: edges.length > 0 };
+    return { ...layouted, hasEdges: edges.length > 0, planByIssue };
   }, [release, fetchedIssues, activeWork, recentIssues]);
 
-  return { nodes, edges, isLoading, error, hasEdges, issueCount: release?.issues.length ?? 0 };
+  return { nodes, edges, isLoading, error, hasEdges, planByIssue, issueCount: release?.issues.length ?? 0 };
 }

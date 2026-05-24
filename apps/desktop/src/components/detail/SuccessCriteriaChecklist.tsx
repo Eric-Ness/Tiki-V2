@@ -38,6 +38,20 @@ export function SuccessCriteriaChecklist({ plan }: SuccessCriteriaChecklistProps
     [plan],
   );
 
+  return <CriteriaChecklistView rows={rows} />;
+}
+
+/**
+ * Presentational success-criteria checklist. Renders already-derived rows so
+ * callers that cannot cheaply build a full {@link EditorPlan} (e.g. the
+ * dependency-graph panel) can render the identical markup straight from
+ * `deriveCriteriaChecklist` output.
+ */
+export function CriteriaChecklistView({
+  rows,
+}: {
+  rows: CriterionVerification[];
+}) {
   if (rows.length === 0) {
     return null;
   }

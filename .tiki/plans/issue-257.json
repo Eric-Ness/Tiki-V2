@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 257,
+    "title": "Dependency graph: click a node to open a live success-criteria panel",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/257"
+  },
+  "createdAt": "2026-05-24T18:25:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Clicking any node opens a panel listing that issue's success criteria with live checkbox (verified/pending) state and an N/M verified count.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:36:30.963Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "The checklist ticks live as a phase completes — no manual refresh, no reselection — riding #256's planChanged -> planNonce -> plan re-read path.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:36:30.963Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "A node with no plan or no success criteria shows a graceful empty state, not a crash.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:34:49.534Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functional",
+      "description": "The panel overlays the graph canvas without disturbing the toolbar/legend, closes cleanly, and is dismissed when the selected release changes.",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:36:30.963Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "No React 19 useSyncExternalStore render-loop regression (no inline ?? {} / ?? [] in new selectors; existing freshRef guard tests stay green; tsc -b clean; desktop vitest stays green).",
+      "verified": true,
+      "verifiedAt": "2026-05-24T18:36:30.963Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Expose per-issue plan data (with phase numbers) from the graph hook",
+      "status": "completed",
+      "content": "Make the success-criteria + coverage + per-phase-with-number data available to the graph view. #256 already retains successCriteria and coverageMatrix on FetchedIssue, but it retains phases as { status }[] WITHOUT the phase number — and deriveCriteriaChecklist needs phase.number to resolve coverageMatrix entries. Fix that and surface a lookup.\n\nIn apps/desktop/src/components/dependencies/useDependencyGraph.ts:\n\n1. Widen the retained phase shape from { status: string } to { number: number; status: string } in THREE places: the PlanShape.phases type, the FetchedIssue.phases type, AND both retain sites — the main fetch effect (currently `phases.map((p) => ({ status: p.status }))`, ~line 135) and the planNonce live-refresh effect (~line 209). Map to `({ number: p.number, status: p.status })`. NOTE: derivePhaseProgressFromPlan (#256) takes PhaseLike { status } and is structurally compatible — adding `number` does not break it; confirm phase progress still works.\n\n2. Build a `planByIssue` lookup in the existing node-builder useMemo (the one that maps fetchedIssues -> nodes, deps [release, fetchedIssues, activeWork, recentIssues]): `Record<number, { successCriteria?: {...}; coverageMatrix?: Record<string, number[]>; phases?: { number: number; status: string }[] }>` keyed by issue.number, populated from each fetched issue's retained successCriteria / coverageMatrix / phases. Building it in this memo means it re-derives whenever fetchedIssues changes — including the #256 planNonce patch — so the panel stays live.\n\n3. Return `planByIssue` from the hook alongside { nodes, edges, isLoading, error, hasEdges, issueCount }.\n\nKeep all changes in this one file. No new Zustand selectors here.",
+      "verification": [
+        "PlanShape.phases and FetchedIssue.phases are { number: number; status: string }[]; both retain sites map number + status",
+        "useDependencyGraph returns planByIssue keyed by issue number, populated from retained plan fields",
+        "#256 phase progress still works: derivePhaseProgressFromPlan unaffected; desktop vitest stays green (196)",
+        "tsc -b clean"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/useDependencyGraph.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-24T18:33:07.880Z",
+      "summary": "useDependencyGraph.ts: widened retained phase shape to {number,status} in 4 spots (PlanShape, FetchedIssue, main fetch effect, planNonce refresh effect); built+returned planByIssue lookup (Record<number,{successCriteria?,coverageMatrix?,phases?}>) from the node-builder memo (empty {} default in both paths). #256 phase progress unaffected. tsc -b clean; vitest 196."
+    },
+    {
+      "number": 2,
+      "title": "Extract reusable CriteriaChecklistView from SuccessCriteriaChecklist",
+      "status": "completed",
+      "content": "Make the success-criteria checklist render reusable by the graph panel WITHOUT fabricating a heavy EditorPlan and without changing the detail panel's behavior.\n\nIn apps/desktop/src/components/detail/SuccessCriteriaChecklist.tsx:\n- Extract the presentational render — the `<details className=\"criteria-checklist\">` block (header with 'Success criteria' + 'N/M verified' count, and the `<ul>` of rows) — into a new EXPORTED component `CriteriaChecklistView({ rows }: { rows: CriterionVerification[] })`. It returns null when rows.length === 0, computes verifiedCount = rows.filter(r => r.verified).length internally, and renders the existing markup and CSS classes verbatim (criteria-checklist, __header, __count, __list, __item, __check, __id, __desc, __phases).\n- Keep `SuccessCriteriaChecklist({ plan })` as a thin wrapper: keep its existing useMemo that derives rows via deriveCriteriaChecklist(...) from the EditorPlan, then render `<CriteriaChecklistView rows={rows} />`. Net markup + behavior for the detail panel is IDENTICAL.\n- Reuse the existing `import './SuccessCriteriaChecklist.css'` (shared by both). CriterionVerification type already lives in utils/criteriaVerification — import the type as today.\n\nThis is a pure refactor: no behavior change. The detail-panel checklist must look and behave exactly as before.",
+      "verification": [
+        "CriteriaChecklistView is exported from SuccessCriteriaChecklist.tsx and takes { rows: CriterionVerification[] }",
+        "SuccessCriteriaChecklist still renders identically (wraps CriteriaChecklistView); detail panel checklist unchanged",
+        "Empty rows -> renders null (unchanged behavior)",
+        "tsc -b clean; desktop vitest stays green"
+      ],
+      "addressesCriteria": [
+        "SC1"
+      ],
+      "files": [
+        "apps/desktop/src/components/detail/SuccessCriteriaChecklist.tsx"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-24T18:33:07.880Z",
+      "summary": "SuccessCriteriaChecklist.tsx: extracted exported CriteriaChecklistView({rows}) (null on empty, computes verifiedCount, renders the existing <details> markup verbatim); SuccessCriteriaChecklist now derives rows then returns <CriteriaChecklistView>. Detail panel byte-identical. tsc -b clean; vitest 196."
+    },
+    {
+      "number": 3,
+      "title": "GraphNodePanel component + styles",
+      "status": "completed",
+      "content": "Create the click-to-open side panel that renders a live success-criteria checklist for one issue, fed entirely by props (no store access -> no fresh-ref risk).\n\nCreate apps/desktop/src/components/dependencies/GraphNodePanel.tsx:\n- Props: `{ issueNumber: number; title: string; plan?: { successCriteria?: { id: string; description: string; category?: string }[]; coverageMatrix?: Record<string, number[]>; phases?: { number: number; status: string }[] }; onClose: () => void }`.\n- Memoize rows: build a ChecklistPlanLike `{ successCriteria: (plan?.successCriteria ?? []).map(c => ({ id: c.id, description: c.description })), phases: (plan?.phases ?? []).map(p => ({ number: p.number, status: p.status })), coverageMatrix: plan?.coverageMatrix ?? {} }` and pass to deriveCriteriaChecklist(...) from utils/criteriaVerification. Memo dep: [plan].\n- Render an overlay panel: a header row with `#{issueNumber}` + a truncated title and a close button (aria-label 'Close', calls onClose); body renders `<CriteriaChecklistView rows={rows} />` (imported from ../detail/SuccessCriteriaChecklist, Phase 2). When rows.length === 0 (no plan or no criteria), render a graceful empty state ('No success criteria for this issue.') instead — never throw.\n- No useTikiStateStore / Zustand selectors inside this component (data arrives via props). Liveness comes from the parent re-rendering with a fresh `plan` prop.\n\nCreate apps/desktop/src/components/dependencies/GraphNodePanel.css:\n- `.graph-node-panel`: position absolute; top 0; right 0; bottom 0; width ~300px; z-index 10 (must sit above the legend/banner at z-index 5 in DependencyGraph.css); background var(--bg-secondary); border-left 1px var(--border-primary); overflow-y auto; padding. Header row flex space-between; close button minimal. Include `[data-theme=\"light\"]` parity rules consistent with DependencyGraph.css / IssueNode.css.\n\nNo render test (project uses the `node` vitest environment with no DOM/testing-library — see vitest.config.ts; criteria-tick logic is already covered by criteriaVerification.test.ts). Verify by build + the empty-state branch being explicit.",
+      "verification": [
+        "GraphNodePanel.tsx renders a header (#number + title + close button) and, for a plan with criteria, a CriteriaChecklistView with live verified/pending rows + N/M count",
+        "plan undefined OR zero criteria -> graceful empty-state message, no throw",
+        "No Zustand selectors in the component (props-only) -> no fresh-ref risk",
+        "GraphNodePanel.css overlays right side at z-index 10 (above legend z-index 5); light-theme parity present",
+        "tsc -b clean; desktop vitest stays green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/GraphNodePanel.tsx",
+        "apps/desktop/src/components/dependencies/GraphNodePanel.css"
+      ],
+      "dependencies": [
+        1,
+        2
+      ],
+      "completedAt": "2026-05-24T18:34:49.534Z",
+      "summary": "Created GraphNodePanel.tsx (props-only: issueNumber/title/plan?/onClose; builds ChecklistPlanLike -> deriveCriteriaChecklist memo on [plan]; renders header #num+title+close button and CriteriaChecklistView, or a graceful \"No success criteria for this issue.\" empty state when rows are empty) + GraphNodePanel.css (right-side absolute overlay, width 300px, z-index 10 above the legend z-index 5, scrollable body, light-theme parity). No Zustand selectors -> no fresh-ref risk. tsc -b clean; vitest 196."
+    },
+    {
+      "number": 4,
+      "title": "Wire click-to-open into DependencyGraph",
+      "status": "completed",
+      "content": "Connect node clicks to the panel.\n\nIn apps/desktop/src/components/dependencies/DependencyGraph.tsx (DependencyGraphInner):\n- Consume `planByIssue` from useDependencyGraph (now returned by Phase 1): `const { nodes, edges, isLoading, error, hasEdges, issueCount, planByIssue } = useDependencyGraph(selectedVersion, releases);`.\n- Add local state: `const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);`.\n- Add `onNodeClick={(_evt, node) => setSelectedNodeId(parseInt(node.id, 10))}` to the <ReactFlow> element (node ids are strings; get_plan/lookup want a number). Keep the existing onNodeMouseEnter/Leave handlers.\n- Render <GraphNodePanel> INSIDE `.dependency-graph-container` when selectedNodeId !== null: pass issueNumber={selectedNodeId}; title from the node data `nodes.find(n => Number(n.id) === selectedNodeId)?.data.title ?? ''`; plan={planByIssue[selectedNodeId]}; onClose={() => setSelectedNodeId(null)}.\n- Dismiss on release switch: add a useEffect `useEffect(() => { setSelectedNodeId(null); }, [selectedVersion])` so a stale issue from another release never lingers.\n- Do NOT route through detailStore.setSelectedIssue — this panel is local to the graph view.\n- Liveness: planByIssue re-derives when fetchedIssues changes (the #256 planNonce patch), so DependencyGraph re-renders and passes a fresh `plan` to the panel -> checklist ticks live.\n\nKeep selectedNodeId as plain local state; no new Zustand selectors.",
+      "verification": [
+        "Clicking a node opens GraphNodePanel for that issue; clicking the close button clears it; switching the release dropdown dismisses the panel",
+        "Panel overlays the canvas without disturbing the toolbar/legend (renders inside .dependency-graph-container)",
+        "Live: a plan/phase status change ticks the open panel's checklist without reselection (rides #256 planChanged)",
+        "No detailStore coupling; no render-loop (existing freshRef guard tests stay green)",
+        "tsc -b clean; desktop vitest stays green; manual: open Dependency Graph, click a node, verify criteria + live tick"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/dependencies/DependencyGraph.tsx"
+      ],
+      "dependencies": [
+        1,
+        3
+      ],
+      "completedAt": "2026-05-24T18:36:30.963Z",
+      "summary": "DependencyGraph.tsx: imported GraphNodePanel; consume planByIssue from useDependencyGraph; added local selectedNodeId state + onNodeClick (parseInt node.id) on <ReactFlow>; render <GraphNodePanel> inside .dependency-graph-container (title from nodes.find by id, plan from planByIssue[selectedNodeId], onClose clears); useEffect clears selectedNodeId on selectedVersion change. No detailStore coupling; no new Zustand selectors. tsc -b clean; vitest 196."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "SC2": [
+      1,
+      3,
+      4
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      4
+    ],
+    "SC5": [
+      1,
+      4
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-24T18:29:37.020Z",
+  "updatedAt": "2026-05-24T18:36:30.963Z"
+}

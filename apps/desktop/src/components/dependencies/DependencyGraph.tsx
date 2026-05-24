@@ -11,6 +11,7 @@ import '@xyflow/react/dist/style.css';
 import { invoke } from '@tauri-apps/api/core';
 import { IssueNode } from './IssueNode';
 import { SwimlaneLayer } from './SwimlaneLayer';
+import { GraphNodePanel } from './GraphNodePanel';
 import { useDependencyGraph } from './useDependencyGraph';
 import { findCriticalPath } from './criticalPath';
 import { useTikiReleasesStore, useProjectsStore, type TikiRelease } from '../../stores';
@@ -70,7 +71,16 @@ function DependencyGraphInner() {
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const { nodes, edges, isLoading, error, hasEdges, issueCount } =
+  // Click-to-open success-criteria panel (#257). Local to the graph view — do
+  // NOT route through detailStore (that would hijack the main detail panel).
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  // Dismiss the panel when the release changes so a stale issue from another
+  // release never lingers.
+  useEffect(() => {
+    setSelectedNodeId(null);
+  }, [selectedVersion]);
+
+  const { nodes, edges, isLoading, error, hasEdges, issueCount, planByIssue } =
     useDependencyGraph(selectedVersion, releases);
 
   // Compute critical path
@@ -263,6 +273,7 @@ function DependencyGraphInner() {
             nodes={isStyled ? styledNodes : nodes}
             edges={isStyled ? styledEdges : edges}
             nodeTypes={nodeTypes}
+            onNodeClick={(_, node) => setSelectedNodeId(parseInt(node.id, 10))}
             onNodeMouseEnter={(_, node) => setHoveredId(node.id)}
             onNodeMouseLeave={() => setHoveredId(null)}
             fitView
@@ -303,6 +314,16 @@ function DependencyGraphInner() {
               </span>
             )}
           </div>
+          {selectedNodeId !== null && (
+            <GraphNodePanel
+              issueNumber={selectedNodeId}
+              title={
+                nodes.find((n) => Number(n.id) === selectedNodeId)?.data.title ?? ''
+              }
+              plan={planByIssue[selectedNodeId]}
+              onClose={() => setSelectedNodeId(null)}
+            />
+          )}
         </div>
       )}
     </div>

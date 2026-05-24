@@ -62,3 +62,32 @@ allocates fresh each call and trips `useSyncExternalStore` into a render loop. S
 `get_plan` resolves `.tiki/plans/issue-{n}.json` only; shipping a release archives the
 release JSON but leaves plan files in place. So `get_plan` on a shipped issue returns the
 final plan (all phases `completed`) → durable `N/N` works with no special-casing.
+
+## 2026-05-24 findings (#257 planning)
+
+After #256 shipped, planning #257 (click-node → live success-criteria panel) surfaced:
+
+- **#256 retained `phases` as `{ status }[]` — WITHOUT the phase `number`.** That was
+  enough for the phase *count* (`derivePhaseProgressFromPlan` only reads `status`), but the
+  criteria checklist (`deriveCriteriaChecklist`) matches `coverageMatrix` entries (which are
+  phase *numbers*) against `phases[].number`. So #257 must widen the retained phase shape to
+  `{ number, status }` in `useDependencyGraph.ts` (PlanShape type, FetchedIssue type, and BOTH
+  retain sites: the main fetch effect and the planNonce live-refresh effect). Adding `number`
+  is structurally compatible with `derivePhaseProgressFromPlan` — no #256 regression.
+- **Reuse the checklist without fabricating an `EditorPlan`.** `SuccessCriteriaChecklist`
+  takes the heavy `EditorPlan` (needs phase title/content/etc the graph never has). Cleanest
+  reuse = extract an exported presentational `CriteriaChecklistView({ rows })` from it (wrapper
+  keeps deriving rows from EditorPlan, detail panel behavior identical), then the graph panel
+  builds the lean `ChecklistPlanLike` and calls `deriveCriteriaChecklist` directly. Avoids
+  dummy EditorPlan objects and avoids touching the detail panel's behavior.
+- **No React render tests in this project.** `apps/desktop/vitest.config.ts` uses the `node`
+  environment and there is NO testing-library/jsdom dependency. Tests cover PURE logic only
+  (e.g. `deriveSummaryRows`, `deriveCriteriaChecklist`). Verify UI phases via `tsc -b` + the
+  existing suite + manual; do not add component render tests.
+- **Feed the panel by props, not store selectors.** Expose a `planByIssue` lookup from the
+  hook (built in the node-builder memo, so it re-derives on the #256 planNonce patch → live)
+  and pass the selected issue's entry into the panel as a prop. A props-only panel has no
+  Zustand selector, so it sidesteps the fresh-ref render-loop class entirely. Keep
+  `selectedNodeId` as local state in `DependencyGraphInner`; do NOT route through `detailStore`
+  (that hijacks the main right-hand detail panel). Clear `selectedNodeId` on release switch so
+  a stale issue never lingers.
