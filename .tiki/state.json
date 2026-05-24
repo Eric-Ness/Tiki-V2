@@ -8,12 +8,13 @@
       "completedAt": "2026-05-24T18:38:17.126Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.7.8",
+      "version": "v0.8.0",
       "issues": [
-        255
+        256,
+        257
       ],
-      "completedAt": "2026-05-24T17:55:12.955Z",
-      "tag": "v0.7.8"
+      "completedAt": "2026-05-24T18:48:58.359Z",
+      "tag": "v0.8.0"
     },
     "recentIssues": [
       {
@@ -242,6 +243,15 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.8.0",
+        "issues": [
+          256,
+          257
+        ],
+        "completedAt": "2026-05-24T18:48:58.359Z",
+        "tag": "v0.8.0"
+      },
       {
         "version": "v0.7.8",
         "issues": [

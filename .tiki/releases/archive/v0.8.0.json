@@ -1,6 +1,6 @@
 {
   "version": "v0.8.0",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 256,
@@ -11,5 +11,8 @@
       "title": "Dependency graph: click a node to open a live success-criteria panel"
     }
   ],
-  "createdAt": "2026-05-24T18:45:00.000Z"
+  "createdAt": "2026-05-24T18:45:00.000Z",
+  "shipped": true,
+  "completedAt": "2026-05-24T18:48:58.621Z",
+  "tag": "v0.8.0"
 }
