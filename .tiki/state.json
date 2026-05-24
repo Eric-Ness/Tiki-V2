@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 256,
-      "title": "Dependency graph: show durable phase progress (N/M) on every node",
-      "completedAt": "2026-05-24T18:18:19.528Z"
+      "number": 257,
+      "title": "Dependency graph: click a node to open a live success-criteria panel",
+      "completedAt": "2026-05-24T18:38:17.126Z"
     },
     "lastCompletedRelease": {
       "version": "v0.7.8",
@@ -16,6 +16,11 @@
       "tag": "v0.7.8"
     },
     "recentIssues": [
+      {
+        "number": 257,
+        "title": "Dependency graph: click a node to open a live success-criteria panel",
+        "completedAt": "2026-05-24T18:38:17.126Z"
+      },
       {
         "number": 256,
         "title": "Dependency graph: show durable phase progress (N/M) on every node",
