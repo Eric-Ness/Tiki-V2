@@ -1,6 +1,6 @@
 {
   "version": "v0.8.1",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 258,
@@ -9,5 +9,6 @@
   ],
   "createdAt": "2026-05-24T19:22:49.461Z",
   "completedAt": "2026-05-24T19:25:25.006Z",
-  "shipped": true
+  "shipped": true,
+  "tag": "v0.8.1"
 }

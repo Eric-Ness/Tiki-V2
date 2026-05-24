@@ -970,6 +970,45 @@ mod tests {
         std::fs::remove_dir_all(&tiki).ok();
     }
 
+    /// REGRESSION GUARD for the #255/#258 bug class — and the one test the prior
+    /// two structurally could NOT catch.
+    ///
+    /// The desktop derives a release's "completed" badge from `TikiRelease.archived`
+    /// (the on-disk `status` stays stale "active" after the ship teardown). Tauri
+    /// serializes IPC command return values with this struct's derived `Serialize`,
+    /// so if `archived` is ever marked `skip_serializing` again it vanishes from the
+    /// payload, the frontend reads `undefined`, and every shipped release shows a
+    /// stale "active" badge.
+    ///
+    /// `load_tiki_releases_marks_archived_by_location_not_status` only inspects the
+    /// in-memory Rust struct (before serialization), so it cannot see an IPC-strip.
+    /// This test exercises the actual wire format: serialize, then assert the key
+    /// survives. If this fails, the desktop's release status tracking is broken even
+    /// when every other test is green — do not "fix" it by relaxing the assertion.
+    #[test]
+    fn tiki_release_archived_survives_serialization() {
+        let release = TikiRelease {
+            version: "v1.2.3".to_string(),
+            name: None,
+            // Archived files keep a stale "active" status — `archived` is the only
+            // reliable completed-signal the frontend has.
+            status: crate::state::TikiReleaseStatus::Active,
+            issues: vec![],
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: None,
+            archived: true,
+        };
+
+        let value = serde_json::to_value(&release).expect("TikiRelease must serialize");
+        assert_eq!(
+            value.get("archived").and_then(|v| v.as_bool()),
+            Some(true),
+            "`archived` must be present in the serialized TikiRelease so it crosses \
+             the Tauri IPC boundary to the frontend — the stale `status` field must \
+             not become the only completed-signal the UI receives (#255/#258)"
+        );
+    }
+
     #[test]
     fn read_release_changelog_reads_top_level_then_archive_else_none() {
         let nanos = std::time::SystemTime::now()

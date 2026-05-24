@@ -292,7 +292,7 @@ node .claude/tiki/scripts/state.mjs remove issue:{number}
 node .claude/tiki/scripts/state.mjs append-history release --version {version} --issues "41,42,43" --tag {version}
 ```
 
-Then move the release file to `.tiki/releases/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation).
+Then archive the release file: first set its `"status"` to `"shipped"` and add `"shipped": true` plus a `"completedAt"` ISO timestamp, then move it to `.tiki/releases/archive/` as a regular filesystem rename (no shim involvement — it's not a state.json mutation). Setting `status` matters: the desktop derives the "completed" badge from the archive LOCATION, but it falls back to the on-disk `status` if the location-derived `archived` flag is ever unavailable — leaving a stale `"status":"active"` in an archived file is the footgun that caused #258. Keep location and status in agreement.
 </state-management>
 
 <output>
@@ -855,8 +855,11 @@ After all issues complete and changelog is approved, ship the release:
 
 6. **Archive release file**
    - Create `.tiki/releases/archive/` if needed
-   - Move `.tiki/releases/{version}.json` to archive
+   - Set the file's `"status"` to `"shipped"` (do NOT leave it `"active"` — the desktop
+     falls back to this field for the completed badge if the location-derived `archived`
+     flag is unavailable; a stale `"active"` here is the #258 footgun)
    - Add `completedAt` and `shipped: true` to archived file
+   - Move `.tiki/releases/{version}.json` to archive
 
 7. **Prune wave worktrees** — after the tag is pushed and state finalized, remove all per-issue worktrees created during wave dispatch:
    ```bash

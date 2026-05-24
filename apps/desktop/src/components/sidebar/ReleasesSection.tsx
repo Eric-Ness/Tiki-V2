@@ -13,6 +13,7 @@ import {
   type TikiRelease,
   type TikiReleaseStatus,
 } from "../../stores";
+import { isReleaseCompleted } from "../../utils/releaseDisplayStatus";
 import "./ReleasesSection.css";
 
 /** Compare two version strings by semver (descending). */
@@ -296,10 +297,15 @@ export function ReleasesSection() {
     // archive/ without flipping its status (so an archived file can still say
     // 'active') — see TikiRelease.archived.
     for (const tiki of tikiReleases) {
-      const tikiDisplay: MergedRelease["displayStatus"] =
-        tiki.archived || tiki.status === "shipped" || tiki.status === "completed"
-          ? "completed"
-          : tiki.status;
+      // 'shipped'/'completed'/archived collapse to 'completed' (displayStatus has
+      // no 'shipped'); the only non-completed statuses that reach here are
+      // 'active'/'not_planned'. Mapped explicitly so tsc -b stays happy without
+      // narrowing through the isReleaseCompleted() boolean.
+      const tikiDisplay: MergedRelease["displayStatus"] = isReleaseCompleted(tiki)
+        ? "completed"
+        : tiki.status === "not_planned"
+          ? "not_planned"
+          : "active";
       const existing = map.get(tiki.version);
       if (existing) {
         existing.status = tiki.status;

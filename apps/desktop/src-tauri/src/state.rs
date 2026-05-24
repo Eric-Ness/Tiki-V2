@@ -599,9 +599,18 @@ pub struct TikiRelease {
     /// True when this release was loaded from `releases/archive/` (i.e. shipped).
     /// Derived from file LOCATION at load time, never from the JSON: the ship
     /// teardown `mv`s a release into `archive/` without flipping `status`, so an
-    /// archived file can still say `"status":"active"`. `skip_serializing` keeps
-    /// this purely derived — it is never written back to disk.
-    #[serde(default, skip_serializing)]
+    /// archived file can still say `"status":"active"`.
+    ///
+    /// MUST stay serialized. Tauri serializes IPC command return values with this
+    /// same derived `Serialize` impl, and the desktop sidebar + detail panel derive
+    /// "completed" from `archived` (the on-disk `status` is unreliable). A
+    /// `skip_serializing` here strips the field from the IPC payload too, so the
+    /// frontend reads `undefined`, falls back to the stale `"active"` status, and
+    /// every shipped release shows a stale "active" badge — the #255/#258 bug class.
+    /// The persisted value is meaningless: `read_release_dir` overwrites it from the
+    /// file's location on every load, so writing it to disk is inert. Guarded by
+    /// `tiki_release_archived_survives_serialization` in `commands.rs`.
+    #[serde(default)]
     pub archived: bool,
 }
 
