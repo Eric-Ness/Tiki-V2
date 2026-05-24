@@ -99,7 +99,18 @@ export function useTikiFileSync({
       } else if (event.payload.type === "releaseChanged") {
         try {
           const projectTikiPath = activeProjectPath ? `${activeProjectPath}/.tiki` : undefined;
-          const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", { tikiPath: projectTikiPath });
+          // #258: must mirror the sidebar mount loader (ReleasesSection.tsx) by
+          // passing includeArchived:true. This is a full setReleases() replace, so
+          // omitting the flag would drop every shipped release from the store on
+          // any releaseChanged event (a release file is created live then moved to
+          // archive/ during a ship) — leaving stale 'active' badges or vanishing
+          // completed releases until a manual refresh remounts the sidebar.
+          // Completes the #255 archived-aware loading fix (mount path was fixed; this
+          // watcher path was missed).
+          const loadedReleases = await invoke<TikiRelease[]>("load_tiki_releases", {
+            tikiPath: projectTikiPath,
+            includeArchived: true,
+          });
           useTikiReleasesStore.getState().setReleases(loadedReleases);
         } catch (e) {
           console.error("Failed to reload releases:", e);

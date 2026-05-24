@@ -220,9 +220,10 @@ pub fn switch_project(app: tauri::AppHandle, path: String) -> Result<(), String>
 /// Load all Tiki releases from .tiki/releases/.
 ///
 /// `include_archived` (default false) controls whether `releases/archive/*.json` is also
-/// scanned. The sidebar passes false (preserves the #142 fix that hides shipped releases
-/// from the active list). The Dependency Graph passes true so it can render the full
-/// historical view.
+/// scanned. Since #255 the sidebar passes true so SHIPPED releases stay visible and carry
+/// the location-derived `archived` flag (gated/styled as completed rather than hidden — this
+/// superseded #142's hide-on-ship behavior); the watcher reload (#258) and the Dependency
+/// Graph likewise pass true so every consumer sees the full historical view consistently.
 #[tauri::command]
 pub fn load_tiki_releases(
     tiki_path: Option<String>,
