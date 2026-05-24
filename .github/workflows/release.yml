@@ -12,7 +12,94 @@ on:
         type: string
 
 jobs:
+  # Pre-deploy gate. release.yml fires on a tag push and goes straight to building
+  # and publishing platform installers — and most Tiki releases ship direct-to-main
+  # with no PR, so they bypass pr.yml entirely. Without this job the ONLY thing
+  # standing between a tag and published binaries is a manual pre-tag checklist;
+  # that is exactly how #258 shipped (the release meant to FIX the stale-"active"
+  # release badge published without any automated test exercising release status
+  # tracking). This job runs the same core suite as pr.yml and the `release` matrix
+  # `needs:` it, so if any check fails NO installer is built or uploaded. Workflow
+  # tracking is the product's foundation — it must be green before anything deploys.
+  test:
+    name: Pre-deploy gate (core tests)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Configure pnpm store
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install Rust stable + clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Vitest (packages/shared)
+        run: pnpm -C packages/shared test
+
+      - name: Vitest (apps/desktop)
+        run: pnpm -C apps/desktop test
+
+      - name: Tests (packages/framework)
+        run: pnpm -C packages/framework test
+
+      - name: Cargo test
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+      - name: Cargo clippy
+        run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- --deny warnings
+
   release:
+    needs: test
     permissions:
       contents: write
     strategy:

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { TikiRelease } from "../../stores/tikiReleasesStore";
 import { useTerminalStore, useProjectsStore, useReleaseDialogStore, useTikiReleasesStore, useDetailStore, EMPTY_TABS } from "../../stores";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { isReleaseCompleted } from "../../utils/releaseDisplayStatus";
 import "./DetailPanel.css";
 
 interface TikiReleaseDetailProps {
@@ -61,7 +62,8 @@ export function TikiReleaseDetail({ release }: TikiReleaseDetailProps) {
 
   // A release is "completed" once it has shipped (archived) — the archive flag is
   // the reliable signal because the ship teardown leaves the JSON status stale.
-  const isCompleted = release.archived || release.status === "completed" || release.status === "shipped";
+  // Shared with the sidebar via isReleaseCompleted so the two never drift.
+  const isCompleted = isReleaseCompleted(release);
 
   // Header badge: surface "Completed" even when an archived record's status field
   // still says "active" (so it matches the sidebar).
