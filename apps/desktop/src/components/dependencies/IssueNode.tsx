@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import './IssueNode.css';
 
@@ -32,7 +33,14 @@ const STATUS_LABELS: Record<string, string> = {
   closed: 'Closed',
 };
 
-export function IssueNode({ data }: NodeProps<IssueNodeType>) {
+// Memoized (#266): on hover the graph re-derives `styledNodes` — a fresh array
+// where every node gets a new `className` (lineage/dimmed) but keeps the same
+// `data` reference. Without memo, React re-rendered every node's inner JSX on
+// each hover, and that re-render churn (combined with the CSS transitions) is
+// what made nodes visibly blink. The dim/lineage highlight is applied by React
+// Flow to the node WRAPPER as pure CSS, so memoizing the inner component keeps
+// the highlight working while eliminating the per-hover re-render storm.
+function IssueNodeComponent({ data }: NodeProps<IssueNodeType>) {
   const truncatedTitle =
     data.title.length > 30 ? data.title.slice(0, 28) + '...' : data.title;
 
@@ -100,3 +108,5 @@ export function IssueNode({ data }: NodeProps<IssueNodeType>) {
     </div>
   );
 }
+
+export const IssueNode = memo(IssueNodeComponent);

@@ -143,6 +143,16 @@ pub fn get_state(tiki_path: Option<String>) -> Result<Option<TikiState>, String>
 ///
 /// Uses the same resilient read as `get_state` since plan files are rewritten
 /// between phases by `/tiki:execute` and reads can race those writes.
+///
+/// Falls back to `plans/archive/issue-N.json` when the active plan is absent
+/// (#266): once an issue ships, `ship.md` moves its plan into `archive/`, so a
+/// lookup that only checked `plans/` returned `None` and the dependency-graph
+/// node panel's success-criteria checklist (#257) went empty for completed
+/// issues. The archived plan retains `phases[].status` + `successCriteria` +
+/// `coverageMatrix`, so the checklist renders all-verified with no UI change.
+/// Active plan wins when both exist (the live one is authoritative). Same
+/// "look in archive too" pattern as `load_tiki_releases` `include_archived`
+/// (#255/#258) and `read_release_changelog`.
 #[tauri::command]
 pub fn get_plan(issue_number: u32, tiki_path: Option<String>) -> Result<Option<TikiPlan>, String> {
     let path = match tiki_path {
@@ -153,8 +163,16 @@ pub fn get_plan(issue_number: u32, tiki_path: Option<String>) -> Result<Option<T
         }
     };
 
-    let plan_file = path.join("plans").join(format!("issue-{}.json", issue_number));
-    fs_utils::read_json_resilient::<TikiPlan>(&plan_file)
+    let plans_dir = path.join("plans");
+    let plan_file = plans_dir.join(format!("issue-{}.json", issue_number));
+    if let Some(plan) = fs_utils::read_json_resilient::<TikiPlan>(&plan_file)? {
+        return Ok(Some(plan));
+    }
+
+    let archived_file = plans_dir
+        .join("archive")
+        .join(format!("issue-{}.json", issue_number));
+    fs_utils::read_json_resilient::<TikiPlan>(&archived_file)
 }
 
 /// Save a plan to `.tiki/plans/issue-N.json` via atomic write.
@@ -1203,6 +1221,60 @@ mod tests {
         // Missing changelog is Ok(None), not an error.
         let missing = read_release_changelog("v9.9.9".to_string(), Some(tiki_str)).unwrap();
         assert!(missing.is_none());
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #266: once an issue ships its plan is moved to `plans/archive/`, so a
+    /// lookup that only checked `plans/` returned None and the dependency-graph
+    /// success-criteria panel went empty. `get_plan` must fall back to the
+    /// archive (active plan wins when both exist).
+    #[test]
+    fn get_plan_falls_back_to_archive_for_shipped_issues() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-getplan-{}", nanos));
+        let plans = tiki.join("plans");
+        let archive = plans.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        let tiki_str = tiki.to_string_lossy().to_string();
+
+        let archived = serde_json::json!({
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "successCriteria": [{ "id": "SC-ARCHIVE", "description": "from archive" }],
+            "phases": []
+        });
+        std::fs::write(archive.join("issue-42.json"), archived.to_string()).unwrap();
+
+        // No active plan: get_plan reaches into archive/.
+        let plan = get_plan(42, Some(tiki_str.clone()))
+            .unwrap()
+            .expect("archived plan must be returned when no active plan exists");
+        assert_eq!(
+            plan.success_criteria.as_ref().unwrap()[0].id,
+            "SC-ARCHIVE",
+            "must read the archived plan's criteria"
+        );
+
+        // Active plan wins when both exist (the live one is authoritative).
+        let active = serde_json::json!({
+            "createdAt": "2026-01-02T00:00:00.000Z",
+            "successCriteria": [{ "id": "SC-ACTIVE", "description": "from active" }],
+            "phases": []
+        });
+        std::fs::write(plans.join("issue-42.json"), active.to_string()).unwrap();
+        let plan = get_plan(42, Some(tiki_str.clone())).unwrap().unwrap();
+        assert_eq!(
+            plan.success_criteria.as_ref().unwrap()[0].id,
+            "SC-ACTIVE",
+            "active plan must take precedence over the archived copy"
+        );
+
+        // Neither present: Ok(None), not an error.
+        let none = get_plan(999, Some(tiki_str)).unwrap();
+        assert!(none.is_none(), "missing plan in both locations is Ok(None)");
 
         std::fs::remove_dir_all(&tiki).ok();
     }

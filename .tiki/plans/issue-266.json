@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 266,
+    "title": "Dependency graph UX papercuts: auto-fit, node hover flicker, criteria vanish after completion",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/266"
+  },
+  "createdAt": "2026-05-25T15:32:05.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "After an issue ships (plan moved to plans/archive/), clicking its dependency-graph node shows the success-criteria checklist (rendered all-verified) instead of 'No success criteria' — get_plan falls back to plans/archive/issue-N.json",
+      "verified": true,
+      "verifiedAt": "2026-05-25T15:36:00.000Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "The dependency graph auto-fits to view on first node populate and when the selected release / node-id set changes, without yanking the viewport during live status-only updates; the manual Fit View button still works",
+      "verified": false
+    },
+    {
+      "id": "SC3",
+      "category": "quality",
+      "description": "Hovering a node no longer re-renders every node's internals — IssueNode is memoized so only CSS class (lineage/dimmed) changes; the hover-to-trace lineage highlight still works. (Visual: confirmed in tauri:dev.)",
+      "verified": false
+    },
+    {
+      "id": "SC4",
+      "category": "quality",
+      "description": "pnpm build clean (tsc -b), desktop vitest green, cargo test --lib green including a new get_plan archive-fallback unit test",
+      "verified": true,
+      "verifiedAt": "2026-05-25T15:36:00.000Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "get_plan archive fallback (Rust) + unit test",
+      "status": "completed",
+      "content": "In apps/desktop/src-tauri/src/commands.rs get_plan: after the resilient read of plans/issue-N.json, if the result is Ok(None), read plans/archive/issue-N.json with the same read_json_resilient helper and return that. Active plan takes precedence; archive is the fallback (mirrors the load_tiki_releases includeArchived / read_release_changelog archive pattern). The archived plan retains phases[].status:'completed' + successCriteria + coverageMatrix, so the existing deriveCriteriaChecklist renders all criteria verified with no UI change. Add a Rust unit test in the existing commands.rs tests module: write a temp .tiki/plans/archive/issue-N.json (no active plan), assert get_plan returns Some with the criteria; and assert active plan wins when both exist.",
+      "verification": [
+        "get_plan returns the archived plan when only plans/archive/issue-N.json exists",
+        "active plans/issue-N.json still takes precedence when both exist",
+        "cargo test --lib passes including the new test"
+      ],
+      "addressesCriteria": ["SC1", "SC4"],
+      "files": ["apps/desktop/src-tauri/src/commands.rs"],
+      "dependencies": [],
+      "completedAt": "2026-05-25T15:36:00.000Z",
+      "summary": "get_plan now reads plans/issue-N.json first and falls back to plans/archive/issue-N.json on Ok(None) — shipped issues' archived plans (which retain phases[].status + successCriteria + coverageMatrix) feed the #257 success-criteria panel, which then renders all-verified instead of empty. Active plan wins when both exist. Added Rust unit test get_plan_falls_back_to_archive_for_shipped_issues (archive-only returns Some; active wins; neither = Ok(None)). cargo --lib 52→53."
+    },
+    {
+      "number": 2,
+      "title": "Auto fitView on load / node-set change",
+      "status": "completed",
+      "content": "In apps/desktop/src/components/dependencies/DependencyGraph.tsx add a useEffect that calls fitView({ padding: 0.2, duration: 300 }) when the node-id set changes. Derive a stable nodeIdSignature = useMemo(nodes.map(n=>n.id).sort().join(','), [nodes]); key the effect on [nodeIdSignature, fitView]. This fits on first populate ('' -> ids) and on release switch (signature changes) but NOT on live status-only updates or hover (node-id set unchanged -> same signature string -> effect skipped), so it never fights a mid-pan user. Wrap the fitView call in requestAnimationFrame so nodes are measured first; cancel on cleanup. Keep the manual Fit View button and the existing fitView prop.",
+      "verification": [
+        "effect keyed on a stable node-id signature, not on the nodes array reference",
+        "graph frames itself on first load and on release switch",
+        "no auto-fit on hover or live status update (signature unchanged)"
+      ],
+      "addressesCriteria": ["SC2", "SC4"],
+      "files": ["apps/desktop/src/components/dependencies/DependencyGraph.tsx"],
+      "dependencies": [],
+      "completedAt": "2026-05-25T15:36:00.000Z",
+      "summary": "Added a useEffect keyed on a stable nodeIdSignature (sorted joined node ids) that calls fitView({padding:0.2,duration:300}) inside requestAnimationFrame. Fires on first populate and release switch (signature changes) but NOT on live status-only updates or hover (same id set → same signature → effect skipped), so it never yanks the viewport mid-pan. Manual Fit View button + existing fitView prop retained. tsc -b clean."
+    },
+    {
+      "number": 3,
+      "title": "Memoize IssueNode to kill hover flicker",
+      "status": "completed",
+      "content": "In apps/desktop/src/components/dependencies/IssueNode.tsx wrap the component in React.memo. On hover the graph re-derives styledNodes (a fresh array with new className per node) but preserves each node's data reference; memoizing IssueNode means className-only changes (lineage/dimmed, applied by ReactFlow on the node WRAPPER) no longer re-render each node's inner JSX, removing the per-hover re-render storm that causes the visible blink. The lineage highlight (pure CSS opacity/box-shadow) still works. INTERACTIVE: final blink-gone confirmation requires tauri:dev.",
+      "verification": [
+        "IssueNode wrapped in React.memo; nodeTypes still defined at module scope",
+        "pnpm build clean (no type regressions)",
+        "lineage highlight logic unchanged"
+      ],
+      "addressesCriteria": ["SC3", "SC4"],
+      "files": ["apps/desktop/src/components/dependencies/IssueNode.tsx"],
+      "dependencies": [],
+      "completedAt": "2026-05-25T15:36:00.000Z",
+      "summary": "Wrapped IssueNode in React.memo (extracted IssueNodeComponent + export const IssueNode = memo(...)). On hover the graph mints a fresh styledNodes array with new per-node className but preserves each node's data ref, so the memoized inner component no longer re-renders on className-only changes — removing the per-hover re-render storm behind the blink. Lineage/dimmed highlight is pure-CSS on the wrapper, unchanged. tsc -b clean. SC3 blink-gone is VISUAL — needs user tauri:dev confirmation."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [1],
+    "SC2": [2],
+    "SC3": [3],
+    "SC4": [1, 2, 3]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-25T15:32:05.000Z"
+}

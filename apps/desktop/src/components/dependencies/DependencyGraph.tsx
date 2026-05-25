@@ -191,6 +191,24 @@ function DependencyGraphInner() {
     fitView({ padding: 0.2, duration: 300 });
   }, [fitView]);
 
+  // Auto-fit when the node-id SET changes (#266): first populate, release
+  // switch, or issues added/removed. Keyed on a stable signature of sorted node
+  // ids — NOT the `nodes` array reference — so live status-only updates and
+  // hover restyling (which mint new array refs but keep the same id set) don't
+  // yank the viewport out from under a user who is panning. rAF defers the fit
+  // until React Flow has measured the freshly-rendered nodes.
+  const nodeIdSignature = useMemo(
+    () => nodes.map((n) => n.id).sort().join(','),
+    [nodes]
+  );
+  useEffect(() => {
+    if (!nodeIdSignature) return; // no nodes yet
+    const raf = requestAnimationFrame(() => {
+      fitView({ padding: 0.2, duration: 300 });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [nodeIdSignature, fitView]);
+
   // No releases at all
   if (releases.length === 0) {
     return (
