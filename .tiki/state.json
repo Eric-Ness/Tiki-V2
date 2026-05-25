@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 261,
-      "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health",
-      "completedAt": "2026-05-24T23:49:20.748Z"
+      "number": 262,
+      "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report",
+      "completedAt": "2026-05-25T01:52:23.060Z"
     },
     "lastCompletedRelease": {
       "version": "v0.8.2",
@@ -16,6 +16,11 @@
       "tag": "v0.8.2"
     },
     "recentIssues": [
+      {
+        "number": 262,
+        "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report",
+        "completedAt": "2026-05-25T01:52:23.060Z"
+      },
       {
         "number": 261,
         "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health",
