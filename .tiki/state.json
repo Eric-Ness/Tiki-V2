@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 263,
-      "title": "Perf: cut desktop cold-start — code-split the ~1.5MB bundle",
-      "completedAt": "2026-05-25T14:10:51.146Z"
+      "number": 264,
+      "title": "Perf: reduce terminal typing/output latency",
+      "completedAt": "2026-05-25T14:19:35.581Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.0",
@@ -17,6 +17,11 @@
       "tag": "v0.9.0"
     },
     "recentIssues": [
+      {
+        "number": 264,
+        "title": "Perf: reduce terminal typing/output latency",
+        "completedAt": "2026-05-25T14:19:35.581Z"
+      },
       {
         "number": 263,
         "title": "Perf: cut desktop cold-start — code-split the ~1.5MB bundle",
