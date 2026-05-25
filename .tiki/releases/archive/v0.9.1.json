@@ -1,6 +1,6 @@
 {
   "version": "v0.9.1",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 263,
@@ -11,5 +11,7 @@
       "title": "Perf: reduce terminal typing/output latency — singleton terminal-output listener + reader sleep floor"
     }
   ],
-  "createdAt": "2026-05-25T14:20:00.000Z"
+  "createdAt": "2026-05-25T14:20:00.000Z",
+  "shipped": true,
+  "completedAt": "2026-05-25T14:23:22.992Z"
 }
