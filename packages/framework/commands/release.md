@@ -824,6 +824,12 @@ After all issues complete and changelog is approved, ship the release:
    cp .tiki/state.json ".tiki/backups/state.$(date -u +%Y-%m-%dT%H-%M-%S).json"
    ```
 
+   **Release-readiness gate (#265) — REQUIRED, run AFTER version-bump + changelog, BEFORE tagging:**
+   ```bash
+   node scripts/check-release-readiness.mjs {version}
+   ```
+   If this exits non-zero, **HALT** — do NOT tag or push. The gate verifies every release issue has an archived + `audited` plan and is in `history.recentIssues`, version parity across the 5 version files, a `{version}-changelog.md`, and zero reconcile drift. Surface the failures, fix them, and re-run. (CI also runs this gate in `release.yml`'s pre-deploy job, so a release that skips it locally still cannot build installers.)
+
 3. **Create git tag**
    ```bash
    git tag -a {version} -m "Release {version}"
