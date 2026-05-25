@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 262,
-      "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report",
-      "completedAt": "2026-05-25T01:52:23.060Z"
+      "number": 263,
+      "title": "Perf: cut desktop cold-start — code-split the ~1.5MB bundle",
+      "completedAt": "2026-05-25T14:10:51.146Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.0",
@@ -17,6 +17,11 @@
       "tag": "v0.9.0"
     },
     "recentIssues": [
+      {
+        "number": 263,
+        "title": "Perf: cut desktop cold-start — code-split the ~1.5MB bundle",
+        "completedAt": "2026-05-25T14:10:51.146Z"
+      },
       {
         "number": 262,
         "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report",

@@ -1,6 +1,6 @@
 {
   "version": "v0.9.0",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 261,
@@ -11,5 +11,7 @@
       "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report"
     }
   ],
-  "createdAt": "2026-05-24T22:27:37.746Z"
+  "createdAt": "2026-05-24T22:27:37.746Z",
+  "shipped": true,
+  "completedAt": "2026-05-25T12:36:53.676Z"
 }
