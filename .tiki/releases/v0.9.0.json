@@ -1,0 +1,15 @@
+{
+  "version": "v0.9.0",
+  "status": "active",
+  "issues": [
+    {
+      "number": 261,
+      "title": "Tiki Doctor (backend): tiki_doctor command — surface .tiki workspace health (state, release drift, reconciler hook)"
+    },
+    {
+      "number": 262,
+      "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report"
+    }
+  ],
+  "createdAt": "2026-05-24T22:27:37.746Z"
+}
