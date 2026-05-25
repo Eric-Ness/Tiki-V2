@@ -46,3 +46,27 @@ Desktop does **not** import `@tiki/shared` at runtime — mirror `DiagnosticsRep
 as a local TS type (same pattern as `deriveCriteriaVerification`, release types).
 Pure `diagnosticsSummary.ts` reduces report → `healthy | warnings` + findings list,
 unit-tested with vitest; panel handles loading/error/empty.
+
+## 2026-05-24 findings (#262 review)
+
+**Template:** `WorkflowConfigSection.tsx` is a near-exact analog — copy its shape:
+- `tikiPath = activeProject ? \`${activeProject.path}/.tiki\` : undefined` via `useProjectsStore((s) => s.getActiveProject())`.
+- `invoke<DiagnosticsReport>("tiki_doctor", { tikiPath })` inside a `useCallback load()` with `loading`/`loadError` state + `useEffect(() => void load(), [load])`. The **Refresh button just calls `load()` again** — no new mechanism.
+- Markup reuses existing CSS classes: `settings-section`, `settings-section-header` (`<h3>` + button), `settings-hint`, `settings-row`. No new global CSS needed beyond panel-specific bits.
+
+**File placement (matches repo conventions):**
+- Pure helper → `apps/desktop/src/utils/diagnosticsSummary.ts`; test → `apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts` (mirrors `criteriaVerification.ts` + its test).
+- Component → `apps/desktop/src/components/settings/DiagnosticsPanel.tsx` (+ `.css`); **export from the `index.ts` barrel** (currently exports `SettingsPage`, `WorkflowConfigSection`).
+- Mount in `SettingsPage.tsx` next to `<WorkflowConfigSection />` (line 256).
+
+**Frontend `DiagnosticsReport` mirror (camelCase, matches Rust serde):**
+`{ frameworkVersion: string | null; stateValid: boolean; schemaVersion: number | null; activeWorkCount: number; releaseChecks: { version: string; location: "active" | "archive"; status: string; archivedButActive: boolean }[]; recentReleasesMissingJson: string[]; reconcilerHookInstalled: boolean }`
+
+**KEY DECISION — `archivedButActive` is NOT a warning.** It is `true` for ALL ~38 archived releases by design. `diagnosticsSummary` must flip top-level `status` to `"warnings"` ONLY for genuine drift:
+- `stateValid === false` (serious)
+- `recentReleasesMissingJson.length > 0` (history↔JSON parity gap)
+- `reconcilerHookInstalled === false` (config gap)
+
+`archivedButActive` may appear as an **informational/neutral** finding (e.g. "N archived releases retain an 'active' status (expected)") but must not, by itself, make the panel show warnings. Encode this in the vitest: a report whose only "issue" is archivedButActive must summarize to `healthy`.
+
+**Visual SC caveat:** the running installed v0.8.2 binary lacks `tiki_doctor` — the user must verify via `pnpm tauri:dev` (which rebuilds the Rust backend from source, so the command IS present there), NOT the installed app.

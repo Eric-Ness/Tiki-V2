@@ -9,6 +9,7 @@ import {
   type NotificationSettings,
 } from "../../stores";
 import { WorkflowConfigSection } from "./WorkflowConfigSection";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import "./SettingsPage.css";
 
 export function SettingsPage() {
@@ -254,6 +255,9 @@ export function SettingsPage() {
 
         {/* Workflow Config (.tiki/config.json) */}
         <WorkflowConfigSection />
+
+        {/* Diagnostics (read-only .tiki/ health via tiki_doctor) */}
+        <DiagnosticsPanel />
 
         {/* GitHub */}
         <div className="settings-section">

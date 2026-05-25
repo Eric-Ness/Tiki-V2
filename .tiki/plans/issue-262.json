@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 262,
+    "title": "Tiki Doctor (UI): Settings → Diagnostics panel rendering the tiki_doctor report",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/262"
+  },
+  "createdAt": "2026-05-24T23:55:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "diagnosticsSummary returns 'healthy' for a clean report and 'warnings' when a genuine finding (stateInvalid / missing-JSON / hook-absent) exists; archivedButActive alone stays healthy (vitest)",
+      "verified": true,
+      "verifiedAt": "2026-05-25T01:37:15.366Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "The panel renders each finding with a clear pass/warn indicator",
+      "verified": true,
+      "verifiedAt": "2026-05-25T01:40:15.645Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Refresh re-invokes tiki_doctor and updates the view; loading and error states are handled",
+      "verified": true,
+      "verifiedAt": "2026-05-25T01:40:15.645Z"
+    },
+    {
+      "id": "SC4",
+      "category": "quality",
+      "description": "pnpm build (tsc -b) and pnpm -C apps/desktop test are clean",
+      "verified": true,
+      "verifiedAt": "2026-05-25T01:43:37.424Z"
+    },
+    {
+      "id": "SC5",
+      "category": "visual",
+      "description": "The panel appears under Settings → Diagnostics in tauri:dev",
+      "verified": false,
+      "note": "code-complete; awaiting visual confirmation in tauri:dev"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Frontend DiagnosticsReport type + diagnosticsSummary helper + vitest",
+      "status": "completed",
+      "content": "Create apps/desktop/src/utils/diagnosticsSummary.ts. First declare a local TS type DiagnosticsReport mirroring the Rust struct's camelCase serialization EXACTLY (the desktop does not import @tiki/shared at runtime): { frameworkVersion: string | null; stateValid: boolean; schemaVersion: number | null; activeWorkCount: number; releaseChecks: ReleaseCheck[]; recentReleasesMissingJson: string[]; reconcilerHookInstalled: boolean } where ReleaseCheck = { version: string; location: 'active' | 'archive'; status: string; archivedButActive: boolean }. Export both types.\n\nThen export a pure function diagnosticsSummary(report: DiagnosticsReport): DiagnosticsSummary where DiagnosticsSummary = { status: 'healthy' | 'warnings'; findings: Finding[] } and Finding = { level: 'pass' | 'warn' | 'info'; message: string }. Rules (decided in review):\n- WARNINGS (flip status to 'warnings'): stateValid === false -> warn 'state.json is invalid'; recentReleasesMissingJson.length > 0 -> warn 'N release(s) in history have no definition file: <list>'; reconcilerHookInstalled === false -> warn 'Reconciler hook not installed'.\n- INFO (must NOT flip status): the count of releaseChecks with archivedButActive === true -> info 'N archived release(s) retain an \"active\" status (expected)'. This is the normal resting state for shipped releases and must never make the panel show warnings.\n- PASS rows for the healthy dimensions (framework version present, state valid, hook installed) so the panel can render positives too.\nstatus is 'warnings' iff at least one finding has level 'warn', else 'healthy'.\n\nAdd apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts (vitest, mirrors criteriaVerification.test.ts). Cover: (a) a fully clean report -> 'healthy'; (b) a report whose ONLY anomaly is archivedButActive -> still 'healthy' (the key regression guard); (c) missing-JSON -> 'warnings'; (d) hook absent -> 'warnings'; (e) stateValid false -> 'warnings'.",
+      "verification": [
+        "diagnosticsSummary.ts exports DiagnosticsReport, ReleaseCheck, DiagnosticsSummary types + the pure function",
+        "archivedButActive-only report summarizes to 'healthy' (regression guard test passes)",
+        "missing-JSON / hook-absent / invalid-state reports summarize to 'warnings'",
+        "pnpm -C apps/desktop test passes (new diagnosticsSummary.test.ts green)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/utils/diagnosticsSummary.ts",
+        "apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-25T01:37:15.366Z",
+      "summary": "Added apps/desktop/src/utils/diagnosticsSummary.ts: local DiagnosticsReport/ReleaseCheck mirror types + pure diagnosticsSummary() (warnings only for invalid-state/missing-JSON/hook-absent; archivedButActive is neutral info). 6 vitest cases pass incl. the archivedButActive-only -> healthy guard."
+    },
+    {
+      "number": 2,
+      "title": "DiagnosticsPanel component (invoke + loading/error/empty + findings + Refresh)",
+      "status": "completed",
+      "content": "Create apps/desktop/src/components/settings/DiagnosticsPanel.tsx (+ DiagnosticsPanel.css). Follow WorkflowConfigSection.tsx as the template:\n- tikiPath = activeProject ? `${activeProject.path}/.tiki` : undefined via useProjectsStore((s) => s.getActiveProject()).\n- load = useCallback(async () => { setLoading; setError(null); try { const report = await invoke<DiagnosticsReport>('tiki_doctor', { tikiPath }); setReport(report); } catch (e) { setError(String(e)); } finally { setLoading(false); } }, [tikiPath]); useEffect(() => void load(), [load]).\n- Render inside <div className='settings-section'> with a settings-section-header (<h3>Diagnostics</h3> + a Refresh button that calls load(), disabled while loading).\n- Compute summary = report ? diagnosticsSummary(report) : null and render each finding row with a pass/warn/info indicator (e.g. ✅ / ⚠️ / ℹ️ or CSS dots), plus the headline fields (frameworkVersion, schemaVersion, activeWorkCount).\n- Handle the three states explicitly: loading ('Loading…'), error (the error string in a settings-hint), and empty/no-active-project (a hint telling the user to open a project).\nImport DiagnosticsReport + diagnosticsSummary from ../../utils/diagnosticsSummary. Keep all data via props/local state + the store selector (no fresh-ref-returning Zustand selector — avoid the #210/#212 render-loop class). New CSS lives in DiagnosticsPanel.css for panel-specific bits; reuse settings-* classes otherwise.",
+      "verification": [
+        "DiagnosticsPanel.tsx invokes tiki_doctor with tikiPath and renders findings via diagnosticsSummary",
+        "loading, error, and empty/no-project states each render distinctly",
+        "Refresh button calls load() again",
+        "pnpm build (tsc -b) clean — component type-checks"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/settings/DiagnosticsPanel.tsx",
+        "apps/desktop/src/components/settings/DiagnosticsPanel.css"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-05-25T01:40:15.645Z",
+      "summary": "Added DiagnosticsPanel.tsx (+css): invoke<DiagnosticsReport>(tiki_doctor,{tikiPath}) via WorkflowConfigSection template; loading/error/no-project states; findings rows (warn/info/pass icons) + meta line; Refresh re-runs load(); warnings badge on header. tsc -b clean."
+    },
+    {
+      "number": 3,
+      "title": "Mount under Settings + warnings badge + tauri:dev spot check",
+      "status": "completed",
+      "content": "Export DiagnosticsPanel from apps/desktop/src/components/settings/index.ts (alongside SettingsPage, WorkflowConfigSection). Mount <DiagnosticsPanel /> in apps/desktop/src/components/settings/SettingsPage.tsx next to <WorkflowConfigSection /> (around line 256), as its own Diagnostics section. Optionally surface a small 'warnings' badge on the section header when summary.status === 'warnings' (the panel can own this, or the header can read it) — keep it simple. Final gate: pnpm build (tsc -b, the strict workspace gate) and pnpm -C apps/desktop test must be clean. Then the VISUAL check (SC5): the user runs pnpm tauri:dev (which rebuilds the Rust backend from source so tiki_doctor is present — the installed v0.8.2 binary does NOT have it) and confirms the Diagnostics panel renders under Settings, shows the live report, and Refresh works. This visual SC cannot be auto-verified.",
+      "verification": [
+        "DiagnosticsPanel exported from index.ts barrel",
+        "<DiagnosticsPanel /> mounted in SettingsPage.tsx",
+        "pnpm build (tsc -b) clean",
+        "pnpm -C apps/desktop test clean",
+        "(visual, user) panel renders under Settings → Diagnostics in tauri:dev with a live report + working Refresh"
+      ],
+      "addressesCriteria": [
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/settings/SettingsPage.tsx",
+        "apps/desktop/src/components/settings/index.ts"
+      ],
+      "dependencies": [
+        2
+      ],
+      "completedAt": "2026-05-25T01:43:37.424Z",
+      "summary": "Exported DiagnosticsPanel from index.ts barrel + mounted <DiagnosticsPanel/> in SettingsPage.tsx (after WorkflowConfigSection) with import. Final gate: pnpm build (full tsc -b) clean; desktop vitest 208 passed (30 files). SC5 (visual panel in tauri:dev) code-complete but awaits user visual confirmation."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2,
+      3
+    ],
+    "SC5": [
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-25T01:34:44.698Z"
+}

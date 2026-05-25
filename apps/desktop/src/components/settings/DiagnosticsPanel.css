@@ -1,0 +1,66 @@
+/* Settings → Diagnostics panel (#262). Reuses the global settings-* classes for
+   the section frame; these rules cover only the diagnostics-specific bits. */
+
+.diagnostics-badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--warning-color);
+  border: 1px solid var(--warning-color);
+  vertical-align: middle;
+}
+
+.diagnostics-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.diagnostics-meta code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.diagnostics-findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.diagnostics-finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.diagnostics-icon {
+  flex: 0 0 auto;
+}
+
+.diagnostics-warn {
+  color: var(--warning-color);
+}
+
+.diagnostics-info {
+  color: var(--text-secondary);
+}
+
+.diagnostics-pass {
+  color: var(--text-secondary);
+}
+
+.diagnostics-error {
+  color: var(--error-color);
+}

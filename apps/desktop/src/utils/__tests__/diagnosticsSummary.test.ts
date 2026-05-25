@@ -1,0 +1,81 @@
+import { describe, it, expect } from "vitest";
+import {
+  diagnosticsSummary,
+  type DiagnosticsReport,
+} from "../diagnosticsSummary";
+
+/** A fully healthy report; tests override single fields to isolate each rule. */
+function cleanReport(overrides: Partial<DiagnosticsReport> = {}): DiagnosticsReport {
+  return {
+    frameworkVersion: "0.9.0",
+    stateValid: true,
+    schemaVersion: 1,
+    activeWorkCount: 0,
+    releaseChecks: [
+      { version: "v0.9.0", location: "active", status: "active", archivedButActive: false },
+    ],
+    recentReleasesMissingJson: [],
+    reconcilerHookInstalled: true,
+    ...overrides,
+  };
+}
+
+describe("diagnosticsSummary", () => {
+  it("returns 'healthy' for a fully clean report", () => {
+    const s = diagnosticsSummary(cleanReport());
+    expect(s.status).toBe("healthy");
+    expect(s.findings.some((f) => f.level === "warn")).toBe(false);
+  });
+
+  it("stays 'healthy' when the ONLY anomaly is archivedButActive (regression guard)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        releaseChecks: [
+          { version: "v0.8.2", location: "archive", status: "active", archivedButActive: true },
+          { version: "v0.8.1", location: "archive", status: "active", archivedButActive: true },
+        ],
+      })
+    );
+    expect(s.status).toBe("healthy");
+    // ...and it is surfaced as an informational finding, not a warning.
+    const info = s.findings.find((f) => f.level === "info" && f.message.includes("archived"));
+    expect(info).toBeDefined();
+    expect(info?.message).toContain("2");
+  });
+
+  it("returns 'warnings' when recentReleasesMissingJson is non-empty", () => {
+    const s = diagnosticsSummary(
+      cleanReport({ recentReleasesMissingJson: ["v0.7.8", "v0.6.7"] })
+    );
+    expect(s.status).toBe("warnings");
+    const warn = s.findings.find((f) => f.level === "warn" && f.message.includes("definition file"));
+    expect(warn?.message).toContain("v0.7.8");
+  });
+
+  it("returns 'warnings' when the reconciler hook is absent", () => {
+    const s = diagnosticsSummary(cleanReport({ reconcilerHookInstalled: false }));
+    expect(s.status).toBe("warnings");
+    expect(s.findings.some((f) => f.level === "warn" && f.message.includes("Reconciler"))).toBe(true);
+  });
+
+  it("returns 'warnings' when state.json is invalid", () => {
+    const s = diagnosticsSummary(cleanReport({ stateValid: false }));
+    expect(s.status).toBe("warnings");
+    expect(s.findings.some((f) => f.level === "warn" && f.message.includes("state.json"))).toBe(true);
+  });
+
+  it("orders findings warnings → info → pass", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        reconcilerHookInstalled: false,
+        releaseChecks: [
+          { version: "v0.8.2", location: "archive", status: "active", archivedButActive: true },
+        ],
+      })
+    );
+    const levels = s.findings.map((f) => f.level);
+    const firstPass = levels.indexOf("pass");
+    const lastWarn = levels.lastIndexOf("warn");
+    expect(lastWarn).toBeLessThan(firstPass);
+  });
+});
