@@ -246,7 +246,10 @@ pub fn start_output_reader(
         let mut pending = String::new();
         let mut last_flush = std::time::Instant::now();
         let mut was_stopped = false;
-        const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(10);
+        // Coalesce window. Short enough that keystroke echo / shell prompts feel
+        // immediate (~4ms floor), but the 64KB size threshold below still bounds
+        // IPC volume during bursts (tab-completion, file dumps). See #264.
+        const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(4);
         const FLUSH_SIZE_BYTES: usize = 64 * 1024;
 
         loop {
@@ -347,8 +350,12 @@ pub fn start_output_reader(
 
             // Only sleep on WouldBlock — non-WouldBlock iterations loop immediately
             // to drain large bursts (tab completion, file dumps) as fast as possible.
+            // Adaptive nap (#264): a short 2ms when bytes are still pending (the next
+            // flush is imminent — keep echo latency low) vs 8ms when truly idle (keep
+            // idle CPU low instead of busy-spinning).
             if is_would_block {
-                std::thread::sleep(std::time::Duration::from_millis(10));
+                let nap = if pending.is_empty() { 8 } else { 2 };
+                std::thread::sleep(std::time::Duration::from_millis(nap));
             }
         }
 

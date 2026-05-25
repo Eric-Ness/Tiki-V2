@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 
 // Types matching Rust backend events
 export interface TerminalOutputEvent {
@@ -33,6 +33,32 @@ export interface UseTerminalReturn {
 
 let terminalCounter = 0;
 
+// Single process-wide terminal-output/terminal-exit listeners (#264). Each
+// useTerminal registers its callbacks in this map keyed by terminal id; the two
+// global listeners dispatch each event to the one matching terminal. Replaces the
+// previous per-terminal `listen()` pair, so one PTY output event wakes ONE
+// callback instead of all N open terminals' listeners.
+interface TerminalCallbacks {
+  onOutput?: (data: string) => void;
+  onExit?: (exitCode: number | null) => void;
+}
+const terminalCallbacks = new Map<string, TerminalCallbacks>();
+let globalListeners: Promise<void> | null = null;
+
+function ensureGlobalTerminalListeners(): Promise<void> {
+  if (!globalListeners) {
+    globalListeners = (async () => {
+      await listen<TerminalOutputEvent>("terminal-output", (event) => {
+        terminalCallbacks.get(event.payload.id)?.onOutput?.(event.payload.data);
+      });
+      await listen<TerminalExitEvent>("terminal-exit", (event) => {
+        terminalCallbacks.get(event.payload.id)?.onExit?.(event.payload.exitCode);
+      });
+    })();
+  }
+  return globalListeners;
+}
+
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
   const { onOutput, onExit, shell, cwd, externalId } = options;
 
@@ -46,9 +72,6 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   onOutputRef.current = onOutput;
   onExitRef.current = onExit;
 
-  // Store unlisten functions for cleanup
-  const unlistenOutputRef = useRef<UnlistenFn | null>(null);
-  const unlistenExitRef = useRef<UnlistenFn | null>(null);
   const currentIdRef = useRef<string | null>(null);
 
   // Create a new terminal session
@@ -60,25 +83,17 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       const id = externalId ?? `terminal-${Date.now()}-${++terminalCounter}`;
       currentIdRef.current = id;
 
-      // Set up event listeners before creating terminal
-      unlistenOutputRef.current = await listen<TerminalOutputEvent>(
-        "terminal-output",
-        (event) => {
-          if (event.payload.id === currentIdRef.current) {
-            onOutputRef.current?.(event.payload.data);
-          }
-        }
-      );
-
-      unlistenExitRef.current = await listen<TerminalExitEvent>(
-        "terminal-exit",
-        (event) => {
-          if (event.payload.id === currentIdRef.current) {
-            setIsConnected(false);
-            onExitRef.current?.(event.payload.exitCode);
-          }
-        }
-      );
+      // Register this terminal's callbacks with the shared listener before
+      // creating the session (#264). The wrappers read the refs so callbacks
+      // stay live without re-registering.
+      await ensureGlobalTerminalListeners();
+      terminalCallbacks.set(id, {
+        onOutput: (data) => onOutputRef.current?.(data),
+        onExit: (exitCode) => {
+          setIsConnected(false);
+          onExitRef.current?.(exitCode);
+        },
+      });
 
       // Create the terminal session
       await invoke("create_terminal", {
@@ -94,11 +109,8 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       setError(message);
       setIsConnected(false);
 
-      // Clean up listeners on error
-      unlistenOutputRef.current?.();
-      unlistenExitRef.current?.();
-      unlistenOutputRef.current = null;
-      unlistenExitRef.current = null;
+      // Unregister this terminal's callbacks on error (id is try-scoped; use the ref).
+      if (currentIdRef.current) terminalCallbacks.delete(currentIdRef.current);
     }
   }, [shell, cwd, externalId]);
 
@@ -144,11 +156,8 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       return;
     }
 
-    // Clean up listeners first
-    unlistenOutputRef.current?.();
-    unlistenExitRef.current?.();
-    unlistenOutputRef.current = null;
-    unlistenExitRef.current = null;
+    // Unregister this terminal's callbacks from the shared listener first.
+    terminalCallbacks.delete(id);
 
     try {
       await invoke("destroy_terminal", { id });
@@ -168,13 +177,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       // Async cleanup - fire and forget
       const id = currentIdRef.current;
       if (id) {
+        terminalCallbacks.delete(id);
         invoke("destroy_terminal", { id }).catch(() => {
           // Ignore cleanup errors
         });
       }
-
-      unlistenOutputRef.current?.();
-      unlistenExitRef.current?.();
     };
   }, []);
 

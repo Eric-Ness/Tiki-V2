@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 264,
+    "title": "Perf: reduce terminal typing/output latency — singleton terminal-output listener + reader sleep floor",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/264"
+  },
+  "createdAt": "2026-05-25T14:40:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "A single process-wide terminal-output/terminal-exit listener dispatches to all terminals by id; no per-terminal listen() calls remain in useTerminal",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:18:57.146Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "No dropped, reordered, or duplicated terminal bytes (dispatch is by exact id; single in-order listener)",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:18:57.146Z"
+    },
+    {
+      "id": "SC3",
+      "category": "performance",
+      "description": "Idle CPU does not regress — the reader does not busy-spin (idle sleep stays modest; short sleep only while bytes are pending)",
+      "verified": false,
+      "note": "design avoids busy-spin (idle 8ms); idle-CPU confirmation pending tauri:dev"
+    },
+    {
+      "id": "SC4",
+      "category": "quality",
+      "description": "pnpm build + pnpm -C apps/desktop test + cargo test --lib clean",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:18:57.146Z"
+    },
+    {
+      "id": "SC5",
+      "category": "visual",
+      "description": "Typing and heavy output feel snappier in tauri:dev (user-confirmed)",
+      "verified": false,
+      "note": "code-complete; interactive snappiness pending tauri:dev"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Singleton terminal-output/exit listener with id dispatch map",
+      "status": "completed",
+      "content": "In apps/desktop/src/components/terminal/useTerminal.ts, replace the PER-INSTANCE `listen(\"terminal-output\", …)` / `listen(\"terminal-exit\", …)` (currently registered in createTerminal, lines ~64-81) with a SINGLE process-wide listener pair plus a `Map<id, callbacks>` dispatch table at MODULE scope.\n\nDesign:\n- Module scope: `type TerminalCallbacks = { onOutput?: (d: string) => void; onExit?: (c: number | null) => void }`; `const terminalCallbacks = new Map<string, TerminalCallbacks>()`; lazy init guard `let globalListeners: Promise<void> | null = null`.\n- `async function ensureGlobalTerminalListeners()`: if `globalListeners` is set, return it; else assign a promise that does `listen<TerminalOutputEvent>(\"terminal-output\", (e) => terminalCallbacks.get(e.payload.id)?.onOutput?.(e.payload.data))` and the same for `terminal-exit` → `?.onExit?.(e.payload.exitCode)`. Keep the unlisten fns module-scoped; the global listeners live for the app lifetime (do NOT unlisten per terminal).\n- In `createTerminal`: `await ensureGlobalTerminalListeners()` BEFORE `invoke(\"create_terminal\")`, then `terminalCallbacks.set(id, { onOutput: (d) => onOutputRef.current?.(d), onExit: (c) => { setIsConnected(false); onExitRef.current?.(c); } })`. (The wrapper reads the refs so callbacks stay live without re-registering.)\n- In `destroyTerminal` and the unmount cleanup effect: replace the per-instance unlisten calls with `terminalCallbacks.delete(currentIdRef.current)` (guard for null). Remove `unlistenOutputRef`/`unlistenExitRef` (no longer needed) or leave them unused-and-removed.\n- Preserve all existing behavior: id filtering (now via map key), isConnected on exit, error handling.\n\nThis cuts N×M listener wake-ups (every output event waking all N terminals' listeners) to 1×M. Dispatch is by exact id and a single listener processes events in order, so no byte drop/reorder.",
+      "verification": [
+        "no per-terminal listen() calls remain in useTerminal.ts; a single module-level listener pair dispatches via terminalCallbacks Map",
+        "createTerminal registers id->callbacks; destroy/unmount deletes the map entry",
+        "tsc -b clean; pnpm -C apps/desktop test clean",
+        "id filtering + isConnected-on-exit behavior preserved"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/components/terminal/useTerminal.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-25T14:16:11.347Z",
+      "summary": "useTerminal.ts: replaced per-terminal listen(terminal-output/exit) with a single module-level listener pair + terminalCallbacks Map<id,{onOutput,onExit}>. ensureGlobalTerminalListeners() lazily registers once (app-lifetime); createTerminal sets map entry (ref-reading wrappers), destroy/unmount/error delete it. Removed UnlistenFn import + unlisten refs. N×M wake-ups -> 1×M. Verified at combined gate."
+    },
+    {
+      "number": 2,
+      "title": "Reduce PTY reader latency floor (adaptive sleep + shorter flush) + final gate",
+      "status": "completed",
+      "content": "In apps/desktop/src-tauri/src/terminal/pty.rs reader loop (around lines 244-352): the echo-latency floor is FLUSH_INTERVAL (10ms) plus the 10ms WouldBlock sleep. Reduce both, carefully, WITHOUT busy-spin:\n- Lower `FLUSH_INTERVAL` from 10ms to ~4ms (the 64KB FLUSH_SIZE_BYTES still bounds IPC volume during bursts, so coalescing during tab-completion/file-dumps is preserved).\n- Replace the fixed 10ms WouldBlock sleep (line ~351) with an ADAPTIVE nap: short (~2ms) when `!pending.is_empty()` (bytes are waiting for the next flush — keep latency low), longer (~8ms) when truly idle (`pending.is_empty()` — keep idle CPU low). e.g. `let nap = if pending.is_empty() { 8 } else { 2 }; std::thread::sleep(Duration::from_millis(nap));`\n- Do NOT change the UTF-8 leftover handling, the flush-before-sleep ordering, the size-threshold flush, or the stop-signal/EOF logic — only the two timing constants/expression.\n\nThis drops the keystroke-echo floor from ~10-20ms to ~4-6ms while keeping an idle reader at ~125 wakeups/sec (8ms) rather than spinning. Final gate: `pnpm build` clean, `pnpm -C apps/desktop test` clean, `cargo test --lib` clean (use --lib to dodge the running-app exe lock). SC5 (typing/output feels snappier) is interactive — user-verified in tauri:dev.",
+      "verification": [
+        "FLUSH_INTERVAL reduced (~4ms); WouldBlock sleep is adaptive (short when pending, longer when idle)",
+        "UTF-8 leftover / flush-before-sleep / size-threshold / EOF / stop-signal logic unchanged",
+        "cargo test --lib clean; pnpm build clean; pnpm -C apps/desktop test clean",
+        "(visual/interactive, user) typing + heavy output feel snappier in tauri:dev; idle CPU not noticeably higher"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3",
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/terminal/pty.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-25T14:18:57.146Z",
+      "summary": "pty.rs reader: FLUSH_INTERVAL 10ms->4ms; WouldBlock sleep replaced with adaptive nap (2ms while pending, 8ms idle). UTF-8/flush-before-sleep/size-threshold/EOF/stop logic untouched. Echo floor ~10-20ms -> ~4-6ms; idle ~125 wakeups/sec (no spin). Gate: cargo test --lib 52, pnpm build clean, desktop vitest 208. Also fixed a try-scoped id ref in phase-1 catch (caught by gate)."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1,
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2
+    ],
+    "SC5": [
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-25T14:14:56.907Z"
+}
