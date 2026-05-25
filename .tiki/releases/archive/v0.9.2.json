@@ -1,0 +1,14 @@
+{
+  "version": "v0.9.2",
+  "status": "shipped",
+  "shipped": true,
+  "issues": [
+    {
+      "number": 266,
+      "title": "Dependency graph UX papercuts: auto-fit, node hover flicker, criteria vanish after completion"
+    }
+  ],
+  "createdAt": "2026-05-25T15:25:08.586Z",
+  "completedAt": "2026-05-25T15:43:22.700Z",
+  "archived": true
+}
