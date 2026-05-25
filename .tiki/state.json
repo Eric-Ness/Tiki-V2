@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 264,
-      "title": "Perf: reduce terminal typing/output latency",
-      "completedAt": "2026-05-25T14:19:35.581Z"
+      "number": 265,
+      "title": "Release gate: check-release-readiness.mjs",
+      "completedAt": "2026-05-25T15:05:09.531Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.1",
@@ -17,6 +17,11 @@
       "tag": "v0.9.1"
     },
     "recentIssues": [
+      {
+        "number": 265,
+        "title": "Release gate: check-release-readiness.mjs",
+        "completedAt": "2026-05-25T15:05:09.531Z"
+      },
       {
         "number": 264,
         "title": "Perf: reduce terminal typing/output latency",
