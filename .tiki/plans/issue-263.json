@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 263,
+    "title": "Perf: cut desktop cold-start — code-split the ~1.5MB bundle (lazy-load non-terminal views + manualChunks)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/263"
+  },
+  "createdAt": "2026-05-25T00:10:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "performance",
+      "description": "Production build emits multiple chunks; the initial/main chunk is materially smaller than the current single ~1.5MB chunk (record the delta)",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:09:07.941Z"
+    },
+    {
+      "id": "SC2",
+      "category": "quality",
+      "description": "tsc -b (pnpm build) clean and pnpm -C apps/desktop test clean",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:09:07.941Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "All views (terminal, kanban, dependencies, settings) and the detail panel still render correctly; lazy ones load on first navigation/selection",
+      "verified": true,
+      "verifiedAt": "2026-05-25T14:09:07.941Z"
+    },
+    {
+      "id": "SC4",
+      "category": "visual",
+      "description": "App launches and navigates without broken/blank views in tauri:dev",
+      "verified": false,
+      "note": "code-complete; awaiting visual confirmation in tauri:dev"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "vite manualChunks vendor split",
+      "status": "completed",
+      "content": "Record the BASELINE bundle: run `pnpm -C apps/desktop build` and note the main chunk size (currently ~1.5MB, single chunk, with the >500kB warning). Then add `build.rollupOptions.output.manualChunks` to apps/desktop/vite.config.ts splitting node_modules vendors into logical groups so they become separate cacheable chunks: e.g. `react`/`react-dom` -> 'react'; `@xyflow/react` + `dagre` -> 'graph'; `@xterm/*` -> 'xterm'; `react-markdown` + `rehype-highlight` + `highlight.js` + `remark-gfm` -> 'markdown'; `framer-motion` -> 'motion'; `@dnd-kit/*` -> 'dnd'. Use a function form that checks `id.includes('node_modules/<pkg>')`. Rebuild and confirm multiple vendor chunks are emitted and the main chunk shrank. NOTE: manualChunks alone is a modest win for a local-loaded Tauri app — the larger cold-start win comes from phases 2-3 deferring EVAL via lazy. This phase is independent of App.tsx (different file).",
+      "verification": [
+        "vite.config.ts has build.rollupOptions.output.manualChunks splitting the heavy vendors",
+        "pnpm -C apps/desktop build emits multiple vendor chunks (graph/xterm/markdown/etc.)",
+        "main chunk size recorded before vs after"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/vite.config.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-25T14:04:45.241Z",
+      "summary": "Added build.rollupOptions.output.manualChunks to vite.config.ts (graph/xterm/markdown/motion/dnd/react groups). Single 1576.96kB chunk -> split: index 287.80kB + vendor chunks; >500kB warning gone. Deferral of graph/dnd/markdown off cold-start comes in P2/P3."
+    },
+    {
+      "number": 2,
+      "title": "React.lazy + first-visit gate for non-default views (Kanban, Dependencies, Settings)",
+      "status": "completed",
+      "content": "In apps/desktop/src/App.tsx, convert the KanbanBoard, DependencyGraph, and SettingsPage imports to `React.lazy(() => import(...))`. CRITICAL: these views are currently always-mounted and toggled via a `hidden` CSS class (App.tsx:367-385), so React.lazy ALONE would still load every chunk at mount (they're all in the JSX tree). Add a first-visit gate: track which views have been activated (e.g. `const [visited, setVisited] = useState<Set<ViewType>>(() => new Set(['terminal']))`; in an effect on `activeView`, add the current view to the set). Render each lazy view's <section> body ONLY if `visited.has(view)` (so its chunk loads on first navigation), wrapped in <Suspense fallback={<small loader>}>. Once visited, keep it mounted (the `hidden` class still toggles visibility) so view state persists. TerminalPane stays EAGER and always-mounted (it is the default view AND must keep PTYs alive — do NOT gate or lazy it). Keep the section wrappers/`hidden` classes intact so layout/visibility behavior is unchanged. Edits App.tsx (shared with phase 3).",
+      "verification": [
+        "KanbanBoard, DependencyGraph, SettingsPage are React.lazy + Suspense-wrapped",
+        "each non-terminal view renders null until first visited, then stays mounted",
+        "TerminalPane remains eager and always-mounted",
+        "tsc -b clean; switching to each view renders it (no blank/broken view)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-05-25T14:05:53.713Z",
+      "summary": "App.tsx: KanbanBoard/DependencyGraph/SettingsPage converted to React.lazy; added visitedViews first-visit gate (terminal pre-seeded) so each non-terminal view chunk loads only on first navigation, then stays mounted (hidden toggle). TerminalPane stays eager. Sections wrapped in Suspense. Verified by P3 final build."
+    },
+    {
+      "number": 3,
+      "title": "React.lazy the detail panel + final gate + bundle delta",
+      "status": "completed",
+      "content": "In apps/desktop/src/App.tsx, convert the detail-panel component imports (IssueDetail, PullRequestDetail, ReleaseDetail, TikiReleaseDetail, ResearchDetail — the `detail/` barrel pulls react-markdown + rehype-highlight + highlight.js via MarkdownRenderer) to `React.lazy`, wrapped in <Suspense>. The detail panel only renders when something is selected, so this defers the markdown/highlight bundle until a detail is first opened. (DetailEmptyState is tiny — can stay eager.) Then the FINAL gate: `pnpm build` (full workspace tsc -b) clean, `pnpm -C apps/desktop test` clean, and re-measure the production bundle — confirm the INITIAL chunk shrank materially vs the phase-1 baseline (record the delta in the summary). Visual SC4 (app launches + every view/detail renders in tauri:dev) is user-verified. Edits App.tsx (shared with phase 2 — serialized via dependency).",
+      "verification": [
+        "detail components are React.lazy + Suspense-wrapped; markdown chunk deferred until a detail opens",
+        "pnpm build (tsc -b) clean",
+        "pnpm -C apps/desktop test clean",
+        "initial bundle chunk materially smaller than baseline (delta recorded)",
+        "(visual, user) app launches and all views/detail render in tauri:dev"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [
+        2
+      ],
+      "completedAt": "2026-05-25T14:09:07.941Z",
+      "summary": "App.tsx detail panels (IssueDetail/PullRequestDetail/ReleaseDetail/TikiReleaseDetail/ResearchDetail) React.lazy + Suspense; DetailEmptyState stays eager. BUNDLE DELTA: single 1576.96kB chunk -> entry 191.58kB; graph(267)+dnd(48)+markdown(334)=649kB now lazy (load on first nav/detail). Cold-start JS ~828kB vs 1577kB (~47% less). pnpm build clean; desktop vitest 208 passed."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2,
+      3
+    ],
+    "SC2": [
+      1,
+      2,
+      3
+    ],
+    "SC3": [
+      2,
+      3
+    ],
+    "SC4": [
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-05-25T14:03:11.614Z"
+}

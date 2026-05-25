@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { Panel, Separator, Group } from "react-resizable-panels";
@@ -12,11 +12,24 @@ import { ResearchSection } from "./components/sidebar/ResearchSection";
 import { StateSection } from "./components/sidebar/StateSection";
 import { ClaudeUsageSection } from "./components/sidebar/ClaudeUsageSection";
 import { TerminalPane } from "./components/terminal";
-import { IssueDetail, PullRequestDetail, ReleaseDetail, ResearchDetail, TikiReleaseDetail, DetailEmptyState } from "./components/detail";
+// DetailEmptyState stays eager (tiny, shown instantly when nothing is selected).
+// The real detail panels are lazy (#263): they pull MarkdownRenderer → react-markdown
+// + highlight.js (the 'markdown' chunk), deferred until a detail is first opened.
+import { DetailEmptyState } from "./components/detail";
+const IssueDetail = lazy(() => import("./components/detail").then((m) => ({ default: m.IssueDetail })));
+const PullRequestDetail = lazy(() => import("./components/detail").then((m) => ({ default: m.PullRequestDetail })));
+const ReleaseDetail = lazy(() => import("./components/detail").then((m) => ({ default: m.ReleaseDetail })));
+const TikiReleaseDetail = lazy(() => import("./components/detail").then((m) => ({ default: m.TikiReleaseDetail })));
+const ResearchDetail = lazy(() => import("./components/detail").then((m) => ({ default: m.ResearchDetail })));
 import { CenterTabs } from "./components/layout/CenterTabs";
-import { KanbanBoard } from "./components/kanban";
-import { DependencyGraph } from "./components/dependencies/DependencyGraph";
-import { SettingsPage } from "./components/settings";
+// Lazy-loaded, first-visit-gated views (#263): their chunks (graph/dnd) load only
+// when the user first navigates to them. TerminalPane stays eager — it's the default
+// view and must stay mounted to keep PTYs alive.
+const KanbanBoard = lazy(() => import("./components/kanban").then((m) => ({ default: m.KanbanBoard })));
+const DependencyGraph = lazy(() =>
+  import("./components/dependencies/DependencyGraph").then((m) => ({ default: m.DependencyGraph }))
+);
+const SettingsPage = lazy(() => import("./components/settings").then((m) => ({ default: m.SettingsPage })));
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { BulkActionToolbar } from "./components/BulkActionToolbar";
 import { BulkYoloDialog } from "./components/BulkYoloDialog";
@@ -47,6 +60,15 @@ function App() {
   const panelSizes = useLayoutStore((s) => s.panelSizes);
   const activeView = useLayoutStore((s) => s.activeView);
   const actions = useCommandActions({ onOpenShortcuts: openShortcuts });
+
+  // First-visit gate for the lazy views (#263): a view's chunk loads only once the
+  // user has navigated to it. Terminal is pre-seeded (it's the default + eager).
+  // Once visited, the view stays mounted (toggled by the `hidden` class) so its
+  // state survives view switches.
+  const [visitedViews, setVisitedViews] = useState<Set<string>>(() => new Set(["terminal"]));
+  useEffect(() => {
+    setVisitedViews((prev) => (prev.has(activeView) ? prev : new Set(prev).add(activeView)));
+  }, [activeView]);
 
   // Active project
   const activeProject = useProjectsStore((s) => s.getActiveProject());
@@ -371,17 +393,29 @@ function App() {
                 </section>
                 <section className={`section terminal-section ${activeView !== 'kanban' ? 'hidden' : ''}`}>
                   <ErrorBoundary label="kanban-view">
-                    <KanbanBoard />
+                    {visitedViews.has('kanban') && (
+                      <Suspense fallback={<div className="view-loading">Loading…</div>}>
+                        <KanbanBoard />
+                      </Suspense>
+                    )}
                   </ErrorBoundary>
                 </section>
                 <section className={`section terminal-section ${activeView !== 'dependencies' ? 'hidden' : ''}`}>
                   <ErrorBoundary label="dependencies-view">
-                    <DependencyGraph />
+                    {visitedViews.has('dependencies') && (
+                      <Suspense fallback={<div className="view-loading">Loading…</div>}>
+                        <DependencyGraph />
+                      </Suspense>
+                    )}
                   </ErrorBoundary>
                 </section>
                 <section className={`section terminal-section ${activeView !== 'settings' ? 'hidden' : ''}`}>
                   <ErrorBoundary label="settings-view">
-                    <SettingsPage />
+                    {visitedViews.has('settings') && (
+                      <Suspense fallback={<div className="view-loading">Loading…</div>}>
+                        <SettingsPage />
+                      </Suspense>
+                    )}
                   </ErrorBoundary>
                 </section>
               </ErrorBoundary>
@@ -398,23 +432,25 @@ function App() {
           className="panel detail-panel"
         >
           <div className="detail-content">
-            {selectedIssueData ? (
-              <IssueDetail
-                issue={selectedIssueData}
-                work={selectedIssueWork}
-                stale={staleFlags?.[`issue:${selectedIssue}`] ?? false}
-              />
-            ) : selectedPrData ? (
-              <PullRequestDetail pr={selectedPrData} />
-            ) : selectedReleaseData ? (
-              <ReleaseDetail release={selectedReleaseData} />
-            ) : selectedTikiReleaseData ? (
-              <TikiReleaseDetail release={selectedTikiReleaseData} />
-            ) : selectedResearchDoc ? (
-              <ResearchDetail filename={selectedResearchDoc} projectPath={activeProject?.path} />
-            ) : (
-              <DetailEmptyState />
-            )}
+            <Suspense fallback={<div className="view-loading">Loading…</div>}>
+              {selectedIssueData ? (
+                <IssueDetail
+                  issue={selectedIssueData}
+                  work={selectedIssueWork}
+                  stale={staleFlags?.[`issue:${selectedIssue}`] ?? false}
+                />
+              ) : selectedPrData ? (
+                <PullRequestDetail pr={selectedPrData} />
+              ) : selectedReleaseData ? (
+                <ReleaseDetail release={selectedReleaseData} />
+              ) : selectedTikiReleaseData ? (
+                <TikiReleaseDetail release={selectedTikiReleaseData} />
+              ) : selectedResearchDoc ? (
+                <ResearchDetail filename={selectedResearchDoc} projectPath={activeProject?.path} />
+              ) : (
+                <DetailEmptyState />
+              )}
+            </Suspense>
           </div>
         </Panel>
       </Group>
