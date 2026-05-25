@@ -1,11 +1,26 @@
 {
   "schemaVersion": 1,
-  "activeWork": {},
+  "activeWork": {
+    "release:v0.9.2": {
+      "type": "release",
+      "release": {
+        "version": "v0.9.2",
+        "issues": [
+          266
+        ],
+        "completedIssues": []
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-05-25T15:32:51.620Z",
+      "lastActivity": "2026-05-25T15:32:51.620Z"
+    }
+  },
   "history": {
     "lastCompletedIssue": {
-      "number": 265,
-      "title": "Release gate: check-release-readiness.mjs",
-      "completedAt": "2026-05-25T15:05:09.531Z"
+      "number": 266,
+      "title": "Dependency graph UX papercuts: auto-fit, node hover flicker, criteria vanish after completion",
+      "completedAt": "2026-05-25T15:39:43.743Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.1",
@@ -17,6 +32,11 @@
       "tag": "v0.9.1"
     },
     "recentIssues": [
+      {
+        "number": 266,
+        "title": "Dependency graph UX papercuts: auto-fit, node hover flicker, criteria vanish after completion",
+        "completedAt": "2026-05-25T15:39:43.743Z"
+      },
       {
         "number": 265,
         "title": "Release gate: check-release-readiness.mjs",
