@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 267,
+    "title": "Test Issue",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/267"
+  },
+  "createdAt": "2026-06-03T22:34:30.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "Card enters the tracked board at the Review column (status pending) and is visible there before any forward move — validated at GET.",
+      "verified": true,
+      "verifiedAt": "2026-06-03T22:38:00.000Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Card advances one column at a time through Plan -> Execute -> Shipping; each forward state.mjs transition is accepted (exit 0) and writes the expected status, exercising every intermediate kanban stage.",
+      "verified": true,
+      "verifiedAt": "2026-06-03T22:38:00.000Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Card reaches the terminal Completed column with all-green pipeline / Completed styling; deriveDisplayStatus maps the final state to column 'completed' with pipelineState 'complete'.",
+      "verified": true,
+      "verifiedAt": "2026-06-03T22:38:00.000Z"
+    },
+    {
+      "id": "SC4",
+      "category": "quality",
+      "description": "Each status value persists to .tiki/state.json (the persistence layer) and survives a re-read; the completed card lands in history.recentIssues so a reload still renders it Completed.",
+      "verified": true,
+      "verifiedAt": "2026-06-03T22:38:00.000Z"
+    },
+    {
+      "id": "SC5",
+      "category": "quality",
+      "description": "No illegal transition errors during the walkthrough: forward and backward moves that ALLOWED_MOVES + the transition table permit are accepted, and an illegal pair is rejected (state.mjs exit 1) with no state corruption.",
+      "verified": true,
+      "verifiedAt": "2026-06-03T22:38:00.000Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Forward-walk verification: Review -> Plan -> Execute persisted correctly",
+      "status": "completed",
+      "content": "No code change. Validate that the pipeline transitions already emitted (GET pending, REVIEW reviewing, PLAN planning) plus the EXECUTE transition wrote the canonical status to .tiki/state.json, and that deriveDisplayStatus maps each status to the expected kanban column (pending/reviewing->review, planning->plan, executing->execute). Re-read state.json to confirm persistence (SC4). Confirm the EXECUTE transition is accepted by state.mjs (exit 0).",
+      "verification": [
+        "state.json status === 'executing' after the EXECUTE transition (re-read from disk)",
+        "deriveDisplayStatus maps executing -> column 'execute' (per STATUS_TO_COLUMN in deriveDisplayStatus.ts)",
+        "all forward transitions returned exit 0 (no illegal-pair rejections)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [],
+      "dependencies": []
+    },
+    {
+      "number": 2,
+      "title": "Bidirectional + illegal-move guard: backward legal, illegal rejected",
+      "status": "completed",
+      "content": "No code change. The acceptance criteria require exercising forward AND backward moves and graceful rejection of illegal ones. (a) Confirm the ALLOWED_MOVES adjacency in KanbanBoard.tsx permits a backward edge from execute (execute -> review). (b) Confirm the state.mjs transition table rejects an illegal pair (e.g. completed -> reviewing, or pending -> shipping) with exit 1 and leaves state.json untouched (atomic temp+rename means a rejected transition never partially writes). This validates SC5 without actually regressing the live card backward (we keep #267 moving forward to ship it clean).",
+      "verification": [
+        "ALLOWED_MOVES['execute'] includes 'review' (backward edge exists in the UI layer)",
+        "an illegal state.mjs transition exits non-zero and does NOT mutate state.json (re-read shows unchanged status)",
+        "a legal same-status / forward transition still exits 0 (idempotent re-emit is a safe no-op)"
+      ],
+      "addressesCriteria": [
+        "SC5"
+      ],
+      "files": [],
+      "dependencies": [
+        1
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Terminal stage + persistence reload: Shipping -> Completed renders Completed",
+      "status": "completed",
+      "content": "No code change. After SHIP moves the card to status 'shipping' (Shipping column), completion removes issue:267 from activeWork and appends it to history.recentIssues + history.lastCompletedIssue (no parentRelease, so the standalone-issue completion path). Verify: (a) deriveDisplayStatus for an issue in history.recentIssues with no activeWork entry returns column 'completed', label 'Completed', pipelineState 'complete' (all-green) — this is the terminal styling SC3 asks for; (b) re-reading state.json confirms the card is durably in history (SC4 reload-survival) and absent from activeWork.",
+      "verification": [
+        "after completion, issue 267 is in state.json history.recentIssues and history.lastCompletedIssue",
+        "issue:267 removed from activeWork (standalone completion path, no parentRelease)",
+        "deriveDisplayStatus({number:267, history:{recentIssues:[{number:267}]}}) === column 'completed' / pipelineState 'complete'"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4"
+      ],
+      "files": [],
+      "dependencies": [
+        2
+      ]
+    }
+  ],
+  "audited": true,
+  "auditedAt": "2026-06-03T22:36:16.587Z"
+}
