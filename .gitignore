@@ -35,3 +35,6 @@ entities.json
 .claude/worktrees/
 .tiki/backups/
 .tiki/issues/
+
+.automaker
+.understand-anything
