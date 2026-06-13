@@ -30,6 +30,26 @@
  *     lastCompletedRelease. Shapes match completedIssueRecord /
  *     completedReleaseRecord in state.schema.json.
  *
+ *   parallel <work-id> --start "1,2,3" --total N | --complete N | --clear
+ *     Manage activeWork[wid].parallelExecution (parallel-group tracking) for an
+ *     issue. --start sets the group, --complete idempotently appends a finished
+ *     phase to completedInGroup, --clear removes the field. (#275)
+ *
+ *   heal-attempt <work-id> --category C --outcome O [--message M] [--strategy S] [--next-step N]
+ *     Append a HealAttempt { ts, category, outcome, ... } to the active phase's
+ *     phase.healAttempts array. category∈{build-error,type-error,test-failure,
+ *     lint-error,other}, outcome∈{success,failure}. (#275)
+ *
+ *   enrich <work-id> --json <file|->
+ *     Shallow-merge allowlisted GitHub metadata (body, labels, labelDetails,
+ *     state, url, createdAt, updatedAt) onto activeWork[wid].issue. Reads JSON
+ *     from a file or '-' (stdin); unknown keys are rejected. (#275)
+ *
+ *   release-wave <release-id> [--current "41,42"] [--completed-issue N] [--completed-branch name]
+ *     Update the wave-tracking fields under activeWork[release:V].release.*:
+ *     currentIssues (replaced), completedIssues / completedBranches (idempotent
+ *     append). (#275)
+ *
  *   journal <work-id> --step <STEP> [--event start] [--phase-current N --phase-total T] [--title "..."]
  *     Append one NDJSON intent line to .tiki/journal.ndjson (#272). The
  *     journal is the drop-proof record of "a workflow step started" — the
@@ -112,18 +132,53 @@ const LEGAL = {
   completed: new Set(), // terminal
 };
 
-const VALID_STATUSES = new Set([
+// ---------------------------------------------------------------------------
+// Enum constants — the SINGLE SOURCE for the framework-side validation sets.
+//
+// These mirror the authoritative JSON schemas under
+// packages/shared/schemas/*.schema.json (state.workStatus, plan.phaseStatus,
+// state.pipelineStep, config.autoHealConfig.categories). The
+// schema-shim-parity test in packages/shared/src/__tests__ parses the array
+// literals below and asserts each equals its schema enum, so a future edit
+// here that drifts from a schema fails loudly. Declared as plain ordered
+// arrays (parseable by the parity test) and wrapped in Sets for O(1) lookups.
+//
+// plan.mjs (#275 phase 2) imports VALID_PHASE_STATUS from this module instead
+// of keeping a second copy.
+// ---------------------------------------------------------------------------
+
+// schema: state.schema.json $defs.workStatus.enum
+const VALID_WORK_STATUS = [
   "pending",
   "reviewing",
   "planning",
   "executing",
   "paused",
-  "failed",
   "shipping",
   "completed",
-]);
+  "failed",
+];
 
-const VALID_STEPS = new Set(["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"]);
+// schema: plan.schema.json $defs.phaseStatus.enum
+const VALID_PHASE_STATUS = ["pending", "executing", "completed", "failed", "skipped"];
+
+// schema: state.schema.json $defs.pipelineStep.enum
+const VALID_STEPS = ["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"];
+
+// schema: config.schema.json $defs.autoHealConfig.properties.categories.items.enum
+const VALID_HEAL_CATEGORY = ["build-error", "type-error", "test-failure", "lint-error", "other"];
+
+// Heal outcome — not a schema enum (HealAttempt records are schema-loose), but
+// pinned here so the heal-attempt subcommand validates it.
+const VALID_HEAL_OUTCOME = ["success", "failure"];
+
+// Set-wrapped lookups (membership checks below use these; the arrays above are
+// what the parity test parses).
+const VALID_STATUSES = new Set(VALID_WORK_STATUS);
+const VALID_STEPS_SET = new Set(VALID_STEPS);
+const VALID_PHASE_STATUS_SET = new Set(VALID_PHASE_STATUS);
+const VALID_HEAL_CATEGORY_SET = new Set(VALID_HEAL_CATEGORY);
+const VALID_HEAL_OUTCOME_SET = new Set(VALID_HEAL_OUTCOME);
 
 // Monotonic pipeline-step ordering. Exported so the reconciler
 // (reconcile-state.mjs) and the journal-floor logic below share ONE source of
@@ -572,8 +627,8 @@ function handleTransition(args) {
   }
 
   const toStep = args["to-step"];
-  if (toStep && !VALID_STEPS.has(toStep)) {
-    die(1, `invalid --to-step '${toStep}' (must be one of: ${[...VALID_STEPS].join(", ")})`);
+  if (toStep && !VALID_STEPS_SET.has(toStep)) {
+    die(1, `invalid --to-step '${toStep}' (must be one of: ${VALID_STEPS.join(", ")})`);
   }
 
   // Optional phase tri-tuple. All three flags must be provided together.
@@ -1040,8 +1095,8 @@ function handleJournal(args) {
     }
 
     const step = args.step;
-    if (typeof step !== "string" || !VALID_STEPS.has(step)) {
-      journalWarn(`invalid --step '${step}' (must be one of: ${[...VALID_STEPS].join(", ")})`);
+    if (typeof step !== "string" || !VALID_STEPS_SET.has(step)) {
+      journalWarn(`invalid --step '${step}' (must be one of: ${VALID_STEPS.join(", ")})`);
       return;
     }
 
@@ -1084,6 +1139,424 @@ function handleJournal(args) {
 }
 
 // ---------------------------------------------------------------------------
+// Mutation-surface subcommands (#275): parallel / heal-attempt / enrich /
+// release-wave.
+//
+// These replace the four acknowledged direct-JSON writes the framework command
+// prose used to do (parallelExecution, phase.healAttempts, issue metadata
+// enrichment, release wave tracking). Each validates workId shape + enum
+// membership + required fields + numeric coercion BEFORE the atomic write and
+// rejects bad input via die(1, msg) — the whole read-modify-write runs under
+// the cross-process state lock, exactly like transition/remove/append-history.
+// ---------------------------------------------------------------------------
+
+/** Resolve an existing activeWork entry of the required kind, dying if absent. */
+function requireActiveEntry(state, workId) {
+  const entry = (state.activeWork || {})[workId];
+  if (!entry) {
+    die(1, `no active work for '${workId}'`);
+  }
+  return entry;
+}
+
+/** Parse a comma-separated list of positive integers, dying on any non-number. */
+function parseIntList(raw, flagName) {
+  const parts = String(raw)
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+  const nums = [];
+  for (const p of parts) {
+    const n = Number(p);
+    if (!Number.isInteger(n) || n < 1) {
+      die(1, `invalid ${flagName} value '${p}': must be a positive integer`);
+    }
+    nums.push(n);
+  }
+  return nums;
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: parallel
+//
+//   parallel <work-id> --start "1,2,3" --total N   set parallelExecution
+//   parallel <work-id> --complete N                append N to completedInGroup
+//   parallel <work-id> --clear                     delete parallelExecution
+//
+// Manages activeWork[wid].parallelExecution, the parallel-group tracking field
+// (shape mirrors state.schema.json parallelExecution: phases / completedInGroup
+// / totalInGroup / startedAt). issue: work-ids only — parallel groups belong to
+// a single issue's phases.
+// ---------------------------------------------------------------------------
+
+function handleParallel(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <work-id> argument (e.g. 'issue:42')");
+  }
+  const { isIssue } = assertWorkIdShape(workId);
+  if (!isIssue) {
+    die(1, `parallel requires an issue work_id (got '${workId}')`);
+  }
+
+  const hasStart = args.start !== undefined;
+  const hasComplete = args.complete !== undefined;
+  const hasClear = args.clear === true;
+  const modeCount = [hasStart, hasComplete, hasClear].filter(Boolean).length;
+  if (modeCount === 0) {
+    die(1, "parallel requires exactly one of --start, --complete, or --clear");
+  }
+  if (modeCount > 1) {
+    die(1, "parallel accepts only one of --start, --complete, or --clear at a time");
+  }
+
+  // Validate inputs BEFORE acquiring the lock / mutating.
+  let startPhases = null;
+  let total = null;
+  let completeN = null;
+  if (hasStart) {
+    if (args.start === true) {
+      die(1, "--start requires a comma-separated phase list (e.g. --start \"1,2,3\")");
+    }
+    startPhases = parseIntList(args.start, "--start");
+    if (startPhases.length === 0) {
+      die(1, "--start must list at least one phase number");
+    }
+    if (args.total === undefined || args.total === true) {
+      die(1, "--start requires --total N");
+    }
+    total = Number(args.total);
+    if (!Number.isInteger(total) || total < 1) {
+      die(1, `invalid --total '${args.total}' (must be a positive integer)`);
+    }
+  } else if (hasComplete) {
+    if (args.complete === true) {
+      die(1, "--complete requires a phase number");
+    }
+    completeN = Number(args.complete);
+    if (!Number.isInteger(completeN) || completeN < 1) {
+      die(1, `invalid --complete '${args.complete}' (must be a positive integer)`);
+    }
+  }
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const dryRun = args["dry-run"] === true;
+  const now = new Date().toISOString();
+
+  let result;
+  const apply = () => {
+    const state = readState(tikiPath);
+    const entry = requireActiveEntry(state, workId);
+
+    if (hasStart) {
+      entry.parallelExecution = {
+        phases: startPhases,
+        completedInGroup: [],
+        totalInGroup: total,
+        startedAt: now,
+      };
+    } else if (hasComplete) {
+      if (!entry.parallelExecution) {
+        die(1, `no parallelExecution group active for '${workId}' (run --start first)`);
+      }
+      const pe = entry.parallelExecution;
+      if (!Array.isArray(pe.completedInGroup)) pe.completedInGroup = [];
+      // Idempotent: don't double-append a phase already marked complete.
+      if (!pe.completedInGroup.includes(completeN)) {
+        pe.completedInGroup.push(completeN);
+      }
+    } else if (hasClear) {
+      delete entry.parallelExecution;
+    }
+
+    entry.lastActivity = now;
+    result = entry.parallelExecution === undefined ? null : entry.parallelExecution;
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
+
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: heal-attempt
+//
+//   heal-attempt <work-id> --category C --outcome O
+//     [--message M] [--strategy S] [--next-step N]
+//
+// Appends a HealAttempt record { ts, category, outcome, message?, strategy?,
+// nextStep? } to activeWork[wid].phase.healAttempts (creating the array if
+// absent). The entry MUST have a phase object — heal attempts are scoped to the
+// phase currently executing.
+// ---------------------------------------------------------------------------
+
+function handleHealAttempt(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <work-id> argument (e.g. 'issue:42')");
+  }
+  const { isIssue } = assertWorkIdShape(workId);
+  if (!isIssue) {
+    die(1, `heal-attempt requires an issue work_id (got '${workId}')`);
+  }
+
+  const category = args.category;
+  if (typeof category !== "string" || !VALID_HEAL_CATEGORY_SET.has(category)) {
+    die(
+      1,
+      `invalid --category '${category}' (must be one of: ${VALID_HEAL_CATEGORY.join(", ")})`
+    );
+  }
+  const outcome = args.outcome;
+  if (typeof outcome !== "string" || !VALID_HEAL_OUTCOME_SET.has(outcome)) {
+    die(1, `invalid --outcome '${outcome}' (must be one of: ${VALID_HEAL_OUTCOME.join(", ")})`);
+  }
+
+  const message = typeof args.message === "string" ? args.message : undefined;
+  const strategy = typeof args.strategy === "string" ? args.strategy : undefined;
+  const nextStep = typeof args["next-step"] === "string" ? args["next-step"] : undefined;
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const dryRun = args["dry-run"] === true;
+  const now = new Date().toISOString();
+
+  let record;
+  const apply = () => {
+    const state = readState(tikiPath);
+    const entry = requireActiveEntry(state, workId);
+    if (!entry.phase || typeof entry.phase !== "object") {
+      die(1, `cannot record heal-attempt: '${workId}' has no active phase`);
+    }
+    record = {
+      ts: now,
+      category,
+      outcome,
+      ...(message !== undefined ? { message } : {}),
+      ...(strategy !== undefined ? { strategy } : {}),
+      ...(nextStep !== undefined ? { nextStep } : {}),
+    };
+    if (!Array.isArray(entry.phase.healAttempts)) {
+      entry.phase.healAttempts = [];
+    }
+    entry.phase.healAttempts.push(record);
+    entry.lastActivity = now;
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
+
+  process.stdout.write(JSON.stringify(record, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: enrich
+//
+//   enrich <work-id> --json <file|->
+//
+// Reads a JSON object from a file (or stdin when the arg is '-'), keeps only
+// the allowlisted GitHub-metadata keys, and shallow-merges them onto
+// activeWork[wid].issue. Any key NOT in the allowlist is REJECTED (exit 1) so a
+// typo can't write garbage into the issue object. issue: work-ids only.
+// ---------------------------------------------------------------------------
+
+const ENRICH_ALLOWLIST = new Set([
+  "body",
+  "labels",
+  "labelDetails",
+  "state",
+  "url",
+  "createdAt",
+  "updatedAt",
+]);
+
+function handleEnrich(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <work-id> argument (e.g. 'issue:42')");
+  }
+  const { isIssue } = assertWorkIdShape(workId);
+  if (!isIssue) {
+    die(1, `enrich requires an issue work_id (got '${workId}')`);
+  }
+
+  const source = args.json;
+  if (source === undefined || source === true) {
+    die(1, "enrich requires --json <file|-> (use '-' to read JSON from stdin)");
+  }
+
+  let raw;
+  if (source === "-") {
+    try {
+      raw = fs.readFileSync(0, "utf-8"); // fd 0 = stdin
+    } catch (e) {
+      die(2, `failed to read JSON from stdin: ${e.message}`);
+    }
+  } else {
+    const file = path.resolve(String(source));
+    if (!fs.existsSync(file)) {
+      die(1, `--json file not found: ${file}`);
+    }
+    try {
+      raw = fs.readFileSync(file, "utf-8");
+    } catch (e) {
+      die(2, `failed to read ${file}: ${e.message}`);
+    }
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    die(1, `--json input is not valid JSON: ${e.message}`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    die(1, "--json input must be a JSON object");
+  }
+
+  // Reject unknown keys — fail loudly rather than silently dropping a typo.
+  const unknown = Object.keys(parsed).filter((k) => !ENRICH_ALLOWLIST.has(k));
+  if (unknown.length > 0) {
+    die(
+      1,
+      `enrich rejects unknown key(s): ${unknown.join(", ")} ` +
+        `(allowed: ${[...ENRICH_ALLOWLIST].join(", ")})`
+    );
+  }
+  if (Object.keys(parsed).length === 0) {
+    die(1, "enrich --json input had no allowlisted keys to merge");
+  }
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const dryRun = args["dry-run"] === true;
+  const now = new Date().toISOString();
+
+  let merged;
+  const apply = () => {
+    const state = readState(tikiPath);
+    const entry = requireActiveEntry(state, workId);
+    if (entry.type !== "issue") {
+      die(1, `enrich requires an issue entry; '${workId}' is a ${entry.type}`);
+    }
+    entry.issue = { ...(entry.issue || {}), ...parsed };
+    entry.lastActivity = now;
+    merged = entry.issue;
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
+
+  process.stdout.write(JSON.stringify(merged, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: release-wave
+//
+//   release-wave <release-id> [--current "41,42"]
+//     [--completed-issue N] [--completed-branch name]
+//
+// Manages the wave-tracking fields nested under
+// activeWork[release:V].release.*: currentIssues (replaced wholesale from
+// --current), completedIssues (idempotent append of --completed-issue), and
+// completedBranches (idempotent append of --completed-branch, in completion
+// order). release: work-ids only.
+// ---------------------------------------------------------------------------
+
+function handleReleaseWave(args) {
+  const workId = args._[1];
+  if (!workId) {
+    die(1, "missing <release-id> argument (e.g. 'release:v1.2')");
+  }
+  const { isRelease } = assertWorkIdShape(workId);
+  if (!isRelease) {
+    die(1, `release-wave requires a release work_id (got '${workId}')`);
+  }
+
+  const hasCurrent = args.current !== undefined;
+  const hasCompletedIssue = args["completed-issue"] !== undefined;
+  const hasCompletedBranch = args["completed-branch"] !== undefined;
+  if (!hasCurrent && !hasCompletedIssue && !hasCompletedBranch) {
+    die(
+      1,
+      "release-wave requires at least one of --current, --completed-issue, or --completed-branch"
+    );
+  }
+
+  // Validate inputs up front.
+  let currentIssues = null;
+  if (hasCurrent) {
+    if (args.current === true) {
+      die(1, "--current requires a comma-separated issue list (e.g. --current \"41,42\")");
+    }
+    currentIssues = parseIntList(args.current, "--current");
+  }
+  let completedIssue = null;
+  if (hasCompletedIssue) {
+    if (args["completed-issue"] === true) {
+      die(1, "--completed-issue requires an issue number");
+    }
+    completedIssue = Number(args["completed-issue"]);
+    if (!Number.isInteger(completedIssue) || completedIssue < 1) {
+      die(1, `invalid --completed-issue '${args["completed-issue"]}' (must be a positive integer)`);
+    }
+  }
+  let completedBranch = null;
+  if (hasCompletedBranch) {
+    if (args["completed-branch"] === true || typeof args["completed-branch"] !== "string") {
+      die(1, "--completed-branch requires a branch name");
+    }
+    completedBranch = args["completed-branch"];
+  }
+
+  const tikiPath = resolveTikiPath(args["tiki-path"]);
+  const dryRun = args["dry-run"] === true;
+  const now = new Date().toISOString();
+
+  let releaseObj;
+  const apply = () => {
+    const state = readState(tikiPath);
+    const entry = requireActiveEntry(state, workId);
+    if (entry.type !== "release") {
+      die(1, `release-wave requires a release entry; '${workId}' is a ${entry.type}`);
+    }
+    entry.release = entry.release || {};
+    const rel = entry.release;
+
+    if (hasCurrent) {
+      rel.currentIssues = currentIssues;
+    }
+    if (hasCompletedIssue) {
+      if (!Array.isArray(rel.completedIssues)) rel.completedIssues = [];
+      if (!rel.completedIssues.includes(completedIssue)) {
+        rel.completedIssues.push(completedIssue);
+      }
+    }
+    if (hasCompletedBranch) {
+      if (!Array.isArray(rel.completedBranches)) rel.completedBranches = [];
+      if (!rel.completedBranches.includes(completedBranch)) {
+        rel.completedBranches.push(completedBranch);
+      }
+    }
+
+    entry.lastActivity = now;
+    releaseObj = rel;
+    if (!dryRun) {
+      writeStateAtomic(tikiPath, state);
+    }
+  };
+  if (dryRun) apply();
+  else withStateLock(tikiPath, apply);
+
+  process.stdout.write(JSON.stringify(releaseObj, null, 2) + "\n");
+}
+
+// ---------------------------------------------------------------------------
 // CLI entry point.
 // ---------------------------------------------------------------------------
 
@@ -1108,10 +1581,22 @@ function main() {
     case "journal":
       handleJournal(args);
       return;
+    case "parallel":
+      handleParallel(args);
+      return;
+    case "heal-attempt":
+      handleHealAttempt(args);
+      return;
+    case "enrich":
+      handleEnrich(args);
+      return;
+    case "release-wave":
+      handleReleaseWave(args);
+      return;
     default:
       die(
         1,
-        `unknown subcommand '${subcommand}' (expected one of: transition, get, remove, append-history, journal)`
+        `unknown subcommand '${subcommand}' (expected one of: transition, get, remove, append-history, journal, parallel, heal-attempt, enrich, release-wave)`
       );
   }
 }
@@ -1150,4 +1635,12 @@ export {
   readJournalEntries,
   journalFloor,
   pruneJournal,
+  // Enum constants — single source for framework-side validation, imported by
+  // plan.mjs (#275 phase 2) and asserted against the schemas by the
+  // schema-shim-parity test.
+  VALID_WORK_STATUS,
+  VALID_PHASE_STATUS,
+  VALID_STEPS,
+  VALID_HEAL_CATEGORY,
+  VALID_HEAL_OUTCOME,
 };

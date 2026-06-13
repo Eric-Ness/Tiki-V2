@@ -253,10 +253,13 @@ Each lifecycle point starts with a `state.mjs journal` line (#272) — the drop-
 node .claude/tiki/scripts/state.mjs journal release:{version} --step EXECUTE
 node .claude/tiki/scripts/state.mjs transition release:{version} \
   --to-status executing --to-step EXECUTE --release-version {version} --release-issues "41,42,43"
-# Per wave: update release.currentIssues (array; direct JSON write — shim does not edit nested release.* fields),
-# spawn one Agent per issue with isolation: 'worktree', wait for the wave to drain, then
-# append each completed issue number to release.completedIssues and each worktree branch
-# name to release.completedBranches (also direct JSON writes).
+# Per wave: set the current wave via the shim, then spawn one Agent per issue with
+# isolation: 'worktree'. Wait for the wave to drain, then record each completed issue
+# number and worktree branch (idempotent) — all via state.mjs release-wave:
+node .claude/tiki/scripts/state.mjs release-wave release:{version} --current "41,42"
+# As each issue's worktree drains:
+node .claude/tiki/scripts/state.mjs release-wave release:{version} \
+  --completed-issue {number} --completed-branch {worktree-branch-name}
 # Ship (BEFORE tagging) — journal first, then transition:
 node .claude/tiki/scripts/state.mjs journal release:{version} --step SHIP
 node .claude/tiki/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
@@ -277,7 +280,7 @@ node .claude/tiki/scripts/state.mjs transition release:{version} --to-status shi
 }
 ```
 
-Both `currentIssues` and `completedBranches` are direct-JSON nested edits. `state.mjs` does NOT need new flags — these follow the existing acknowledged exception for `release.currentIssue` (nested release.* fields are written directly to the JSON file by the framework command).
+`currentIssues`, `completedIssues`, and `completedBranches` are all written through `state.mjs release-wave` (validated, atomic) — never edit nested `release.*` fields by hand. `currentIssue` (singular, legacy serial mode) is set by the `--release-issues` transition above and is ignored when `currentIssues` is populated.
 
 After shipping:
 

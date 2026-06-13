@@ -36,7 +36,12 @@ node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status pending --to-step GET --issue-number {number} --issue-title "{title}"
 ```
 
-The shim stores `number`/`title` only. Add richer GitHub metadata (`body`, `labels`, `labelDetails`, `state`, `url`, `createdAt`, `updatedAt`) with a follow-up direct JSON write — the desktop app needs these for the issue panel.
+The transition stores `number`/`title` only. Enrich the entry with the richer GitHub metadata the desktop issue panel needs (`body`, `labels`, `labelDetails`, `state`, `url`, `createdAt`, `updatedAt`) by piping the `gh issue view` JSON straight into the `enrich` shim — it allowlists those keys and rejects anything else, so a typo can't write garbage:
+
+```bash
+gh issue view {number} --json number,title,body,state,labels,url,createdAt,updatedAt \
+  | node .claude/tiki/scripts/state.mjs enrich issue:{number} --json -
+```
 </state-management>
 
 <output>

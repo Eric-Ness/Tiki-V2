@@ -19,10 +19,10 @@
  * Exit codes: 0 success · 1 bad args / missing plan · 2 I/O error.
  */
 
-import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { resolveTikiPath } from "./state.mjs";
+import { applyAudited } from "./plan.mjs";
 
 function die(code, msg) {
   process.stderr.write(`mark-audited.mjs: ${msg}\n`);
@@ -49,22 +49,6 @@ function parseArgs(argv) {
   return args;
 }
 
-function writeJsonAtomic(file, obj) {
-  const tmp = file + ".tmp";
-  const json = JSON.stringify(obj, null, 2);
-  try {
-    fs.writeFileSync(tmp, json, "utf-8");
-    fs.renameSync(tmp, file);
-  } catch (e) {
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      /* ignore */
-    }
-    die(2, `failed to write ${file}: ${e.message}`);
-  }
-}
-
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const raw = args._[0];
@@ -73,29 +57,14 @@ function main() {
     die(1, `missing/invalid <issue-number> (got '${raw}')`);
   }
 
+  // Delegate the actual artifact write to the shared plan.mjs logic — single
+  // source for `audited`/`auditedAt` (#275 phase 2). audit.md still invokes
+  // this script until phase 3 repoints it to `plan.mjs audited`; the CLI
+  // behavior, exit codes, and one-line JSON output stay identical.
   const tikiPath = resolveTikiPath(args["tiki-path"]);
-  const planFile = path.join(tikiPath, "plans", `issue-${number}.json`);
-  if (!fs.existsSync(planFile)) {
-    die(1, `no plan file at ${planFile} — run /tiki:plan ${number} first`);
-  }
+  const result = applyAudited(tikiPath, number, { dryRun: args["dry-run"] === true });
 
-  let plan;
-  try {
-    plan = JSON.parse(fs.readFileSync(planFile, "utf-8"));
-  } catch (e) {
-    die(2, `plan file is not valid JSON: ${e.message}`);
-  }
-
-  plan.audited = true;
-  plan.auditedAt = new Date().toISOString();
-
-  if (args["dry-run"] !== true) {
-    writeJsonAtomic(planFile, plan);
-  }
-
-  process.stdout.write(
-    JSON.stringify({ issue: number, audited: true, auditedAt: plan.auditedAt }, null, 2) + "\n"
-  );
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
 }
 
 import { fileURLToPath } from "node:url";

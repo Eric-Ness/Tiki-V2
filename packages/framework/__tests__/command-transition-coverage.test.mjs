@@ -217,3 +217,53 @@ test("release.md teardown appends child issues to history (append-history issue)
     `in the desktop Kanban Completed column (issue #219).`
   );
 });
+
+// Source-scan guard for issue #275: once every state.json / plan-file direct
+// write has a dedicated shim subcommand (state.mjs parallel/heal-attempt/enrich/
+// release-wave, plan.mjs phase/verify-criteria/audited), NO command file may
+// keep an "acknowledged direct-JSON write" / "shim does not expose" escape
+// hatch. This pins the deletion: a future edit can't quietly reintroduce a raw
+// JSON mutation under cover of an acknowledgement paragraph.
+//
+// IMPORTANT: yolo.md's "Legacy: direct JSON" section is a PATH-RESOLUTION
+// fallback (plugin-only installs where `.claude/tiki/scripts/` was never copied
+// — issue #268), NOT a surface-gap acknowledgement. The regexes below target the
+// acknowledgement phrasings ("...write acknowledged", "shim does not expose",
+// "write <field> directly in (the) JSON") and deliberately do NOT match the bare
+// words "direct JSON" or yolo's "fall back to the direct-JSON write", so that
+// fallback stays untouched.
+const FORBIDDEN_ACK_PHRASES = [
+  /direct[- ]JSON write acknowledged/i,
+  /direct[- ]JSON write is acknowledged/i,
+  /shim does not expose/i,
+  /write [^\n]*directly in (the )?JSON/i,
+];
+
+test("no command file keeps an acknowledged direct-JSON-write escape hatch (issue #275)", () => {
+  const failures = [];
+
+  const files = fs
+    .readdirSync(COMMANDS_DIR)
+    .filter((f) => f.endsWith(".md"));
+
+  for (const file of files) {
+    const content = fs.readFileSync(path.join(COMMANDS_DIR, file), "utf-8");
+    for (const re of FORBIDDEN_ACK_PHRASES) {
+      const match = content.match(re);
+      if (match) {
+        failures.push(`${file}: matched forbidden phrase /${re.source}/ → "${match[0]}"`);
+      }
+    }
+  }
+
+  assert.equal(
+    failures.length,
+    0,
+    `Direct-JSON-write acknowledgement reintroduced:\n  - ${failures.join("\n  - ")}\n\n` +
+    `Every state.json / plan-file mutation now has a dedicated shim subcommand ` +
+    `(state.mjs parallel/heal-attempt/enrich/release-wave, plan.mjs phase/` +
+    `verify-criteria/audited). Command files MUST call those instead of writing ` +
+    `JSON directly (issue #275). yolo.md's plugin-only "Legacy: direct JSON" ` +
+    `path-resolution fallback is exempt and is NOT matched by these regexes.`
+  );
+});

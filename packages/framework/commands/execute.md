@@ -168,35 +168,36 @@ This is the parallelism mechanism. The Anthropic Agent (Task) tool runs concurre
 
 ### Step 5 — State updates (`.tiki/state.json`)
 
-**When starting a parallel group (size >= 2):** before dispatching the Task calls, write:
+**When starting a parallel group (size >= 2):** before dispatching the Task calls, mark the group in-flight via the shim (sets `parallelExecution` and bumps `phase.current` to `max(...)` so old desktop clients see a sensible "Phase X of Y" while the group runs):
 
-```json
-"phase": {
-  "current": <max(phase.number for phase in group)>,
-  "total": <total phases in plan>,
-  "status": "executing"
-},
-"parallelExecution": {
-  "phases": [<all phase numbers in group, ascending>],
-  "completedInGroup": [],
-  "totalInGroup": <group size>,
-  "startedAt": "<current ISO timestamp>"
-}
+```bash
+node .claude/tiki/scripts/state.mjs parallel issue:{number} \
+  --start "{comma-separated phase numbers in group, ascending}" --total {total phases in plan}
 ```
 
 `phase.current = max(...)` so old desktop clients that only read `phase` see a sensible "Phase X of Y" display while the group is in flight.
 
 **As each phase in the group returns:**
-- Append its number to `parallelExecution.completedInGroup` (or move to `failed` tracking if it failed).
-- Update the per-phase status in `.tiki/plans/issue-N.json` immediately (don't batch — the file watcher relies on this).
+- Mark it complete in the group (idempotent):
+  ```bash
+  node .claude/tiki/scripts/state.mjs parallel issue:{number} --complete {phase number}
+  ```
+- Update the per-phase status in the plan file immediately (don't batch — the file watcher relies on this):
+  ```bash
+  node .claude/tiki/scripts/plan.mjs phase {number} --number {phase number} --status completed \
+    --summary "{one-line summary}" --completed-at "{ISO timestamp}"
+  ```
 - Do NOT advance `phase.current` while siblings are still running.
 
 **When all phases in the group have returned:**
-- Remove the `parallelExecution` field entirely (omit on serialize, or set to `null`).
+- Clear the group:
+  ```bash
+  node .claude/tiki/scripts/state.mjs parallel issue:{number} --clear
+  ```
 - If any phase failed, see Failure Handling below.
 - Otherwise, advance to the next group/level. If the next batch is also a parallel group of size >= 2, repeat from Step 4. If it's size 1, run sequentially without `parallelExecution`.
 
-**When the entire plan is done:** set work `status` to `"shipping"` and clear `phase.status` to `"completed"`.
+**When the entire plan is done:** set work `status` to `"shipping"` and clear `phase.status` to `"completed"` (via the `state.mjs transition` call in `<state-update-requirement>`).
 
 ### Step 6 — Failure handling
 
@@ -204,8 +205,8 @@ When at least one sub-agent in a parallel group fails:
 
 - **Do NOT cancel sibling sub-agents.** They are already in flight; cancellation is unsupported by the Agent tool and would only waste work. Let them run to completion.
 - **Wait for all sub-agents to return.** Collect every result.
-- **Surface all failures together.** Update the plan file: each failed phase gets `status: "failed"` with its error message. Successful siblings get `status: "completed"`.
-- **Pause for manual recovery.** Set work `status` to `"failed"`, clear `parallelExecution`, and present the recovery options from `<next-actions>` (fix and retry, skip, pause, heal). Do NOT auto-advance to the next level.
+- **Surface all failures together.** Update the plan file via `plan.mjs phase`: each failed phase gets `--status failed --error "{message}"`; successful siblings get `--status completed`.
+- **Pause for manual recovery.** Set work `status` to `"failed"`, clear the group with `node .claude/tiki/scripts/state.mjs parallel issue:{number} --clear`, and present the recovery options from `<next-actions>` (fix and retry, skip, pause, heal). Do NOT auto-advance to the next level.
 
 ### Step 7 — Backward compatibility
 
@@ -347,15 +348,25 @@ The sub-agent's response becomes the phase summary.
 </output>
 
 <state-management>
-See `<state-update-requirement>` for state.json. For the plan file: when a phase completes, set its `status: "completed"` with `completedAt` + `summary` in `.tiki/plans/issue-{number}.json`; on failure use `status: "failed"` + error details. For parallel groups, write `parallelExecution` directly in JSON (shim does not expose this yet — see `<parallel-execution>`).
+See `<state-update-requirement>` for state.json. For the plan file: when a phase completes, record its status + summary via the `plan.mjs phase` shim (never edit the plan JSON by hand):
 
-**After each phase completes, also update `successCriteria` verification** in the same plan file (`.tiki/plans/issue-{number}.json`), applying the "all covering phases complete" rule:
+```bash
+# On success:
+node .claude/tiki/scripts/plan.mjs phase {number} --number {N} --status completed \
+  --summary "{one-line summary}" --completed-at "{ISO timestamp}"
+# On failure:
+node .claude/tiki/scripts/plan.mjs phase {number} --number {N} --status failed --error "{error message}"
+```
 
-- For each criterion in `successCriteria`, look up its covering phase numbers in `coverageMatrix[criterion.id]` (treat a missing or empty entry as no coverage).
-- If the criterion has at least one covering phase AND **every** covering phase now has `status: "completed"` in `phases[]` (matched by `phase.number`), set `verified: true` and `verifiedAt: "{ISO timestamp}"` on that criterion (preserve an existing `verifiedAt` if already set).
-- Otherwise leave the criterion unverified (`verified: false`, no `verifiedAt`).
+For parallel groups, track the in-flight group via the `state.mjs parallel` shim — see `<parallel-execution>`.
 
-This is the same rule implemented by `deriveCriteriaVerification` in `@tiki/shared`; the desktop checklist derives the live state from phase completion, but persisting it here keeps the plan file authoritative once EXECUTE finishes. (Direct-JSON write is acknowledged — `successCriteria` is not exposed by the state shim.)
+**After each phase completes, recompute `successCriteria` verification** by running the `plan.mjs verify-criteria` shim on the same plan file:
+
+```bash
+node .claude/tiki/scripts/plan.mjs verify-criteria {number}
+```
+
+This applies the "all covering phases complete" rule (for each criterion, every phase in `coverageMatrix[criterion.id]` must be `status: "completed"`) — the same rule `deriveCriteriaVerification` implements in `@tiki/shared`. The desktop checklist derives the live state from phase completion; running the shim persists it so the plan file stays authoritative once EXECUTE finishes. It is a safe recompute, so re-running it after every phase is correct.
 </state-management>
 
 <errors>
@@ -519,17 +530,15 @@ When verification fails AND auto-heal is enabled:
    - The categorized error is not in `config.workflow.autoHeal.categories`
    - The same error has already been seen on the previous attempt with no progress (heal is looping)
 5. **Otherwise, attempt a targeted fix** based on category (see "Healing strategies" below). Apply the fix as a normal edit, then **re-run the same verification command** that originally failed.
-6. **Append a `HealAttempt` record** to `phase.healAttempts` in `.tiki/state.json` regardless of outcome:
-   ```json
-   {
-     "attempt": {1-indexed},
-     "timestamp": "{ISO timestamp}",
-     "errorCategory": "type-error",
-     "errorSummary": "{one-line summary, ~120 chars}",
-     "fixApplied": "{one-line description of the change}",
-     "outcome": "success" | "failure"
-   }
+6. **Append a `HealAttempt` record** via the `state.mjs heal-attempt` shim regardless of outcome (it appends to `activeWork["issue:{N}"].phase.healAttempts`, creating the array if absent, and validates the category/outcome enums):
+   ```bash
+   node .claude/tiki/scripts/state.mjs heal-attempt issue:{number} \
+     --category type-error --outcome failure \
+     --message "{one-line error summary, ~120 chars}" \
+     --strategy "{one-line description of the fix applied}" \
+     --next-step "{what to try next, optional}"
    ```
+   The stored record is `{ ts, category, outcome, message?, strategy?, nextStep? }` — `category` must be one of `build-error | type-error | test-failure | lint-error | other` and `outcome` one of `success | failure`. The attempt count is derived from the array length (no manual `attempt` index).
 7. **On success**, clear the failure state and continue to the next phase normally. Include the heal attempts in the phase summary so they are visible.
 8. **On failure**, loop back to step 1 with the new error output. The next iteration's `attempt` count increments naturally because the prior record was appended.
 
@@ -563,7 +572,7 @@ Then fire the existing `AskUserQuestion` from `<next-actions>` "After failure".
 
 ### Where to record attempts
 
-`HealAttempt` records live in `.tiki/state.json` under the active work item's `phase.healAttempts` array. The Rust state schema treats this loosely (no validation), so you can write the array directly. Do not create a separate file.
+`HealAttempt` records live in `.tiki/state.json` under the active work item's `phase.healAttempts` array. Always append via `node .claude/tiki/scripts/state.mjs heal-attempt issue:{number} ...` (see step 6) — never write the array by hand. Do not create a separate file.
 </auto-heal>
 
 <next-actions>
