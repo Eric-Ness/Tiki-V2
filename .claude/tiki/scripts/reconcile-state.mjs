@@ -19,10 +19,32 @@
  *
  *   1. activeWork-scoped. ONLY mutates issue entries that ALREADY exist in
  *      state.activeWork. It never scans plan files to CREATE entries — the repo
- *      has ~100 live plan files for long-shipped issues (plan archiving is
+ *      has ~120 stale ACTIVE plan files for long-shipped issues (plan archiving is
  *      dropped as often as transitions), and resurrecting them would flood the
  *      kanban. Early steps (GET→PLAN, before an entry exists) are covered by the
  *      unconditional foreground transitions from #247, not by this reconciler.
+ *      1a. AMENDMENT (#270): a NARROW bootstrap exception exists for the case
+ *          where the entry itself is what got dropped (e.g. a plugin-only
+ *          install whose state.mjs path is dead, so GET never created the
+ *          entry). findBootstrapCandidates() may create issue:N entries from
+ *          plan files, but ONLY when ALL FIVE guards pass, in order:
+ *            (1) no issue:N entry already in activeWork — never clobber a
+ *                tracked entry;
+ *            (2) N not in history.recentIssues — but history only reaches back
+ *                to #149 (~52 issues), so this guard ALONE cannot fence off
+ *                the ~120 older stale plans;
+ *            (3) no plans/archive/issue-N.json — archive presence means the
+ *                issue shipped, even where history predates the record;
+ *            (4) plan is RECENT: newest of the plan JSON's createdAt /
+ *                updatedAt / auditedAt within BOOTSTRAP_RECENCY_MS (14 days)
+ *                of now. JSON timestamps ONLY, never file mtime (git clone /
+ *                checkout resets mtime → a fresh clone would flood). A plan
+ *                with no parseable timestamp is NOT recent. This is the guard
+ *                that actually holds back the ~70 stale plans guards 2+3 miss:
+ *                a legit bootstrap case has a recently written plan, a
+ *                weeks-stale dropped entry is an accepted miss.
+ *            (5) plan parses and plan.issue.number matches the filename —
+ *                a mismatch means a corrupt/hand-mangled file, never trust it.
  *   2. Advance-only. Never moves an item backward; only forward when artifacts
  *      justify a later step (or more phase progress) than currently recorded.
  *   3. Skips LLM-set / terminal states. Never touches status failed | paused |
@@ -58,6 +80,10 @@ const STEP_ORDER = { GET: 0, REVIEW: 1, PLAN: 2, AUDIT: 3, EXECUTE: 4, SHIP: 5 }
 
 // Statuses the reconciler must never override (LLM-set or terminal).
 const FROZEN_STATUSES = new Set(["failed", "paused", "completed"]);
+
+// Bootstrap recency window (#270, contract rule 1a guard 4): a plan whose
+// newest JSON timestamp is older than this is never bootstrapped.
+export const BOOTSTRAP_RECENCY_MS = 14 * 24 * 60 * 60 * 1000;
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -171,6 +197,69 @@ function deriveTarget(plan) {
   return { status: "planning", step: "PLAN" };
 }
 
+/** Newest parseable plan JSON timestamp (epoch ms), or null if none parse. */
+function newestPlanTimestamp(plan) {
+  let newest = null;
+  for (const key of ["createdAt", "updatedAt", "auditedAt"]) {
+    const t = Date.parse(plan?.[key]);
+    if (!Number.isNaN(t) && (newest === null || t > newest)) newest = t;
+  }
+  return newest;
+}
+
+/**
+ * Scan <tikiPath>/plans for issue plans that justify CREATING an activeWork
+ * entry (#270 — contract rule 1a). Returns candidate records
+ * { workId, number, plan, target }; applies the five 1a guards IN ORDER and
+ * never mutates state. `now` is epoch ms (callers pass Date.now(); tests pin it).
+ */
+export function findBootstrapCandidates(state, tikiPath, now) {
+  const candidates = [];
+  const plansDir = path.join(tikiPath, "plans");
+
+  let entries;
+  try {
+    entries = fs.readdirSync(plansDir);
+  } catch {
+    return []; // no plans dir — nothing to bootstrap
+  }
+
+  const activeWork = (state && state.activeWork) || {};
+  const history = (state && state.history) || {};
+
+  for (const name of entries) {
+    const m = /^issue-(\d+)\.json$/.exec(name);
+    if (!m) continue; // skips the archive/ subdir and any non-plan files
+    const number = Number(m[1]);
+    const workId = `issue:${number}`;
+
+    // Guard 1: never clobber an entry that already exists.
+    if (activeWork[workId]) continue;
+    // Guard 2: already shipped per history.
+    if (inHistory(history, number)) continue;
+    // Guard 3: archived copy = shipped, even where history predates the record.
+    if (fs.existsSync(path.join(plansDir, "archive", `issue-${number}.json`))) continue;
+
+    // Guard 5 (parse) is needed before guard 4 can read timestamps.
+    const plan = readPlanSafe(tikiPath, number);
+    if (!plan) continue; // missing or corrupt JSON
+
+    // Guard 4: recency from plan JSON timestamps ONLY (never file mtime —
+    // git clone/checkout resets mtime and would flood a fresh clone).
+    const newest = newestPlanTimestamp(plan);
+    if (newest === null || now - newest > BOOTSTRAP_RECENCY_MS) continue;
+
+    // Guard 5 (rest): filename/content mismatch = corrupt, never trust it.
+    if (plan.issue?.number !== number) continue;
+
+    // A phases-empty plan is still a PLAN artifact — fall back to PLAN.
+    const target = deriveTarget(plan) ?? { status: "planning", step: "PLAN" };
+    candidates.push({ workId, number, plan, target });
+  }
+
+  return candidates;
+}
+
 /** Structural equality for a { current, total, status } phase (null-safe). */
 function phaseEqual(a, b) {
   if (!a && !b) return true;
@@ -193,6 +282,9 @@ function phaseEqual(a, b) {
  *   - in history → derived is SHIP (completed for a release child, otherwise the
  *     entry would be removed).
  *   - otherwise → deriveTarget(plan); a null target (pre-PLAN) is left as-is.
+ *
+ * Also appends one "would create (bootstrap #270)" row per bootstrap candidate
+ * (recorded -/- since no entry exists yet) so --print previews entry creation.
  */
 export function buildReport(state, tikiPath) {
   const rows = [];
@@ -254,6 +346,24 @@ export function buildReport(state, tikiPath) {
       derivedPhase,
       drift,
       note,
+    });
+  }
+
+  // Mirror the bootstrap rule (#270): plans that WOULD create an entry on the
+  // next real pass show up in the doctor as "would create" rows. Read-only —
+  // findBootstrapCandidates never mutates state.
+  for (const c of findBootstrapCandidates(state, tikiPath, Date.now())) {
+    rows.push({
+      workId: c.workId,
+      number: c.number,
+      recordedStatus: null,
+      recordedStep: null,
+      recordedPhase: null,
+      derivedStatus: c.target.status,
+      derivedStep: c.target.step,
+      derivedPhase: c.target.phase ?? null,
+      drift: true,
+      note: "would create (bootstrap #270)",
     });
   }
 
@@ -392,6 +502,24 @@ export function reconcile(tikiPath, { dryRun = false } = {}) {
       if (!workId.startsWith("issue:")) continue; // leave release:* untouched
       const change = reconcileEntry(state, workId, entry, history, tikiPath);
       if (change) result.changes.push(change);
+    }
+
+    // Bootstrap (#270, contract rule 1a): create entries for recent plans whose
+    // GET transition was dropped. Runs after the entry loop, inside the same
+    // locked pass. applyTransition creates fresh entries without a legality
+    // check when `issue` is provided, so no isLegalTransition pre-guard needed.
+    for (const c of findBootstrapCandidates(state, tikiPath, Date.now())) {
+      applyTransition(state, {
+        workId: c.workId,
+        toStatus: c.target.status,
+        toStep: c.target.step,
+        phase: c.target.phase ?? null,
+        parallelExecution: null,
+        parentRelease: undefined,
+        issue: { number: c.number, title: c.plan.issue.title ?? `Issue ${c.number}` },
+        release: null,
+      });
+      result.changes.push({ workId: c.workId, action: `bootstrapped at ${c.target.step}` });
     }
 
     if (!dryRun && result.changes.length > 0) {
