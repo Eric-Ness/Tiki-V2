@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 268,
-      "title": "Plugin-only install: pipeline state-tracking silently dead (command bodies reference unresolvable .claude/tiki/scripts/state.mjs)",
-      "completedAt": "2026-06-13T00:41:59.303Z"
+      "number": 270,
+      "title": "Reconciler: bootstrap missing activeWork entries from active plan files (narrow rule)",
+      "completedAt": "2026-06-13T00:59:56.947Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.2",
@@ -16,6 +16,11 @@
       "tag": "v0.9.2"
     },
     "recentIssues": [
+      {
+        "number": 270,
+        "title": "Reconciler: bootstrap missing activeWork entries from active plan files (narrow rule)",
+        "completedAt": "2026-06-13T00:59:56.947Z"
+      },
       {
         "number": 268,
         "title": "Plugin-only install: pipeline state-tracking silently dead (command bodies reference unresolvable .claude/tiki/scripts/state.mjs)",

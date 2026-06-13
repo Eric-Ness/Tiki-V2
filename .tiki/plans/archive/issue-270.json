@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 270,
+    "title": "Reconciler: bootstrap missing activeWork entries from active plan files (narrow rule)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/270"
+  },
+  "createdAt": "2026-06-13T01:05:00.000Z",
+  "research": [
+    "reconciler-contract"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "A recent active plan with no activeWork entry bootstraps an issue:N entry at the artifact-derived step (planning/PLAN, planning/AUDIT when audited, or executing/EXECUTE with correct phase N/M when phases started)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:54:25.812Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "No resurrection: an archived plan, history.recentIssues membership, or a stale plan (newest of createdAt/updatedAt/auditedAt older than 14 days) each independently block bootstrap",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:54:25.812Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "reconcile-state.mjs --print shows 'would create' rows for bootstrap candidates and remains strictly read-only",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:57:39.185Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "All 16 existing reconciler tests still pass; new tests cover every guard independently plus the positive bootstrap paths",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:57:39.185Z"
+    },
+    {
+      "id": "SC5",
+      "category": "functionality",
+      "description": "Live-fire on this dogfood repo (~120 stale active plans, history only reaching #149): --print reports zero 'would create' rows and a real reconcile pass creates nothing",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:57:39.185Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Bootstrap rule in reconcile-state.mjs + guard tests",
+      "status": "completed",
+      "content": "Implement the 5-guard bootstrap in `packages/framework/scripts/reconcile-state.mjs` (read `.tiki/research/reconciler-contract.md` first — it documents the contract, the applyTransition creation semantics, and the quantified stale-plan flood this rule must not trigger).\n\n1. New helper `findBootstrapCandidates(state, tikiPath, now)` (export for tests): readdir `<tikiPath>/plans` (tolerate missing dir), match files via `/^issue-(\\d+)\\.json$/` (skips the archive/ subdir entry naturally). For each number N apply the guards IN ORDER and return candidate records `{ workId, number, plan, target }`:\n   - skip if `state.activeWork[\"issue:\" + N]` exists;\n   - skip if N is in `history.recentIssues` (reuse `inHistory`);\n   - skip if `<tikiPath>/plans/archive/issue-N.json` exists (archive presence = shipped, even where history predates the record);\n   - skip if NOT recent: newest of plan.createdAt / plan.updatedAt / plan.auditedAt (parse defensively; unparseable/missing timestamps count as ABSENT, and a plan with NO parseable timestamp is NOT recent) must be within `BOOTSTRAP_RECENCY_MS = 14 * 24 * 60 * 60 * 1000` of `now`. Use plan JSON timestamps, NEVER file mtime (git clone/checkout resets mtime — would flood on fresh clones).\n   - derive target: `deriveTarget(plan)`; if null but the plan parses and has `plan.issue.number === N`, fall back to `{ status: \"planning\", step: \"PLAN\" }` (a phases-empty plan is still a PLAN artifact). If the plan does not parse (`readPlanSafe` null) or `plan.issue.number !== N`, skip (filename/content mismatch = corrupt, do not bootstrap).\n2. Wire into `reconcile()`'s pass: after the existing entry loop, iterate candidates and create each via `applyTransition(state, { workId, toStatus: target.status, toStep: target.step, phase: target.phase ?? null, parallelExecution: null, parentRelease: undefined, issue: { number: N, title: plan.issue.title ?? `Issue ${N}` }, release: null })` — applyTransition creates fresh entries when given an issue payload and performs NO legality check on creation, so no pre-guard needed. Push `{ workId, action: \"bootstrapped at <STEP>\" }` into result.changes (required for the write-only-on-change persistence).\n3. Amend the SAFETY CONTRACT header: rule 1 gets a numbered amendment documenting the 5-guard bootstrap (#270) and why each guard exists (cite the ~120 stale-plan count).\n4. Tests in `packages/framework/__tests__/reconcile-state.test.mjs` (ESM-import style, fixture .tiki trees, follow existing conventions; a `makePlan(overrides)` fixture helper with fresh timestamps will keep these terse):\n   - positive: recent audited plan, empty activeWork → entry created at planning/AUDIT; recent plan with phase 2 executing of 3 → executing/EXECUTE phase {2,3,executing}; recent phases-empty plan → planning/PLAN;\n   - TRAP per guard: archived copy exists → no creation; in history → no creation; stale timestamps (30 days old) → no creation; corrupt plan JSON → no creation; filename/issue-number mismatch → no creation;\n   - existing-entry no-op: entry already present → bootstrap does not touch it (count unchanged);\n   - RE-PIN the existing TRAP test 'a stale all-complete plan for an issue NOT in activeWork is never resurrected' so its fixture explicitly exercises the new rule (give its plan OLD timestamps and/or an archived copy so it stays a non-candidate under the new semantics — do not delete it, re-pin it).\n5. Run the framework suite; all 74 existing + new tests green. Do NOT regenerate the dogfood copy yet (phase 2 does install.js regen + live-fire).",
+      "verification": [
+        "Framework test suite green including all new bootstrap tests",
+        "Every guard has an independent TRAP test",
+        "deriveTarget fallback (phases-empty plan -> planning/PLAN) covered",
+        "Safety-contract header documents the amendment"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        "packages/framework/__tests__/reconcile-state.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T00:54:25.811Z",
+      "summary": "Implemented findBootstrapCandidates(state, tikiPath, now) (exported, +BOOTSTRAP_RECENCY_MS=14d) with the 5 ordered guards (existing entry / history / archive presence / JSON-timestamp recency via newestPlanTimestamp / filename-content number match) and deriveTarget fallback {planning,PLAN} for phases-empty plans. Wired into reconcile()'s locked pass after the entry loop via applyTransition's create path; changes pushed as \"bootstrapped at <STEP>\". Safety-contract header rule 1 gained amendment 1a (cites ~120 stale plans, history reaching #149). 11 new tests (3 positive paths, 5 TRAP guards, no-op, dry-run, window-boundary 13d-in/15d-out) + re-pinned the stale-resurrection TRAP with explicit 45-day-old timestamps. Reconcile suite 27/27. Framework suite 84/85 — the 1 red is the dogfood-parity guard, EXPECTED until phase 2 regenerates .claude/tiki/scripts/ (live Stop-hook still runs the old reconciler; nothing ships from phase 1 alone). Pre-validated live-fire: findBootstrapCandidates on this repo's real .tiki returns ZERO candidates. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 84, failed: 1, skipped: 0, status: \"failed\" } — failure is the expected phase-boundary dogfood drift, accepted by plan design."
+    },
+    {
+      "number": 2,
+      "title": "--print 'would create' mirror, dogfood regen, live-fire validation",
+      "status": "completed",
+      "content": "1. Mirror the bootstrap rule in the read-only doctor: `buildReport(state, tikiPath)` in `packages/framework/scripts/reconcile-state.mjs` additionally calls `findBootstrapCandidates` and appends rows shaped like the existing ones with `recordedStatus/recordedStep/recordedPhase: null`, derived values from the candidate target, `drift: true`, `note: \"would create (bootstrap)\"`. `formatReport` needs no structural change (rows render generically) — verify the output reads sensibly and adjust only if needed. `--print` must remain strictly read-only (the existing test asserts this; extend it to cover a bootstrap candidate).\n2. Tests: --print/report test with a bootstrap candidate → row present with note 'would create' and state file byte-unchanged; report with only excluded orphans (stale/archived/history) → no bootstrap rows.\n3. Regenerate the dogfood copy: run `node packages/framework/install.js` from the repo root (the plugin-distribution test requires .claude/tiki/scripts/reconcile-state.mjs identical to canonical).\n4. LIVE-FIRE on this repo (SC5): run `node .claude/tiki/scripts/reconcile-state.mjs --print` from the repo root — assert by inspection ZERO 'would create' rows despite ~120 stale active plans (all excluded by history/archive/recency guards). CAUTION: the live repo has issue:270 itself in activeWork mid-pipeline — its row must show as a normal entry, not a bootstrap row. Then run a real pass `node .claude/tiki/scripts/reconcile-state.mjs` (NOT --dry-run, NOT --quiet) and verify output changes:[] — nothing created, nothing advanced unexpectedly (270's recorded state may legitimately show drift healing toward its plan artifacts; if the pass advances issue:270 per its own plan file that is CORRECT reconciler behavior — report it, don't fight it).\n5. Full framework suite green; then `pnpm -C packages/framework test` final count reported.",
+      "verification": [
+        "--print shows 'would create' rows in fixture and is byte-level read-only",
+        "Live-fire --print on dogfood repo: zero bootstrap rows",
+        "Live-fire real pass: changes [] (or only legitimate self-healing of in-flight entries)",
+        "Dogfood script copy regenerated; plugin-distribution dogfood-parity test green",
+        "Full framework suite green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        "packages/framework/__tests__/reconcile-state.test.mjs",
+        ".claude/tiki/scripts/reconcile-state.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T00:57:39.184Z",
+      "summary": "buildReport() now mirrors the bootstrap rule: one \"would create (bootstrap #270)\" row per findBootstrapCandidates result (null recorded triple renders as -/-, drift:true); --print stays strictly read-only (byte-unchanged state asserted in test). +2 tests (candidate row + state byte-unchanged; excluded orphans yield zero rows). Dogfood .claude/tiki/scripts/reconcile-state.mjs regenerated via install.js (settings.json line-ending churn restored). LIVE-FIRE SC5 on this repo: --print showed issue:270 as a normal in-sync row (executing/EXECUTE 2/2) and ZERO would-create rows despite ~120 stale active plans; real pass returned changes: [] verbatim. Framework suite 87/87 including the dogfood-parity guard. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 87, failed: 0, skipped: 0, status: \"passed\" }. Ship note: canonical + dogfood copies must ship in the same commit or the parity guard goes red."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2
+    ],
+    "SC5": [
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T00:49:07.008Z"
+}
