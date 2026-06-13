@@ -1,6 +1,6 @@
 {
   "name": "tiki-v2",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "description": "GitHub-issue-centric workflow framework for Claude Code",
   "type": "module",

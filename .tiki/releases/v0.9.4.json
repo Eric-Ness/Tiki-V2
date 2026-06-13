@@ -1,0 +1,12 @@
+{
+  "version": "v0.9.4",
+  "status": "active",
+  "issues": [
+    { "number": 278, "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new" },
+    { "number": 279, "title": "Build the three declined abstractions: shared compareSemver, dedup resolve_tiki_path, ESLint fresh-ref rule" },
+    { "number": 280, "title": "Kanban wiring: parity-test column table vs canonical transitions + toast on undispatchable drags" },
+    { "number": 281, "title": "Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)" },
+    { "number": 282, "title": "pnpm lint: clear pre-existing errors via deliberate config + gate lint in CI" }
+  ],
+  "createdAt": "2026-06-13T22:00:00.000Z"
+}

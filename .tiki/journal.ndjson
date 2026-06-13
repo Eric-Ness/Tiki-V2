@@ -9,3 +9,4 @@
 {"ts":"2026-06-13T20:51:20.635Z","workId":"issue:282","step":"AUDIT","event":"start"}
 {"ts":"2026-06-13T20:51:21.054Z","workId":"issue:282","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-13T20:56:59.385Z","workId":"issue:282","step":"SHIP","event":"start"}
+{"ts":"2026-06-13T20:59:20.279Z","workId":"release:v0.9.4","step":"EXECUTE","event":"start"}

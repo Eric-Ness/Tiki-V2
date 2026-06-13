@@ -1,7 +1,7 @@
 {
   "name": "tiki",
   "description": "GitHub-issue-centric workflow framework for Claude Code",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "author": {
     "name": "Eric Nichols"
   },
