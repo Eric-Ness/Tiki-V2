@@ -1649,6 +1649,7 @@ mod tests {
     ///  - issue-10: an unverified SC whose description is visual ("renders") → included
     ///  - issue-20: an unverified SC that is non-visual ("reconciler advances") → excluded
     ///  - issue-30: a visual SC but verified:true → excluded
+    ///
     /// issue-10 also carries a SECOND visual unverified SC so we can pin (issue,id)
     /// ordering within a file.
     fn temp_tiki_unverified_sc_fixture(tag: &str) -> PathBuf {
