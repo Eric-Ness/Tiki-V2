@@ -24,11 +24,13 @@ function buildTempRelease(opts = {}) {
   writeFileSync(join(root, "packages/framework/.claude-plugin/plugin.json"), JSON.stringify({ name: "tiki", version: VERSION }));
   writeFileSync(join(tiki, ".framework-version"), opts.frameworkVersion ?? VERSION);
 
-  // Release def + changelog.
+  // Release def + changelog. `opts.archived` writes the def into releases/archive/
+  // (location = the sole "archived" truth); `opts.defStatus` overrides its status field.
   if (opts.def !== false) {
+    const defDir = opts.archived ? join(tiki, "releases", "archive") : join(tiki, "releases");
     writeFileSync(
-      join(tiki, "releases", `v${VERSION}.json`),
-      JSON.stringify({ version: `v${VERSION}`, status: "shipped", issues: [{ number: 1, title: "a" }, { number: 2, title: "b" }] })
+      join(defDir, `v${VERSION}.json`),
+      JSON.stringify({ version: `v${VERSION}`, status: opts.defStatus ?? "shipped", issues: [{ number: 1, title: "a" }, { number: 2, title: "b" }] })
     );
   }
   if (opts.changelog !== false) {
@@ -93,4 +95,26 @@ test("missing release def fails fast", () =>
   withTempRelease({ def: false }, (r) => {
     assert.equal(r.ok, false);
     assert.ok(r.failures.some((f) => f.includes("release def not found")), r.failures.join("; "));
+  }));
+
+// #276: an archived def (location = truth) whose status field is stale-"active"
+// gets a SOFT warning — it must not flip the overall gate, only inform.
+test("archived def with stale status warns softly (gate still passes)", () =>
+  withTempRelease({ archived: true, defStatus: "active" }, (r) => {
+    assert.equal(r.ok, true, "should still pass (soft warn only): " + r.failures.join("; "));
+    assert.equal(r.failures.length, 0);
+    assert.ok(
+      r.warnings.some((w) => w.includes('status is "active"') && w.toLowerCase().includes("expected")),
+      r.warnings.join("; ")
+    );
+  }));
+
+// An archived def already at status:"shipped" produces NO such warning.
+test("archived def with shipped status produces no stale-status warning", () =>
+  withTempRelease({ archived: true, defStatus: "shipped" }, (r) => {
+    assert.equal(r.ok, true, "unexpected failures: " + r.failures.join("; "));
+    assert.ok(
+      !r.warnings.some((w) => w.includes("expected") && w.includes("shipped")),
+      "no stale-status warning expected: " + r.warnings.join("; ")
+    );
   }));

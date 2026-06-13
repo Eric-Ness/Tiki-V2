@@ -937,6 +937,106 @@ pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, Strin
     })
 }
 
+/// One-shot fixer for the `archivedButActive` residue (#276): scan
+/// `<tiki>/releases/archive/*.json` and, for every def whose `status` is not
+/// already `"shipped"`, rewrite it with `status:"shipped"` while preserving ALL
+/// other fields verbatim. Returns the count of files actually rewritten.
+///
+/// Location (`archive/`) is the sole source of the "completed" truth (#259); this
+/// command only reconciles the cosmetic `status` field on disk so status-field
+/// readers (e.g. `check-release-readiness.mjs`) don't get misled. We edit a parsed
+/// `serde_json::Value` rather than round-tripping through `TikiRelease` so no
+/// unmodeled fields are dropped. Atomic write via `fs_utils::atomic_write`.
+///
+/// A single unreadable / unparseable / non-object file is skipped (logged at warn),
+/// never failing the whole operation. `tiki_path` defaults to `<cwd>/.tiki`.
+#[tauri::command]
+pub fn normalize_archived_releases(tiki_path: Option<String>) -> Result<usize, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let archive_dir = path.join("releases").join("archive");
+    if !archive_dir.exists() {
+        return Ok(0);
+    }
+
+    let entries = match std::fs::read_dir(&archive_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            log::warn!("Failed to read archive dir {:?}: {}", archive_dir, e);
+            return Ok(0);
+        }
+    };
+
+    let mut fixed = 0usize;
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.extension().map_or(false, |ext| ext == "json") {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Failed to read archived release {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        let mut value: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Failed to parse archived release {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        let obj = match value.as_object_mut() {
+            Some(o) => o,
+            None => {
+                log::warn!("Archived release {:?} is not a JSON object; skipping", file_path);
+                continue;
+            }
+        };
+
+        // Already shipped? leave the file byte-for-byte untouched.
+        let already_shipped = obj
+            .get("status")
+            .and_then(|s| s.as_str())
+            .map(|s| s == "shipped")
+            .unwrap_or(false);
+        if already_shipped {
+            continue;
+        }
+
+        obj.insert(
+            "status".to_string(),
+            serde_json::Value::String("shipped".to_string()),
+        );
+
+        let serialized = match serde_json::to_string_pretty(&value) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("Failed to serialize archived release {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+
+        if let Err(e) = fs_utils::atomic_write(&file_path, &serialized) {
+            log::warn!("Failed to rewrite archived release {:?}: {}", file_path, e);
+            continue;
+        }
+        fixed += 1;
+    }
+
+    Ok(fixed)
+}
+
 /// Versions listed in `<tiki>/state.json` `history.recentReleases` that have no
 /// matching `{version}.json` in either `releases/` or `releases/archive/`. A parity
 /// gap — the release shipped (it's in history) but its definition file is gone.
@@ -1419,6 +1519,82 @@ mod tests {
             !live.archived_but_active,
             "a top-level release must not be flagged archived_but_active"
         );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #276: `normalize_archived_releases` rewrites ONLY the stale-active archived
+    /// def to `status:"shipped"`, returns the count fixed, and leaves the
+    /// already-shipped archived def + the active-location def untouched (preserving
+    /// their other fields). Location-derived completion is unaffected; this only
+    /// reconciles the cosmetic on-disk `status`.
+    fn temp_tiki_normalize_fixture(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-normalize-{}-{}", tag, nanos));
+        let releases = tiki.join("releases");
+        let archive = releases.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        // Stale-active archived def (the residue to fix) — note extra fields to
+        // confirm they survive the rewrite.
+        let stale = serde_json::json!({
+            "version": "v9.9.8",
+            "status": "active",
+            "issues": [101, 102],
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        });
+        // Already-shipped archived def — must be left byte-equivalent.
+        let shipped = serde_json::json!({
+            "version": "v9.9.7",
+            "status": "shipped",
+            "issues": [103],
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        });
+        // Active-location def — must NOT be touched (it's a live release).
+        let live = serde_json::json!({
+            "version": "v9.9.9",
+            "status": "active",
+            "issues": [104],
+            "createdAt": "2026-01-01T00:00:00.000Z"
+        });
+        std::fs::write(archive.join("v9.9.8.json"), stale.to_string()).unwrap();
+        std::fs::write(archive.join("v9.9.7.json"), shipped.to_string()).unwrap();
+        std::fs::write(releases.join("v9.9.9.json"), live.to_string()).unwrap();
+        tiki
+    }
+
+    #[test]
+    fn normalize_archived_releases_fixes_only_stale_active_archived_defs() {
+        let tiki = temp_tiki_normalize_fixture("fix");
+        let tiki_str = tiki.to_string_lossy().to_string();
+
+        let archive = tiki.join("releases").join("archive");
+        let live_path = tiki.join("releases").join("v9.9.9.json");
+        let shipped_before = std::fs::read_to_string(archive.join("v9.9.7.json")).unwrap();
+        let live_before = std::fs::read_to_string(&live_path).unwrap();
+
+        let count = normalize_archived_releases(Some(tiki_str)).unwrap();
+        assert_eq!(count, 1, "only the one stale-active archived def is fixed");
+
+        // The stale def is now shipped AND kept its other fields.
+        let stale_after: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(archive.join("v9.9.8.json")).unwrap())
+                .unwrap();
+        assert_eq!(stale_after["status"], "shipped");
+        assert_eq!(stale_after["version"], "v9.9.8");
+        assert_eq!(stale_after["issues"], serde_json::json!([101, 102]));
+        assert_eq!(stale_after["createdAt"], "2026-01-01T00:00:00.000Z");
+
+        // The already-shipped archived def is untouched (byte-equivalent).
+        let shipped_after = std::fs::read_to_string(archive.join("v9.9.7.json")).unwrap();
+        assert_eq!(shipped_after, shipped_before, "shipped archived def must be untouched");
+
+        // The active-location def is untouched (byte-equivalent) — still active.
+        let live_after = std::fs::read_to_string(&live_path).unwrap();
+        assert_eq!(live_after, live_before, "active-location def must not be touched");
 
         std::fs::remove_dir_all(&tiki).ok();
     }

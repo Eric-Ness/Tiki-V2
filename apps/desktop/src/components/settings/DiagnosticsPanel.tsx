@@ -23,6 +23,7 @@ export function DiagnosticsPanel() {
   const [report, setReport] = useState<DiagnosticsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [normalizing, setNormalizing] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeProject) {
@@ -48,6 +49,28 @@ export function DiagnosticsPanel() {
 
   const summary: DiagnosticsSummary | null = report ? diagnosticsSummary(report) : null;
 
+  // #276: a stale-"active" archived release def is cosmetic residue that the
+  // doctor surfaces as an actionable finding. Offer a one-shot Fix that runs the
+  // `normalize_archived_releases` command (rewrites them to status:"shipped") then
+  // re-runs the diagnostics. Mirrors the Refresh button's invoke + load pattern.
+  const canNormalize = Boolean(
+    summary?.findings.some((f) => f.action === "normalizeArchivedReleases")
+  );
+
+  const normalizeArchivedReleases = useCallback(async () => {
+    if (!activeProject) return;
+    setNormalizing(true);
+    setError(null);
+    try {
+      await invoke<number>("normalize_archived_releases", { tikiPath });
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setNormalizing(false);
+    }
+  }, [activeProject, tikiPath, load]);
+
   return (
     <div className="settings-section">
       <div className="settings-section-header">
@@ -59,14 +82,26 @@ export function DiagnosticsPanel() {
             </span>
           )}
         </h3>
-        <button
-          className="settings-reset-btn"
-          onClick={() => void load()}
-          disabled={loading || !activeProject}
-          title="Re-run tiki_doctor"
-        >
-          {loading ? "Checking…" : "Refresh"}
-        </button>
+        <div className="diagnostics-actions">
+          {canNormalize && (
+            <button
+              className="settings-reset-btn"
+              onClick={() => void normalizeArchivedReleases()}
+              disabled={normalizing || loading || !activeProject}
+              title="Rewrite stale-active archived release defs to status:shipped"
+            >
+              {normalizing ? "Normalizing…" : "Normalize archived releases"}
+            </button>
+          )}
+          <button
+            className="settings-reset-btn"
+            onClick={() => void load()}
+            disabled={loading || normalizing || !activeProject}
+            title="Re-run tiki_doctor"
+          >
+            {loading ? "Checking…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <p className="settings-hint">

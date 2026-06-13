@@ -63,6 +63,14 @@ export type FindingLevel = "pass" | "warn" | "info";
 export interface Finding {
   level: FindingLevel;
   message: string;
+  /**
+   * When set, the panel can render a Fix affordance (button) for this finding.
+   * `'normalizeArchivedReleases'` (#276) rewrites stale-"active" archived release
+   * defs to `status:"shipped"` via the `normalize_archived_releases` command. An
+   * actionable finding is still purely cosmetic residue — it does NOT flip the
+   * top-level status to "warnings".
+   */
+  action?: "normalizeArchivedReleases";
 }
 
 export interface DiagnosticsSummary {
@@ -124,12 +132,17 @@ export function diagnosticsSummary(report: DiagnosticsReport): DiagnosticsSummar
     passes.push({ level: "pass", message: "Reconciler hook installed" });
   }
 
-  // --- Informational (never flips status) ---
+  // --- Actionable residue (never flips status) ---
+  // Stale-"active" archived release defs are cosmetic residue, not drift (location
+  // is the source of truth since #259), so this stays an `info` and never makes the
+  // panel report "warnings". When present, it carries a Fix affordance (#276): the
+  // panel offers a "Normalize" button that runs `normalize_archived_releases`.
   const archivedButActive = report.releaseChecks.filter((c) => c.archivedButActive).length;
   if (archivedButActive > 0) {
     infos.push({
       level: "info",
-      message: `${archivedButActive} archived release(s) retain an "active" status (expected)`,
+      message: `${archivedButActive} archived release(s) carry a stale "active" status — Normalize to fix`,
+      action: "normalizeArchivedReleases",
     });
   }
 

@@ -37,6 +37,20 @@ export async function checkReleaseReadiness(tikiPath, version) {
     return { ok: false, failures, warnings };
   }
   const def = readJson(defPath);
+
+  // Soft footgun-catch (#276): location is the sole truth for "archived", but the
+  // JSON `status` field is kept and SHOULD agree (archived ⟹ "shipped"). When the
+  // def resolves from the archive/ location yet its status is something else (the
+  // v0.9.0 stale-"active" footgun), any status-field reader could be misled. Warn
+  // (soft) — the gate stays read-only; the doctor's Normalize action does the fix.
+  const fromArchive = /[\\/]archive[\\/]/.test(defPath);
+  if (fromArchive && def.status != null && def.status !== "shipped") {
+    warnings.push(
+      `archived release def for ${version}: status is "${def.status}", expected "shipped" — ` +
+        `run Normalize (Diagnostics) or it can mislead any status-field reader (location is the truth)`
+    );
+  }
+
   const issues = (def.issues || [])
     .map((i) => (typeof i === "number" ? i : i?.number))
     .filter((n) => typeof n === "number");

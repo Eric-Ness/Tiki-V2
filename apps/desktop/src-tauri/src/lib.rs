@@ -67,6 +67,7 @@ pub fn run() {
             commands::install_framework,
             commands::read_framework_version,
             commands::tiki_doctor,
+            commands::normalize_archived_releases,
             config::read_tiki_config,
             config::save_tiki_config,
             state_transition::state_transition,

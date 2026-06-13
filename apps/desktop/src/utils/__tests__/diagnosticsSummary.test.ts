@@ -45,6 +45,34 @@ describe("diagnosticsSummary", () => {
     expect(info?.message).toContain("2");
   });
 
+  it("marks archivedButActive>0 as an actionable (fixable) finding while staying healthy (#276)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        releaseChecks: [
+          { version: "v0.8.2", location: "archive", status: "active", archivedButActive: true },
+        ],
+      })
+    );
+    // Cosmetic residue must NOT flip the top-level status.
+    expect(s.status).toBe("healthy");
+    const finding = s.findings.find((f) => f.action === "normalizeArchivedReleases");
+    expect(finding).toBeDefined();
+    expect(finding?.level).toBe("info");
+    expect(finding?.message).toContain("1");
+    expect(finding?.message).toContain("Normalize");
+  });
+
+  it("has no actionable normalize finding when archivedButActive count is 0 (#276)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        releaseChecks: [
+          { version: "v0.9.0", location: "archive", status: "shipped", archivedButActive: false },
+        ],
+      })
+    );
+    expect(s.findings.some((f) => f.action === "normalizeArchivedReleases")).toBe(false);
+  });
+
   it("returns 'warnings' when recentReleasesMissingJson is non-empty", () => {
     const s = diagnosticsSummary(
       cleanReport({ recentReleasesMissingJson: ["v0.7.8", "v0.6.7"] })
