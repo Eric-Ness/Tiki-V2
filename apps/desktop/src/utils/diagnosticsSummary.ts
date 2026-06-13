@@ -23,6 +23,11 @@
  * hook is only a warning on a copy install; on a plugin-only install the plugin's
  * own hooks.json delivers the reconciler (the doctor cannot inspect plugin config),
  * so it is downgraded to `info`.
+ *
+ * #281 added the mirrored field `unverifiedShippedCriteria` — shipped success
+ * criteria left `verified:false` that match the visual/manual heuristic (computed
+ * in Rust; the frontend only renders them and adds a neutral `info` checklist
+ * finding, never re-deriving visual-ness or flipping the top-level status).
  */
 
 /** One release file's consistency check — mirrors Rust `ReleaseCheck`. */
@@ -55,6 +60,15 @@ export interface DiagnosticsReport {
    * reconciler hook is expected (the plugin provides it).
    */
   copyInstallDetected: boolean;
+  /**
+   * Shipped success criteria left `verified:false` that match the visual/manual
+   * heuristic, as computed by Rust `tiki_doctor` scanning archived plans (#281).
+   * ALWAYS present (serde default + non-Option Vec → `[]` when empty, never
+   * undefined), pre-sorted by (issue, id). The frontend only renders this list
+   * and adds an `info` finding — it must NOT re-derive visual-ness. Empty = none
+   * pending.
+   */
+  unverifiedShippedCriteria: { issue: number; id: string; description: string }[];
 }
 
 /** Severity of a single finding row in the panel. */
@@ -143,6 +157,18 @@ export function diagnosticsSummary(report: DiagnosticsReport): DiagnosticsSummar
       level: "info",
       message: `${archivedButActive} archived release(s) carry a stale "active" status — Normalize to fix`,
       action: "normalizeArchivedReleases",
+    });
+  }
+
+  // --- Pending visual-SC checklist (never flips status) ---
+  // Shipped success criteria left verified:false that match the visual/manual
+  // heuristic (#281). These are a checklist for the user to confirm in
+  // tauri:dev/installer — purely informational, NEVER a warning.
+  const unverifiedVisual = report.unverifiedShippedCriteria.length;
+  if (unverifiedVisual > 0) {
+    infos.push({
+      level: "info",
+      message: `${unverifiedVisual} shipped visual criterion(s) await verification`,
     });
   }
 

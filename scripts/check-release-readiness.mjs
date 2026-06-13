@@ -12,6 +12,21 @@ import { fileURLToPath, pathToFileURL } from "url";
 const stripV = (v) => String(v).replace(/^v/, "");
 const readJson = (p) => JSON.parse(readFileSync(p, "utf-8"));
 
+// Canonical "is this a visual/manual success criterion" heuristic (#281).
+// MUST stay IDENTICAL (same category set + same term list) to the Rust mirror in
+// apps/desktop/src-tauri (tiki_doctor). The single source of truth is
+// `.tiki/research/visual-sc-surfacing.md` — update that doc and BOTH sites together.
+// A criterion is treated as visual/manual iff its category is one of the set below,
+// OR its description matches the stem alternation. Intentionally a heuristic: it flags
+// genuine visual SCs and tolerates the rare over-flag (this is an informational
+// checklist, never a blocker).
+const VISUAL_CATEGORIES = new Set(["visual", "manual", "ux", "ui"]);
+const VISUAL_DESC_RE =
+  /\b(render|display|look|visual|blink|flicker|fram(e|ing)|snapp|animat|button|panel|badge|colou?r|icon|layout|screen|pixel|scroll|hover|theme|css|styl|tauri:dev|eyes)/i;
+const isVisualCriterion = (sc) =>
+  VISUAL_CATEGORIES.has(String(sc?.category || "").toLowerCase()) ||
+  VISUAL_DESC_RE.test(String(sc?.description || ""));
+
 /**
  * Check that release `version` is ready to tag.
  * @param {string} tikiPath absolute path to the project's `.tiki` directory
@@ -80,6 +95,22 @@ export async function checkReleaseReadiness(tikiPath, version) {
       }
       if (!plan) failures.push(`issue #${n}: plan unreadable`);
       else if (plan.audited !== true) failures.push(`issue #${n}: plan not audited (audited !== true)`);
+
+      // Surface unverified visual/manual success criteria (#281) as SOFT warnings —
+      // these can't be auto-verified (they need eyes in tauri:dev/installer), so EXECUTE
+      // leaves them verified:false. Never a failure: this is an informational nudge that
+      // the gate must not block on (#276 soft-warning convention). Heuristic above is the
+      // canonical one shared with the Rust tiki_doctor mirror; see
+      // `.tiki/research/visual-sc-surfacing.md`.
+      if (plan && Array.isArray(plan.successCriteria)) {
+        for (const sc of plan.successCriteria) {
+          if (sc?.verified === false && isVisualCriterion(sc)) {
+            warnings.push(
+              `#${n} ${sc.id}: ${sc.description} — visual/manual criterion left unverified (confirm in tauri:dev/installer)`
+            );
+          }
+        }
+      }
     }
     if (!recentIssues.has(n)) {
       failures.push(`issue #${n}: not in state.json history.recentIssues (did it ship?)`);

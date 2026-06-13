@@ -37,11 +37,15 @@ function buildTempRelease(opts = {}) {
     writeFileSync(join(tiki, "releases", `v${VERSION}-changelog.md`), "# v9.9.9");
   }
 
-  // Archived audited plans.
-  const mkplan = (n, audited) =>
-    writeFileSync(join(tiki, "plans", "archive", `issue-${n}.json`), JSON.stringify({ issue: { number: n }, audited, phases: [] }));
-  if (opts.plan1 !== false) mkplan(1, opts.audited1 ?? true);
-  if (opts.plan2 !== false) mkplan(2, opts.audited2 ?? true);
+  // Archived audited plans. `opts.criteria1`/`opts.criteria2` attach a successCriteria[]
+  // to the issue's plan (for the #281 unverified-visual-SC surfacing tests).
+  const mkplan = (n, audited, criteria) =>
+    writeFileSync(
+      join(tiki, "plans", "archive", `issue-${n}.json`),
+      JSON.stringify({ issue: { number: n }, audited, phases: [], ...(criteria ? { successCriteria: criteria } : {}) })
+    );
+  if (opts.plan1 !== false) mkplan(1, opts.audited1 ?? true, opts.criteria1);
+  if (opts.plan2 !== false) mkplan(2, opts.audited2 ?? true, opts.criteria2);
 
   // state.json history.
   const recent = opts.recentIssues ?? [{ number: 1, completedAt: "x" }, { number: 2, completedAt: "x" }];
@@ -118,3 +122,50 @@ test("archived def with shipped status produces no stale-status warning", () =>
       "no stale-status warning expected: " + r.warnings.join("; ")
     );
   }));
+
+// #281: an unverified VISUAL success criterion in a release issue's plan gets a SOFT
+// warning that names the issue + id + description — and the gate must STILL PASS (it's
+// an informational nudge, never a blocker).
+test("unverified visual SC surfaces a soft warning (gate still passes)", () =>
+  withTempRelease(
+    { criteria1: [{ id: "SC2", description: "the panel renders correctly", verified: false }] },
+    (r) => {
+      assert.equal(r.ok, true, "should still pass (soft warn only): " + r.failures.join("; "));
+      assert.equal(r.failures.length, 0);
+      assert.ok(
+        r.warnings.some(
+          (w) => w.includes("#1 SC2") && w.includes("the panel renders correctly") && w.includes("unverified")
+        ),
+        r.warnings.join("; ")
+      );
+    }
+  ));
+
+// A visual SC matched only by category (not description) is also surfaced.
+test("unverified SC matched by visual category surfaces a soft warning", () =>
+  withTempRelease(
+    { criteria2: [{ id: "SC5", category: "Manual", description: "user confirms the flow end to end", verified: false }] },
+    (r) => {
+      assert.equal(r.ok, true, "should still pass: " + r.failures.join("; "));
+      assert.ok(
+        r.warnings.some((w) => w.includes("#2 SC5") && w.includes("unverified")),
+        r.warnings.join("; ")
+      );
+    }
+  ));
+
+// Verified SCs and non-visual unverified SCs produce NO such warning.
+test("verified or non-visual unverified SCs produce no visual warning", () =>
+  withTempRelease(
+    {
+      criteria1: [{ id: "SC1", description: "the panel renders correctly", verified: true }],
+      criteria2: [{ id: "SC2", description: "reconciler advances state from the plan artifact", verified: false }],
+    },
+    (r) => {
+      assert.equal(r.ok, true, "unexpected failures: " + r.failures.join("; "));
+      assert.ok(
+        !r.warnings.some((w) => w.includes("unverified")),
+        "no visual-unverified warning expected: " + r.warnings.join("; ")
+      );
+    }
+  ));

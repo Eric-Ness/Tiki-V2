@@ -665,6 +665,30 @@ pub struct DiagnosticsReport {
     /// behavior (#268).
     #[serde(default)]
     pub copy_install_detected: bool,
+    /// Success criteria in archived (shipped) plans that were left
+    /// `verified:false` and look visual/manual (per the heuristic in
+    /// `.tiki/research/visual-sc-surfacing.md`). These ship un-flipped because
+    /// they can only be confirmed by eye in `tauri:dev`/the installer; the
+    /// frontend surfaces them as an INFO checklist (never a warning). Empty =
+    /// nothing pending. Sorted by (issue, id). (#281)
+    #[serde(default)]
+    pub unverified_shipped_criteria: Vec<UnverifiedCriterion>,
+}
+
+/// One archived-plan success criterion left `verified:false` that matches the
+/// visual/manual heuristic — surfaced as pending visual verification (#281).
+/// The heuristic and its term list are canonical in
+/// `.tiki/research/visual-sc-surfacing.md` and MUST stay identical to the Node
+/// mirror in `scripts/check-release-readiness.mjs`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnverifiedCriterion {
+    /// Issue number parsed from the archived plan's filename (`issue-N.json`).
+    pub issue: u32,
+    /// The success criterion id (e.g. `"SC2"`).
+    pub id: String,
+    /// The success criterion's human-readable description.
+    pub description: String,
 }
 
 /// One release file's consistency check within a `DiagnosticsReport`.

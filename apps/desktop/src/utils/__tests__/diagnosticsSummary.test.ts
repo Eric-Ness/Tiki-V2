@@ -18,6 +18,7 @@ function cleanReport(overrides: Partial<DiagnosticsReport> = {}): DiagnosticsRep
     reconcilerHookInstalled: true,
     unresolvedScriptPaths: [],
     copyInstallDetected: true,
+    unverifiedShippedCriteria: [],
     ...overrides,
   };
 }
@@ -120,6 +121,29 @@ describe("diagnosticsSummary", () => {
     expect(
       s.findings.some((f) => f.level === "pass" && f.message === "Framework scripts resolvable")
     ).toBe(true);
+  });
+
+  it("adds an info finding for unverified visual SCs but stays 'healthy' (#281)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        unverifiedShippedCriteria: [
+          { issue: 263, id: "SC4", description: "the badge renders correctly" },
+          { issue: 266, id: "SC2", description: "graph auto-frames on populate" },
+        ],
+      })
+    );
+    // A checklist must never flip the top-level status.
+    expect(s.status).toBe("healthy");
+    const info = s.findings.find(
+      (f) => f.level === "info" && f.message.includes("await verification")
+    );
+    expect(info).toBeDefined();
+    expect(info?.message).toContain("2");
+  });
+
+  it("has no pending visual-SC finding when the list is empty (#281)", () => {
+    const s = diagnosticsSummary(cleanReport({ unverifiedShippedCriteria: [] }));
+    expect(s.findings.some((f) => f.message.includes("await verification"))).toBe(false);
   });
 
   it("returns 'warnings' when state.json is invalid", () => {

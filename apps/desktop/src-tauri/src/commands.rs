@@ -1,7 +1,7 @@
 use crate::fs_utils::{self, BackupInfo};
 use crate::state::{
     DiagnosticsReport, ReleaseCheck, TikiPlan, TikiRelease, TikiReleaseStatus, TikiState,
-    WorkContext, WorkStatus,
+    UnverifiedCriterion, WorkContext, WorkStatus,
 };
 use crate::watcher;
 use include_dir::{include_dir, Dir};
@@ -934,7 +934,114 @@ pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, Strin
         copy_install_detected: project_root
             .map(|p| p.join(".claude").join("commands").join("tiki").is_dir())
             .unwrap_or(false),
+        unverified_shipped_criteria: compute_unverified_shipped_criteria(&path),
     })
+}
+
+/// Stems that mark a success-criterion description as plausibly visual/manual.
+/// CANONICAL list — kept identical to the Node mirror in
+/// `scripts/check-release-readiness.mjs` and documented in
+/// `.tiki/research/visual-sc-surfacing.md`. Matched as lowercase substrings
+/// (dependency-free; the `regex` crate is intentionally NOT a dependency).
+const VISUAL_SC_STEMS: [&str; 25] = [
+    "render", "display", "look", "visual", "blink", "flicker", "fram", "snapp", "animat", "button",
+    "panel", "badge", "color", "colour", "icon", "layout", "screen", "pixel", "scroll", "hover",
+    "theme", "css", "styl", "tauri:dev", "eyes",
+];
+
+/// `category` values (lowercased) that are inherently visual/manual.
+const VISUAL_SC_CATEGORIES: [&str; 4] = ["visual", "manual", "ux", "ui"];
+
+/// Whether a success criterion is plausibly visual/manual (the #281 heuristic):
+/// its lowercased `category` is one of {visual, manual, ux, ui}, OR its
+/// lowercased `description` contains any canonical stem. Heuristic by design —
+/// over-flagging an automated SC is a minor annoyance (it's an info checklist,
+/// never a blocker). Keep IDENTICAL to the Node mirror.
+fn is_visual_criterion(category: Option<&str>, description: &str) -> bool {
+    if let Some(cat) = category {
+        let cat = cat.to_lowercase();
+        if VISUAL_SC_CATEGORIES.contains(&cat.as_str()) {
+            return true;
+        }
+    }
+    let desc = description.to_lowercase();
+    VISUAL_SC_STEMS.iter().any(|stem| desc.contains(stem))
+}
+
+/// Scan `<tiki>/plans/archive/issue-<N>.json` for success criteria left
+/// `verified:false` that look visual/manual (`is_visual_criterion`). These ship
+/// un-flipped because only a human can confirm them in `tauri:dev`/the installer
+/// (#281). Returns `{issue, id, description}` sorted by (issue, id).
+///
+/// Defensive: a single unreadable / unparseable / mis-named file is skipped — the
+/// whole scan never fails (diagnostics must work on a degraded workspace). The
+/// issue number is parsed from the filename (`issue-42.json` => 42); a file whose
+/// stem is not `issue-<digits>` is ignored.
+fn compute_unverified_shipped_criteria(tiki_path: &Path) -> Vec<UnverifiedCriterion> {
+    let archive_dir = tiki_path.join("plans").join("archive");
+    let entries = match std::fs::read_dir(&archive_dir) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut out: Vec<UnverifiedCriterion> = Vec::new();
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if file_path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        // Parse the issue number from `issue-<N>.json`.
+        let issue = match file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|stem| stem.strip_prefix("issue-"))
+            .and_then(|n| n.parse::<u32>().ok())
+        {
+            Some(n) => n,
+            None => continue,
+        };
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        let value: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let criteria = match value.get("successCriteria").and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => continue,
+        };
+        for sc in criteria {
+            // Only criteria explicitly left verified:false (not absent/true).
+            if sc.get("verified").and_then(|v| v.as_bool()) != Some(false) {
+                continue;
+            }
+            let description = sc
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let category = sc.get("category").and_then(|v| v.as_str());
+            if !is_visual_criterion(category, description) {
+                continue;
+            }
+            let id = sc
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            out.push(UnverifiedCriterion {
+                issue,
+                id,
+                description: description.to_string(),
+            });
+        }
+    }
+
+    out.sort_by(|a, b| a.issue.cmp(&b.issue).then_with(|| a.id.cmp(&b.id)));
+    out
 }
 
 /// One-shot fixer for the `archivedButActive` residue (#276): scan
@@ -1537,6 +1644,112 @@ mod tests {
         std::fs::remove_dir_all(&tiki).ok();
     }
 
+    /// #281: build a `<tiki>/plans/archive/` fixture with three archived plans and
+    /// return its path. The plans exercise the visual-SC heuristic:
+    ///  - issue-10: an unverified SC whose description is visual ("renders") → included
+    ///  - issue-20: an unverified SC that is non-visual ("reconciler advances") → excluded
+    ///  - issue-30: a visual SC but verified:true → excluded
+    /// issue-10 also carries a SECOND visual unverified SC so we can pin (issue,id)
+    /// ordering within a file.
+    fn temp_tiki_unverified_sc_fixture(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-unverified-sc-{}-{}", tag, nanos));
+        let archive = tiki.join("plans").join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        // (a) visual + unverified → INCLUDED. Two SCs so ordering is checkable;
+        // listed SC2-before-SC1 in the file to confirm we sort by id.
+        let issue_10 = serde_json::json!({
+            "successCriteria": [
+                { "id": "SC2", "category": "visual", "description": "the panel renders correctly", "verified": false },
+                { "id": "SC1", "category": "functionality", "description": "the badge renders correctly", "verified": false }
+            ],
+            "phases": []
+        });
+        // (b) unverified but NON-visual → EXCLUDED.
+        let issue_20 = serde_json::json!({
+            "successCriteria": [
+                { "id": "SC1", "category": "functionality", "description": "the reconciler advances state from artifacts", "verified": false }
+            ],
+            "phases": []
+        });
+        // (c) visual but verified:true → EXCLUDED.
+        let issue_30 = serde_json::json!({
+            "successCriteria": [
+                { "id": "SC1", "category": "visual", "description": "the layout looks right", "verified": true }
+            ],
+            "phases": []
+        });
+        std::fs::write(archive.join("issue-10.json"), issue_10.to_string()).unwrap();
+        std::fs::write(archive.join("issue-20.json"), issue_20.to_string()).unwrap();
+        std::fs::write(archive.join("issue-30.json"), issue_30.to_string()).unwrap();
+        tiki
+    }
+
+    /// #281 (SC1/SC4): `tiki_doctor` surfaces only the unverified visual/manual SCs
+    /// from archived plans, sorted by (issue, id). Non-visual unverified SCs and
+    /// verified visual SCs are excluded; the issue number is parsed from the
+    /// `issue-N.json` filename.
+    #[test]
+    fn tiki_doctor_surfaces_unverified_visual_criteria() {
+        let tiki = temp_tiki_unverified_sc_fixture("doctor");
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+
+        let pending = &report.unverified_shipped_criteria;
+        // Exactly the two visual unverified SCs from issue-10 — issue-20 (non-visual)
+        // and issue-30 (verified) are excluded.
+        assert_eq!(
+            pending.len(),
+            2,
+            "only the two visual unverified SCs from issue-10 should surface, got: {:?}",
+            pending
+        );
+        // Sorted by (issue, id): SC1 before SC2 even though the file lists SC2 first.
+        assert_eq!(pending[0].issue, 10);
+        assert_eq!(pending[0].id, "SC1");
+        assert_eq!(pending[0].description, "the badge renders correctly");
+        assert_eq!(pending[1].issue, 10);
+        assert_eq!(pending[1].id, "SC2");
+        assert_eq!(pending[1].description, "the panel renders correctly");
+        // Defensive: nothing from the excluded plans leaked in.
+        assert!(
+            pending.iter().all(|c| c.issue == 10),
+            "no criteria from the non-visual or verified plans should appear"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #281 / #259 round-trip discipline: a `DiagnosticsReport` serializes with the
+    /// `unverifiedShippedCriteria` key (camelCase) as an array, and each entry uses
+    /// the camelCase `{issue, id, description}` shape the frontend mirrors. If the
+    /// key is dropped/renamed at the IPC boundary the desktop reads `undefined`.
+    #[test]
+    fn diagnostics_report_serializes_unverified_shipped_criteria_key() {
+        let tiki = temp_tiki_unverified_sc_fixture("serialize");
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        let value = serde_json::to_value(&report).expect("DiagnosticsReport must serialize");
+
+        let arr = value
+            .get("unverifiedShippedCriteria")
+            .expect("unverifiedShippedCriteria key must be present in the IPC payload")
+            .as_array()
+            .expect("unverifiedShippedCriteria must serialize as an array");
+        assert_eq!(arr.len(), 2, "the fixture's two visual unverified SCs must serialize");
+        let first = &arr[0];
+        assert_eq!(first.get("issue").and_then(|v| v.as_u64()), Some(10));
+        assert_eq!(first.get("id").and_then(|v| v.as_str()), Some("SC1"));
+        assert!(
+            first.get("description").and_then(|v| v.as_str()).is_some(),
+            "each entry must carry a description field"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
     /// #276: `normalize_archived_releases` rewrites ONLY the stale-active archived
     /// def to `status:"shipped"`, returns the count fixed, and leaves the
     /// already-shipped archived def + the active-location def untouched (preserving
@@ -1908,7 +2121,8 @@ mod ipc_serialization {
     use crate::state::{
         DiagnosticsReport, IssueContext, IssueRef, Phase, PhaseProgress, PhaseProgressStatus,
         PhaseStatus, PipelineStep, ReleaseCheck, ReleaseContext, ReleaseRef, TikiPlan, TikiRelease,
-        TikiReleaseIssue, TikiReleaseStatus, TikiState, WorkContext, WorkStatus,
+        TikiReleaseIssue, TikiReleaseStatus, TikiState, UnverifiedCriterion, WorkContext,
+        WorkStatus,
     };
     use serde_json::Value;
     use std::collections::HashMap;
@@ -2192,6 +2406,11 @@ mod ipc_serialization {
             // #[serde(default)] empty vec — must still serialize as `[]`, not vanish.
             unresolved_script_paths: vec![],
             copy_install_detected: false,
+            unverified_shipped_criteria: vec![UnverifiedCriterion {
+                issue: 10,
+                id: "SC1".to_string(),
+                description: "the badge renders correctly".to_string(),
+            }],
         };
         let v = serde_json::to_value(&report).unwrap();
         assert_keys_present(
@@ -2206,6 +2425,7 @@ mod ipc_serialization {
                 "reconcilerHookInstalled",
                 "unresolvedScriptPaths",
                 "copyInstallDetected",
+                "unverifiedShippedCriteria",
             ],
         );
         // #[serde(default)] / non-optional: present even at default value.
@@ -2223,6 +2443,13 @@ mod ipc_serialization {
             &["version", "location", "status", "archivedButActive"],
         );
         assert_eq!(check["archivedButActive"], true);
+
+        // #281: entries carry the camelCase {issue, id, description} shape the
+        // frontend mirrors.
+        let crit = &v["unverifiedShippedCriteria"][0];
+        assert_keys_present(crit, &["issue", "id", "description"]);
+        assert_eq!(crit["issue"], 10);
+        assert_eq!(crit["id"], "SC1");
     }
 
     // ── GitHubRelease — Some + None both directions ────────────────────────────

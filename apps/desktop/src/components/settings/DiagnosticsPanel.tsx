@@ -143,6 +143,29 @@ export function DiagnosticsPanel() {
               </li>
             ))}
           </ul>
+          {report.unverifiedShippedCriteria.length > 0 && (
+            <div className="diagnostics-pending-visual">
+              <h4 className="settings-hint">Pending visual verification</h4>
+              <ul className="diagnostics-findings">
+                {report.unverifiedShippedCriteria.map((c) => (
+                  <li
+                    key={`${c.issue}:${c.id}`}
+                    className="diagnostics-finding diagnostics-info"
+                  >
+                    <span className="diagnostics-icon" aria-hidden="true">
+                      ℹ️
+                    </span>
+                    <span title={c.description}>
+                      #{c.issue} {c.id} —{" "}
+                      {c.description.length > 80
+                        ? `${c.description.slice(0, 80)}…`
+                        : c.description}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       ) : null}
     </div>
