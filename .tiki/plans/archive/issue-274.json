@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 274,
+    "title": "Schema-first TS types + schema-Rust parity test + fix PhaseProgressStatus(skipped) drift",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/274"
+  },
+  "createdAt": "2026-06-13T02:05:00.000Z",
+  "research": [
+    "type-system-parity"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "The JSON schemas are the authoritative enum/field source: a schema-vs-TS parity test asserts the hand-written @tiki/shared union types match the schema enums, failing CI on drift",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:06:44.045Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "A schema-vs-Rust parity test parses state.rs enums and asserts their variant sets (alias lines stripped) match the schema enums, failing CI on drift",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:10:35.674Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Rust PhaseProgressStatus includes Skipped and the Skipped->Completed coercion is gone; a cargo test pins a skipped current-phase round-tripping as skipped",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:15:12.630Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "Both parity tests are proven to catch drift (a mutated COPY of the parsed set fails the comparator) without mutating real source",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:10:35.674Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "@tiki/shared public exports unchanged; pnpm build (tsc -b) clean; full pnpm test green incl. existing transitions-parity.test.ts and cargo --lib",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:15:12.630Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Schema loader + schema-vs-TS enum parity test",
+      "status": "completed",
+      "content": "Read `.tiki/research/type-system-parity.md` first (binding design + the transitions-parity.test.ts pattern to mirror).\n\nIn `packages/shared/src/__tests__/`, add `schema-ts-parity.test.ts` (vitest):\n1. Schema-enum loader: read `packages/shared/schemas/{state,plan,config}.schema.json` via fs.readFileSync(resolve(repoRoot, ...)) + JSON.parse. Extract the canonical enum value arrays: state.schema → workStatus, phaseStatus, pipelineStep; plan.schema → phaseStatus (confirm identical to state's), criteriaCategory; config.schema → autoHealCategory. Resolve them at their actual $defs/property locations (inspect the files — the first scout reported state.schema phaseStatus at a $defs block and the enums defined inline; verify exact JSON paths before coding).\n2. TS-source parser: read `packages/shared/src/types/{state,plan,config}.ts` and regex-extract each `export type <Name> =` union's string-literal members (handle the multi-line `| 'x'` format). Names: WorkStatus, PhaseStatus, PipelineStep (state.ts); CriteriaCategory (plan.ts); AutoHealCategory (config.ts).\n3. Assert each TS union's member set deep-equals the matching schema enum set (sorted). One it() per enum with an actionable message naming the diverging members.\n4. SC4 drift-proof sub-test: take a parsed set, add a bogus member to a COPY, assert the comparator (a small pure compareSets helper) reports inequality — proving the test would fail on real drift. Do NOT mutate source files.\n5. Parser-sanity it()s: each TS union parsed has >0 members (guards against a regex that silently matches nothing).\nRun `pnpm -C packages/shared test` — green (this is additive; the TS unions currently match the schemas).",
+      "verification": [
+        "schema-ts-parity.test.ts green; one assertion per enum (WorkStatus, PhaseStatus, PipelineStep, CriteriaCategory, AutoHealCategory)",
+        "Drift-proof sub-test demonstrates the comparator fails on a mutated copy",
+        "Parser-sanity guards present (each parsed union non-empty)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC4"
+      ],
+      "files": [
+        "packages/shared/src/__tests__/schema-ts-parity.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T16:06:44.044Z",
+      "summary": "Created packages/shared/src/__tests__/schema-ts-parity.test.ts. Schema-enum loader verified exact JSON paths: WorkStatus/PhaseStatus/PipelineStep at state.schema $defs.{name}.enum; CriteriaCategory + plan PhaseStatus at plan.schema $defs.{name}.enum (plan phaseStatus == state's); AutoHealCategory INLINE at config.schema $defs.autoHealConfig.properties.categories.items.enum. One it() per enum (5) asserting TS union == schema set; cross-schema phaseStatus equality; SC4 drift-proof block (3 cases, mutate COPY only); parser-sanity (each union/enum non-empty). compareSets exported {equal,onlyInA,onlyInB}. Shared suite 86→105, all green; transitions-parity unaffected. testResults: { framework: \"vitest\", command: \"pnpm -C packages/shared test\", passed: 105, failed: 0, skipped: 0, status: \"passed\" }. Phase 2: extract loadSchema/at/schemaEnumAt/compareSets into _schema-enums.ts; PipelineStep compares UPPERCASE; RED target = Rust PhaseProgressStatus missing skipped vs $defs.phaseStatus.enum; repoRoot = fileURLToPath up 4."
+    },
+    {
+      "number": 2,
+      "title": "Schema-vs-Rust enum parity test (RED on the real drift)",
+      "status": "completed",
+      "content": "In `packages/shared/src/__tests__/`, add `schema-rust-parity.test.ts` (vitest). Reuse the schema-enum loader from phase 1 (extract it into a tiny shared test helper module, e.g. `packages/shared/src/__tests__/_schema-enums.ts`, and have phase-1's test import it too — coordinate: this phase may refactor phase 1's loader into the helper; keep phase-1 green).\n\n1. Rust-source parser: read `apps/desktop/src-tauri/src/state.rs`; for each target enum, locate `pub enum <Name> {` … matching `}` and extract variant identifiers. Targets + their schema counterpart: `WorkStatus`→workStatus, `PipelineStep`→pipelineStep (note `#[serde(rename_all=\"SCREAMING_SNAKE_CASE\")]` → compare UPPERCASE), `PhaseProgressStatus`→phaseStatus, and the plan-side `PhaseStatus`→phaseStatus. The parser MUST skip `#[serde(...)]` attribute lines and `///` doc comments between variants, and MUST treat `#[serde(alias = \"...\")]` values as EXTRA accepted inputs (strip them — they are not canonical schema values). Map Rust variant casing to the schema's serialized casing per each enum's `rename_all` (lowercase for WorkStatus/PhaseProgressStatus/PhaseStatus; SCREAMING_SNAKE for PipelineStep).\n2. Assert each Rust enum's canonical variant set deep-equals the schema enum set. **EXPECT `PhaseProgressStatus` to FAIL here** (missing `skipped`) — that is the point; this test is RED until phase 3. To keep the SUITE meaningful at this phase boundary without a hard red that blocks, mark the PhaseProgressStatus case with a clear `it(...)` that will go green in phase 3 (do NOT skip it — a real failing assertion documents the drift; the ship gate runs after phase 3 so transient red here is fine, like #270/#271 dogfood-boundary reds). The other three enums must pass NOW.\n3. SC4 drift-proof sub-test (same approach as phase 1) for the Rust parser.\n4. Parser-sanity it()s (each parsed Rust enum non-empty; attribute/doc-comment lines correctly skipped — assert a known-good enum like WorkStatus has exactly its 8 values).\nRun `pnpm -C packages/shared test`: the three good enums + drift-proof + sanity green; PhaseProgressStatus assertion RED (expected, fixed in phase 3).",
+      "verification": [
+        "schema-rust-parity.test.ts: WorkStatus, PipelineStep, plan PhaseStatus assertions green",
+        "PhaseProgressStatus assertion RED (documents the real drift) — will go green in phase 3",
+        "Rust parser correctly strips serde attrs/doc-comments and treats serde aliases as non-canonical",
+        "Drift-proof + parser-sanity guards present"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "packages/shared/src/__tests__/schema-rust-parity.test.ts",
+        "packages/shared/src/__tests__/_schema-enums.ts"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T16:10:35.672Z",
+      "summary": "Created _schema-enums.ts (exported loadSchema/at/schemaEnumAt/compareSets/repoRoot) and schema-rust-parity.test.ts; refactored schema-ts-parity.test.ts to import the helper (stayed green). Rust parser brace-matches pub enum bodies, skips // and #[ lines (serde aliases never enter the canonical set), cases per rename_all (lowercase; UPPERCASE for PipelineStep). WorkStatus/PipelineStep/plan PhaseStatus assertions PASS; PhaseProgressStatus assertion RED as intended (only in schema: [\"skipped\"]) — real .toEqual, not skip. SC4 drift-proof + parser-sanity (WorkStatus exactly 8, no alias leakage) green. Shared suite 115 passed / 1 failed (the expected RED); typecheck clean; state.rs untouched. testResults: { framework: \"vitest\", command: \"pnpm -C packages/shared test\", passed: 115, failed: 1, skipped: 0, status: \"failed\" } — the 1 failure is the planned phase-2 drift documentation, fixed in phase 3. Phase 3: add Skipped to PhaseProgressStatus (rename_all lowercase → \"skipped\") + change state.rs:259 coercion Skipped=>Completed to Skipped=>Skipped; test auto-flips green."
+    },
+    {
+      "number": 3,
+      "title": "Fix PhaseProgressStatus drift (add Skipped) + cargo test",
+      "status": "completed",
+      "content": "Fix the real drift in `apps/desktop/src-tauri/src/state.rs`:\n1. Add `Skipped` variant to `PhaseProgressStatus` (state.rs ~L365-371), matching the enum's serde rename (lowercase → \"skipped\").\n2. In the custom IssueContext deserializer (~L253-260), change `PhaseStatus::Skipped => PhaseProgressStatus::Completed` to `=> PhaseProgressStatus::Skipped`. Search the whole file for any OTHER place that maps/coerces phase status and fix consistently (there may be a forward map elsewhere).\n3. Check downstream consumers of `PhaseProgressStatus` (commands.rs, any match that is now non-exhaustive — Rust will error at compile, fix each arm to handle Skipped sensibly; for progress display, skipped is its own state).\n4. Frontend: the desktop reads phase status via IPC as a string; confirm `WorkCard.tsx`/phase rendering handles a `\"skipped\"` value (the shared TS `PhaseStatus` already includes it). If a desktop switch/map omits skipped, add it. Do NOT over-reach — minimal change to render skipped without crashing.\n5. cargo test in `apps/desktop/src-tauri`: add a test that deserializes a state.json fixture whose current phase is skipped and asserts `PhaseProgress.status == PhaseProgressStatus::Skipped` (round-trips faithfully, NOT coerced to Completed). Run `cargo test --lib` (avoids the running-app exe lock) — green.\n6. Now `pnpm -C packages/shared test` schema-rust-parity PhaseProgressStatus assertion goes GREEN.\nFinal: `pnpm build` (tsc -b) clean; full `pnpm test` (shared + desktop vitest + framework + cargo) all green; transitions-parity.test.ts still green; @tiki/shared exports unchanged (no edits to index.ts).",
+      "verification": [
+        "PhaseProgressStatus has Skipped; no Skipped->Completed coercion anywhere in state.rs",
+        "cargo --lib test pins skipped current-phase round-tripping as skipped (not completed)",
+        "Non-exhaustive match errors resolved; desktop renders skipped without crash",
+        "schema-rust-parity now fully green; pnpm build + full pnpm test green; @tiki/shared exports unchanged"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [
+        2
+      ],
+      "completedAt": "2026-06-13T16:15:12.629Z",
+      "summary": "Added Skipped variant to Rust PhaseProgressStatus (state.rs, rename_all lowercase → \"skipped\"); changed the array-format coercion state.rs:259 from PhaseStatus::Skipped=>Completed to =>Skipped. No non-exhaustive matches anywhere (the one match is on PhaseStatus which already had Skipped; state_transition.rs refs are construction sites). Frontend: IssueDetail.tsx PhaseItem statusClass gained a skipped arm (mapped to existing phase-status-completed class — skipped=resolved; minimal, reuses styled class). 2 new cargo tests: skipped current phase round-trips as Skipped not Completed + re-serializes to \"skipped\" (#259 lesson) + flat-format variant. Gates: cargo --lib 58→60, clippy --lib -D warnings clean, packages/shared 116/116 (phase-2 RED flipped green), pnpm build (tsc -b) clean, @tiki/shared index.ts unchanged. testResults: { framework: \"cargo+vitest\", command: \"cargo test --lib + pnpm -C packages/shared test\", passed: 176, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      1,
+      2
+    ],
+    "SC5": [
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T16:04:12.715Z"
+}

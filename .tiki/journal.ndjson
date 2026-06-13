@@ -1,2 +1,8 @@
 {"ts":"2026-06-13T01:38:08.647Z","workId":"issue:272","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-13T01:39:22.714Z","workId":"issue:272","step":"SHIP","event":"start"}
+{"ts":"2026-06-13T16:01:18.563Z","workId":"issue:274","step":"GET","event":"start","title":"Schema-first TS types + schema-Rust parity test + fix PhaseProgressStatus(skipped) drift"}
+{"ts":"2026-06-13T16:01:19.291Z","workId":"issue:274","step":"REVIEW","event":"start"}
+{"ts":"2026-06-13T16:03:10.662Z","workId":"issue:274","step":"PLAN","event":"start"}
+{"ts":"2026-06-13T16:04:12.620Z","workId":"issue:274","step":"AUDIT","event":"start"}
+{"ts":"2026-06-13T16:04:22.794Z","workId":"issue:274","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-13T16:15:12.920Z","workId":"issue:274","step":"SHIP","event":"start"}
