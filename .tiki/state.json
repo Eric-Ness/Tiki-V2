@@ -1,25 +1,6 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "release:v0.9.4": {
-      "type": "release",
-      "release": {
-        "version": "v0.9.4",
-        "issues": [
-          278,
-          279,
-          280,
-          281,
-          282
-        ],
-        "completedIssues": []
-      },
-      "status": "executing",
-      "pipelineStep": "EXECUTE",
-      "createdAt": "2026-06-13T20:59:20.385Z",
-      "lastActivity": "2026-06-13T20:59:20.385Z"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
       "number": 282,
@@ -27,18 +8,16 @@
       "completedAt": "2026-06-13T20:58:31.624Z"
     },
     "lastCompletedRelease": {
-      "version": "v0.9.3",
+      "version": "v0.9.4",
       "issues": [
-        268,
-        270,
-        271,
-        272,
-        274,
-        275,
-        276
+        278,
+        279,
+        280,
+        281,
+        282
       ],
-      "completedAt": "2026-06-13T17:51:03.004Z",
-      "tag": "v0.9.3"
+      "completedAt": "2026-06-13T21:04:40.222Z",
+      "tag": "v0.9.4"
     },
     "recentIssues": [
       {
@@ -372,6 +351,18 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v0.9.4",
+        "issues": [
+          278,
+          279,
+          280,
+          281,
+          282
+        ],
+        "completedAt": "2026-06-13T21:04:40.222Z",
+        "tag": "v0.9.4"
+      },
       {
         "version": "v0.9.3",
         "issues": [
