@@ -16,6 +16,8 @@ function cleanReport(overrides: Partial<DiagnosticsReport> = {}): DiagnosticsRep
     ],
     recentReleasesMissingJson: [],
     reconcilerHookInstalled: true,
+    unresolvedScriptPaths: [],
+    copyInstallDetected: true,
     ...overrides,
   };
 }
@@ -52,10 +54,44 @@ describe("diagnosticsSummary", () => {
     expect(warn?.message).toContain("v0.7.8");
   });
 
-  it("returns 'warnings' when the reconciler hook is absent", () => {
-    const s = diagnosticsSummary(cleanReport({ reconcilerHookInstalled: false }));
+  it("returns 'warnings' when the reconciler hook is absent on a copy install (regression pin)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({ reconcilerHookInstalled: false, copyInstallDetected: true })
+    );
     expect(s.status).toBe("warnings");
     expect(s.findings.some((f) => f.level === "warn" && f.message.includes("Reconciler"))).toBe(true);
+  });
+
+  it("stays 'healthy' when the hook is absent on a plugin-only install (#268 channel-aware)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({ reconcilerHookInstalled: false, copyInstallDetected: false })
+    );
+    expect(s.status).toBe("healthy");
+    const info = s.findings.find((f) => f.level === "info" && f.message.includes("Reconciler"));
+    expect(info).toBeDefined();
+    expect(info?.message).toContain("plugin");
+  });
+
+  it("returns 'warnings' when unresolvedScriptPaths is non-empty, listing each path (#268)", () => {
+    const paths = [".claude/tiki/scripts/reconcile-state.mjs", ".claude/tiki/scripts/state.mjs"];
+    const s = diagnosticsSummary(cleanReport({ unresolvedScriptPaths: paths }));
+    expect(s.status).toBe("warnings");
+    const warn = s.findings.find((f) => f.level === "warn" && f.message.includes("framework script"));
+    expect(warn).toBeDefined();
+    expect(warn?.message).toContain("2");
+    for (const p of paths) {
+      expect(warn?.message).toContain(p);
+    }
+    // Remedy hint is part of the message.
+    expect(warn?.message).toContain("restart the session");
+  });
+
+  it("surfaces a 'Framework scripts resolvable' pass when unresolvedScriptPaths is empty (#268)", () => {
+    const s = diagnosticsSummary(cleanReport({ unresolvedScriptPaths: [] }));
+    expect(s.status).toBe("healthy");
+    expect(
+      s.findings.some((f) => f.level === "pass" && f.message === "Framework scripts resolvable")
+    ).toBe(true);
   });
 
   it("returns 'warnings' when state.json is invalid", () => {

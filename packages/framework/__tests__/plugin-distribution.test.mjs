@@ -51,6 +51,24 @@ test('hooks/hooks.json is well-formed with Stop + SubagentStop running the recon
   );
 });
 
+test('hooks/hooks.json defines a SessionStart hook running bootstrap-scripts.mjs via ${CLAUDE_PLUGIN_ROOT} (#268 Fix A)', () => {
+  const cfg = JSON.parse(readFileSync(join(FRAMEWORK, 'hooks', 'hooks.json'), 'utf8'));
+  const groups = cfg.hooks?.SessionStart;
+  assert.ok(Array.isArray(groups) && groups.length > 0, 'hooks.json must define SessionStart');
+
+  // Some group must run the bootstrap — that's what delivers .claude/tiki/scripts/
+  // on plugin-only installs where command bodies can't expand ${CLAUDE_PLUGIN_ROOT}.
+  const commands = groups.flatMap((g) => (Array.isArray(g.hooks) ? g.hooks : [])).map((h) => h?.command);
+  const bootstrapCmd = commands.find((c) => typeof c === 'string' && /bootstrap-scripts\.mjs/.test(c));
+  assert.ok(bootstrapCmd, 'SessionStart must run bootstrap-scripts.mjs');
+  assert.match(bootstrapCmd, /\$\{CLAUDE_PLUGIN_ROOT\}/, 'SessionStart hook must resolve via ${CLAUDE_PLUGIN_ROOT}');
+
+  assert.ok(
+    existsSync(join(FRAMEWORK, 'scripts', 'bootstrap-scripts.mjs')),
+    'hooks.json references scripts/bootstrap-scripts.mjs which must exist',
+  );
+});
+
 test('committed dogfood scripts (.claude/tiki/scripts) match canonical (packages/framework/scripts)', () => {
   const canonicalDir = join(FRAMEWORK, 'scripts');
   const installedDir = join(ROOT, '.claude', 'tiki', 'scripts');

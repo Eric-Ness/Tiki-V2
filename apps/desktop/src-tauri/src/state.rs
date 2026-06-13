@@ -652,6 +652,18 @@ pub struct DiagnosticsReport {
     /// Whether `.claude/settings.json` registers `reconcile-state.mjs` in a
     /// `Stop` / `SubagentStop` hook.
     pub reconciler_hook_installed: bool,
+    /// Project-relative script paths (forward-slash form, e.g.
+    /// `.claude/tiki/scripts/state.mjs`) that Tiki command bodies depend on but
+    /// that do not exist on disk. Empty = healthy; non-empty on plugin-only
+    /// installs where the scripts were never copied (#268).
+    #[serde(default)]
+    pub unresolved_script_paths: Vec<String>,
+    /// Whether `.claude/commands/tiki/` exists — the copy-install channel
+    /// marker. The frontend uses it to judge whether a missing settings.json
+    /// reconciler hook is genuine drift (copy install) or expected plugin
+    /// behavior (#268).
+    #[serde(default)]
+    pub copy_install_detected: bool,
 }
 
 /// One release file's consistency check within a `DiagnosticsReport`.

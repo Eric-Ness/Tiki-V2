@@ -1,6 +1,16 @@
 {
-  "description": "Tiki reconciler — derives pipeline state from artifacts every turn so dropped /tiki transitions self-heal (epic #244). Applies when Tiki is loaded as a Claude Code plugin.",
+  "description": "Tiki plugin hooks — SessionStart bootstraps framework scripts into .claude/tiki/scripts/ so command bodies resolve them on plugin-only installs (#268); Stop/SubagentStop run the reconciler that derives pipeline state from artifacts every turn so dropped /tiki transitions self-heal (epic #244). Applies when Tiki is loaded as a Claude Code plugin.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-scripts.mjs\""
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

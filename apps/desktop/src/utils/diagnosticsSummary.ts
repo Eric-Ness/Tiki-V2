@@ -9,12 +9,20 @@
  * reads `undefined`.
  *
  * Health rule (decided in #262 review): the panel shows "warnings" ONLY for
- * genuine drift — invalid state, history↔JSON parity gaps, or a missing reconciler
- * hook. `archivedButActive` is the NORMAL resting state for every shipped release
- * (the ship teardown moves a release into archive/ without flipping `status`;
- * #259 made the file location, not `status`, the source of truth), so it is
- * surfaced as a neutral `info` finding and must never, on its own, make the panel
- * report warnings.
+ * genuine drift — invalid state, history↔JSON parity gaps, unresolved framework
+ * script paths, or a missing reconciler hook on a copy install. `archivedButActive`
+ * is the NORMAL resting state for every shipped release (the ship teardown moves a
+ * release into archive/ without flipping `status`; #259 made the file location, not
+ * `status`, the source of truth), so it is surfaced as a neutral `info` finding and
+ * must never, on its own, make the panel report warnings.
+ *
+ * #268 added two mirrored fields: `unresolvedScriptPaths` (framework scripts that
+ * command bodies need but that don't exist on disk — the authoritative
+ * install-health signal) and `copyInstallDetected` (whether `.claude/commands/tiki/`
+ * exists). The reconciler-hook finding is CHANNEL-AWARE: a missing settings.json
+ * hook is only a warning on a copy install; on a plugin-only install the plugin's
+ * own hooks.json delivers the reconciler (the doctor cannot inspect plugin config),
+ * so it is downgraded to `info`.
  */
 
 /** One release file's consistency check — mirrors Rust `ReleaseCheck`. */
@@ -34,6 +42,19 @@ export interface DiagnosticsReport {
   releaseChecks: ReleaseCheck[];
   recentReleasesMissingJson: string[];
   reconcilerHookInstalled: boolean;
+  /**
+   * Project-relative, forward-slash, sorted+deduped paths of framework scripts
+   * that Tiki command bodies reference but that don't exist on disk (#268 —
+   * e.g. `.claude/tiki/scripts/state.mjs` on a plugin-only install with no
+   * bootstrap copy). Empty = healthy.
+   */
+  unresolvedScriptPaths: string[];
+  /**
+   * True iff `.claude/commands/tiki/` exists — marker for the copy-install
+   * channel. False on plugin-only installs, where a missing settings.json
+   * reconciler hook is expected (the plugin provides it).
+   */
+  copyInstallDetected: boolean;
 }
 
 /** Severity of a single finding row in the panel. */
@@ -76,8 +97,29 @@ export function diagnosticsSummary(report: DiagnosticsReport): DiagnosticsSummar
     passes.push({ level: "pass", message: "All recent releases have a definition file" });
   }
 
+  const unresolved = report.unresolvedScriptPaths;
+  if (unresolved.length > 0) {
+    warnings.push({
+      level: "warn",
+      message: `${unresolved.length} framework script(s) missing: ${unresolved.join(", ")} — run the Tiki installer or restart the session (plugin installs bootstrap on SessionStart)`,
+    });
+  } else {
+    passes.push({ level: "pass", message: "Framework scripts resolvable" });
+  }
+
+  // Channel-aware (#268): a missing settings.json hook is genuine drift only on a
+  // copy install; plugin-only installs get the reconciler from the plugin's own
+  // hooks.json, which the doctor cannot inspect.
   if (!report.reconcilerHookInstalled) {
-    warnings.push({ level: "warn", message: "Reconciler hook not installed" });
+    if (report.copyInstallDetected) {
+      warnings.push({ level: "warn", message: "Reconciler hook not installed" });
+    } else {
+      infos.push({
+        level: "info",
+        message:
+          "Reconciler hook not in .claude/settings.json (expected for plugin installs — the plugin provides it)",
+      });
+    }
   } else {
     passes.push({ level: "pass", message: "Reconciler hook installed" });
   }

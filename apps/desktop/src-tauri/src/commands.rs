@@ -916,6 +916,10 @@ pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, Strin
 
     let recent_releases_missing_json = compute_recent_releases_missing_json(&path);
 
+    // tiki_path points at <project>/.tiki, so project-level checks (settings.json,
+    // .claude/ scripts and commands) live in its parent.
+    let project_root = path.parent();
+
     Ok(DiagnosticsReport {
         framework_version,
         state_valid,
@@ -923,10 +927,12 @@ pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, Strin
         active_work_count,
         release_checks,
         recent_releases_missing_json,
-        // tiki_path points at <project>/.tiki, so .claude/settings.json lives in its parent.
-        reconciler_hook_installed: path
-            .parent()
-            .map(reconciler_hook_installed)
+        reconciler_hook_installed: project_root.map(reconciler_hook_installed).unwrap_or(false),
+        unresolved_script_paths: project_root
+            .map(compute_unresolved_script_paths)
+            .unwrap_or_default(),
+        copy_install_detected: project_root
+            .map(|p| p.join(".claude").join("commands").join("tiki").is_dir())
             .unwrap_or(false),
     })
 }
@@ -1011,6 +1017,84 @@ fn reconciler_hook_installed(project: &Path) -> bool {
             })
             .unwrap_or(false)
     })
+}
+
+/// The script floor every Tiki install needs at `.claude/tiki/scripts/`, no
+/// matter the distribution channel. Plugin-only installs serve command bodies
+/// from the plugin, so there are no local command files to scan — but those
+/// bodies still invoke these project-relative scripts (#268).
+const CANONICAL_TIKI_SCRIPTS: [&str; 4] = [
+    "state.mjs",
+    "reconcile-state.mjs",
+    "run-hook.mjs",
+    "mark-audited.mjs",
+];
+
+/// Project-relative script paths that Tiki command bodies depend on but that
+/// do not exist under `project_root` (#268 Fix B). Always checks the canonical
+/// floor (`CANONICAL_TIKI_SCRIPTS` at `.claude/tiki/scripts/`); additionally,
+/// on a copy install (`.claude/commands/tiki/` present) scans each installed
+/// command file for `node .claude/...mjs` invocations and checks those too.
+/// Returns deduped, sorted, forward-slash paths (stable for the frontend
+/// across OSes). Read failures are skipped — empty/partial, never Err/panic.
+fn compute_unresolved_script_paths(project_root: &Path) -> Vec<String> {
+    use std::collections::BTreeSet;
+
+    // BTreeSet gives dedupe + sorted order for free.
+    let mut missing: BTreeSet<String> = BTreeSet::new();
+
+    let scripts_dir = project_root.join(".claude").join("tiki").join("scripts");
+    for name in CANONICAL_TIKI_SCRIPTS {
+        if !scripts_dir.join(name).exists() {
+            missing.insert(format!(".claude/tiki/scripts/{}", name));
+        }
+    }
+
+    // Copy-install channel: also honor whatever the installed command bodies
+    // actually invoke (e.g. project-specific extras beyond the floor).
+    let commands_dir = project_root.join(".claude").join("commands").join("tiki");
+    if let Ok(entries) = std::fs::read_dir(&commands_dir) {
+        for entry in entries.flatten() {
+            let file = entry.path();
+            if file.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            if let Ok(content) = std::fs::read_to_string(&file) {
+                for rel in extract_script_invocations(&content) {
+                    // Forward-slash relative paths join fine on Windows too.
+                    if !project_root.join(&rel).exists() {
+                        missing.insert(rel);
+                    }
+                }
+            }
+        }
+    }
+
+    missing.into_iter().collect()
+}
+
+/// Extract `node .claude/...mjs` invocations from a command body. A simple
+/// scan: at each literal `node .claude/`, take the token up to the next
+/// whitespace / quote / backtick; keep it only if it ends with `.mjs` and does
+/// not involve `CLAUDE_PLUGIN_ROOT` (those resolve outside the project).
+fn extract_script_invocations(content: &str) -> Vec<String> {
+    const MARKER: &str = "node .claude/";
+    let mut out = Vec::new();
+    let mut from = 0;
+    while let Some(idx) = content[from..].find(MARKER) {
+        // Token starts right after "node " (so it begins with ".claude/").
+        let start = from + idx + "node ".len();
+        let rest = &content[start..];
+        let end = rest
+            .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '`')
+            .unwrap_or(rest.len());
+        let token = &rest[..end];
+        if token.ends_with(".mjs") && !token.contains("CLAUDE_PLUGIN_ROOT") {
+            out.push(token.to_string());
+        }
+        from = start;
+    }
+    out
 }
 
 #[cfg(test)]
@@ -1442,5 +1526,166 @@ mod tests {
             "absent settings.json must yield false, not error"
         );
         std::fs::remove_dir_all(&p4).ok();
+    }
+
+    /// Creates `.claude/tiki/scripts/` under `project` with all four canonical
+    /// scripts present (the healthy copy-install/script floor).
+    fn write_canonical_scripts(project: &Path) {
+        let scripts = project.join(".claude").join("tiki").join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        for name in CANONICAL_TIKI_SCRIPTS {
+            std::fs::write(scripts.join(name), "// stub").unwrap();
+        }
+    }
+
+    /// #268 Fix B: with all four canonical scripts on disk, the unresolved
+    /// list is empty.
+    #[test]
+    fn compute_unresolved_script_paths_empty_for_healthy_layout() {
+        let project = temp_project("scripts-healthy");
+        write_canonical_scripts(&project);
+
+        let missing = compute_unresolved_script_paths(&project);
+        assert!(
+            missing.is_empty(),
+            "all canonical scripts exist, expected empty, got {:?}",
+            missing
+        );
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    /// #268 Fix B: a plugin-only layout (no `.claude/tiki/scripts/` at all)
+    /// reports exactly the four canonical paths, sorted.
+    #[test]
+    fn compute_unresolved_script_paths_reports_canonical_floor_when_missing() {
+        let project = temp_project("scripts-missing");
+
+        let missing = compute_unresolved_script_paths(&project);
+        assert_eq!(
+            missing,
+            vec![
+                ".claude/tiki/scripts/mark-audited.mjs".to_string(),
+                ".claude/tiki/scripts/reconcile-state.mjs".to_string(),
+                ".claude/tiki/scripts/run-hook.mjs".to_string(),
+                ".claude/tiki/scripts/state.mjs".to_string(),
+            ],
+            "missing scripts dir must yield exactly the sorted canonical floor"
+        );
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    /// #268 Fix B: on a copy install, invocations inside installed command
+    /// bodies are checked too — an `extra.mjs` referenced by a command file but
+    /// absent on disk is reported (and the present canonical floor is not).
+    /// `${CLAUDE_PLUGIN_ROOT}` invocations are ignored.
+    #[test]
+    fn compute_unresolved_script_paths_scans_installed_command_bodies() {
+        let project = temp_project("scripts-cmd-scan");
+        write_canonical_scripts(&project);
+        let commands = project.join(".claude").join("commands").join("tiki");
+        std::fs::create_dir_all(&commands).unwrap();
+        std::fs::write(
+            commands.join("foo.md"),
+            "Run this:\n\
+             ```bash\n\
+             node .claude/tiki/scripts/state.mjs transition issue:1\n\
+             node .claude/tiki/scripts/extra.mjs --flag\n\
+             node ${CLAUDE_PLUGIN_ROOT}/scripts/plugin-only.mjs\n\
+             ```\n",
+        )
+        .unwrap();
+
+        let missing = compute_unresolved_script_paths(&project);
+        assert_eq!(
+            missing,
+            vec![".claude/tiki/scripts/extra.mjs".to_string()],
+            "only the command-body extra should be unresolved"
+        );
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    /// #268: `copy_install_detected` is true iff `.claude/commands/tiki/`
+    /// exists, and a fixture mirroring the dogfood repo layout (commands dir +
+    /// full script floor) is fully healthy.
+    #[test]
+    fn tiki_doctor_reports_copy_install_and_unresolved_scripts() {
+        // Copy-install fixture mirroring this dogfood repo: commands dir +
+        // all canonical scripts + a valid .tiki.
+        let copy = temp_project("doctor-copy-install");
+        write_canonical_scripts(&copy);
+        std::fs::create_dir_all(copy.join(".claude").join("commands").join("tiki")).unwrap();
+        let tiki = copy.join(".tiki");
+        std::fs::create_dir_all(&tiki).unwrap();
+        std::fs::write(
+            tiki.join("state.json"),
+            serde_json::json!({ "schemaVersion": 1, "activeWork": {} }).to_string(),
+        )
+        .unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert!(
+            report.copy_install_detected,
+            ".claude/commands/tiki/ exists, marker must be true"
+        );
+        assert!(
+            report.unresolved_script_paths.is_empty(),
+            "full script floor present, expected empty, got {:?}",
+            report.unresolved_script_paths
+        );
+        std::fs::remove_dir_all(&copy).ok();
+
+        // Plugin-only fixture: no commands dir, no scripts dir.
+        let plugin = temp_project("doctor-plugin-only");
+        let tiki = plugin.join(".tiki");
+        std::fs::create_dir_all(&tiki).unwrap();
+        std::fs::write(
+            tiki.join("state.json"),
+            serde_json::json!({ "schemaVersion": 1, "activeWork": {} }).to_string(),
+        )
+        .unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert!(
+            !report.copy_install_detected,
+            "no .claude/commands/tiki/, marker must be false"
+        );
+        assert_eq!(
+            report.unresolved_script_paths.len(),
+            4,
+            "plugin-only install must report the 4-script canonical floor, got {:?}",
+            report.unresolved_script_paths
+        );
+        std::fs::remove_dir_all(&plugin).ok();
+    }
+
+    /// #259 lesson: any new IPC field must be proven to survive serde — Tauri
+    /// serializes command returns with the same Serialize impl, so a
+    /// `skip_serializing` or naming drift silently strips fields from the
+    /// payload. Assert the camelCase KEYS exist in the serialized value.
+    #[test]
+    fn diagnostics_report_serializes_new_camel_case_keys() {
+        let project = temp_project("doctor-serde");
+        let tiki = project.join(".tiki");
+        std::fs::create_dir_all(&tiki).unwrap();
+        std::fs::write(
+            tiki.join("state.json"),
+            serde_json::json!({ "schemaVersion": 1, "activeWork": {} }).to_string(),
+        )
+        .unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        let value = serde_json::to_value(&report).unwrap();
+        let obj = value.as_object().expect("report serializes to an object");
+        assert!(
+            obj.contains_key("unresolvedScriptPaths"),
+            "unresolvedScriptPaths must survive serialization, got keys {:?}",
+            obj.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            obj.contains_key("copyInstallDetected"),
+            "copyInstallDetected must survive serialization, got keys {:?}",
+            obj.keys().collect::<Vec<_>>()
+        );
+        std::fs::remove_dir_all(&project).ok();
     }
 }
