@@ -256,7 +256,7 @@ impl<'de> Deserialize<'de> for IssueContext {
                             PhaseStatus::Executing => PhaseProgressStatus::Executing,
                             PhaseStatus::Completed => PhaseProgressStatus::Completed,
                             PhaseStatus::Failed => PhaseProgressStatus::Failed,
-                            PhaseStatus::Skipped => PhaseProgressStatus::Completed,
+                            PhaseStatus::Skipped => PhaseProgressStatus::Skipped,
                         })
                         .unwrap_or(PhaseProgressStatus::Pending);
                     Some(PhaseProgress { total, current, status })
@@ -368,6 +368,7 @@ pub enum PhaseProgressStatus {
     Executing,
     Completed,
     Failed,
+    Skipped,
 }
 
 /// Context for working on a release
@@ -681,4 +682,58 @@ pub struct ReleaseCheck {
     /// location (not `status`) the source of truth. So it is `true` for ALL archived
     /// releases here; it is informational, not necessarily a problem to fix.
     pub archived_but_active: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A `skipped` current-phase status must round-trip faithfully as
+    /// `PhaseProgressStatus::Skipped` — it must NOT be coerced to `Completed`
+    /// (the pre-#274 drift) or fall back to `Pending`. Mirrors the schema's
+    /// `phaseStatus` enum, which includes `"skipped"`. The serialize half guards
+    /// the #259 round-trip lesson: it must emit `"skipped"`, not get dropped or
+    /// re-spelled.
+    #[test]
+    fn skipped_current_phase_round_trips_as_skipped() {
+        // Array (issue #66 style) phases where the current phase is skipped.
+        let json = r#"{
+            "type": "issue",
+            "issue": { "number": 42, "title": "skip test" },
+            "status": "executing",
+            "currentPhase": 2,
+            "totalPhases": 3,
+            "phases": [
+                { "id": 1, "title": "one", "status": "completed" },
+                { "id": 2, "title": "two", "status": "skipped" },
+                { "id": 3, "title": "three", "status": "pending" }
+            ],
+            "createdAt": "2026-06-13T00:00:00.000Z"
+        }"#;
+
+        let ctx: WorkContext = serde_json::from_str(json).expect("should deserialize");
+        let phase = match ctx {
+            WorkContext::Issue(c) => c.phase.expect("phase should be derived"),
+            _ => panic!("expected an issue context"),
+        };
+
+        assert_eq!(phase.current, 2);
+        assert_eq!(
+            phase.status,
+            PhaseProgressStatus::Skipped,
+            "skipped current phase must stay Skipped, not be coerced to Completed"
+        );
+
+        // #259 round-trip: serializing back must emit "skipped".
+        let serialized = serde_json::to_value(&phase).expect("should serialize");
+        assert_eq!(serialized["status"], "skipped");
+    }
+
+    /// Direct deserialize of the new flat-phase format with a skipped status.
+    #[test]
+    fn flat_phase_skipped_deserializes_as_skipped() {
+        let json = r#"{ "total": 3, "current": 2, "status": "skipped" }"#;
+        let phase: PhaseProgress = serde_json::from_str(json).expect("should deserialize");
+        assert_eq!(phase.status, PhaseProgressStatus::Skipped);
+    }
 }

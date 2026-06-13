@@ -64,6 +64,9 @@ function PhaseItem({ phase }: { phase: PlanPhase }) {
     phase.status === "completed" ? "phase-status-completed" :
     phase.status === "executing" ? "phase-status-executing" :
     phase.status === "failed" ? "phase-status-failed" :
+    // A skipped phase is resolved (not pending); reuse the completed styling
+    // so it isn't mislabeled as still-to-do.
+    phase.status === "skipped" ? "phase-status-completed" :
     "phase-status-pending";
 
   return (
