@@ -23,6 +23,12 @@ Fetch a GitHub issue and display it in a readable format. This is typically the 
 </instructions>
 
 <state-management>
+**FIRST — append the intent journal line (#272), before the transition below.** The journal is the drop-proof record of what step ran: even if every later state write is forgotten, the reconciler reconstructs the entry from this one line. It never exits non-zero, so it can never break the command. `--title` feeds journal-qualified bootstrap (a pre-plan entry gets a real title).
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step GET --title "{title}"
+```
+
 **REQUIRED — run this immediately after fetching the issue (you now have the title), before displaying anything.** This creates the `issue:{number}` entry the desktop app tracks; skip it and the issue never appears in the pipeline. Re-running is a safe no-op. Canonical shape and parent-release detection: see `yolo.md` `<state-management>`.
 
 ```bash

@@ -96,6 +96,73 @@ test("every command file retains its expected state.mjs transition --to-step pai
   );
 });
 
+// Coverage assertion for issue #272: every workflow command file must append
+// the drop-proof intent journal line (`state.mjs journal <workId> --step <STEP>`)
+// as its first state action. The journal is the reconciler's floor signal —
+// if a future edit drops the journal call, dropped transitions become
+// unrecoverable again (the original #244/#272 bug class). Mirrors the
+// required-transition-pairs table above: per file, the expected workId prefix
+// and the step token(s) that must appear paired with a `state.mjs journal`
+// invocation.
+const REQUIRED_JOURNAL = {
+  "get.md": { workId: "issue:", steps: ["GET"] },
+  "review.md": { workId: "issue:", steps: ["REVIEW"] },
+  "plan.md": { workId: "issue:", steps: ["PLAN"] },
+  "audit.md": { workId: "issue:", steps: ["AUDIT"] },
+  "execute.md": { workId: "issue:", steps: ["EXECUTE"] },
+  "ship.md": { workId: "issue:", steps: ["SHIP"] },
+  "yolo.md": { workId: "issue:", steps: ["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"] },
+  "release.md": { workId: "release:", steps: ["EXECUTE", "SHIP"] },
+};
+
+// Pair regex mirroring PAIR_RE: walks each `state.mjs journal <workId> ...
+// --step <STEP>` invocation (journal calls are single-line, but the windowed
+// non-greedy form keeps it robust to wrapping) so a stranded prose mention of
+// `--step` cannot satisfy the assertion.
+const JOURNAL_PAIR_RE =
+  /state\.mjs\s+journal\s+(issue:|release:)\S*[\s\S]{0,120}?--step\s+([A-Z]+)/g;
+
+function extractJournalPairs(content) {
+  const found = new Set();
+  for (const match of content.matchAll(JOURNAL_PAIR_RE)) {
+    found.add(`${match[1]}${match[2]}`);
+  }
+  return found;
+}
+
+test("every command file journals its pipeline steps (state.mjs journal, issue #272)", () => {
+  const failures = [];
+
+  for (const [file, { workId, steps }] of Object.entries(REQUIRED_JOURNAL)) {
+    const filePath = path.join(COMMANDS_DIR, file);
+    if (!fs.existsSync(filePath)) {
+      failures.push(`${file}: file does not exist at ${filePath}`);
+      continue;
+    }
+
+    const content = fs.readFileSync(filePath, "utf-8");
+    const found = extractJournalPairs(content);
+
+    for (const step of steps) {
+      if (!found.has(`${workId}${step}`)) {
+        failures.push(
+          `${file}: missing 'state.mjs journal ${workId}{...} --step ${step}' invocation ` +
+          `(found journal pairs: [${[...found].sort().join(", ") || "none"}])`
+        );
+      }
+    }
+  }
+
+  assert.equal(
+    failures.length,
+    0,
+    `Intent-journal coverage regressed:\n  - ${failures.join("\n  - ")}\n\n` +
+    `Each command file MUST append its 'state.mjs journal <workId> --step <STEP>' ` +
+    `line as the FIRST state action so the reconciler can reconstruct dropped ` +
+    `pipeline steps from .tiki/journal.ndjson (issue #272).`
+  );
+});
+
 // Regression assertion for issue #247: yolo.md must NOT reintroduce the
 // conditional "the skill will emit it, so the parent won't" dispatch trap. That
 // branch (formerly "Pattern A / Pattern B") is exactly how intermediate

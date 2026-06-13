@@ -141,19 +141,23 @@ The desktop kanban board reads `.tiki/state.json` to render pipeline progress. I
 
 Run the matching block BEFORE dispatching that step. The shim validates transitions, atomic-writes, and preserves `parentRelease`.
 
-**If the shim path does not resolve** (e.g. a plugin-only project where `.claude/tiki/scripts/` was not installed, so `node .claude/tiki/scripts/state.mjs` errors with "Cannot find module"), DO NOT skip the state update — fall back to the direct-JSON write in **Legacy: direct JSON** below. (The reconciler hook still corrects state from artifacts, but emitting the transition keeps the kanban live mid-step.)
+Each block starts with a `state.mjs journal` line (#272) — the drop-proof intent record: even if the transition after it is dropped, the reconciler reconstructs the step from the journal. It never exits non-zero. The unconditional-emission rule below applies to journal lines exactly as to transitions: emit both, every step, regardless of dispatch.
 
 **Before GET** (fresh issue — initializes the entry; pass `--issue-number` + `--issue-title` so the work item materializes):
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step GET --title "{title}"
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status pending --to-step GET \
   --issue-number {number} --issue-title "{title}"
 ```
 
+**If the shim path does not resolve** (e.g. a plugin-only project where `.claude/tiki/scripts/` was not installed, so `node .claude/tiki/scripts/state.mjs` errors with "Cannot find module"), DO NOT skip the state update — fall back to the direct-JSON write in **Legacy: direct JSON** below. (The reconciler hook still corrects state from artifacts, but emitting the transition keeps the kanban live mid-step.)
+
 **Before REVIEW**:
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step REVIEW
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status reviewing --to-step REVIEW
 ```
@@ -161,6 +165,7 @@ node .claude/tiki/scripts/state.mjs transition issue:{number} \
 **Before PLAN** (phase total `N` is provisional — re-emit after plan.md writes the real count):
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step PLAN
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step PLAN \
   --phase-current 1 --phase-total {N} --phase-status pending
@@ -169,6 +174,7 @@ node .claude/tiki/scripts/state.mjs transition issue:{number} \
 **Before AUDIT** (same `status: planning`, but `pipelineStep` advances to `AUDIT`):
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step AUDIT
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status planning --to-step AUDIT \
   --phase-current 1 --phase-total {N} --phase-status pending
@@ -177,6 +183,7 @@ node .claude/tiki/scripts/state.mjs transition issue:{number} \
 **Before EXECUTE** (each phase — `{current}` is the phase about to run, `{total}` is the plan's phase count):
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step EXECUTE
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status executing --to-step EXECUTE \
   --phase-current {current} --phase-total {total} --phase-status executing
@@ -185,6 +192,7 @@ node .claude/tiki/scripts/state.mjs transition issue:{number} \
 **Before SHIP** (after all phases pass):
 
 ```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step SHIP
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
   --to-status shipping --to-step SHIP
 ```

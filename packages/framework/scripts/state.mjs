@@ -30,6 +30,15 @@
  *     lastCompletedRelease. Shapes match completedIssueRecord /
  *     completedReleaseRecord in state.schema.json.
  *
+ *   journal <work-id> --step <STEP> [--event start] [--phase-current N --phase-total T] [--title "..."]
+ *     Append one NDJSON intent line to .tiki/journal.ndjson (#272). The
+ *     journal is the drop-proof record of "a workflow step started" — the
+ *     reconciler uses it as a floor when state transitions get dropped.
+ *     UNLIKE every other subcommand, journal NEVER exits non-zero: any
+ *     failure (bad args, unwritable disk) warns on stderr and exits 0,
+ *     because a journal failure must never break the workflow command
+ *     that emitted it. On success the appended line is printed.
+ *
  * Common flags:
  *
  *   --tiki-path <path>      Override .tiki location (defaults to <cwd>/.tiki).
@@ -62,6 +71,9 @@
  *
  *   # Append a completed release record to history:
  *   node state.mjs append-history release --version v1.2.0 --issues "41,42,43" --tag v1.2.0
+ *
+ *   # Journal that GET started for an issue (title feeds journal bootstrap):
+ *   node state.mjs journal issue:42 --step GET --title "Add user profiles"
  *
  * Exit codes:
  *   0  success (prints relevant JSON or scalar to stdout)
@@ -112,6 +124,11 @@ const VALID_STATUSES = new Set([
 ]);
 
 const VALID_STEPS = new Set(["GET", "REVIEW", "PLAN", "AUDIT", "EXECUTE", "SHIP"]);
+
+// Monotonic pipeline-step ordering. Exported so the reconciler
+// (reconcile-state.mjs) and the journal-floor logic below share ONE source of
+// truth for "which step is further along" instead of drifting copies.
+const STEP_ORDER = { GET: 0, REVIEW: 1, PLAN: 2, AUDIT: 3, EXECUTE: 4, SHIP: 5 };
 
 function isLegalTransition(from, to) {
   if (from === to) return true;
@@ -808,6 +825,265 @@ function handleAppendHistory(args) {
 }
 
 // ---------------------------------------------------------------------------
+// Intent journal (#272): append-only .tiki/journal.ndjson.
+//
+// Every workflow command journals "step X started for workId" as its FIRST
+// action. Unlike state.json transitions (which the LLM can forget to emit),
+// the journal is a single fire-and-forget line, so the reconciler can use it
+// as a step floor and as a bootstrap signal even when every transition was
+// dropped. Design contract: .tiki/research/reconciler-contract.md
+// "#272 REVIEW decisions".
+//
+// Entry shape (one JSON object per line):
+//   { ts, workId, step, event, phase?, title? }
+// `event` is "start" in v1 ("complete" is reserved). GET passes `title` so a
+// journal-qualified bootstrap can create an activeWork entry with a real
+// title before any plan file exists.
+//
+// Appends take NO lock: fs.appendFileSync with O_APPEND of a sub-PIPE_BUF
+// line is atomic enough, and the defensive reader skips torn lines anyway.
+// ---------------------------------------------------------------------------
+
+const JOURNAL_FILE = "journal.ndjson";
+
+/**
+ * Append one journal line. Creates `.tiki/` if missing — the journal may be
+ * the FIRST tiki artifact in a project (GET journals before anything else).
+ *
+ * NEVER throws. Returns the appended entry object on success, `false` on any
+ * failure (truthy/falsy contract — callers that only care about success can
+ * treat the result as a boolean).
+ */
+function appendJournalEntry(tikiPath, { workId, step, event = "start", phase, title } = {}) {
+  try {
+    if (!workId || !step) return false;
+    if (!fs.existsSync(tikiPath)) {
+      fs.mkdirSync(tikiPath, { recursive: true });
+    }
+    const entry = {
+      ts: new Date().toISOString(),
+      workId,
+      step,
+      event,
+      ...(phase ? { phase } : {}),
+      ...(title ? { title } : {}),
+    };
+    fs.appendFileSync(path.join(tikiPath, JOURNAL_FILE), JSON.stringify(entry) + "\n", "utf-8");
+    return entry;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read all parseable journal entries, in file (= append) order. Defensive:
+ * unparseable / torn / non-object lines are silently skipped — a torn line
+ * from an append racing a prune rewrite degrades to "that one line is lost",
+ * never to a read failure. Returns [] when the journal doesn't exist.
+ */
+function readJournalEntries(tikiPath) {
+  const journalFile = path.join(tikiPath, JOURNAL_FILE);
+  let raw;
+  try {
+    raw = fs.readFileSync(journalFile, "utf-8");
+  } catch {
+    return [];
+  }
+  const entries = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        entries.push(parsed);
+      }
+    } catch {
+      /* torn or garbage line — skip */
+    }
+  }
+  return entries;
+}
+
+/**
+ * Highest journaled step for `workId`, by STEP_ORDER. Returns
+ * `{ step, title? }` or null when no entry (with a known step) exists for the
+ * workId. `title` comes from the NEWEST entry for the workId that carries
+ * one (GET journals the title; later steps don't repeat it).
+ */
+function journalFloor(entries, workId) {
+  let bestIdx = -1;
+  let bestStep = null;
+  let title;
+  for (const entry of entries || []) {
+    if (!entry || entry.workId !== workId) continue;
+    const idx = STEP_ORDER[entry.step];
+    if (idx === undefined) continue;
+    if (idx > bestIdx) {
+      bestIdx = idx;
+      bestStep = entry.step;
+    }
+    // Entries are in append order, so the last title seen is the newest.
+    if (typeof entry.title === "string" && entry.title) {
+      title = entry.title;
+    }
+  }
+  if (bestStep === null) return null;
+  return { step: bestStep, ...(title !== undefined ? { title } : {}) };
+}
+
+/**
+ * Rewrite the journal WITHOUT entries for shipped work — `issue:N` where N is
+ * in history.recentIssues, `release:V` where V is in history.recentReleases.
+ *
+ * Churn threshold: only acts when the journal has >= 50 total lines OR >= 10
+ * prunable lines; below that the file is left byte-identical. Rewrite is
+ * atomic (tmp + rename, tmp cleaned up on failure). Unparseable lines are
+ * preserved as-is (the reader skips them; pruning must not destroy data it
+ * cannot understand).
+ *
+ * The CALLER is responsible for holding the state lock (the reconciler runs
+ * this inside its locked pass). Returns the number of lines pruned (0 on any
+ * failure — degrade silently).
+ */
+function pruneJournal(tikiPath, state) {
+  const journalFile = path.join(tikiPath, JOURNAL_FILE);
+  let raw;
+  try {
+    raw = fs.readFileSync(journalFile, "utf-8");
+  } catch {
+    return 0;
+  }
+
+  const history = (state && state.history) || {};
+  const shippedIssues = new Set(
+    (Array.isArray(history.recentIssues) ? history.recentIssues : [])
+      .filter((r) => r && r.number !== undefined)
+      .map((r) => String(r.number))
+  );
+  const shippedReleases = new Set(
+    (Array.isArray(history.recentReleases) ? history.recentReleases : [])
+      .filter((r) => r && r.version !== undefined)
+      .map((r) => String(r.version))
+  );
+
+  const lines = raw.split(/\r?\n/).filter((line) => line.trim() !== "");
+  const kept = [];
+  let pruned = 0;
+  for (const line of lines) {
+    let entry = null;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      /* unparseable — keep verbatim */
+    }
+    const workId = entry && typeof entry === "object" ? entry.workId : undefined;
+    let prunable = false;
+    if (typeof workId === "string") {
+      if (workId.startsWith("issue:")) {
+        prunable = shippedIssues.has(workId.slice("issue:".length));
+      } else if (workId.startsWith("release:")) {
+        prunable = shippedReleases.has(workId.slice("release:".length));
+      }
+    }
+    if (prunable) {
+      pruned++;
+    } else {
+      kept.push(line);
+    }
+  }
+
+  // Churn threshold: don't rewrite a small, mostly-live journal.
+  if (pruned === 0 || (lines.length < 50 && pruned < 10)) {
+    return 0;
+  }
+
+  const tmp = journalFile + ".tmp";
+  try {
+    fs.writeFileSync(tmp, kept.length > 0 ? kept.join("\n") + "\n" : "", "utf-8");
+    fs.renameSync(tmp, journalFile);
+  } catch {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+    return 0;
+  }
+  return pruned;
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: journal
+//
+// IMPORTANT: this handler must NEVER exit non-zero. It is invoked as the
+// first action of every workflow command; if a malformed flag or a read-only
+// disk could fail the whole command, the journal would make tracking LESS
+// reliable instead of more. All failures warn on stderr and exit 0.
+// ---------------------------------------------------------------------------
+
+function journalWarn(msg) {
+  process.stderr.write(`state.mjs: journal warning (ignored, exit 0): ${msg}\n`);
+}
+
+function handleJournal(args) {
+  try {
+    const workId = args._[1];
+    if (!workId || typeof workId !== "string") {
+      journalWarn("missing <work-id> argument (e.g. 'issue:42' or 'release:v1.2')");
+      return;
+    }
+    if (!workId.startsWith("issue:") || workId === "issue:") {
+      if (!workId.startsWith("release:") || workId === "release:") {
+        journalWarn(`invalid work_id '${workId}': must start with 'issue:' or 'release:'`);
+        return;
+      }
+    }
+
+    const step = args.step;
+    if (typeof step !== "string" || !VALID_STEPS.has(step)) {
+      journalWarn(`invalid --step '${step}' (must be one of: ${[...VALID_STEPS].join(", ")})`);
+      return;
+    }
+
+    const eventRaw = args.event;
+    const event = typeof eventRaw === "string" && eventRaw ? eventRaw : "start";
+
+    // Optional phase pair — both flags or neither.
+    const phaseCurrent = args["phase-current"];
+    const phaseTotal = args["phase-total"];
+    let phase;
+    if (phaseCurrent !== undefined || phaseTotal !== undefined) {
+      if (phaseCurrent === undefined || phaseTotal === undefined) {
+        journalWarn("--phase-current and --phase-total must be provided together");
+        return;
+      }
+      const current = Number(phaseCurrent);
+      const total = Number(phaseTotal);
+      if (!Number.isFinite(current) || !Number.isFinite(total)) {
+        journalWarn("--phase-current and --phase-total must be numbers");
+        return;
+      }
+      phase = { current, total };
+    }
+
+    const titleRaw = args.title;
+    const title = typeof titleRaw === "string" && titleRaw ? titleRaw : undefined;
+
+    const tikiPath = resolveTikiPath(
+      typeof args["tiki-path"] === "string" ? args["tiki-path"] : undefined
+    );
+    const entry = appendJournalEntry(tikiPath, { workId, step, event, phase, title });
+    if (!entry) {
+      journalWarn(`failed to append to ${path.join(tikiPath, JOURNAL_FILE)}`);
+      return;
+    }
+    process.stdout.write(JSON.stringify(entry) + "\n");
+  } catch (e) {
+    journalWarn(e && e.message ? e.message : String(e));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // CLI entry point.
 // ---------------------------------------------------------------------------
 
@@ -829,10 +1105,13 @@ function main() {
     case "append-history":
       handleAppendHistory(args);
       return;
+    case "journal":
+      handleJournal(args);
+      return;
     default:
       die(
         1,
-        `unknown subcommand '${subcommand}' (expected one of: transition, get, remove, append-history)`
+        `unknown subcommand '${subcommand}' (expected one of: transition, get, remove, append-history, journal)`
       );
   }
 }
@@ -866,4 +1145,9 @@ export {
   withStateLock,
   applyTransition,
   isLegalTransition,
+  STEP_ORDER,
+  appendJournalEntry,
+  readJournalEntries,
+  journalFloor,
+  pruneJournal,
 };

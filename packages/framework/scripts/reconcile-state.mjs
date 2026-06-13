@@ -47,6 +47,20 @@
  *                a mismatch means a corrupt/hand-mangled file, never trust it.
  *   2. Advance-only. Never moves an item backward; only forward when artifacts
  *      justify a later step (or more phase progress) than currently recorded.
+ *      2a. AMENDMENT (#272): the advance target is MAX(artifact target,
+ *          journal floor) by STEP_ORDER. Every workflow command appends one
+ *          intent line to .tiki/journal.ndjson as its FIRST action (see
+ *          state.mjs), so the journal records "step X started" even when every
+ *          transition was dropped — including GET/REVIEW, which artifacts
+ *          cannot distinguish. Floor → target mapping: GET→pending,
+ *          REVIEW→reviewing, PLAN→planning, AUDIT→planning, EXECUTE→executing,
+ *          SHIP→shipping. Phase progress comes from ARTIFACTS ONLY: a winning
+ *          journal floor carries phase null (applyTransition leaves any
+ *          recorded phase untouched); when artifact and journal tie at
+ *          EXECUTE, the artifact target (with its phase) wins. The journal
+ *          NEVER overrides frozen / history / ship-derivation — it is
+ *          consulted strictly after those, and every journal advance is still
+ *          legality-pre-guarded and advance-only.
  *   3. Skips LLM-set / terminal states. Never touches status failed | paused |
  *      completed — those are decisions the artifacts can't override.
  *   4. Completion comes from history, not plan phases. "All phases complete"
@@ -98,10 +112,24 @@ import {
   withStateLock,
   applyTransition,
   isLegalTransition,
+  STEP_ORDER,
+  readJournalEntries,
+  journalFloor,
+  pruneJournal,
 } from "./state.mjs";
 
-// Monotonic step ordering — used for the advance-only check.
-const STEP_ORDER = { GET: 0, REVIEW: 1, PLAN: 2, AUDIT: 3, EXECUTE: 4, SHIP: 5 };
+// Journal-floor → reconcile-target mapping (#272, contract amendment 2a).
+// A journaled step means that step STARTED, so the status is the in-progress
+// status for the step. Deliberately NO phase here — phase progress is derived
+// from plan artifacts only (the journal's optional phase field is ignored).
+const JOURNAL_FLOOR_TARGETS = {
+  GET: { status: "pending", step: "GET" },
+  REVIEW: { status: "reviewing", step: "REVIEW" },
+  PLAN: { status: "planning", step: "PLAN" },
+  AUDIT: { status: "planning", step: "AUDIT" },
+  EXECUTE: { status: "executing", step: "EXECUTE" },
+  SHIP: { status: "shipping", step: "SHIP" },
+};
 
 // Statuses the reconciler must never override (LLM-set or terminal).
 const FROZEN_STATUSES = new Set(["failed", "paused", "completed"]);
@@ -305,6 +333,25 @@ function deriveTarget(plan) {
   return { status: "planning", step: "PLAN" };
 }
 
+/**
+ * MAX(artifact target, journal floor) by STEP_ORDER (#272, amendment 2a).
+ * Returns { target, journalWon }. The journal wins only when its floor step is
+ * STRICTLY further than the artifact target (a tie at EXECUTE keeps the
+ * artifact target so its phase progress is preserved — phase comes from
+ * artifacts only). A winning floor target carries no phase.
+ */
+function combineWithJournalFloor(artifactTarget, floor) {
+  if (!floor) return { target: artifactTarget, journalWon: false };
+  const floorTarget = JOURNAL_FLOOR_TARGETS[floor.step];
+  if (!floorTarget) return { target: artifactTarget, journalWon: false };
+  const artIdx = artifactTarget ? STEP_ORDER[artifactTarget.step] ?? -1 : -1;
+  const floorIdx = STEP_ORDER[floor.step] ?? -1;
+  if (floorIdx > artIdx) {
+    return { target: { ...floorTarget }, journalWon: true };
+  }
+  return { target: artifactTarget, journalWon: false };
+}
+
 /** Newest parseable plan JSON timestamp (epoch ms), or null if none parse. */
 function newestPlanTimestamp(plan) {
   let newest = null;
@@ -318,10 +365,21 @@ function newestPlanTimestamp(plan) {
 /**
  * Scan <tikiPath>/plans for issue plans that justify CREATING an activeWork
  * entry (#270 — contract rule 1a). Returns candidate records
- * { workId, number, plan, target }; applies the five 1a guards IN ORDER and
- * never mutates state. `now` is epoch ms (callers pass Date.now(); tests pin it).
+ * { workId, number, plan, target, title, source }; applies the five 1a guards
+ * IN ORDER and never mutates state. `now` is epoch ms (callers pass
+ * Date.now(); tests pin it).
+ *
+ * #272 EXTENSION: journal entries qualify bootstrap too. An issue:N whose
+ * NEWEST journal line is within BOOTSTRAP_RECENCY_MS qualifies even with NO
+ * plan file (covers a dropped GET/REVIEW, previously impossible) — guards 1-3
+ * (existing entry / history / archived plan) still apply; only the recency
+ * source differs (journal ts instead of plan timestamps). Targets:
+ *   - journal only → the journal-floor mapping (e.g. GET → pending/GET),
+ *     title from the newest journaled title ?? `Issue N`, source "journal";
+ *   - plan only → exactly as before (#270), source "plan";
+ *   - both → the plan candidate with target = MAX(plan target, journal floor).
  */
-export function findBootstrapCandidates(state, tikiPath, now) {
+export function findBootstrapCandidates(state, tikiPath, now, journalEntries = []) {
   const candidates = [];
   const plansDir = path.join(tikiPath, "plans");
 
@@ -329,7 +387,7 @@ export function findBootstrapCandidates(state, tikiPath, now) {
   try {
     entries = fs.readdirSync(plansDir);
   } catch {
-    return []; // no plans dir — nothing to bootstrap
+    entries = []; // no plans dir — journal-qualified bootstrap may still apply
   }
 
   const activeWork = (state && state.activeWork) || {};
@@ -362,7 +420,63 @@ export function findBootstrapCandidates(state, tikiPath, now) {
 
     // A phases-empty plan is still a PLAN artifact — fall back to PLAN.
     const target = deriveTarget(plan) ?? { status: "planning", step: "PLAN" };
-    candidates.push({ workId, number, plan, target });
+    candidates.push({
+      workId,
+      number,
+      plan,
+      target,
+      title: plan.issue.title ?? `Issue ${number}`,
+      source: "plan",
+    });
+  }
+
+  // --- Journal-qualified bootstrap (#272) -----------------------------------
+  const byWorkId = new Map(candidates.map((c) => [c.workId, c]));
+  const newestJournalTs = new Map();
+  for (const e of journalEntries || []) {
+    if (!e || typeof e.workId !== "string") continue;
+    if (!/^issue:\d+$/.test(e.workId)) continue;
+    const t = Date.parse(e.ts);
+    if (Number.isNaN(t)) continue;
+    const prev = newestJournalTs.get(e.workId);
+    if (prev === undefined || t > prev) newestJournalTs.set(e.workId, t);
+  }
+
+  for (const [workId, ts] of newestJournalTs) {
+    // Recency: the NEWEST journal line for the workId must be inside the same
+    // 14-day window — a weeks-stale journal never resurrects work.
+    if (now - ts > BOOTSTRAP_RECENCY_MS) continue;
+
+    const floor = journalFloor(journalEntries, workId);
+    if (!floor) continue;
+    const floorTarget = JOURNAL_FLOOR_TARGETS[floor.step];
+    if (!floorTarget) continue;
+
+    const planCandidate = byWorkId.get(workId);
+    if (planCandidate) {
+      // Both plan and journal qualify → target = MAX(plan target, journal floor).
+      const { target, journalWon } = combineWithJournalFloor(planCandidate.target, floor);
+      if (journalWon) planCandidate.target = target;
+      continue;
+    }
+
+    const number = Number(workId.slice("issue:".length));
+    // Guards 1-3 from #270 still apply to journal-qualified candidates.
+    if (activeWork[workId]) continue;
+    if (inHistory(history, number)) continue;
+    if (hasArchivedPlan(tikiPath, number)) continue;
+    // No plan-file requirement: the journal alone is the signal here. (A plan
+    // file that exists but failed the #270 guards — stale/corrupt/mismatched —
+    // does NOT block a fresh journal; the next pass heals phase progress from
+    // the artifact once the entry exists.)
+    candidates.push({
+      workId,
+      number,
+      plan: null,
+      target: { ...floorTarget },
+      title: floor.title ?? `Issue ${number}`,
+      source: "journal",
+    });
   }
 
   return candidates;
@@ -445,19 +559,25 @@ function buildReleaseRow(workId, entry, history, tikiPath) {
  *     fabricated from an unconfirmable signal (SC5). There is deliberately NO
  *     default fetcher here: only --print (main) passes fetchIssueStateViaGh,
  *     so programmatic buildReport callers stay gh-free.
- *   - otherwise → deriveTarget(plan); a null target (pre-PLAN) is left as-is.
+ *   - otherwise → MAX(deriveTarget(plan), journal floor) (#272, amendment 2a);
+ *     a journal-floor-won derivation is noted `journal floor: <STEP>` and
+ *     keeps the recorded phase (the journal carries no phase information);
+ *     a null combined target (pre-PLAN, no journal) is left as-is.
  *
  * Release rows (#271, amendment 5a) mirror reconcileReleaseEntry: recorded
  * triple as-is; derived shows the teardown verdict when the version is in
  * history.recentReleases or the def is archived, else derived == recorded.
  *
- * Also appends one "would create (bootstrap #270)" row per bootstrap candidate
- * (recorded -/- since no entry exists yet) so --print previews entry creation.
+ * Also appends one "would create (bootstrap #270)" row per plan bootstrap
+ * candidate and one "would create (journal #272)" row per journal-only
+ * candidate (recorded -/- since no entry exists yet) so --print previews
+ * entry creation. STRICTLY read-only: --print never prunes the journal.
  */
 export function buildReport(state, tikiPath, { fetchIssueState = null } = {}) {
   const rows = [];
   const activeWork = (state && state.activeWork) || {};
   const history = (state && state.history) || {};
+  const journalEntries = readJournalEntries(tikiPath); // once per report (#272)
 
   for (const [workId, entry] of Object.entries(activeWork)) {
     if (workId.startsWith("release:")) {
@@ -513,11 +633,18 @@ export function buildReport(state, tikiPath, { fetchIssueState = null } = {}) {
       }
     } else {
       const plan = readPlanSafe(tikiPath, number);
-      const target = deriveTarget(plan);
+      const { target, journalWon } = combineWithJournalFloor(
+        deriveTarget(plan),
+        journalFloor(journalEntries, workId)
+      );
       if (target) {
         derivedStatus = target.status;
         derivedStep = target.step;
-        derivedPhase = target.phase ?? null;
+        // A journal floor carries no phase information: the reconciler's
+        // applyTransition leaves the recorded phase untouched, so the derived
+        // row must too (else shipped-ish entries show phantom phase drift).
+        derivedPhase = journalWon ? recordedPhase : target.phase ?? null;
+        if (journalWon) note = `journal floor: ${target.step}`;
       } else {
         note = plan ? "plan has no phases" : "no plan (pre-PLAN, see #247)";
       }
@@ -542,10 +669,11 @@ export function buildReport(state, tikiPath, { fetchIssueState = null } = {}) {
     });
   }
 
-  // Mirror the bootstrap rule (#270): plans that WOULD create an entry on the
-  // next real pass show up in the doctor as "would create" rows. Read-only —
-  // findBootstrapCandidates never mutates state.
-  for (const c of findBootstrapCandidates(state, tikiPath, Date.now())) {
+  // Mirror the bootstrap rule (#270 + journal extension #272): plans/journals
+  // that WOULD create an entry on the next real pass show up in the doctor as
+  // "would create" rows. Read-only — findBootstrapCandidates never mutates
+  // state, and --print never prunes the journal.
+  for (const c of findBootstrapCandidates(state, tikiPath, Date.now(), journalEntries)) {
     rows.push({
       workId: c.workId,
       number: c.number,
@@ -556,7 +684,7 @@ export function buildReport(state, tikiPath, { fetchIssueState = null } = {}) {
       derivedStep: c.target.step,
       derivedPhase: c.target.phase ?? null,
       drift: true,
-      note: "would create (bootstrap #270)",
+      note: c.source === "journal" ? "would create (journal #272)" : "would create (bootstrap #270)",
     });
   }
 
@@ -606,11 +734,13 @@ export function formatReport(rows) {
 /**
  * Reconcile a single issue entry in place. Returns a small change record or null
  * if nothing changed. Mutates `state` only via guarded applyTransition / delete.
- * Ordering is contractual: history check FIRST (rule 4), then ship-derivation
- * (amendment 4a), then the in-flight artifact advance — an entry healed by
- * ship-derivation returns immediately and is never also advanced.
+ * Ordering is contractual: frozen check, then history FIRST (rule 4), then
+ * ship-derivation (amendment 4a), then the in-flight advance to MAX(artifact
+ * target, journal floor) (amendment 2a) — an entry healed by ship-derivation
+ * returns immediately and is never also advanced, so the journal can never
+ * override frozen / history / ship-derivation.
  */
-function reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState) {
+function reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState, journalEntries) {
   if (!entry || entry.type !== "issue" || !entry.issue) return null;
   const number = entry.issue.number;
   if (typeof number !== "number") return null;
@@ -684,9 +814,14 @@ function reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState
     // the in-flight advance (a genuinely reopened issue is in flight again).
   }
 
-  // --- In-flight: advance from artifacts ------------------------------------
+  // --- In-flight: advance to MAX(artifact target, journal floor) (#272) -----
+  // Phase progress always comes from artifacts: a winning journal floor has no
+  // phase, and applyTransition leaves the recorded phase untouched on null.
   const plan = readPlanSafe(tikiPath, number);
-  const target = deriveTarget(plan);
+  const { target, journalWon } = combineWithJournalFloor(
+    deriveTarget(plan),
+    journalFloor(journalEntries, workId)
+  );
   if (!target) return null;
 
   const curIdx = STEP_ORDER[entry.pipelineStep] ?? -1;
@@ -717,7 +852,11 @@ function reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState
   });
   return {
     workId,
-    action: stepAdvances ? `advanced to ${target.step}` : `phase ${target.phase.current}/${target.phase.total}`,
+    action: journalWon
+      ? `journal floor: ${target.step}`
+      : stepAdvances
+        ? `advanced to ${target.step}`
+        : `phase ${target.phase.current}/${target.phase.total}`,
   };
 }
 
@@ -766,12 +905,15 @@ function reconcileReleaseEntry(state, workId, entry, history, tikiPath) {
 }
 
 /**
- * Run one reconcile pass. Returns { changes: [...] } (changes empty if nothing
- * to do or the lock was contended). Writes state.json only when something
- * actually changed (so the watcher isn't churned every turn).
+ * Run one reconcile pass. Returns { changes: [...], journalPruned } (changes
+ * empty if nothing to do or the lock was contended). Writes state.json only
+ * when a reconcile change exists (so the watcher isn't churned every turn) —
+ * journal pruning (#272) alone NEVER causes a state.json write: it rewrites
+ * only journal.ndjson, inside the same locked pass, and is skipped on
+ * --dry-run.
  */
 export function reconcile(tikiPath, { dryRun = false, fetchIssueState = fetchIssueStateViaGh } = {}) {
-  const result = { changes: [] };
+  const result = { changes: [], journalPruned: 0 };
 
   const pass = () => {
     const state = readStateSafe(tikiPath);
@@ -781,10 +923,12 @@ export function reconcile(tikiPath, { dryRun = false, fetchIssueState = fetchIss
     // land in the same object that gets written back.
     state.history = state.history || {};
     const history = state.history;
+    // Read the journal ONCE per pass (#272) and thread it everywhere.
+    const journalEntries = readJournalEntries(tikiPath);
 
     for (const [workId, entry] of Object.entries(state.activeWork)) {
       if (workId.startsWith("issue:")) {
-        const change = reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState);
+        const change = reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState, journalEntries);
         if (change) result.changes.push(change);
       } else if (workId.startsWith("release:")) {
         // Teardown-only release reconciliation (#271, contract amendment 5a).
@@ -793,11 +937,12 @@ export function reconcile(tikiPath, { dryRun = false, fetchIssueState = fetchIss
       }
     }
 
-    // Bootstrap (#270, contract rule 1a): create entries for recent plans whose
-    // GET transition was dropped. Runs after the entry loop, inside the same
-    // locked pass. applyTransition creates fresh entries without a legality
-    // check when `issue` is provided, so no isLegalTransition pre-guard needed.
-    for (const c of findBootstrapCandidates(state, tikiPath, Date.now())) {
+    // Bootstrap (#270, contract rule 1a + journal extension #272): create
+    // entries for recent plans/journals whose GET transition was dropped. Runs
+    // after the entry loop, inside the same locked pass. applyTransition
+    // creates fresh entries without a legality check when `issue` is provided,
+    // so no isLegalTransition pre-guard needed.
+    for (const c of findBootstrapCandidates(state, tikiPath, Date.now(), journalEntries)) {
       applyTransition(state, {
         workId: c.workId,
         toStatus: c.target.status,
@@ -805,14 +950,30 @@ export function reconcile(tikiPath, { dryRun = false, fetchIssueState = fetchIss
         phase: c.target.phase ?? null,
         parallelExecution: null,
         parentRelease: undefined,
-        issue: { number: c.number, title: c.plan.issue.title ?? `Issue ${c.number}` },
+        issue: { number: c.number, title: c.title },
         release: null,
       });
-      result.changes.push({ workId: c.workId, action: `bootstrapped at ${c.target.step}` });
+      result.changes.push({
+        workId: c.workId,
+        action: c.source === "journal"
+          ? `bootstrapped at ${c.target.step} (journal)`
+          : `bootstrapped at ${c.target.step}`,
+      });
     }
 
     if (!dryRun && result.changes.length > 0) {
       writeStateSafe(tikiPath, state);
+    }
+
+    // Journal pruning (#272): drop journal lines for shipped work (history
+    // members), AFTER the state write so a failed write can't orphan lines
+    // whose history record never landed. pruneJournal is thresholded
+    // (>= 50 total / >= 10 prunable lines) and atomic; it touches ONLY
+    // journal.ndjson — never state.json — so a prune-only pass leaves
+    // state.json byte-identical (the changes-based write rule above is the
+    // sole state writer).
+    if (!dryRun) {
+      result.journalPruned = pruneJournal(tikiPath, state);
     }
   };
 

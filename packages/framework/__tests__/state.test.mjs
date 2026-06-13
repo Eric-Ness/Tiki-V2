@@ -21,7 +21,14 @@ import path from "node:path";
 import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { resolveTikiPath } from "../scripts/state.mjs";
+import {
+  resolveTikiPath,
+  appendJournalEntry,
+  readJournalEntries,
+  journalFloor,
+  pruneJournal,
+  STEP_ORDER,
+} from "../scripts/state.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -446,4 +453,272 @@ test("concurrent state.mjs writers do not lose updates (#224 lock)", async () =>
     false,
     "state.json.lock should be released after all writers finish"
   );
+});
+
+// ---------------------------------------------------------------------------
+// Intent journal (#272): `state.mjs journal` subcommand + exported helpers
+// (appendJournalEntry / readJournalEntries / journalFloor / pruneJournal).
+// CLI tests spawn the real shim; helper tests import directly.
+// ---------------------------------------------------------------------------
+
+const journalPathIn = (dir) => path.join(dir, ".tiki", "journal.ndjson");
+
+function readJournalLines(dir) {
+  return fs
+    .readFileSync(journalPathIn(dir), "utf-8")
+    .split(/\r?\n/)
+    .filter((l) => l.trim() !== "");
+}
+
+test("journal CLI: creates .tiki/ and journal.ndjson in a bare project (no pre-existing .tiki)", async () => {
+  // The journal may be the FIRST tiki artifact: GET journals before anything
+  // else exists. No .tiki dir is created up front here, on purpose.
+  const repo = await makeTmpDir("tiki-journal-bare");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [STATE_SHIM, "journal", "issue:42", "--step", "GET", "--title", "Add user profiles"],
+    { cwd: repo, encoding: "utf-8" }
+  );
+
+  assert.equal(result.status, 0, `journal exited non-zero: ${result.stderr}`);
+  assert.equal(fs.existsSync(journalPathIn(repo)), true, ".tiki/journal.ndjson should exist");
+
+  const lines = readJournalLines(repo);
+  assert.equal(lines.length, 1, "exactly one journal line");
+  const entry = JSON.parse(lines[0]);
+  assert.equal(entry.workId, "issue:42");
+  assert.equal(entry.step, "GET");
+  assert.equal(entry.event, "start");
+  assert.equal(entry.title, "Add user profiles");
+  assert.match(entry.ts, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "ts should be an ISO timestamp");
+
+  // The appended line is also printed on stdout.
+  assert.equal(JSON.parse(result.stdout.trim()).workId, "issue:42");
+});
+
+test("journal CLI: multiple appends accumulate as NDJSON lines", async () => {
+  const repo = await makeTmpDir("tiki-journal-accumulate");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+
+  for (const step of ["GET", "REVIEW", "PLAN"]) {
+    const r = spawnSync(
+      process.execPath,
+      [STATE_SHIM, "journal", "issue:7", "--step", step],
+      { cwd: repo, encoding: "utf-8" }
+    );
+    assert.equal(r.status, 0, `journal --step ${step} failed: ${r.stderr}`);
+  }
+
+  const lines = readJournalLines(repo);
+  assert.equal(lines.length, 3, "three appends → three lines");
+  assert.deepEqual(
+    lines.map((l) => JSON.parse(l).step),
+    ["GET", "REVIEW", "PLAN"],
+    "lines preserve append order"
+  );
+});
+
+test("journal CLI: --title and --phase flags land in the entry", async () => {
+  const repo = await makeTmpDir("tiki-journal-flags");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      STATE_SHIM, "journal", "issue:11",
+      "--step", "EXECUTE",
+      "--phase-current", "2", "--phase-total", "5",
+      "--title", "flagged entry",
+    ],
+    { cwd: repo, encoding: "utf-8" }
+  );
+  assert.equal(result.status, 0, `journal failed: ${result.stderr}`);
+
+  const entry = JSON.parse(readJournalLines(repo)[0]);
+  assert.deepEqual(entry.phase, { current: 2, total: 5 });
+  assert.equal(entry.title, "flagged entry");
+  assert.equal(entry.event, "start", "event defaults to start");
+});
+
+test("journal CLI: invalid step warns on stderr but exits 0 and writes no line", async () => {
+  const repo = await makeTmpDir("tiki-journal-badstep");
+  await fsp.mkdir(path.join(repo, ".git"), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    [STATE_SHIM, "journal", "issue:42", "--step", "DEPLOY"],
+    { cwd: repo, encoding: "utf-8" }
+  );
+
+  // The journal must NEVER break a workflow command: exit 0 even on bad args.
+  assert.equal(result.status, 0, "invalid step must still exit 0");
+  assert.match(result.stderr, /journal warning/, "expected a warning on stderr");
+  assert.match(result.stderr, /invalid --step 'DEPLOY'/);
+  assert.equal(
+    fs.existsSync(journalPathIn(repo)),
+    false,
+    "no journal line should be written for an invalid step"
+  );
+
+  // Same exit-0 contract for a malformed workId.
+  const badId = spawnSync(
+    process.execPath,
+    [STATE_SHIM, "journal", "story:42", "--step", "GET"],
+    { cwd: repo, encoding: "utf-8" }
+  );
+  assert.equal(badId.status, 0, "invalid workId must still exit 0");
+  assert.match(badId.stderr, /journal warning/);
+  assert.equal(fs.existsSync(journalPathIn(repo)), false);
+});
+
+test("readJournalEntries: skips torn/garbage lines and parses the rest", async () => {
+  const dir = await makeTmpDir("tiki-journal-torn");
+  const tikiPath = path.join(dir, ".tiki");
+  await fsp.mkdir(tikiPath, { recursive: true });
+
+  const good1 = JSON.stringify({ ts: "2026-06-12T00:00:00Z", workId: "issue:1", step: "GET", event: "start" });
+  const torn = '{"ts":"2026-06-12T00:01:00Z","workId":"issue:1","st'; // truncated mid-write
+  const garbage = "not json at all";
+  const good2 = JSON.stringify({ ts: "2026-06-12T00:02:00Z", workId: "issue:1", step: "REVIEW", event: "start" });
+  await fsp.writeFile(
+    path.join(tikiPath, "journal.ndjson"),
+    [good1, torn, garbage, good2].join("\n") + "\n",
+    "utf-8"
+  );
+
+  const entries = readJournalEntries(tikiPath);
+  assert.equal(entries.length, 2, "only the two valid lines parse");
+  assert.deepEqual(entries.map((e) => e.step), ["GET", "REVIEW"]);
+});
+
+test("readJournalEntries: returns [] when journal.ndjson does not exist", async () => {
+  const dir = await makeTmpDir("tiki-journal-missing");
+  assert.deepEqual(readJournalEntries(path.join(dir, ".tiki")), []);
+});
+
+test("journalFloor: picks the highest step and the newest title", () => {
+  const entries = [
+    { ts: "2026-06-12T00:00:00Z", workId: "issue:5", step: "GET", event: "start", title: "old title" },
+    { ts: "2026-06-12T00:01:00Z", workId: "issue:5", step: "REVIEW", event: "start" },
+    // Another workId's entries must not leak in.
+    { ts: "2026-06-12T00:02:00Z", workId: "issue:6", step: "SHIP", event: "start", title: "other issue" },
+    { ts: "2026-06-12T00:03:00Z", workId: "issue:5", step: "PLAN", event: "start", title: "newest title" },
+    // A lower step journaled later (e.g. re-run) must not lower the floor.
+    { ts: "2026-06-12T00:04:00Z", workId: "issue:5", step: "GET", event: "start" },
+  ];
+
+  const floor = journalFloor(entries, "issue:5");
+  assert.deepEqual(floor, { step: "PLAN", title: "newest title" });
+
+  // STEP_ORDER is the shared ordering source the floor is computed with.
+  assert.ok(STEP_ORDER.PLAN > STEP_ORDER.REVIEW && STEP_ORDER.REVIEW > STEP_ORDER.GET);
+
+  // Unknown workId → null.
+  assert.equal(journalFloor(entries, "issue:999"), null);
+
+  // Entries whose step is not in STEP_ORDER are ignored.
+  assert.equal(journalFloor([{ workId: "issue:9", step: "BOGUS" }], "issue:9"), null);
+});
+
+test("pruneJournal: below threshold leaves the file byte-identical and returns 0", async () => {
+  const dir = await makeTmpDir("tiki-journal-prune-below");
+  const tikiPath = path.join(dir, ".tiki");
+  await fsp.mkdir(tikiPath, { recursive: true });
+
+  // 6 total lines, 2 prunable — below BOTH thresholds (50 total / 10 prunable).
+  const lines = [
+    { workId: "issue:1", step: "GET" },
+    { workId: "issue:1", step: "REVIEW" },
+    { workId: "issue:2", step: "GET" }, // in history → prunable
+    { workId: "issue:2", step: "SHIP" }, // in history → prunable
+    { workId: "issue:3", step: "GET" },
+    { workId: "release:v1.0", step: "EXECUTE" },
+  ].map((e) => JSON.stringify({ ts: "2026-06-12T00:00:00Z", event: "start", ...e }));
+  const original = lines.join("\n") + "\n";
+  await fsp.writeFile(path.join(tikiPath, "journal.ndjson"), original, "utf-8");
+
+  const state = { history: { recentIssues: [{ number: 2, title: "shipped", completedAt: "x" }] } };
+  const pruned = pruneJournal(tikiPath, state);
+  assert.equal(pruned, 0, "below threshold → nothing pruned");
+  assert.equal(
+    await fsp.readFile(path.join(tikiPath, "journal.ndjson"), "utf-8"),
+    original,
+    "file must be untouched below threshold"
+  );
+});
+
+test("pruneJournal: >= 10 prunable lines removes only history members, atomically", async () => {
+  const dir = await makeTmpDir("tiki-journal-prune-above");
+  const tikiPath = path.join(dir, ".tiki");
+  await fsp.mkdir(tikiPath, { recursive: true });
+
+  const mk = (workId, step) =>
+    JSON.stringify({ ts: "2026-06-12T00:00:00Z", workId, step, event: "start" });
+  const lines = [];
+  // 10 prunable issue lines + 2 prunable release lines.
+  for (let i = 0; i < 10; i++) lines.push(mk("issue:100", i % 2 ? "REVIEW" : "GET"));
+  lines.push(mk("release:v2.0", "EXECUTE"));
+  lines.push(mk("release:v2.0", "SHIP"));
+  // Keepers: live issue, live release, and an issue NOT in history.
+  lines.push(mk("issue:200", "PLAN"));
+  lines.push(mk("release:v3.0", "EXECUTE"));
+  await fsp.writeFile(path.join(tikiPath, "journal.ndjson"), lines.join("\n") + "\n", "utf-8");
+
+  const state = {
+    history: {
+      recentIssues: [{ number: 100, title: "shipped", completedAt: "x" }],
+      recentReleases: [{ version: "v2.0", completedAt: "x" }],
+    },
+  };
+  const pruned = pruneJournal(tikiPath, state);
+  assert.equal(pruned, 12, "10 issue lines + 2 release lines pruned");
+
+  const remaining = readJournalLines(dir).map((l) => JSON.parse(l).workId);
+  assert.deepEqual(remaining, ["issue:200", "release:v3.0"], "only non-history entries survive");
+
+  // Atomic rewrite: the tmp file must not linger.
+  assert.equal(
+    fs.existsSync(path.join(tikiPath, "journal.ndjson.tmp")),
+    false,
+    "tmp file must be cleaned up by the rename"
+  );
+});
+
+test("pruneJournal: >= 50 total lines triggers pruning even with few prunable lines", async () => {
+  const dir = await makeTmpDir("tiki-journal-prune-total");
+  const tikiPath = path.join(dir, ".tiki");
+  await fsp.mkdir(tikiPath, { recursive: true });
+
+  const mk = (workId, step) =>
+    JSON.stringify({ ts: "2026-06-12T00:00:00Z", workId, step, event: "start" });
+  const lines = [];
+  for (let i = 0; i < 48; i++) lines.push(mk(`issue:${300 + i}`, "GET")); // live
+  lines.push(mk("issue:42", "GET")); // shipped
+  lines.push(mk("issue:42", "SHIP")); // shipped
+  assert.equal(lines.length, 50);
+  await fsp.writeFile(path.join(tikiPath, "journal.ndjson"), lines.join("\n") + "\n", "utf-8");
+
+  const state = { history: { recentIssues: [{ number: 42, title: "shipped", completedAt: "x" }] } };
+  const pruned = pruneJournal(tikiPath, state);
+  assert.equal(pruned, 2, "50-total-lines threshold lets 2 prunable lines go");
+  assert.equal(readJournalLines(dir).length, 48);
+});
+
+test("appendJournalEntry: returns false instead of throwing on unwritable path", async () => {
+  // A tikiPath whose parent is a FILE makes mkdir/append fail on every OS.
+  const dir = await makeTmpDir("tiki-journal-unwritable");
+  const fileAsDir = path.join(dir, "not-a-dir");
+  fs.writeFileSync(fileAsDir, "occupied", "utf-8");
+
+  const result = appendJournalEntry(path.join(fileAsDir, ".tiki"), {
+    workId: "issue:1",
+    step: "GET",
+  });
+  assert.equal(result, false, "append must degrade to false, never throw");
+
+  // Missing required fields also return false.
+  assert.equal(appendJournalEntry(path.join(dir, ".tiki"), { workId: "issue:1" }), false);
+  assert.equal(appendJournalEntry(path.join(dir, ".tiki"), { step: "GET" }), false);
 });

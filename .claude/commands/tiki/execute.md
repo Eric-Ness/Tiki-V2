@@ -50,6 +50,12 @@ Procedure:
 <state-update-requirement>
 ## CRITICAL: Phase State Updates
 
+**FIRST — append the intent journal line (#272) ONCE, before the per-phase transition loop below.** The journal is the drop-proof record that EXECUTE started: even if every per-phase transition is dropped, the reconciler advances the entry to EXECUTE from this line (phase progress comes from the plan artifact). It never exits non-zero.
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step EXECUTE
+```
+
 Run the transition below BEFORE **every** phase — not just the first. This loop is the single most common place the desktop pipeline freezes: when you are deep in a multi-phase run dispatching sub-agents, it is easy to skip the per-phase emit and the kanban stalls on an early phase while work continues. Emit it for phase 1, phase 2, … phase T, unconditionally. Re-running with the same values is a safe no-op.
 
 Update `.tiki/state.json` BEFORE each phase. On failure, set `phase.status: "failed"` and do NOT advance `current`. When all phases finish, transition to `shipping`. (Canonical shape: see `yolo.md`.)

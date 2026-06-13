@@ -137,6 +137,12 @@ If any phase has no `dependencies` field, treat it as an empty list (no deps).
 </output>
 
 <state-management>
+**FIRST — append the intent journal line (#272), before auditing and before any transition below.** The journal is the drop-proof record: even if the verdict transition is dropped, the reconciler advances the entry to AUDIT from this line. It never exits non-zero.
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step AUDIT
+```
+
 **REQUIRED — run the matching transition as the first thing after you reach a verdict, unconditionally** (regardless of how this command was invoked). Set `pipelineStep: "AUDIT"`. PASS → `status: "executing"`; WARN/FAIL → keep `planning`. Re-running is a safe no-op.
 
 **On PASS, ALSO write the AUDIT artifact to the plan file** (before or after the transition). AUDIT produces no other durable on-disk signal — `coverageMatrix` is written by PLAN — so without this, the state reconciler cannot tell AUDIT from PLAN when the transition above is dropped:

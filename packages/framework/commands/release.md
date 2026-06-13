@@ -246,15 +246,19 @@ This is informational. Do NOT prompt for confirmation. The user invoked the comm
 <state-management>
 Release lifecycle: **start** → **per-wave** → **ship**. See `yolo.md` `<state-management>` for the issue-side canonical shape.
 
+Each lifecycle point starts with a `state.mjs journal` line (#272) — the drop-proof intent record: even if the transition after it is dropped, the reconciler reconstructs the release step from the journal. It never exits non-zero; emit it unconditionally, first.
+
 ```bash
-# Start:
+# Start (cascade kickoff) — journal first, then transition:
+node .claude/tiki/scripts/state.mjs journal release:{version} --step EXECUTE
 node .claude/tiki/scripts/state.mjs transition release:{version} \
   --to-status executing --to-step EXECUTE --release-version {version} --release-issues "41,42,43"
 # Per wave: update release.currentIssues (array; direct JSON write — shim does not edit nested release.* fields),
 # spawn one Agent per issue with isolation: 'worktree', wait for the wave to drain, then
 # append each completed issue number to release.completedIssues and each worktree branch
 # name to release.completedBranches (also direct JSON writes).
-# Ship:
+# Ship (BEFORE tagging) — journal first, then transition:
+node .claude/tiki/scripts/state.mjs journal release:{version} --step SHIP
 node .claude/tiki/scripts/state.mjs transition release:{version} --to-status shipping --to-step SHIP
 ```
 

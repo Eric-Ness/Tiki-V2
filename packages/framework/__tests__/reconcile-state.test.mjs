@@ -1009,6 +1009,425 @@ test("--print report: a pass with no ship-shaped entries makes ZERO fetcher call
   assert.equal(fetcher.calls.length, 0);
 });
 
+// ---------------------------------------------------------------------------
+// Intent journal (#272, contract amendment 2a): every workflow command appends
+// one line to .tiki/journal.ndjson as its FIRST action. The reconciler
+// advances entries to MAX(artifact target, journal floor), can bootstrap from
+// journal lines alone (GET/REVIEW, previously invisible), and prunes
+// shipped-work lines inside the locked pass. The journal NEVER overrides
+// frozen / history / ship-derivation.
+// ---------------------------------------------------------------------------
+
+const JOURNAL = "journal.ndjson";
+
+/** One journal line as state.mjs `journal` would write it. */
+const jline = (workId, step, over = {}) => ({
+  ts: new Date().toISOString(),
+  workId,
+  step,
+  event: "start",
+  ...over,
+});
+
+function writeJournal(tikiPath, entries) {
+  fs.writeFileSync(
+    path.join(tikiPath, JOURNAL),
+    entries.map((e) => JSON.stringify(e)).join("\n") + "\n"
+  );
+}
+
+function appendJournal(tikiPath, entry) {
+  fs.appendFileSync(path.join(tikiPath, JOURNAL), JSON.stringify(entry) + "\n");
+}
+
+function readJournalRaw(tikiPath) {
+  return fs.readFileSync(path.join(tikiPath, JOURNAL), "utf-8");
+}
+
+test("JOURNAL FLOOR: pending/GET + a journal REVIEW line advances to reviewing/REVIEW (GET/REVIEW distinguishability — artifacts are silent)", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:120": issueEntry(120) }, history: {} }
+  );
+  writeJournal(tikiPath, [
+    jline("issue:120", "GET", { title: "Issue 120" }),
+    jline("issue:120", "REVIEW"),
+  ]);
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:120"];
+  assert.equal(e.status, "reviewing");
+  assert.equal(e.pipelineStep, "REVIEW");
+  assert.deepEqual(r.changes, [{ workId: "issue:120", action: "journal floor: REVIEW" }]);
+});
+
+test("JOURNAL MAX: artifact target beats a lower journal floor (plan wins, phase kept)", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:121": issueEntry(121, { status: "reviewing", pipelineStep: "REVIEW" }) }, history: {} },
+    { 121: plan(121, ["completed", "executing", "pending"], { audited: true }) }
+  );
+  writeJournal(tikiPath, [jline("issue:121", "PLAN")]); // floor PLAN < artifact EXECUTE
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:121"];
+  assert.equal(e.status, "executing");
+  assert.equal(e.pipelineStep, "EXECUTE");
+  assert.deepEqual(e.phase, { current: 2, total: 3, status: "executing" });
+  assert.deepEqual(r.changes, [{ workId: "issue:121", action: "advanced to EXECUTE" }]);
+});
+
+test("JOURNAL MAX: journal floor beats the artifact target (EXECUTE over an audited plan; phase stays null — artifacts only)", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:122": issueEntry(122, { status: "planning", pipelineStep: "PLAN" }) }, history: {} },
+    { 122: plan(122, ["pending", "pending"], { audited: true }) } // artifact target: planning/AUDIT
+  );
+  writeJournal(tikiPath, [jline("issue:122", "EXECUTE")]);
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:122"];
+  assert.equal(e.status, "executing");
+  assert.equal(e.pipelineStep, "EXECUTE");
+  assert.equal(e.phase ?? null, null); // journal carries NO phase information
+  assert.deepEqual(r.changes, [{ workId: "issue:122", action: "journal floor: EXECUTE" }]);
+});
+
+test("JOURNAL MAX tie at EXECUTE: the artifact target wins so its phase progress is preserved", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:123": issueEntry(123, { status: "planning", pipelineStep: "AUDIT" }) }, history: {} },
+    { 123: plan(123, ["completed", "executing", "pending"], { audited: true }) }
+  );
+  writeJournal(tikiPath, [jline("issue:123", "EXECUTE")]);
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:123"];
+  assert.equal(e.pipelineStep, "EXECUTE");
+  assert.deepEqual(e.phase, { current: 2, total: 3, status: "executing" }); // from the artifact, not the journal
+  assert.deepEqual(r.changes, [{ workId: "issue:123", action: "advanced to EXECUTE" }]);
+});
+
+test("JOURNAL TRAP: a frozen (paused) entry is never advanced by a journal floor", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:124": issueEntry(124, { status: "paused", pipelineStep: "REVIEW" }) }, history: {} }
+  );
+  writeJournal(tikiPath, [jline("issue:124", "EXECUTE")]);
+  const r = reconcile(tikiPath);
+  assert.equal(readBack(tikiPath).activeWork["issue:124"].status, "paused");
+  assert.equal(r.changes.length, 0);
+});
+
+test("JOURNAL TRAP: history wins over the journal — entry removed via the history path, never advanced to SHIP", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: { "issue:125": issueEntry(125, { status: "executing", pipelineStep: "EXECUTE" }) },
+    history: { recentIssues: [{ number: 125, title: "Issue 125", completedAt: "2026-01-02T00:00:00.000Z" }] },
+  });
+  writeJournal(tikiPath, [jline("issue:125", "SHIP")]);
+  const r = reconcile(tikiPath);
+  assert.equal("issue:125" in readBack(tikiPath).activeWork, false);
+  assert.deepEqual(r.changes, [{ workId: "issue:125", action: "removed" }]); // history path, not journal
+});
+
+test("JOURNAL TRAP: ship-derivation wins over the journal (archived plan + CLOSED → removed, not journal-advanced)", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:126": issueEntry(126, { status: "executing", pipelineStep: "EXECUTE" }) }, history: {} }
+  );
+  writeArchivedPlan(tikiPath, 126);
+  writeJournal(tikiPath, [jline("issue:126", "SHIP")]);
+  const fetcher = fakeFetcher("CLOSED");
+  const r = reconcile(tikiPath, { fetchIssueState: fetcher });
+  const state = readBack(tikiPath);
+  assert.equal("issue:126" in state.activeWork, false);
+  assert.deepEqual(r.changes, [{ workId: "issue:126", action: "ship-derived: removed" }]);
+  assert.equal(state.history.recentIssues[0].number, 126);
+  assert.deepEqual(fetcher.calls, [126]);
+});
+
+test("JOURNAL advance-only: a floor behind the recorded step never moves the entry back", () => {
+  const entry = issueEntry(127, { status: "executing", pipelineStep: "EXECUTE", phase: { current: 2, total: 3, status: "executing" } });
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:127": entry }, history: {} }
+  );
+  writeJournal(tikiPath, [jline("issue:127", "REVIEW")]);
+  const r = reconcile(tikiPath);
+  assert.deepEqual(readBack(tikiPath).activeWork["issue:127"], entry);
+  assert.equal(r.changes.length, 0);
+});
+
+test("JOURNAL legality pre-guard: an illegal floor target (pending → shipping) is skipped, never crashes", () => {
+  const entry = issueEntry(128); // pending/GET
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: { "issue:128": entry }, history: {} }
+  );
+  writeJournal(tikiPath, [jline("issue:128", "SHIP")]); // pending -> shipping is illegal
+  const r = reconcile(tikiPath);
+  assert.deepEqual(readBack(tikiPath).activeWork["issue:128"], entry);
+  assert.equal(r.changes.length, 0);
+});
+
+test("JOURNAL BOOTSTRAP: a recent GET line with NO plan file creates pending/GET with the journaled title", () => {
+  const tikiPath = makeTiki({ schemaVersion: 1, activeWork: {}, history: {} });
+  writeJournal(tikiPath, [jline("issue:130", "GET", { title: "Add widgets" })]);
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:130"];
+  assert.ok(e, "entry was created from the journal alone");
+  assert.deepEqual(e.issue, { number: 130, title: "Add widgets" });
+  assert.equal(e.status, "pending");
+  assert.equal(e.pipelineStep, "GET");
+  assert.deepEqual(r.changes, [{ workId: "issue:130", action: "bootstrapped at GET (journal)" }]);
+});
+
+test("JOURNAL BOOTSTRAP: GET+REVIEW lines bootstrap at the floor (reviewing/REVIEW); missing title falls back to `Issue N`", () => {
+  const tikiPath = makeTiki({ schemaVersion: 1, activeWork: {}, history: {} });
+  writeJournal(tikiPath, [jline("issue:131", "GET"), jline("issue:131", "REVIEW")]);
+  const r = reconcile(tikiPath);
+  const e = readBack(tikiPath).activeWork["issue:131"];
+  assert.deepEqual(e.issue, { number: 131, title: "Issue 131" });
+  assert.equal(e.status, "reviewing");
+  assert.equal(e.pipelineStep, "REVIEW");
+  assert.deepEqual(r.changes, [{ workId: "issue:131", action: "bootstrapped at REVIEW (journal)" }]);
+});
+
+test("JOURNAL BOOTSTRAP TRAP: a stale (30d) journal never qualifies bootstrap", () => {
+  const tikiPath = makeTiki({ schemaVersion: 1, activeWork: {}, history: {} });
+  writeJournal(tikiPath, [jline("issue:132", "GET", { ts: isoAgo(30), title: "Stale" })]);
+  const r = reconcile(tikiPath);
+  assert.equal("issue:132" in readBack(tikiPath).activeWork, false);
+  assert.equal(r.changes.length, 0);
+});
+
+test("JOURNAL BOOTSTRAP TRAPs: history membership and an archived plan still block journal-qualified bootstrap", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: {},
+    history: { recentIssues: [{ number: 133, title: "Issue 133", completedAt: isoAgo(1) }] },
+  });
+  writeArchivedPlan(tikiPath, 134);
+  writeJournal(tikiPath, [jline("issue:133", "GET"), jline("issue:134", "GET")]);
+  const r = reconcile(tikiPath);
+  const aw = readBack(tikiPath).activeWork;
+  assert.equal("issue:133" in aw, false); // guard 2: in history
+  assert.equal("issue:134" in aw, false); // guard 3: archived plan
+  assert.equal(r.changes.length, 0);
+});
+
+test("JOURNAL BOOTSTRAP MAX: when both plan and journal qualify, the target is MAX of the two", () => {
+  const tikiPath = makeTiki(
+    { schemaVersion: 1, activeWork: {}, history: {} },
+    {
+      135: makePlan(135, []), // plan target: planning/PLAN
+      136: makePlan(136, ["pending"], { audited: true, auditedAt: isoAgo(0) }), // plan target: planning/AUDIT
+    }
+  );
+  writeJournal(tikiPath, [
+    jline("issue:135", "AUDIT"), // journal floor AUDIT > plan PLAN → journal wins
+    jline("issue:136", "REVIEW"), // journal floor REVIEW < plan AUDIT → plan wins
+  ]);
+  const r = reconcile(tikiPath);
+  const aw = readBack(tikiPath).activeWork;
+  assert.equal(aw["issue:135"].pipelineStep, "AUDIT");
+  assert.equal(aw["issue:135"].status, "planning");
+  assert.equal(aw["issue:136"].pipelineStep, "AUDIT");
+  // Both are plan-qualified candidates (the plan marker, not "(journal)").
+  assert.deepEqual(
+    r.changes.sort((a, b) => a.workId.localeCompare(b.workId)),
+    [
+      { workId: "issue:135", action: "bootstrapped at AUDIT" },
+      { workId: "issue:136", action: "bootstrapped at AUDIT" },
+    ]
+  );
+});
+
+test("JOURNAL PRUNE: shipped-work lines are pruned in the real pass once thresholds are met; state.json stays byte-identical when only pruning happened", () => {
+  // issue:140 is shipped (in history) with 12 journal lines (>= 10 prunable);
+  // issue:141 is tracked and in sync (no reconcile change anywhere).
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: { "issue:141": issueEntry(141, { status: "reviewing", pipelineStep: "REVIEW" }) },
+    history: { recentIssues: [{ number: 140, title: "Issue 140", completedAt: isoAgo(1) }] },
+  });
+  const lines = [];
+  for (let i = 0; i < 12; i++) lines.push(jline("issue:140", "EXECUTE"));
+  lines.push(jline("issue:141", "GET", { title: "Issue 141" }));
+  lines.push(jline("issue:141", "REVIEW"));
+  writeJournal(tikiPath, lines);
+
+  const stateBefore = fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8");
+  const r = reconcile(tikiPath);
+  const stateAfter = fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8");
+
+  assert.equal(r.changes.length, 0);
+  assert.equal(r.journalPruned, 12);
+  assert.equal(stateBefore, stateAfter); // pruning alone NEVER writes state.json
+
+  const kept = readJournalRaw(tikiPath).trim().split("\n");
+  assert.equal(kept.length, 2);
+  assert.ok(kept.every((l) => JSON.parse(l).workId === "issue:141"));
+});
+
+test("JOURNAL PRUNE threshold: a small, mostly-live journal is left byte-identical", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: {},
+    history: { recentIssues: [{ number: 142, title: "Issue 142", completedAt: isoAgo(1) }] },
+  });
+  // 3 prunable lines, 4 total — below both thresholds (>= 50 total / >= 10 prunable).
+  writeJournal(tikiPath, [
+    jline("issue:142", "GET"),
+    jline("issue:142", "REVIEW"),
+    jline("issue:142", "SHIP"),
+    jline("release:v9.9", "EXECUTE"),
+  ]);
+  const before = readJournalRaw(tikiPath);
+  const r = reconcile(tikiPath);
+  assert.equal(r.journalPruned, 0);
+  assert.equal(readJournalRaw(tikiPath), before);
+});
+
+test("JOURNAL PRUNE: --dry-run never prunes", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: {},
+    history: { recentIssues: [{ number: 143, title: "Issue 143", completedAt: isoAgo(1) }] },
+  });
+  const lines = [];
+  for (let i = 0; i < 12; i++) lines.push(jline("issue:143", "EXECUTE"));
+  writeJournal(tikiPath, lines);
+  const before = readJournalRaw(tikiPath);
+  const r = reconcile(tikiPath, { dryRun: true });
+  assert.equal(r.journalPruned, 0);
+  assert.equal(readJournalRaw(tikiPath), before);
+});
+
+test("--print report: journal floor shows as a drift row with note 'journal floor: <STEP>'; recorded phase is never phantom-cleared", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: {
+      "issue:150": issueEntry(150), // pending/GET, journal says REVIEW → drift
+      "issue:151": issueEntry(151, { status: "reviewing", pipelineStep: "REVIEW" }), // floor == recorded → in sync
+    },
+    history: {},
+  });
+  writeJournal(tikiPath, [
+    jline("issue:150", "REVIEW"),
+    jline("issue:151", "REVIEW"),
+  ]);
+  const rows = buildReport(readBack(tikiPath), tikiPath);
+
+  const r150 = rows.find((x) => x.workId === "issue:150");
+  assert.equal(r150.drift, true);
+  assert.equal(r150.derivedStatus, "reviewing");
+  assert.equal(r150.derivedStep, "REVIEW");
+  assert.equal(r150.derivedPhase, null); // = recorded phase (journal has no phase info)
+  assert.equal(r150.note, "journal floor: REVIEW");
+
+  const r151 = rows.find((x) => x.workId === "issue:151");
+  assert.equal(r151.drift, false);
+});
+
+test("--print report: journal-only bootstrap candidate shows 'would create (journal #272)'; state.json AND journal stay byte-identical (no pruning in --print)", () => {
+  const tikiPath = makeTiki({
+    schemaVersion: 1,
+    activeWork: {},
+    history: { recentIssues: [{ number: 152, title: "Issue 152", completedAt: isoAgo(1) }] },
+  });
+  // Above the prune threshold (12 prunable lines) to prove --print never prunes,
+  // plus one fresh journal-only bootstrap candidate.
+  const lines = [];
+  for (let i = 0; i < 12; i++) lines.push(jline("issue:152", "EXECUTE"));
+  lines.push(jline("issue:153", "GET", { title: "Journal-born issue" }));
+  writeJournal(tikiPath, lines);
+
+  const stateBefore = fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8");
+  const journalBefore = readJournalRaw(tikiPath);
+  const rows = buildReport(readBack(tikiPath), tikiPath);
+  assert.equal(fs.readFileSync(path.join(tikiPath, "state.json"), "utf-8"), stateBefore);
+  assert.equal(readJournalRaw(tikiPath), journalBefore); // read-only: no prune
+
+  const r153 = rows.find((x) => x.workId === "issue:153");
+  assert.ok(r153, "journal-only bootstrap row present");
+  assert.equal(r153.number, 153);
+  assert.equal(r153.recordedStatus, null);
+  assert.equal(r153.derivedStatus, "pending");
+  assert.equal(r153.derivedStep, "GET");
+  assert.equal(r153.drift, true);
+  assert.equal(r153.note, "would create (journal #272)");
+
+  // The shipped issue's lines yield no rows (guard 2 blocks bootstrap).
+  assert.equal(rows.some((x) => x.workId === "issue:152"), false);
+});
+
+test("SC5 E2E: a zero-transition pipeline (journal lines + artifacts only) reconciles through the imperative path's milestones", () => {
+  // The whole pipeline runs WITHOUT a single state.mjs transition and WITHOUT
+  // any history append: each stage appends its journal line (as the command
+  // files now do first) and produces its artifacts; reconcile() after each
+  // stage must land exactly where the imperative path would have.
+  const tikiPath = makeTiki({ schemaVersion: 1, activeWork: {}, history: {} });
+  const planFile = path.join(tikiPath, "plans", "issue-160.json");
+  const J = (step, over) => appendJournal(tikiPath, jline("issue:160", step, over));
+  const snap = () => {
+    const e = readBack(tikiPath).activeWork["issue:160"];
+    return e ? { status: e.status, step: e.pipelineStep, phase: e.phase ?? null } : null;
+  };
+
+  // GET — journal line only (with title); no entry, no plan, nothing else.
+  J("GET", { title: "Zero-transition pipeline" });
+  let r = reconcile(tikiPath);
+  assert.deepEqual(r.changes, [{ workId: "issue:160", action: "bootstrapped at GET (journal)" }]);
+  assert.deepEqual(snap(), { status: "pending", step: "GET", phase: null });
+  assert.equal(readBack(tikiPath).activeWork["issue:160"].issue.title, "Zero-transition pipeline");
+
+  // REVIEW — journal line; artifacts still silent (the previously-impossible hop).
+  J("REVIEW");
+  r = reconcile(tikiPath);
+  assert.deepEqual(r.changes, [{ workId: "issue:160", action: "journal floor: REVIEW" }]);
+  assert.deepEqual(snap(), { status: "reviewing", step: "REVIEW", phase: null });
+
+  // PLAN — journal line + the plan file artifact.
+  J("PLAN");
+  fs.writeFileSync(planFile, JSON.stringify(makePlan(160, ["pending", "pending"])));
+  r = reconcile(tikiPath);
+  assert.equal(r.changes.length, 1);
+  assert.deepEqual(snap(), { status: "planning", step: "PLAN", phase: null });
+
+  // AUDIT — journal line + plan.audited artifact.
+  J("AUDIT");
+  fs.writeFileSync(
+    planFile,
+    JSON.stringify(makePlan(160, ["pending", "pending"], { audited: true, auditedAt: isoAgo(0) }))
+  );
+  r = reconcile(tikiPath);
+  assert.equal(r.changes.length, 1);
+  assert.deepEqual(snap(), { status: "planning", step: "AUDIT", phase: null });
+
+  // EXECUTE — journal line + phase progress in the plan artifact (N/M from artifacts).
+  J("EXECUTE");
+  fs.writeFileSync(
+    planFile,
+    JSON.stringify(makePlan(160, ["completed", "executing"], { audited: true, auditedAt: isoAgo(0) }))
+  );
+  r = reconcile(tikiPath);
+  assert.equal(r.changes.length, 1);
+  assert.deepEqual(snap(), {
+    status: "executing",
+    step: "EXECUTE",
+    phase: { current: 2, total: 2, status: "executing" },
+  });
+
+  // SHIP — journal line + ship artifacts (plan archived, issue CLOSED on GitHub).
+  J("SHIP");
+  writeArchivedPlan(tikiPath, 160, makePlan(160, ["completed", "completed"], { audited: true }));
+  fs.rmSync(planFile);
+  const fetcher = fakeFetcher("CLOSED");
+  r = reconcile(tikiPath, { fetchIssueState: fetcher });
+  assert.deepEqual(r.changes, [{ workId: "issue:160", action: "ship-derived: removed" }]);
+
+  const state = readBack(tikiPath);
+  assert.equal("issue:160" in state.activeWork, false); // removed, exactly like a real ship teardown
+  const rec = state.history.recentIssues[0];
+  assert.equal(rec.number, 160);
+  assert.equal(rec.title, "Zero-transition pipeline"); // title carried from the GET journal line
+  assert.ok(!Number.isNaN(Date.parse(rec.completedAt)));
+  // The lingering journal lines must NOT resurrect the issue (history guard).
+  const r2 = reconcile(tikiPath, { fetchIssueState: fetcher });
+  assert.equal(r2.changes.length, 0);
+  assert.equal("issue:160" in readBack(tikiPath).activeWork, false);
+});
+
 test("SHIP-DERIVED: --dry-run computes the heal without writing state or history", () => {
   const tikiPath = makeTiki(
     { schemaVersion: 1, activeWork: { "issue:100": issueEntry(100, { status: "executing", pipelineStep: "EXECUTE" }) }, history: {} },

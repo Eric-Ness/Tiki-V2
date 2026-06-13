@@ -161,7 +161,13 @@ Rules:
 </research-capture>
 
 <early-state-update>
-**REQUIRED — run this FIRST, before designing any phases.** Set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` so the desktop pipeline advances to PLAN immediately. Emit it unconditionally as the first action regardless of how this command was invoked; it is a safe no-op if already recorded (shim; see `yolo.md` for the legacy direct-write shape):
+**FIRST — append the intent journal line (#272), before the transition below and before designing any phases.** The journal is the drop-proof record: even if the transition is dropped, the reconciler advances the entry to PLAN from this line. It never exits non-zero.
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step PLAN
+```
+
+**REQUIRED — run this next, before designing any phases.** Set the `issue:{number}` entry to `status: "planning"`, `pipelineStep: "PLAN"` so the desktop pipeline advances to PLAN immediately. Emit it unconditionally as the first action regardless of how this command was invoked; it is a safe no-op if already recorded (shim; see `yolo.md` for the legacy direct-write shape):
 
 ```bash
 node .claude/tiki/scripts/state.mjs transition issue:{number} \

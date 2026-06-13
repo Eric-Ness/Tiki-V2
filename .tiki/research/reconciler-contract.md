@@ -1,7 +1,7 @@
 ---
 topic: reconciler-contract
 tags: [reconciler, state, framework, hooks]
-issues: [270, 271]
+issues: [270, 271, 272]
 created: 2026-06-13T01:00:00Z
 ---
 
@@ -34,6 +34,18 @@ Facts verified against `packages/framework/scripts/reconcile-state.mjs` (2026-06
 - **Release reconciliation scope (kept tight):** (a) version in `history.recentReleases` → delete `release:*` entry; (b) NOT in history but def archived at `.tiki/releases/archive/<version>.json` → append release history record `{version, issues (from archived def), completedAt, tag: version}` + delete entry; (c) in-flight releases left untouched (no progress healing this issue — advance-only semantics for release progress deferred). FROZEN_STATUSES applies to releases too.
 - **buildReport gains release rows** (currently `continue`s on non-issue keys): recorded triple as-is; derived = teardown verdict when (a)/(b) applies, else recorded (in-sync). Plus ship-derivation rows for issues need the fetcher; --print accepts the same injection and tolerates fetcher absence (rows then show "gh unavailable" note rather than fabricating drift).
 - **Version key normalization:** state key is `release:<version>`; def files live at `releases/<version>.json` with or without `v` prefix historically — check both (mirror check-release-readiness.mjs which accepts both).
+
+## 2026-06-13 findings (#272 REVIEW decisions — intent journal)
+
+- **No new script file.** Journal helpers live INSIDE state.mjs (exported: `appendJournalEntry`, `readJournalEntries`, `journalFloor`, `pruneJournal`) plus a `state.mjs journal` CLI subcommand — command bodies gain no new path dependency (#268 class), and the bootstrap/plugin-layout tests need no script-list changes.
+- **Entry shape:** one JSON line `{ts, workId, step, event, phase?, title?}`. `event` = "start" (only event v1 — "complete" reserved). GET passes `--title` so journal-qualified bootstrap can create entries with a real title pre-plan.
+- **Append = O_APPEND single-line write, NO lock** (fs.appendFileSync; atomic enough for sub-PIPE_BUF lines; a torn line is tolerated by the defensive reader — skip unparseable lines). Append must NEVER fail the command: wrap, warn to stderr, exit 0 from the subcommand.
+- **Reconciler consumption order (binding):** frozen → history → ship-derivation (#271) → advance to MAX(artifact target, journal floor) by STEP_ORDER, legality-pre-guarded, advance-only. Journal floor status mapping: GET→pending, REVIEW→reviewing, PLAN→planning, AUDIT→planning, EXECUTE→executing (phase from artifact only), SHIP→shipping. Journal NEVER overrides frozen/history/ship-derivation.
+- **Journal-qualified bootstrap:** a journal entry for issue:N within the same 14-day recency window qualifies bootstrap even with NO plan file (covers dropped GET/REVIEW — previously impossible). Guards 1-3 from #270 still apply (existing entry / history / archived plan); title from the newest journal entry's `title` ?? `Issue N`.
+- **Pruning:** inside the locked pass only; rewrite journal atomically WITHOUT entries whose issue number is in history.recentIssues (or release version in recentReleases), only when the file has > 50 prunable-or-total threshold lines (avoid churn). Accepted risk (documented): an append racing the rewrite can lose that one line = degraded to pre-#272 behavior, never corruption (reader skips torn lines).
+- **--print:** journal-derived floors appear as normal drift rows with note "journal floor: <STEP>"; journal-qualified bootstrap candidates show "would create (journal #272)".
+- **Coverage guard:** command-transition-coverage.test.mjs extended — every workflow command file must contain a `state.mjs journal` invocation; yolo/release must journal once per step they orchestrate (static presence per required step, mirroring the transition-pair checks).
+- **SC5 e2e:** fixture pipeline writing ONLY journal lines + artifacts (zero transitions, zero history) must reconcile to the same state.json as the imperative path (extends the #248 DROP-RESILIENCE family; now includes GET/REVIEW distinguishability, which artifacts alone cannot provide).
 
 ## Test conventions (`__tests__/reconcile-state.test.mjs`)
 - Imports `reconcile`/`buildReport` directly (ESM import, no spawn) + fixture `.tiki` trees in tmp dirs; 16 existing scenarios incl. TRAP tests (frozen, stale-plan-not-resurrected — that one currently asserts NO entry creation for an issue NOT in activeWork **with the issue in history**... verify exact fixture before changing semantics; #270 must keep the not-in-history+archived-plan resurrection guard intact and re-pin the TRAP test for the new rule: archived plan → never bootstrap, history member → never bootstrap).

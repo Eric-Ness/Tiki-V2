@@ -241,7 +241,13 @@ All success criteria verified:
 </output>
 
 <state-management>
-**REQUIRED — run the `shipping` transition FIRST, before committing/pushing**, then the completion writes after the issue is closed. Emit unconditionally regardless of how this command was invoked; re-running is a safe no-op. Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the canonical shape and the parent-release contract.
+**FIRST — append the intent journal line (#272), before the transitions below and before committing anything.** The journal is the drop-proof record: even if the shipping transition is dropped, the reconciler advances the entry to SHIP from this line. It never exits non-zero.
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step SHIP
+```
+
+**REQUIRED — run the `shipping` transition next, before committing/pushing**, then the completion writes after the issue is closed. Emit unconditionally regardless of how this command was invoked; re-running is a safe no-op. Shipping is two state-machine steps. See `yolo.md` `<state-management>` for the canonical shape and the parent-release contract.
 
 ```bash
 # 1. Mark shipping:

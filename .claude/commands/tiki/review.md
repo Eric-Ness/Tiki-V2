@@ -137,7 +137,13 @@ Rules:
 </research-capture>
 
 <state-management>
-**REQUIRED — run this FIRST, before analyzing the issue.** Record the `pending → reviewing` transition through the validated shim so the desktop pipeline advances to REVIEW immediately. Do NOT defer it to the end of the step or make it conditional on how this command was invoked — emit it unconditionally as the first action. The shim creates the `issue:{number}` entry if missing, updates status/`pipelineStep`/`lastActivity`, preserves `parentRelease`, and is a safe no-op if the step was already recorded.
+**FIRST — append the intent journal line (#272), before the transition below and before analyzing anything.** This is the drop-proof record: even if the transition below is dropped, the reconciler advances the entry to REVIEW from this line. It never exits non-zero.
+
+```bash
+node .claude/tiki/scripts/state.mjs journal issue:{number} --step REVIEW
+```
+
+**REQUIRED — run this next, before analyzing the issue.** Record the `pending → reviewing` transition through the validated shim so the desktop pipeline advances to REVIEW immediately. Do NOT defer it to the end of the step or make it conditional on how this command was invoked — emit it unconditionally as the first action. The shim creates the `issue:{number}` entry if missing, updates status/`pipelineStep`/`lastActivity`, preserves `parentRelease`, and is a safe no-op if the step was already recorded.
 
 ```bash
 node .claude/tiki/scripts/state.mjs transition issue:{number} \
