@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 276,
-      "title": "Kill dual status encoding for releases: location is sole truth, doctor auto-fix",
-      "completedAt": "2026-06-13T16:53:34.160Z"
+      "number": 278,
+      "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new",
+      "completedAt": "2026-06-13T19:56:52.155Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.3",
@@ -22,6 +22,11 @@
       "tag": "v0.9.3"
     },
     "recentIssues": [
+      {
+        "number": 278,
+        "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new",
+        "completedAt": "2026-06-13T19:56:52.155Z"
+      },
       {
         "number": 276,
         "title": "Kill dual status encoding for releases: location is sole truth, doctor auto-fix",

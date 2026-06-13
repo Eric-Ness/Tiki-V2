@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 278,
+    "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/278"
+  },
+  "createdAt": "2026-06-13T18:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "testing",
+      "description": "A cargo serde round-trip test covers every IPC-returned struct, asserting expected camelCase keys are present; it fails if a field is dropped or mis-renamed on the wire",
+      "verified": true,
+      "verifiedAt": "2026-06-13T19:54:30.391Z"
+    },
+    {
+      "id": "SC2",
+      "category": "testing",
+      "description": "skip_serializing_if fields asserted present-when-Some / absent-when-None; non-optional + #[serde(default)] fields asserted always-present (the #259 invariant)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T19:54:30.391Z"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "A source-scan guard bans raw Command::new outside hidden_command (github/mod.rs); demonstrated to match a planted bypass string, not just the wrapper definition; portable-pty not falsely flagged",
+      "verified": true,
+      "verifiedAt": "2026-06-13T19:54:30.612Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "cargo --lib + full pnpm test green; the existing #259 tiki_release_archived_survives_serialization assertion is preserved (kept or folded with the same check)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T19:54:30.612Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Serde IPC round-trip test for every command-returned struct",
+      "status": "completed",
+      "content": "Add a cargo test that pins serde serialization shape for every struct returned across the Tauri IPC boundary (generalizes #259, which guarded only TikiRelease.archived). Put it in a clear location — either a new `#[cfg(test)] mod ipc_serialization` in commands.rs or a new test module file; match the crate's existing test conventions.\n\nFor each struct: build an instance with ALL fields populated (and, for Option fields, also a None-variant where relevant), `serde_json::to_value`, and assert:\n- expected camelCase keys are PRESENT (e.g. createdAt, schemaVersion, activeWork, pipelineStep, unresolvedScriptPaths, copyInstallDetected, tagName, isDraft);\n- `#[serde(skip_serializing_if = \"Option::is_none\")]` fields: present when Some, ABSENT when None (assert both directions on at least GitHubRelease {name, publishedAt, url} and one IssueContext optional);\n- non-optional and `#[serde(default)]` fields: ALWAYS present even when default/false (the #259 invariant — e.g. TikiRelease.archived present when false; DiagnosticsReport.unresolvedScriptPaths present when empty);\n- the `#[serde(tag=\"type\")]` WorkContext union serializes `type:\"issue\"` / `type:\"release\"`.\n\nStructs to cover (from the scout inventory): TikiRelease, TikiState, WorkContext/IssueContext, TikiPlan, Phase, DiagnosticsReport, ReleaseCheck, GitHubRelease (Some + None variants), GitHubIssue, GitHubPullRequest, GitHubPrDetail, GitHubComment. Read each struct's serde attrs first (state.rs, github/*.rs) so the asserted keys match the actual rename_all/skip rules — do NOT guess; open the structs.\n\nKeep the existing `tiki_release_archived_survives_serialization` test (commands.rs:1362) OR fold its exact assertion into the new test (archived present == true). Run `cargo test --lib` (from apps/desktop/src-tauri, avoids the running-app exe lock) — green. `cargo clippy --lib -- -D warnings` clean for additions.",
+      "verification": [
+        "cargo --lib round-trip test covers all IPC-returned structs with camelCase key assertions",
+        "skip_serializing_if Some/None both asserted; default/non-optional always-present asserted",
+        "WorkContext union tag asserted; #259 archived assertion preserved",
+        "cargo --lib + clippy green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T19:54:30.389Z",
+      "summary": "Added #[cfg(test)] mod ipc_serialization to commands.rs — 12 tests pinning serde wire shape for every IPC-returned struct (TikiRelease, TikiState, WorkContext/IssueContext, TikiPlan+Phase, DiagnosticsReport+ReleaseCheck, GitHubRelease Some+None, GitHubIssue, GitHubPullRequest, GitHubPrDetail+nested, GitHubComment). Asserts camelCase keys present, skip_serializing_if Some-present/None-absent (GitHubRelease {name,publishedAt,url}; IssueContext optionals both directions), default/non-optional always-present (TikiRelease.archived present when false; DiagnosticsReport.unresolvedScriptPaths [] when empty), WorkContext tag type:\"issue\"/\"release\", enum renames (status lowercase, pipelineStep SCREAMING_SNAKE). #259 invariant folded into tiki_release_wire_shape AND original tiki_release_archived_survives_serialization kept. cargo --lib 61→75 (with sibling phase 2's +2); clippy --lib --tests clean. testResults: { framework: \"cargo\", command: \"cargo test --lib\", passed: 75, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 2,
+      "title": "Source-scan guard banning raw Command::new outside hidden_command",
+      "status": "completed",
+      "content": "Add a guard test asserting `hidden_command` (github/mod.rs) is the ONLY place that constructs a raw `std::process::Command` — so a future spawn can't bypass the Windows CREATE_NO_WINDOW hygiene (#36/#121).\n\nImplement as a cargo test (self-contained in the crate): walk `apps/desktop/src-tauri/src/**/*.rs` (use `std::fs` + recursion or `include_str!`-free dir walk; the crate root via `env!(\"CARGO_MANIFEST_DIR\")`), read each file, and assert no occurrence of the literal `Command::new(` EXCEPT inside github/mod.rs (the single `hidden_command` definition). Be precise:\n- Match `Command::new(` (the construction), not type annotations or comments referencing it — a simple substring scan is acceptable but exclude `//`-comment lines and the github/mod.rs definition line.\n- Allow the one legitimate site (github/mod.rs hidden_command). Report file:line of any violation with a message pointing at hidden_command.\n- Confirm portable-pty (pty.rs CommandBuilder / native_pty_system) does NOT contain `Command::new(` so it isn't falsely flagged (it uses portable_pty::CommandBuilder, a different type).\n- SC3 proof: include an in-test assertion that the matcher WOULD flag a planted bypass — e.g. run the same predicate over a synthetic string `let x = Command::new(\"gh\");` and assert it matches (demonstrates the guard catches a real bypass, not vacuously passing).\n\nRun `cargo test --lib` — green (the real tree has exactly one legitimate site). clippy clean.",
+      "verification": [
+        "cargo guard test scans src/**.rs and passes (only github/mod.rs hidden_command constructs Command::new)",
+        "the matcher is shown to flag a planted bypass string (not vacuously green)",
+        "portable-pty not falsely flagged",
+        "cargo --lib + clippy green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/github/mod.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T19:54:30.610Z",
+      "summary": "Added #[cfg(test)] mod command_hygiene_guard to github/mod.rs — walks src/**/*.rs from env!(CARGO_MANIFEST_DIR)/src, flags any line with literal Command::new( except (a) //-comment lines and (b) tokens inside string literals (odd preceding-quote count), allowlisting only github/mod.rs. Asserts exactly 1 legit site (fails if hidden_command deleted/renamed — non-vacuous). Planted-bypass proof: predicate true for `Command::new(\"gh\")`, false for comment/doc lines. Real tree confirmed: only github/mod.rs L20 (doc comment, excluded) + L25 (hidden_command body) — no bypass. pty.rs uses portable_pty::CommandBuilder, not flagged. cargo --lib green (75 total with phase 1); clippy clean for github/mod.rs. testResults: { framework: \"cargo\", command: \"cargo test --lib\", passed: 75, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1,
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T19:48:19.668Z"
+}
