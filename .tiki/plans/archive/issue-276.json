@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 276,
+    "title": "Kill dual status encoding for releases: location is sole truth, doctor auto-fix",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/276"
+  },
+  "createdAt": "2026-06-13T16:55:00.000Z",
+  "research": [
+    "release-status-single-source"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "No desktop lifecycle/display decision is made from the release JSON status field; isReleaseCompleted relies solely on the location-derived archived flag, pinned by updated tests",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:51:44.633Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "tiki_doctor exposes residual stale-active archived defs as an actionable finding with a normalize_archived_releases command that rewrites them to status:shipped; cargo test pins the normalizer",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:51:44.686Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "The Diagnostics panel offers a Fix action that runs the normalizer and reloads; the finding is reframed from permanent-info to actionable-when-residue-exists; vitest pins the summary logic",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:51:44.686Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "check-release-readiness.mjs warns when an archived release def's status != shipped (the v0.9.0 footgun catch), with a framework test",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:51:44.743Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "Existing release tests stay green (location-derivation, #259 archived-survives-serialization, archivedButActive compute, includeArchived guard); full pnpm test + build green; dogfood regen if a canonical script changed",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:51:44.743Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Desktop UI: location-only release completion",
+      "status": "completed",
+      "content": "Read `.tiki/research/release-status-single-source.md` first.\n\nMake the location-derived `archived` flag the SOLE signal for release completion in the desktop:\n1. `apps/desktop/src/utils/releaseDisplayStatus.ts` `isReleaseCompleted()`: change from `archived || status===shipped || status===completed` to `Boolean(release.archived)` only. Update the function's doc comment to state location is the sole truth (status no longer consulted; #276). Since #259 guarantees `archived` always survives IPC (Rust stamps it from location on every load), the status disjuncts were dead/footgun fallback.\n2. AUDIT the rest of `apps/desktop/src` for any OTHER place that branches on a release's `status` field for a display/gating decision (grep `\\.status` near release usage: ReleasesSection, TikiReleaseDetail, ReleaseDialog gating, etc.). ReleaseDialog create/edit WRITING status:'active' is correct (a live release) — leave writes. Only redirect READ-side DECISIONS to `archived`. Report what you found; redirect any genuine status-based decision, leave informational displays.\n3. `apps/desktop/src/utils/__tests__/releaseDisplayStatus.test.ts`: update cases. The old 'falls back to status=shipped/completed when archived absent' cases now assert: archived flag is the only thing that marks completed; a def with status:'shipped' but archived:false/undefined is NOT completed (location is truth — and in practice the Rust loader always sets archived, so this models the invariant). Keep the 'archived=true regardless of status' case. Add a case: archived:true + status:'active' (the residue) → still completed (location wins).\nGates: `pnpm -C apps/desktop test` green; `pnpm build` (tsc -b) clean.",
+      "verification": [
+        "isReleaseCompleted uses only archived (location); doc updated",
+        "No other desktop status-based lifecycle decision remains (audit reported)",
+        "releaseDisplayStatus.test.ts updated: archived is sole completion signal; residue case (archived+status:active) → completed",
+        "desktop vitest + tsc -b green"
+      ],
+      "addressesCriteria": [
+        "SC1"
+      ],
+      "files": [
+        "apps/desktop/src/utils/releaseDisplayStatus.ts",
+        "apps/desktop/src/utils/__tests__/releaseDisplayStatus.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T16:51:44.632Z",
+      "summary": "isReleaseCompleted() → Boolean(release.archived) only (dropped status==='shipped'/'completed' disjuncts); doc rewritten (location is sole truth, #259 guarantees archived survives IPC). Audit: isReleaseCompleted was the ONLY completion-decision site; its callers (TikiReleaseDetail:66, ReleasesSection:304) inherit the fix. Other release.status==='active' usages (DependencyGraph, KanbanFilters, IssueFormModal, ReleasesSection not_planned) are \"which release is live\" filters NOT completion decisions — correct, left as-is. releaseDisplayStatus.test.ts updated: archived sole signal (status:shipped+archived:false → NOT completed), archived:true+status:active residue → completed. Gates: desktop vitest 212, tsc -b clean. testResults: { framework: \"vitest\", command: \"pnpm -C apps/desktop test\", passed: 212, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 2,
+      "title": "Doctor: normalize_archived_releases command + actionable finding + Fix button",
+      "status": "completed",
+      "content": "Read the research doc. Add a one-shot normalizer + make the doctor finding actionable.\n1. Rust: new `#[tauri::command] pub fn normalize_archived_releases(tiki_path: Option<String>) -> Result<usize, String>` in commands.rs — scans `releases/archive/*.json`, for each whose parsed status != Shipped, rewrite the file with status set to Shipped (preserve all other fields; atomic write via the existing atomic_write/fs_utils helper). Returns count fixed. Read-failures on a single file skip it (never Err the whole op for one bad file). Register in the invoke_handler (generate_handler!). Keep `archivedButActive` computation as-is in tiki_doctor (it stays the signal source).\n2. cargo test (`cargo test --lib` from src-tauri): a fixture with two archived defs (one status:active, one status:shipped) + one active-location def → normalize rewrites ONLY the stale archived one to shipped, returns 1, leaves the shipped archived + active-location defs untouched. Assert the rewritten file parses with status shipped.\n3. Frontend `diagnosticsSummary.ts`: the `archivedButActive` count currently surfaces as a neutral info finding. Reframe: when count>0, surface it as an ACTIONABLE finding (a new finding level or a flag the panel can act on) labeled e.g. 'N archived release(s) have a stale \"active\" status — Normalize to fix'. It must STILL NOT flip top-level status to \"warnings\" (it's cosmetic residue, not drift) — keep status healthy; the actionability is a Fix affordance, not an alarm. Add an `actionable`/`fixable` marker to that finding's shape so the panel can render a button. Update `diagnosticsSummary.test.ts` accordingly (count>0 → actionable finding present, status stays healthy; count==0 → no finding).\n4. `DiagnosticsPanel.tsx`: when the report has archivedButActive>0, render a 'Normalize archived releases' button that `invoke('normalize_archived_releases', { tikiPath })` then re-runs `load()`. Minimal, mirrors the existing Refresh button pattern. (Visual; note for user eyes but reuses existing button styling.)\nGates: `cargo test --lib` green incl. the new test + the #259/location tests; `pnpm -C apps/desktop test` green; `pnpm build` clean. `cargo clippy --lib -- -D warnings` clean for your additions.",
+      "verification": [
+        "normalize_archived_releases rewrites only stale-active archived defs to shipped (cargo test, returns count)",
+        "registered in invoke_handler; #259 + location tests still green",
+        "diagnosticsSummary reframes archivedButActive>0 as actionable but never flips status to warnings (vitest)",
+        "DiagnosticsPanel shows a Normalize button wired to the command",
+        "cargo --lib + desktop vitest + build green; clippy clean"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src/utils/diagnosticsSummary.ts",
+        "apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts",
+        "apps/desktop/src/components/settings/DiagnosticsPanel.tsx"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T16:51:44.686Z",
+      "summary": "Rust normalize_archived_releases(tiki_path)->Result<usize,String> in commands.rs: scans releases/archive/*.json, edits ONLY the status key via serde_json::Value (preserves all other fields), sets stale != shipped → \"shipped\", skips already-shipped + per-file failures, atomic_write, returns count; registered in lib.rs invoke_handler. cargo test normalize_archived_releases_fixes_only_stale_active_archived_defs (stale→shipped keeps version/issues, shipped+active-location untouched), cargo --lib 60→61, clippy clean, #259+location guards green. diagnosticsSummary.ts: Finding gained optional action?:\"normalizeArchivedReleases\"; archivedButActive>0 stays level:info (never flips status to warnings) but carries the action + \"Normalize to fix\" message; count==0 absent; vitest 9→11. DiagnosticsPanel.tsx: \"Normalize archived releases\" button (canNormalize when a finding has the action) → invoke normalize_archived_releases then load(); +.diagnostics-actions css. Build clean. VISUAL (panel button) needs user eyes in tauri:dev. testResults: { framework: \"cargo+vitest\", command: \"cargo test --lib + pnpm -C apps/desktop test\", passed: 273, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 3,
+      "title": "Gate: check-release-readiness warns on archived def status != shipped",
+      "status": "completed",
+      "content": "Read the research doc. Make the pre-release gate catch the v0.9.0 footgun.\n1. `packages/framework/scripts/check-release-readiness.mjs`: when it resolves a release def from the `archive/` location, additionally check the def's `status` field; if it is present and != 'shipped', emit a WARNING (soft — add to a warnings list, do NOT necessarily fail exit unless the script already treats this class as hard; match the script's existing soft-vs-hard convention — prefer soft/warn so it informs without blocking, since location is already truth). The message: name the version + 'archived def status is \"<x>\", expected \"shipped\" — run Normalize (Diagnostics) or it will mislead status-field readers'. Keep it read-only (no rewrite in the gate).\n2. `packages/framework/__tests__/check-release-readiness.test.mjs`: add a case — an archived def with status:'active' → the readiness output includes the warning (and the overall pass/fail behaves per the soft convention). A shipped archived def → no warning.\n3. If check-release-readiness.mjs is in the dogfood canonical scripts set (plugin-distribution parity), the final gate (run by the parent after this phase) will regen; note whether you changed a dogfood-copied script so the parent regenerates `.claude/tiki/scripts/`.\nGates: `pnpm -C packages/framework test` green for check-release-readiness.test.mjs (note: dogfood-parity may go red if check-release-readiness.mjs is a copied script — the parent runs install.js at the final gate; attribute it).",
+      "verification": [
+        "check-release-readiness warns when an archived def's status != shipped; shipped → no warning",
+        "test case added (active archived def → warning; shipped → none)",
+        "soft/warn convention matched (informs, doesn't spuriously hard-fail)",
+        "noted whether a dogfood-copied script changed (for the parent's regen)"
+      ],
+      "addressesCriteria": [
+        "SC4"
+      ],
+      "files": [
+        "packages/framework/scripts/check-release-readiness.mjs",
+        "packages/framework/__tests__/check-release-readiness.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T16:51:44.742Z",
+      "summary": "check-release-readiness.mjs (repo-root scripts/, NOT dogfood-copied → no regen impact) gained an archive-location check: when a def resolves from .../archive/... and its status != \"shipped\", push a soft WARNING (existing warnings[] channel — printed, never affects ok/exit, matching the script's soft convention): names version + status + \"run Normalize (Diagnostics)\". Read-only (gate flags, doctor fixes). check-release-readiness.test.mjs: archived+status:active → warning present + gate still passes; archived+status:shipped → no warning. Framework 161/161 incl. dogfood-parity green (script is outside the distributed surface). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 161, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      3
+    ],
+    "SC5": [
+      1,
+      2,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T16:45:55.027Z"
+}

@@ -1,14 +1,6 @@
-{"ts":"2026-06-13T01:38:08.647Z","workId":"issue:272","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T01:39:22.714Z","workId":"issue:272","step":"SHIP","event":"start"}
-{"ts":"2026-06-13T16:01:18.563Z","workId":"issue:274","step":"GET","event":"start","title":"Schema-first TS types + schema-Rust parity test + fix PhaseProgressStatus(skipped) drift"}
-{"ts":"2026-06-13T16:01:19.291Z","workId":"issue:274","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T16:03:10.662Z","workId":"issue:274","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T16:04:12.620Z","workId":"issue:274","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T16:04:22.794Z","workId":"issue:274","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T16:15:12.920Z","workId":"issue:274","step":"SHIP","event":"start"}
-{"ts":"2026-06-13T16:17:11.638Z","workId":"issue:275","step":"GET","event":"start","title":"Close the shim mutation-surface gaps: subcommands for every direct-JSON write + write-time validation"}
-{"ts":"2026-06-13T16:17:12.684Z","workId":"issue:275","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T16:18:59.023Z","workId":"issue:275","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T16:20:13.954Z","workId":"issue:275","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T16:20:23.390Z","workId":"issue:275","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T16:39:49.172Z","workId":"issue:275","step":"SHIP","event":"start"}
+{"ts":"2026-06-13T16:41:11.643Z","workId":"issue:276","step":"GET","event":"start","title":"Kill dual status encoding for releases: location is sole truth, doctor auto-fix"}
+{"ts":"2026-06-13T16:41:12.425Z","workId":"issue:276","step":"REVIEW","event":"start"}
+{"ts":"2026-06-13T16:44:55.303Z","workId":"issue:276","step":"PLAN","event":"start"}
+{"ts":"2026-06-13T16:45:54.961Z","workId":"issue:276","step":"AUDIT","event":"start"}
+{"ts":"2026-06-13T16:46:05.898Z","workId":"issue:276","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-13T16:51:45.262Z","workId":"issue:276","step":"SHIP","event":"start"}
