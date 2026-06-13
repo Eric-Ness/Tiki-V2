@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 280,
+    "title": "Kanban wiring: parity-test column table vs canonical transitions + toast on undispatchable drags",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/280"
+  },
+  "createdAt": "2026-06-13T20:40:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "A pure classifyKanbanMove(source,target) decision function replaces the inline kanban transition logic; exhaustively unit-tested over all column pairs (dispatch-execute / dispatch-ship / reorder / toast)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:20:02.733Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "A parity test asserts the kanban move table is consistent with canonical VALID_TRANSITIONS via the column->statuses map: every dispatchable move is canonically legal, and the board offers no move that canonical forbids without it being a toast",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:20:02.733Z"
+    },
+    {
+      "id": "SC3",
+      "category": "ux",
+      "description": "handleDragEnd shows a toast on any cross-column drag that isn't dispatched (backward/lateral/invalid) instead of silently snapping back; pinned by a test of the decision (dispatch vs toast) per move",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:22:45.528Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "desktop vitest + build green; existing kanban tests (executeCommand, kanbanOrder) + transitions-parity stay green; no silent no-op cross-column drag remains",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:22:45.528Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Pure classifyKanbanMove helper + column<->canonical parity test",
+      "status": "completed",
+      "content": "Extract the kanban move decision into a pure, testable function and pin it against the canonical transition table.\n\n1. New `apps/desktop/src/components/kanban/kanbanMoves.ts`:\n   - Export `COLUMN_STATUSES: Record<ColumnId, WorkStatus[]>` mirroring KanbanBoard's COLUMN_CONFIG (open:[], review:[pending,reviewing], plan:[planning], execute:[executing], shipping:[shipping], completed:[completed]) — single source for the column<->status map. (failed/paused display in the execute column per deriveDisplayStatus; note them as execute-mapped for completeness.)\n   - Export `type KanbanMove = 'reorder' | 'dispatch-execute' | 'dispatch-ship' | 'toast'`.\n   - Export `classifyKanbanMove(source: ColumnId, target: ColumnId): KanbanMove`: same column -> 'reorder'; target==='execute' (from open/review/plan) -> 'dispatch-execute'; source==='execute' && target==='shipping' -> 'dispatch-ship'; everything else cross-column -> 'toast' (the backward/lateral/unsupported moves that today silently snap back). This encodes the ONLY two command-backed dispatches; the rest get user feedback.\n2. New parity test `apps/desktop/src/components/kanban/__tests__/kanbanMoves.test.ts` (vitest):\n   - Import canonical `VALID_TRANSITIONS` from @tiki/shared and `COLUMN_STATUSES` + `classifyKanbanMove`.\n   - Define `columnMoveIsCanonical(a,b)`: true iff some sA in COLUMN_STATUSES[a] can canonically transition to some sB in COLUMN_STATUSES[b] (skip when either set empty — 'open' is a UI-only untracked column with no work status).\n   - Assert: every move classifyKanbanMove returns as 'dispatch-execute'/'dispatch-ship' is EITHER canonically legal (via columnMoveIsCanonical) OR involves the empty-status 'open' column (start-work affordance) — i.e. the board never dispatches a canonically-illegal status transition.\n   - Exhaustive classifier test: iterate ALL ordered column pairs and assert classifyKanbanMove returns the expected value (a small expected-map) — proves no cross-column pair falls through to a silent/undefined outcome (every cross-column non-dispatch is 'toast').\n   - Drift-proof: assert that if a canonically-FORBIDDEN status pair were offered as a dispatch it would be caught (demonstrate columnMoveIsCanonical returns false for e.g. execute->plan status sets).\n3. Do NOT wire handleDragEnd yet (phase 2). KanbanBoard.tsx can keep its current inline logic this phase; just add the helper + tests.\nGates: `pnpm -C apps/desktop test` green (new kanbanMoves.test.ts + existing); `pnpm build` clean.",
+      "verification": [
+        "kanbanMoves.ts exports COLUMN_STATUSES, KanbanMove, classifyKanbanMove (pure)",
+        "parity test maps columns->statuses and asserts dispatched moves are canonically legal (or open-affordance)",
+        "exhaustive classifier test over all column pairs; drift-proof negative case",
+        "desktop vitest + build green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/kanban/kanbanMoves.ts",
+        "apps/desktop/src/components/kanban/__tests__/kanbanMoves.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T20:20:02.732Z",
+      "summary": "Created kanbanMoves.ts: ColumnId type, COLUMN_STATUSES (open:[], review:[pending,reviewing], plan:[planning], execute:[executing,failed,paused] — failed/paused per deriveDisplayStatus, makes execute->plan column-canonical), KanbanMove type, pure classifyKanbanMove(source,target): same->reorder; target=execute from {open,review,plan}->dispatch-execute; execute->shipping->dispatch-ship; else cross-column->toast. Scoped dispatch-execute to open/review/plan sources (completed->execute, shipping->execute now toast, not dispatch — they were never board-supported). kanbanMoves.test.ts: 43 tests — exhaustive 36-pair classifier table (every cross-column non-dispatch === toast, no fall-through), parity columnMoveIsCanonical vs canonical VALID_TRANSITIONS (.has on ReadonlySet; every dispatch-* is column-canonical OR open-affordance), drift-proof negatives (shipping->plan/review false → toast; completed->* never canonical). desktop vitest 214->257; build clean. testResults: { framework: \"vitest\", command: \"pnpm -C apps/desktop test\", passed: 257, failed: 0, skipped: 0, status: \"passed\" }. Phase 2: keep same-column reorder early-return before the classifier switch; replace lines 236-248 cross-column block with switch(classifyKanbanMove(src as ColumnId, tgt as ColumnId)); delete inline VALID_TRANSITIONS/isValidTransition/console.log; keep COLUMN_CONFIG."
+    },
+    {
+      "number": 2,
+      "title": "Wire handleDragEnd to classifyKanbanMove + toast on undispatchable drags",
+      "status": "completed",
+      "content": "Replace the silent snap-backs in KanbanBoard.tsx with the pure classifier + a toast, fixing the #267 silent no-op.\n\n1. In `KanbanBoard.tsx` handleDragEnd cross-column branch: call `classifyKanbanMove(sourceColumn, targetColumn)` and switch:\n   - 'dispatch-execute' -> triggerExecution(issueNumber, sourceColumn) (unchanged);\n   - 'dispatch-ship' -> requestShipConfirmation(issueNumber) (unchanged);\n   - 'toast' -> `useToastStore.getState().addToast(message, 'info')` with a clear message, e.g. \"Moving work backward from the board isn't supported — drive it from the terminal (e.g. /tiki:execute {n} or pause/fail in the pipeline).\" Tailor wording: a purely-invalid move (e.g. completed->anything) can get \"This move isn't available from the board.\" Keep it ONE addToast call (pick the message by a small predicate, or one general message). The card still visually snaps back (dnd-kit) but now the user gets feedback.\n   - same-column 'reorder' -> existing reorder path (leave as-is; classifyKanbanMove returns 'reorder' but the existing same-column early-return already handles it BEFORE this switch — keep that ordering, don't double-handle).\n2. Remove the now-dead inline `VALID_TRANSITIONS` const and `isValidTransition` from KanbanBoard.tsx (the classifier subsumes them) — OR, if COLUMN_CONFIG.statuses is still used for column derivation, keep COLUMN_CONFIG but delete the transition table + isValidTransition. Verify nothing else references them.\n3. Remove the `console.log('Invalid transition...')` debug line.\n4. Test: add/extend a kanban test asserting the decision per move — at minimum a unit test that a backward move (e.g. execute->review) results in an addToast call (mock useToastStore.getState) and NOT a triggerExecution; and that execute (forward) still dispatches. If testing handleDragEnd directly is heavy, test via classifyKanbanMove already covered in phase 1 PLUS a thin test that the 'toast' branch calls addToast (can be a focused test of a small extracted dispatch function if cleaner).\nGates: `pnpm -C apps/desktop test` green; `pnpm build` clean; freshRefGuard + executeCommand + kanbanOrder + transitions-parity green. Visual nicety (the toast actually rendering) is a tauri:dev nicety; the logic is unit-tested.",
+      "verification": [
+        "handleDragEnd uses classifyKanbanMove; 'toast' branch calls addToast; no silent cross-column snap-back remains",
+        "dead VALID_TRANSITIONS/isValidTransition/console.log removed; nothing else references them",
+        "test asserts a backward move toasts (not dispatches) and a forward move still dispatches",
+        "desktop vitest + build green; existing kanban/transitions tests green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src/components/kanban/KanbanBoard.tsx"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T20:22:45.527Z",
+      "summary": "KanbanBoard.tsx handleDragEnd now delegates the cross-column case to an extracted pure injectable dispatchKanbanMove(source,target,issueNumber,{triggerExecution,requestShip,toast}) which switches on classifyKanbanMove: dispatch-execute->triggerExecution, dispatch-ship->requestShip, toast->one addToast(...,'info'), reorder->noop. Toast message \"Moving work backward from the board isn't supported — drive it from the terminal (e.g. /tiki:execute {n}).\" with completed-source special case \"This move isn't available from the board.\" Deleted dead inline VALID_TRANSITIONS + isValidTransition + console.log (grep-confirmed no other refs; canonical VALID_TRANSITIONS from @tiki/shared is a different symbol); kept COLUMN_CONFIG. kanbanDispatch.test.ts (8 tests): forward dispatches, backward toasts-not-dispatches (msg contains /tiki:execute 42), lateral toasts, completed generic msg, same-column noop, exhaustive 30-pair loop asserting exactly one action per cross-column move (no silent snap-back). desktop vitest 257->265; build clean. #267 silent no-op FIXED. testResults: { framework: \"vitest\", command: \"pnpm -C apps/desktop test\", passed: 265, failed: 0, skipped: 0, status: \"passed\" }. Toast rendering is a tauri:dev visual nicety; logic fully unit-tested."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T20:15:49.314Z"
+}
