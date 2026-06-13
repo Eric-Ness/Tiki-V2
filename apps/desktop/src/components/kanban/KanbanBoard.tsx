@@ -20,18 +20,61 @@ import { KanbanCard, type WorkItem } from './KanbanCard';
 import { KanbanFilters } from './KanbanFilters';
 import { getExecuteCommand } from './executeCommand';
 import { collectCompletedIssueNumbers, buildCompletedCards } from './completedColumn';
+import { classifyKanbanMove, type ColumnId } from './kanbanMoves';
+import { useToastStore } from '../../stores/toastStore';
 import { deriveDisplayStatus, type DisplayColumn } from '../../utils/deriveDisplayStatus';
 import './kanban.css';
 
-// Valid state transitions for drag-and-drop
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  open: ['review', 'execute'],
-  review: ['open', 'plan', 'execute'],
-  plan: ['review', 'execute'],
-  execute: ['shipping', 'review'],
-  shipping: ['completed', 'execute'],
-  completed: [], // Cannot move completed items
-};
+/**
+ * Side-effect handlers a cross-column kanban drag may invoke. Injected so the
+ * dispatch decision (which action runs for which classified move) is unit-
+ * testable without rendering the board or driving a dnd-kit event (#280).
+ */
+export interface KanbanMoveDispatchers {
+  triggerExecution: (issueNumber: number, fromColumn: string) => void;
+  requestShip: (issueNumber: number) => void;
+  toast: (message: string) => void;
+}
+
+/**
+ * Build the toast message for a cross-column drag that the board can't dispatch.
+ * Terminal-state sources (completed) have no terminal-driven recovery, so they
+ * get a generic line; everything else points the user at the terminal command.
+ */
+function undispatchableMoveMessage(issueNumber: number, sourceColumn: ColumnId): string {
+  if (sourceColumn === 'completed') {
+    return "This move isn't available from the board.";
+  }
+  return `Moving work backward from the board isn't supported — drive it from the terminal (e.g. /tiki:execute ${issueNumber}).`;
+}
+
+/**
+ * Pure routing of a classified cross-column move to a side effect (#280). The
+ * same-column 'reorder' case is handled earlier in handleDragEnd, so it is a
+ * no-op here. Every cross-column move resolves to a dispatch or a toast — there
+ * is no silent snap-back.
+ */
+export function dispatchKanbanMove(
+  source: ColumnId,
+  target: ColumnId,
+  issueNumber: number,
+  d: KanbanMoveDispatchers
+): void {
+  switch (classifyKanbanMove(source, target)) {
+    case 'dispatch-execute':
+      d.triggerExecution(issueNumber, source);
+      break;
+    case 'dispatch-ship':
+      d.requestShip(issueNumber);
+      break;
+    case 'toast':
+      d.toast(undispatchableMoveMessage(issueNumber, source));
+      break;
+    case 'reorder':
+      // Handled by the same-column early-return in handleDragEnd; no-op here.
+      break;
+  }
+}
 
 // Column configuration mapping to Tiki work statuses
 const COLUMN_CONFIG = [
@@ -188,11 +231,6 @@ export function KanbanBoard() {
     return displayColumnFor(issueNumber);
   }, [displayColumnFor]);
 
-  // Check if a transition is valid
-  const isValidTransition = (fromColumn: string, toColumn: string): boolean => {
-    return VALID_TRANSITIONS[fromColumn]?.includes(toColumn) ?? false;
-  };
-
   const handleDragStart = (event: DragStartEvent) => {
     const id = event.active.id as number;
     setActiveId(id);
@@ -233,19 +271,15 @@ export function KanbanBoard() {
       return;
     }
 
-    // Cross-column transition (existing logic).
-    if (!isValidTransition(sourceColumn, targetColumn)) {
-      // Invalid transition - card will snap back automatically
-      console.log(`Invalid transition: ${sourceColumn} → ${targetColumn}`);
-      return;
-    }
-
-    // Trigger workflow action based on target column
-    if (targetColumn === 'execute') {
-      triggerExecution(issueNumber, sourceColumn);
-    } else if (targetColumn === 'shipping' && sourceColumn === 'execute') {
-      requestShipConfirmation(issueNumber);
-    }
+    // Cross-column move: dispatch the two command-backed actions, or surface a
+    // toast for any unsupported (backward/lateral/invalid) drag instead of
+    // silently snapping back (#267/#280). The card still visually snaps back
+    // (dnd-kit) but the user now gets feedback.
+    dispatchKanbanMove(sourceColumn as ColumnId, targetColumn as ColumnId, issueNumber, {
+      triggerExecution,
+      requestShip: requestShipConfirmation,
+      toast: (message) => useToastStore.getState().addToast(message, 'info'),
+    });
   };
 
   // Get the issue being dragged for the overlay
