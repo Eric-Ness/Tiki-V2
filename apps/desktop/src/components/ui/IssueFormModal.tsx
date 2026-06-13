@@ -27,7 +27,7 @@ interface IssueFormModalProps {
  * suffix) without trying to reproduce git's full regex — the error message
  * needs to be actionable.
  */
-const BRANCH_NAME_FORBIDDEN_CHARS = /[\s~^:?*\[\\@]/;
+const BRANCH_NAME_FORBIDDEN_CHARS = /[\s~^:?*[\\@]/;
 function validateBranchName(name: string): string | null {
   const v = name.trim();
   if (!v) return "Branch name is required";

@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Tauri build artifacts (codegen assets under target/, generated bindings
+  // under gen/) are not source and must not be linted — they trip parsing errors.
+  globalIgnores(['dist', 'src-tauri/target', 'src-tauri/gen']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -57,6 +59,37 @@ export default defineConfig([
             'Inline `?? []` / `|| []` in a React hook dependency array creates a fresh reference every render, defeating memo equality — the #210/#212 crash class. Use a module-level EMPTY_* constant instead.',
         },
       ],
+
+      // Honor the `_`-prefix intentional-discard convention. Unused vars stay an
+      // ERROR (catches real dead code), but `_`-prefixed names (e.g. `_removed`,
+      // `_r1`, `_get`, destructured `_removedTabs` array holes) are deliberate
+      // discards — e.g. pulling a key out of an object/array to drop it.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
+      ],
+
+      // --- Advisory rules downgraded to WARN (non-blocking) ---
+      // These come from eslint-plugin-react-hooks v7's `recommended` preset,
+      // which now bundles the React Compiler's advisory diagnostics. This project
+      // has NOT adopted the React Compiler, so these are guidance, not
+      // correctness errors. Tracked for incremental cleanup. NOTE:
+      // `react-hooks/rules-of-hooks` (real correctness rule) stays an ERROR via
+      // the recommended preset and is intentionally NOT listed here.
+      'react-hooks/set-state-in-effect': 'warn', // Compiler advisory: setState in effect body
+      'react-hooks/refs': 'warn', // Compiler advisory: ref access during render
+      'react-hooks/purity': 'warn', // Compiler advisory: render-phase purity
+      'react-hooks/preserve-manual-memoization': 'warn', // Compiler advisory: manual deps vs inferred
+      // exhaustive-deps is conventionally a warning (deps choices are often
+      // deliberate); react-refresh/only-export-components is a dev fast-refresh
+      // nicety, not a correctness concern.
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
   },
 ])

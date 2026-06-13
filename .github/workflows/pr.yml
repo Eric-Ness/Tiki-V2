@@ -67,6 +67,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Gates on errors only (eslint exits non-zero on errors, not warnings).
+      # The deliberately warn-level rules (#282) stay non-blocking.
+      - name: Lint
+        run: pnpm -C apps/desktop lint
+
       - name: Build
         run: pnpm build
 
