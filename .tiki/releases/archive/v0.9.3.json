@@ -1,6 +1,8 @@
 {
   "version": "v0.9.3",
-  "status": "active",
+  "status": "shipped",
+  "shipped": true,
+  "completedAt": "2026-06-13T17:20:00.000Z",
   "issues": [
     { "number": 268, "title": "Plugin-only install: pipeline state-tracking silently dead" },
     { "number": 270, "title": "Reconciler: bootstrap missing activeWork entries from active plan files" },
