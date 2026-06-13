@@ -1,0 +1,14 @@
+{
+  "version": "v0.9.3",
+  "status": "active",
+  "issues": [
+    { "number": 268, "title": "Plugin-only install: pipeline state-tracking silently dead" },
+    { "number": 270, "title": "Reconciler: bootstrap missing activeWork entries from active plan files" },
+    { "number": 271, "title": "Reconciler: derive SHIP/completed from archived plan + closed GitHub issue; reconcile release entries" },
+    { "number": 272, "title": "Intent journal: append-only .tiki/journal.ndjson as primary tracking signal" },
+    { "number": 274, "title": "Schema-first TS types + schema-Rust parity test + fix PhaseProgressStatus(skipped) drift" },
+    { "number": 275, "title": "Close the shim mutation-surface gaps: subcommands for every direct-JSON write + write-time validation" },
+    { "number": 276, "title": "Kill dual status encoding for releases: location is sole truth, doctor auto-fix" }
+  ],
+  "createdAt": "2026-06-13T17:10:00.000Z"
+}
