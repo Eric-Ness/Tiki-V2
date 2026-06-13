@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 271,
+    "title": "Reconciler: derive SHIP/completed from archived plan + closed GitHub issue; reconcile release entries",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/271"
+  },
+  "createdAt": "2026-06-13T01:30:00.000Z",
+  "research": [
+    "reconciler-contract"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "Archived plan + GitHub-closed + not in history: standalone entry gets an idempotent history record and is removed; a parentRelease child transitions to completed/SHIP and gets the history record",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:09:32.341Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "Either ship signal alone is insufficient (archived-but-open and closed-but-not-archived both leave the entry untouched); a failing/absent gh fetcher degrades silently with the rest of the pass unaffected",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:09:32.341Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Release entries reconcile: version in history.recentReleases is removed; def archived but history missing gets a reconstructed release history record (issues from the archived def, tag = version) and is removed; in-flight and frozen release entries are untouched",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:16:04.895Z"
+    },
+    {
+      "id": "SC4",
+      "category": "performance",
+      "description": "Zero gh-fetcher invocations on passes with no ship-shaped entries (asserted via fake-fetcher call counting)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:09:32.341Z"
+    },
+    {
+      "id": "SC5",
+      "category": "functionality",
+      "description": "--print shows recorded-vs-derived rows for release entries and would-heal ship rows for issues, stays strictly read-only, and never fabricates drift when the fetcher is unavailable",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:16:04.895Z"
+    },
+    {
+      "id": "SC6",
+      "category": "testing",
+      "description": "All existing reconciler tests (29) plus new ones green; full framework suite green; live-fire --print and a real pass on this repo are clean",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:16:04.895Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Issue SHIP derivation (archived plan + gh-closed) with injectable fetcher",
+      "status": "completed",
+      "content": "Read `.tiki/research/reconciler-contract.md` first — the '#271 REVIEW decisions' section is the binding design. Modify `packages/framework/scripts/reconcile-state.mjs`:\n\n1. Default fetcher `fetchIssueStateViaGh(number)`: spawnSync `gh issue view <number> --json state` with `shell: process.platform === \"win32\"`, `timeout: 5000`, encoding utf-8. Returns \"OPEN\" | \"CLOSED\" (uppercased from JSON .state) or null on ANY failure (non-zero, parse error, timeout, spawn error). Never throws.\n2. Thread an options object through: `reconcile(tikiPath, { dryRun, fetchIssueState = fetchIssueStateViaGh })`. Inside the pass, ship-derivation for an entry runs ONLY when ALL of: entry not frozen; number not in history; `.tiki/plans/archive/issue-N.json` exists (archive presence wins even if an active plan also lingers). Only then call fetchIssueState(number) — this is the gh budget rule (SC4).\n3. On \"CLOSED\": append an idempotent history record (state.mjs does not export its internals — implement the same shape locally: ensure `state.history.recentIssues` array, filter any prior record with the same number, unshift `{ number, title: entry.issue.title, completedAt: new Date().toISOString(), ...(entry.parentRelease ? { parentRelease: entry.parentRelease } : {}) }`). Then: standalone → `delete state.activeWork[workId]`, change action \"ship-derived: removed\"; parentRelease child → legality-pre-guarded applyTransition to completed/SHIP (phase null, parentRelease undefined-preserve), change action \"ship-derived: completed\". On \"OPEN\" or null → no change.\n4. ORDERING in reconcileEntry: history check stays FIRST (unchanged); ship-derivation slots after it and BEFORE the in-flight artifact advance; an entry healed by ship-derivation must not also be advanced.\n5. Amend the SAFETY CONTRACT header: rule 4 gains amendment 4a (#271) — completion may now ALSO be derived from archived-plan + gh-closed, with the budget + degrade-silently rules.\n\nTests (`packages/framework/__tests__/reconcile-state.test.mjs`; fake fetchers = plain functions with a call counter):\n- standalone: archived plan + fake CLOSED → history gains record (assert shape incl. completedAt), entry removed;\n- idempotent: history already has a record for N → no duplicate after heal;\n- release child: archived plan + CLOSED + parentRelease → completed/SHIP, parentRelease preserved, history record carries parentRelease;\n- TRAP: archived + fake OPEN → untouched; TRAP: NOT archived + CLOSED fetcher → fetcher NEVER CALLED and entry untouched (budget rule, SC4); TRAP: fetcher returns null (simulating gh failure) → untouched, pass exit normal, other entries still reconciled in the same pass;\n- frozen: paused entry with archived plan → fetcher never called;\n- call-count: a pass over a fixture with only in-flight entries (no archives) → fetcher call count 0 (SC4);\n- dry-run: ship-derivation computes the change without writing.\nRun `pnpm -C packages/framework test` — the dogfood-parity guard WILL be red until phase 2 regenerates (expected, same as #270 phase 1); all other tests must be green.",
+      "verification": [
+        "All reconcile-state tests green (29 existing + new); only the dogfood-parity guard red (expected until phase 2)",
+        "Fake-fetcher call-count assertions prove the gh budget rule",
+        "History record shape matches state.mjs append-history output (number, title, completedAt, optional parentRelease)",
+        "Safety-contract header documents amendment 4a"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        "packages/framework/__tests__/reconcile-state.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T01:09:32.340Z",
+      "summary": "Added fetchIssueStateViaGh(number) (exported; spawnSync gh, shell on win32, 5s timeout, OPEN/CLOSED/null, never throws) and threaded { fetchIssueState } through reconcile(). Ship-derivation in reconcileEntry sits after the history check, before in-flight advance: gated on new hasArchivedPlan() helper (fetcher called ONLY past that gate — budget rule), CLOSED → idempotent appendShipHistoryRecord + standalone delete (\"ship-derived: removed\") or legality-pre-guarded completed/SHIP for parentRelease children (\"ship-derived: completed\"); OPEN/null falls through. Safety contract amendment 4a. 9 new tests (heal, idempotency/history-first, release child single-change, archived+OPEN, budget never-called, fetcher-null isolation, frozen, zero-call in-flight fixture, dry-run); reconcile suite 38/38; framework 95/96 with only the expected dogfood-parity red (phase 2 regen). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 95, failed: 1, skipped: 0, status: \"failed\" } — the 1 failure is the planned phase-boundary dogfood drift. Phase 2 hooks: hasArchivedPlan + appendShipHistoryRecord patterns reusable; buildReport gains { fetchIssueState } third param; release hook point is the non-issue continue line."
+    },
+    {
+      "number": 2,
+      "title": "Release reconciliation, --print rows, dogfood regen, live-fire",
+      "status": "completed",
+      "content": "Same files as phase 1 plus the dogfood regen. Read the research doc's '#271 REVIEW decisions' for the binding scope.\n\n1. Release reconciliation in the pass loop (currently `continue`s on non-issue keys — change to route `release:*` entries to a new `reconcileReleaseEntry(state, workId, entry, history, tikiPath)`):\n   - skip frozen statuses (FROZEN_STATUSES applies);\n   - version = entry.release?.version (skip if absent). `inReleaseHistory(history, version)`: match against history.recentReleases[].version;\n   - (a) in history → `delete state.activeWork[workId]`, action \"release: removed (in history)\";\n   - (b) NOT in history but def archived → archived def lookup must tolerate the v-prefix variance: check `releases/archive/<version>.json` and the toggled variant (add/strip leading 'v') — mirror check-release-readiness.mjs. Read the archived def (defensive parse); append release history record `{ version, issues: def.issues ?? entry.release.issues ?? [], completedAt: now, tag: version }` (idempotent: filter prior record with same version, unshift to history.recentReleases); then delete the entry, action \"release: torn down (archived def)\";\n   - (c) otherwise in-flight → untouched.\n2. buildReport: add release rows (recorded triple as-is; derived = the teardown verdict when (a)/(b) applies — render like the issue history rows: '(shipped → remove)' style — else derived = recorded, in-sync). Add issue ship-derivation rows: buildReport accepts the same `{ fetchIssueState }` options; for ship-shaped issue entries with a fetcher available and returning CLOSED, derived shows '(ship-derived → remove)' / completed; if the fetcher is unavailable or returns null, the row stays in-sync with note \"archived plan; gh unavailable/open\" — NEVER fabricated drift (SC5). --print main() passes the default fetcher.\n3. Tests: release entry + version in history → removed; release entry + archived def (test BOTH v-prefix variants) + not in history → history reconstructed (assert issues list from def + tag) + removed; idempotent re-pass → no duplicate; in-flight release untouched; frozen (paused) release untouched; buildReport release rows (in-sync and teardown-derivable) + ship-derivation row with fake fetcher + read-only byte-unchanged assertion + fetcher-null row shows no drift.\n4. Regenerate dogfood: `node packages/framework/install.js` from repo root; `git restore .claude/settings.json` if its diff is content-empty (line-ending churn).\n5. LIVE-FIRE: from repo root run `node .claude/tiki/scripts/reconcile-state.mjs --print` — expect: issue:271 as a normal in-flight row (executing/EXECUTE 2/2, in sync per its own plan); ZERO would-create rows; ZERO ship-derived/release teardown rows (no archived plan exists for any active entry; there are no release:* entries). NOTE: --print with the default fetcher must make zero gh calls here because no entry is ship-shaped — if it hangs or calls gh, the budget rule is broken. Then a real pass `node .claude/tiki/scripts/reconcile-state.mjs` → expect changes []. Report both outputs verbatim.\n6. Full `pnpm -C packages/framework test` — fully green including dogfood-parity.",
+      "verification": [
+        "Full framework suite green including dogfood-parity guard",
+        "Release teardown tests cover both v-prefix variants and idempotency",
+        "--print read-only assertion extended to release + ship-derivation rows; fetcher-null never fabricates drift",
+        "Live-fire: --print clean (no gh calls, no spurious rows), real pass changes []"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC5",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        "packages/framework/__tests__/reconcile-state.test.mjs",
+        ".claude/tiki/scripts/reconcile-state.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T01:16:04.894Z",
+      "summary": "reconcileReleaseEntry wired at the former non-issue continue: (a) version in history.recentReleases → entry removed; (b) archived def (both v-prefix variants, defensive parse, issues-from-def-wins) → idempotent release history record {version, issues, completedAt, tag} reconstructed + entry removed; (c) in-flight untouched; frozen respected. Safety contract amendment 5a. buildReport gained { fetchIssueState } third param (default null — programmatic callers never spawn gh; only --print passes fetchIssueStateViaGh): release rows (in-sync/in-history/archived-def) + ship-derived issue rows past the hasArchivedPlan gate; fetcher absent/null/OPEN → in-sync row with \"archived plan; gh unavailable/open\" note, drift never fabricated. 11 new tests (reconcile suite 49); dogfood regenerated; LIVE-FIRE: --print instant with zero gh calls, issue:271 in-sync executing/EXECUTE 2/2, no spurious rows; real pass changes []. Framework suite 107/107 incl. dogfood-parity. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 107, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      2
+    ],
+    "SC4": [
+      1
+    ],
+    "SC5": [
+      2
+    ],
+    "SC6": [
+      1,
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T01:03:54.632Z"
+}
