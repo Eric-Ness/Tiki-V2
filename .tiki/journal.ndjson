@@ -3,3 +3,9 @@
 {"ts":"2026-06-13T20:25:42.668Z","workId":"issue:281","step":"PLAN","event":"start"}
 {"ts":"2026-06-13T20:26:38.455Z","workId":"issue:281","step":"AUDIT","event":"start"}
 {"ts":"2026-06-13T20:26:38.822Z","workId":"issue:281","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-13T20:44:34.649Z","workId":"issue:282","step":"GET","event":"start","title":"pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint"}
+{"ts":"2026-06-13T20:44:35.372Z","workId":"issue:282","step":"REVIEW","event":"start"}
+{"ts":"2026-06-13T20:50:26.055Z","workId":"issue:282","step":"PLAN","event":"start"}
+{"ts":"2026-06-13T20:51:20.635Z","workId":"issue:282","step":"AUDIT","event":"start"}
+{"ts":"2026-06-13T20:51:21.054Z","workId":"issue:282","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-13T20:56:59.385Z","workId":"issue:282","step":"SHIP","event":"start"}

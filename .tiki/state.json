@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 281,
-      "title": "Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)",
-      "completedAt": "2026-06-13T20:37:45.456Z"
+      "number": 282,
+      "title": "pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint",
+      "completedAt": "2026-06-13T20:58:31.624Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.3",
@@ -22,6 +22,11 @@
       "tag": "v0.9.3"
     },
     "recentIssues": [
+      {
+        "number": 282,
+        "title": "pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint",
+        "completedAt": "2026-06-13T20:58:31.624Z"
+      },
       {
         "number": 281,
         "title": "Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)",
