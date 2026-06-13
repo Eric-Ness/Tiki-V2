@@ -1,12 +1,5 @@
-{"ts":"2026-06-13T19:57:48.489Z","workId":"issue:279","step":"GET","event":"start","title":"Build the three declined abstractions: shared compareSemver, dedup resolve_tiki_path, ESLint fresh-ref rule"}
-{"ts":"2026-06-13T19:57:49.611Z","workId":"issue:279","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T19:59:39.591Z","workId":"issue:279","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T20:00:37.864Z","workId":"issue:279","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T20:00:38.221Z","workId":"issue:279","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T20:11:42.839Z","workId":"issue:279","step":"SHIP","event":"start"}
-{"ts":"2026-06-13T20:13:47.504Z","workId":"issue:280","step":"GET","event":"start","title":"Kanban wiring: parity-test column table vs canonical transitions + toast on undispatchable drags"}
-{"ts":"2026-06-13T20:13:48.264Z","workId":"issue:280","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T20:14:50.111Z","workId":"issue:280","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T20:15:49.235Z","workId":"issue:280","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T20:15:49.630Z","workId":"issue:280","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T20:22:45.803Z","workId":"issue:280","step":"SHIP","event":"start"}
+{"ts":"2026-06-13T20:24:38.054Z","workId":"issue:281","step":"GET","event":"start","title":"Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)"}
+{"ts":"2026-06-13T20:24:38.822Z","workId":"issue:281","step":"REVIEW","event":"start"}
+{"ts":"2026-06-13T20:25:42.668Z","workId":"issue:281","step":"PLAN","event":"start"}
+{"ts":"2026-06-13T20:26:38.455Z","workId":"issue:281","step":"AUDIT","event":"start"}
+{"ts":"2026-06-13T20:26:38.822Z","workId":"issue:281","step":"EXECUTE","event":"start"}

@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 281,
+    "title": "Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/281"
+  },
+  "createdAt": "2026-06-13T21:05:00.000Z",
+  "research": [
+    "visual-sc-surfacing"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "tiki_doctor scans archived plans and reports unverifiedShippedCriteria ({issue,id,description}) for success criteria left verified:false that match the visual/manual heuristic; cargo-tested incl. serialization",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:33:02.809Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "The desktop Diagnostics panel surfaces the pending visual-SC list as an info-level finding (never flips status to warnings); diagnosticsSummary mirror + vitest",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:35:31.335Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "check-release-readiness.mjs soft-warns (non-blocking) when a release issue's archived plan has an unverified visual SC, naming #issue SCx; framework test",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:33:02.972Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "The visual heuristic (category visual/manual/ux/ui OR description stem-match) is identical across Rust and Node and documented; run live against this repo's 6 real unverified SCs; full suite + build green",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:33:02.972Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Rust tiki_doctor: scan archived plans for unverified visual SCs",
+      "status": "completed",
+      "content": "Read `.tiki/research/visual-sc-surfacing.md` (binding heuristic + term list). Modify `apps/desktop/src-tauri/src/state.rs` + `commands.rs`.\n1. state.rs: add `unverified_shipped_criteria: Vec<UnverifiedCriterion>` to `DiagnosticsReport` (`#[serde(default)]`, camelCase `unverifiedShippedCriteria`). Define `pub struct UnverifiedCriterion { pub issue: u32, pub id: String, pub description: String }` (camelCase serde).\n2. commands.rs `tiki_doctor`: scan `<tiki>/plans/archive/issue-*.json` (the archived plans). For each, parse defensively; for each `successCriteria[]` entry with `verified == Some(false)`, apply the visual heuristic (dependency-free, NO regex crate): lowercased `category` ∈ {visual, manual, ux, ui} OR lowercased `description` contains ANY stem from the canonical list (render, display, look, visual, blink, flicker, fram, snapp, animat, button, panel, badge, color, colour, icon, layout, screen, pixel, scroll, hover, theme, css, styl, tauri:dev, eyes). Collect `{issue (parsed from filename issue-N.json), id, description}`. Sort by issue then id. Populate the new field. Read failures skip the file, never Err.\n3. cargo test: a fixture archive dir with (a) a plan with a visual unverified SC (description 'the badge renders correctly') → included; (b) a plan with an unverified NON-visual SC ('the reconciler advances state') → EXCLUDED; (c) a verified visual SC → excluded; assert the collected list. Plus a serialization test: `serde_json::to_value(report)` has key `unverifiedShippedCriteria` (array). Run `cargo test --lib` (from src-tauri) green; clippy --lib clean.\nGates: cargo --lib + clippy green. Do NOT touch the frontend (phase 2).",
+      "verification": [
+        "DiagnosticsReport.unverified_shipped_criteria + UnverifiedCriterion struct (camelCase serde, serde default)",
+        "tiki_doctor scans archived plans; visual heuristic (category + stem-list contains, no regex crate); filename-derived issue number",
+        "cargo test: visual-included / non-visual-excluded / verified-excluded + serialization key present",
+        "cargo --lib + clippy green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T20:33:02.808Z",
+      "summary": "state.rs: added DiagnosticsReport.unverified_shipped_criteria: Vec<UnverifiedCriterion> (#[serde(default)], camelCase unverifiedShippedCriteria) + pub struct UnverifiedCriterion{issue:u32,id,description} (camelCase). commands.rs: compute_unverified_shipped_criteria scans plans/archive/issue-*.json, issue# from file_stem strip issue-, for verified==Some(false) applies is_visual_criterion (NO regex crate; lowercase category in {visual,manual,ux,ui} OR description.contains any of 25 stems render/display/look/visual/blink/flicker/fram/snapp/animat/button/panel/badge/color/colour/icon/layout/screen/pixel/scroll/hover/theme/css/styl/tauri:dev/eyes), collects {issue,id,description} sorted (issue,id), defensive skip. 2 new cargo tests (visual-included/non-visual-excluded/verified-excluded ordering + serialization key) + extended the IPC-wire-shape test. cargo --lib 77->79, clippy clean. testResults: { framework: \"cargo\", command: \"cargo test --lib\", passed: 79, failed: 0, skipped: 0, status: \"passed\" }. Phase 2 TS mirror: unverifiedShippedCriteria: { issue:number; id:string; description:string }[] — always present ([] when empty, never undefined), pre-sorted; frontend only renders + adds info finding, does NOT re-derive visual-ness."
+    },
+    {
+      "number": 2,
+      "title": "Desktop Diagnostics panel surfaces the pending visual-SC list",
+      "status": "completed",
+      "content": "Read the research doc. Mirror the new Rust field in the desktop and render it. Files: `apps/desktop/src/utils/diagnosticsSummary.ts` + its test + `apps/desktop/src/components/settings/DiagnosticsPanel.tsx`.\n1. diagnosticsSummary.ts: add `unverifiedShippedCriteria: { issue: number; id: string; description: string }[]` to the `DiagnosticsReport` interface (keep the documented-mirror comment current). When the list is non-empty, add an INFO finding (level 'info' — MUST NOT flip top-level status to 'warnings'; it's a checklist) with a message like `N shipped visual criterion(s) await verification`. Keep status healthy. count==0 → no finding.\n2. diagnosticsSummary.test.ts: cases — non-empty list → info finding present + status stays 'healthy'; empty → absent. Update any existing fixtures to include the new required field (add `unverifiedShippedCriteria: []`).\n3. DiagnosticsPanel.tsx: when `report.unverifiedShippedCriteria.length > 0`, render the list (each row: `#{issue} {id} — {description}` truncated) under the findings, in a small 'Pending visual verification' section. Reuse existing styling; minimal. (Visual — note for user eyes in tauri:dev; logic unit-tested.)\nGates: `pnpm -C apps/desktop test` (diagnosticsSummary tests) green; `pnpm build` (tsc -b) clean.",
+      "verification": [
+        "diagnosticsSummary mirrors unverifiedShippedCriteria; info finding when non-empty; status stays healthy",
+        "vitest: non-empty→info+healthy, empty→absent; fixtures updated with the new field",
+        "DiagnosticsPanel renders the pending list",
+        "desktop vitest + build green"
+      ],
+      "addressesCriteria": [
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/utils/diagnosticsSummary.ts",
+        "apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts",
+        "apps/desktop/src/components/settings/DiagnosticsPanel.tsx"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T20:35:31.334Z",
+      "summary": "diagnosticsSummary.ts: mirrored unverifiedShippedCriteria: { issue:number; id:string; description:string }[] (header mirror-comment updated; always present, render-only, no visual re-derivation). diagnosticsSummary() pushes a level:'info' finding \"${n} shipped visual criterion(s) await verification\" when non-empty → infos bucket, status stays 'healthy'; count 0 → absent. Updated shared cleanReport() fixture with the required field + 2 new cases (non-empty→info+healthy; empty→absent). DiagnosticsPanel.tsx renders a \"Pending visual verification\" section (#{issue} {id} — {desc} truncated 80, full in title) reusing diagnostics-info classes. desktop vitest 265->267; build clean. testResults: { framework: \"vitest\", command: \"pnpm -C apps/desktop test\", passed: 267, failed: 0, skipped: 0, status: \"passed\" }. Panel rendering is tauri:dev visual; summary logic unit-tested."
+    },
+    {
+      "number": 3,
+      "title": "check-release-readiness.mjs soft-warns on unverified visual SCs",
+      "status": "completed",
+      "content": "Read the research doc (the Node heuristic must be IDENTICAL to the Rust one — same term list). Files: `scripts/check-release-readiness.mjs` + `packages/framework/__tests__/check-release-readiness.test.mjs`.\n1. check-release-readiness.mjs: for each release issue, locate its plan (archive/ or active), read successCriteria, and for each `verified === false` that matches the visual heuristic (JS regex from the research doc: `/\\b(render|display|look|visual|blink|flicker|fram(e|ing)|snapp|animat|button|panel|badge|colou?r|icon|layout|screen|pixel|scroll|hover|theme|css|styl|tauri:dev|eyes)/i` OR category ∈ {visual,manual,ux,ui}), push a SOFT warning (existing `warnings[]` channel — printed, never affects exit code; matches the #276/#258 convention) naming `#{issue} {id}: {description}`. Read-only. Document the heuristic inline with a pointer to the research doc as canonical.\n2. check-release-readiness.test.mjs: a case where a release issue's plan has an unverified visual SC ('the panel renders') → warning present, gate still PASSES (soft); a case with only verified or non-visual-unverified SCs → no such warning.\nGates: `pnpm -C packages/framework test` (check-release-readiness.test.mjs) green. (check-release-readiness.mjs is repo-root scripts/, NOT dogfood-copied — no install.js regen.)",
+      "verification": [
+        "Node visual heuristic identical to Rust (same term list); documented w/ research-doc pointer",
+        "soft warning per unverified visual SC, gate still passes (non-blocking)",
+        "test: visual-unverified→warning+pass; verified/non-visual→no warning",
+        "framework suite green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "scripts/check-release-readiness.mjs",
+        "packages/framework/__tests__/check-release-readiness.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T20:33:02.971Z",
+      "summary": "scripts/check-release-readiness.mjs (repo-root, NOT dogfood-copied): per release issue, after loading its plan (archive/ or active), iterate successCriteria; verified===false matching isVisualCriterion (module VISUAL_CATEGORIES {visual,manual,ux,ui} + VISUAL_DESC_RE /\\b(render|display|look|visual|blink|flicker|fram(e|ing)|snapp|animat|button|panel|badge|colou?r|icon|layout|screen|pixel|scroll|hover|theme|css|styl|tauri:dev|eyes)/i — identical to Rust, inline comment points to research doc) pushes a SOFT warning \"#{issue} {id}: {description} — visual/manual criterion left unverified (confirm in tauri:dev/installer)\" to warnings[] (never failures; ok unaffected, gate still passes). 3 new tests (visual-by-desc + visual-by-category warn & pass; verified/non-visual no warning); extended mkplan fixture. framework 161->164. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 164, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      1,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T20:26:38.562Z"
+}
