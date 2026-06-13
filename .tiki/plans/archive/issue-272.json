@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 272,
+    "title": "Intent journal: append-only .tiki/journal.ndjson as primary tracking signal",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/272"
+  },
+  "createdAt": "2026-06-13T01:45:00.000Z",
+  "research": [
+    "reconciler-contract",
+    "plugin-distribution-channels"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "state.mjs journal subcommand appends valid NDJSON ({ts, workId, step, event, phase?, title?}), never exits non-zero even on failure, and readJournalEntries skips torn/garbage lines",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:26:14.911Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "All 8 workflow command files journal as their first action; command-transition-coverage.test.mjs enforces per-step journal presence including yolo/release per-step coverage",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:39:22.458Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Reconciler advances entries to max(artifact target, journal floor) with GET/REVIEW now distinguishable; journal never overrides frozen/history/ship-derivation; journal entries within the 14-day window qualify bootstrap even with no plan file, using the journaled title",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:38:01.464Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "Pruning rewrites the journal without shipped-work entries inside the locked pass (thresholded to avoid churn); --print shows journal-floor drift notes and journal-bootstrap rows and stays read-only",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:38:01.464Z"
+    },
+    {
+      "id": "SC5",
+      "category": "functionality",
+      "description": "End-to-end: a fixture pipeline that writes ONLY journal lines + artifacts (zero state.mjs transitions, zero history appends until ship artifacts) reconciles to the same state.json as the imperative path, including pre-plan steps",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:38:01.464Z"
+    },
+    {
+      "id": "SC6",
+      "category": "testing",
+      "description": "Full framework suite green (state + reconcile + coverage + dist guards); dogfood command and script mirrors regenerated; live-fire --print and real pass on this repo clean",
+      "verified": true,
+      "verifiedAt": "2026-06-13T01:39:22.458Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Journal core in state.mjs (subcommand + helpers) + tests",
+      "status": "completed",
+      "content": "Read `.tiki/research/reconciler-contract.md` section '#272 REVIEW decisions' — it is the binding design. Modify `packages/framework/scripts/state.mjs` ONLY (plus its test file).\n\n1. Exported helpers (Node built-ins only, mirror file conventions):\n   - `appendJournalEntry(tikiPath, { workId, step, event = \"start\", phase, title })` — ensures `.tiki/` exists (mkdir -p; the journal may be the FIRST tiki artifact in a project — GET journals before anything else), builds `{ts: ISO, workId, step, event, ...(phase ? {phase} : {}), ...(title ? {title} : {})}`, `fs.appendFileSync(join(tikiPath, \"journal.ndjson\"), JSON.stringify(line) + \"\\n\")`. NO lock (O_APPEND single line). Never throws — catch, return false.\n   - `readJournalEntries(tikiPath)` — read file if present, split lines, JSON.parse each defensively (skip unparseable/torn lines), return array.\n   - `journalFloor(entries, workId)` — highest STEP_ORDER step among entries for workId (STEP_ORDER duplicated or exported; reconcile-state.mjs has its own copy — export ONE from state.mjs and have callers share it if trivial, else keep local copies consistent). Returns `{step, title?}` (title = newest entry's title for that workId) or null.\n   - `pruneJournal(tikiPath, state)` — rewrite journal atomically (tmp+rename) WITHOUT entries whose `issue:N` number is in history.recentIssues or whose `release:V` version is in history.recentReleases; ONLY act when the file has >= 50 lines OR >= 10 prunable lines (churn threshold); returns count pruned. Caller is responsible for holding the lock.\n2. CLI subcommand: `node state.mjs journal <workId> --step <STEP> [--event start] [--phase-current N --phase-total T] [--title \"...\"] [--tiki-path ...]` — validates workId shape and STEP against the known set, calls appendJournalEntry, prints the line on success. ANY failure: warn to stderr, exit 0 (a journal failure must never break a command). Update the usage/help text.\n3. Tests in `packages/framework/__tests__/state.test.mjs` (spawn-the-real-CLI conventions): append creates the file in a bare .tiki-less project (mkdir behavior) and appends valid NDJSON; multiple appends accumulate; --title and --phase flags land in the line; invalid step → stderr warning but exit 0 and no line; reader skips a deliberately torn line (write garbage between valid lines) and parses the rest; journalFloor picks the highest step and newest title; pruneJournal removes only history-member entries above threshold, keeps the file intact below threshold, and is atomic (tmp cleaned).\n4. Run `pnpm -C packages/framework test` — all green (journal is additive; no existing behavior changes).",
+      "verification": [
+        "Framework suite green; new journal tests cover append/read/floor/prune incl. torn-line skip and exit-0-on-failure",
+        "Journal append works in a project with no pre-existing .tiki/",
+        "CLI subcommand documented in state.mjs usage text"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/scripts/state.mjs",
+        "packages/framework/__tests__/state.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T01:26:14.909Z",
+      "summary": "state.mjs gained the journal core: exported STEP_ORDER (reconciler can converge), appendJournalEntry (mkdir-p .tiki, one NDJSON line {ts,workId,step,event,phase?,title?}, no lock, never throws), readJournalEntries (defensive, skips torn lines), journalFloor (highest step + newest-title-carrying entry), pruneJournal (history-member lines dropped, thresholds >=50 total or >=10 prunable, atomic tmp+rename, preserves unparseable lines, returns 0 on no-op/failure, never writes state.json). CLI `state.mjs journal <workId> --step <STEP> [--event] [--phase-current/--phase-total] [--title] [--tiki-path]` — ANY failure warns to stderr and exits 0. State suite 11→22 (bare-project mkdir, accumulation, flags, invalid-step/workId exit-0, torn-line skip, floor cases, prune thresholds/atomicity). Framework 117/119 — 2 reds are the expected mirror-sync guards (phase 4 regen). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 117, failed: 2, skipped: 0, status: \"failed\" } — both failures are planned phase-boundary mirror staleness."
+    },
+    {
+      "number": 2,
+      "title": "Command files journal as first action + coverage guard",
+      "status": "completed",
+      "content": "Touch ONLY `packages/framework/commands/*.md` (the 8 workflow files: get, review, plan, audit, execute, ship, yolo, release — NOT research.md/version.md, which have no pipeline steps) and `packages/framework/__tests__/command-transition-coverage.test.mjs`. Do NOT regenerate mirrors (.claude/) — phase 4 does.\n\n1. Each command's state-management section gains the journal line as the FIRST action, BEFORE the transition call, with brief prose: the journal is the drop-proof intent record (#272) — one line, even if every later step is forgotten the reconciler can reconstruct. Exact invocations:\n   - get.md: `node .claude/tiki/scripts/state.mjs journal issue:{number} --step GET --title \"{title}\"` (title flows to journal-qualified bootstrap)\n   - review.md: `... journal issue:{number} --step REVIEW`\n   - plan.md: `... journal issue:{number} --step PLAN`\n   - audit.md: `... journal issue:{number} --step AUDIT`\n   - execute.md: `... journal issue:{number} --step EXECUTE` once before the per-phase loop (per-phase journaling deferred — artifact phase statuses already cover it)\n   - ship.md: `... journal issue:{number} --step SHIP`\n   - yolo.md: per-step journal line immediately before EACH of its 6+ per-step transitions (same unconditional-emission rule as transitions — see the Pattern A/B warning it already carries)\n   - release.md: `... journal release:{version} --step EXECUTE` at start and `--step SHIP` before tagging.\n   Keep edits surgical: insert the journal invocation + 1-2 lines of prose into the existing state-management/instructions blocks; do not restructure the files.\n2. Extend `command-transition-coverage.test.mjs`: a REQUIRED_JOURNAL table mirroring the existing transition-pair table — each of the 8 files must contain `state.mjs journal` with its expected step token(s) (yolo: all 6 steps; release: EXECUTE and SHIP for release:). Failure messages name the file + missing step.\n3. Run the framework suite. EXPECTED reds at this phase boundary: commands-sync.test.mjs (dogfood command mirrors differ until phase 4 regen). Everything else green, including your extended coverage test against the CANONICAL files.",
+      "verification": [
+        "All 8 canonical command files journal as first action with correct workId/step",
+        "Extended coverage test green against canonical files; failure messages actionable",
+        "Only the mirror-sync guards red (expected until phase 4)"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/commands/get.md",
+        "packages/framework/commands/review.md",
+        "packages/framework/commands/plan.md",
+        "packages/framework/commands/audit.md",
+        "packages/framework/commands/execute.md",
+        "packages/framework/commands/ship.md",
+        "packages/framework/commands/yolo.md",
+        "packages/framework/commands/release.md",
+        "packages/framework/__tests__/command-transition-coverage.test.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T01:26:14.962Z",
+      "summary": "All 8 workflow command files journal as their FIRST state action (before transitions, with drop-proof-record prose): get GET+--title, review REVIEW, plan PLAN (early-state-update section), audit AUDIT (unconditional pre-verdict), execute EXECUTE once before the phase loop, ship SHIP, yolo all 6 steps (journal line first in each per-step bash block; unconditional-emission prose extended to journal), release release:{version} EXECUTE at cascade start + SHIP before tagging. command-transition-coverage.test.mjs gained REQUIRED_JOURNAL table + JOURNAL_PAIR_RE (workId-prefix+step pairing so prose can't satisfy it) with actionable failures. Suite 106/108 — same 2 expected mirror-sync reds (commands-sync + dogfood script parity), cleared by phase 4 install.js regen. plugin-layout reference-resolution already green with journal invocations (same state.mjs path). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 106, failed: 2, skipped: 0, status: \"failed\" } — both failures planned phase-boundary mirror staleness."
+    },
+    {
+      "number": 3,
+      "title": "Reconciler consumes the journal: floor advance, journal bootstrap, pruning, --print",
+      "status": "completed",
+      "content": "Touch ONLY `packages/framework/scripts/reconcile-state.mjs` and `packages/framework/__tests__/reconcile-state.test.mjs`. Import the phase-1 helpers from ./state.mjs. Read the research doc's '#272 REVIEW decisions'.\n\n1. Pass-level: read journal once per pass (`readJournalEntries`).\n2. `reconcileEntry` order (BINDING): frozen → history → ship-derivation (#271) → advance to MAX(artifact target, journal floor) by STEP_ORDER, legality-pre-guarded, advance-only. Journal floor status mapping: GET→pending, REVIEW→reviewing, PLAN→planning, AUDIT→planning, EXECUTE→executing (phase ONLY from artifacts), SHIP→shipping. When the journal floor wins, change action `\"journal floor: <STEP>\"`. EXECUTE phase progress: if artifact target also EXECUTE, keep its phase; journal floor EXECUTE alone carries phase null.\n3. Journal-qualified bootstrap: extend `findBootstrapCandidates` — a workId with journal entries whose newest ts is within BOOTSTRAP_RECENCY_MS qualifies even with NO plan file, provided #270 guards 1-3 hold (no existing entry, not in history, no archived plan). Candidate target = journal floor mapping (e.g. GET → pending/GET); title = newest journal title ?? `Issue ${N}`; note these distinctly. Plan-file candidates behave exactly as before; when both exist, target = MAX(plan target, journal floor).\n4. Pruning: inside the locked pass (NOT dry-run), after reconciliation, call `pruneJournal(tikiPath, state)`; include `{ action: \"journal pruned (<n> entries)\" }` in changes when n > 0? NO — pruning alone must NOT trigger a state.json write; track it separately and write ONLY the journal file (state write rule unchanged: only when reconcile changes exist). Report pruned count on stdout in non-quiet mode.\n5. buildReport/--print: journal floors appear as drift rows with note `journal floor: <STEP>`; journal-only bootstrap candidates as `would create (journal #272)`. Read-only (no pruning in --print).\n6. Tests: floor advance pending/GET → reviewing/REVIEW from a journal line (artifacts silent) — THE GET/REVIEW distinguishability test, previously impossible; artifact-beats-journal and journal-beats-artifact MAX cases; journal never overrides frozen/history/ship-derivation (order TRAPs); journal-qualified bootstrap with no plan file (title from journal); stale journal (30d) does not qualify bootstrap; pruning threshold + only-history-members pruned + state.json NOT written when only pruning happened; --print journal rows + read-only.\n7. **SC5 E2E test**: fixture simulating a full zero-transition pipeline: journal lines GET→...→EXECUTE + plan file (audited, phases completing in steps) + finally archived plan with a CLOSED fake fetcher; run reconcile() after each stage; assert the state.json trajectory matches what the imperative path would record (pending/GET → reviewing/REVIEW → planning/PLAN → planning/AUDIT → executing/EXECUTE N/M → removed+history). This extends the #248 DROP-RESILIENCE family to the whole pipeline.\n8. `pnpm -C packages/framework test`: same expected reds as phase 2 boundary (mirror guards) until phase 4; all reconcile/state/coverage tests green.",
+      "verification": [
+        "GET/REVIEW distinguishability test passes (journal floor advances where artifacts cannot)",
+        "MAX(artifact, journal) and order TRAPs green; bootstrap-from-journal with title green",
+        "Pruning thresholded, lock-scoped, never causes a state.json write by itself",
+        "SC5 zero-transition E2E trajectory test green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4",
+        "SC5",
+        "SC6"
+      ],
+      "files": [
+        "packages/framework/scripts/reconcile-state.mjs",
+        "packages/framework/__tests__/reconcile-state.test.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T01:38:01.464Z",
+      "summary": "Reconciler consumes the journal: imports STEP_ORDER/readJournalEntries/journalFloor/pruneJournal from state.mjs (local STEP_ORDER deleted); JOURNAL_FLOOR_TARGETS mapping + combineWithJournalFloor (journal wins only on strictly-higher step, EXECUTE tie keeps artifact phase); binding order preserved (frozen → history → ship-derivation → MAX advance, legality-pre-guarded); journal-won advances logged as \"journal floor: <STEP>\". findBootstrapCandidates: journal-only candidates (no plan file) within the 14d window, title from journal ?? Issue N, source:\"journal\", plan+journal → MAX. reconcile() reads journal once/pass, returns {changes, journalPruned}; pruning runs in the locked pass after the changes-gated write and never writes state.json itself. buildReport: journal-floor drift rows (derivedPhase=recordedPhase, no phantom phase-clear), \"would create (journal #272)\" rows, no pruning in --print. Contract amendment 2a. 20 new tests incl. GET/REVIEW distinguishability, MAX both directions + tie, 3 order TRAPs, advance-only + legality, 4 bootstrap cases, 3 prune cases, 2 --print cases, and the SC5 zero-transition E2E trajectory (pending/GET → ... → removed+history with journaled title, re-pass no resurrection). Reconcile suite 69/69; framework 137/139 with only the 2 expected mirror guards (phase 4 regen). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 137, failed: 2, skipped: 0, status: \"failed\" } — both failures planned phase-boundary mirror staleness."
+    },
+    {
+      "number": 4,
+      "title": "Regenerate mirrors, live-fire, full gate",
+      "status": "completed",
+      "content": "1. From repo root: `node packages/framework/install.js` — regenerates `.claude/commands/tiki/*.md` (8 journaled commands) and `.claude/tiki/scripts/{state,reconcile-state}.mjs`. `git restore .claude/settings.json` if content-empty diff. Verify `git status` shows only expected mirror updates under .claude/.\n2. Full `pnpm -C packages/framework test` — EVERYTHING green now (commands-sync, plugin-distribution dogfood-parity, coverage, state, reconcile, bootstrap, plugin-layout — note plugin-layout's reference-resolution test now also extracts the new `state.mjs journal` invocations; they reference the same state.mjs so they resolve).\n3. LIVE-FIRE: `node .claude/tiki/scripts/state.mjs journal issue:272 --step EXECUTE` (a real journal line for THIS issue — also validates the CLI end-to-end), then `node .claude/tiki/scripts/reconcile-state.mjs --print` → issue:272 row in-sync (recorded executing/EXECUTE 4/4 vs journal floor EXECUTE — no drift), zero would-create rows, fast (no gh). Then real pass → expect changes [] (journal floor EXECUTE does not exceed recorded EXECUTE). Verify `.tiki/journal.ndjson` exists with the line. Report outputs verbatim.\n4. Full root `pnpm test` (shared + desktop + framework + cargo) — all green.",
+      "verification": [
+        "Framework suite fully green including all mirror guards",
+        "Live-fire: journal line written, --print in-sync, real pass changes []",
+        "Root pnpm test green across all packages"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC6"
+      ],
+      "files": [
+        ".claude/commands/tiki",
+        ".claude/tiki/scripts/state.mjs",
+        ".claude/tiki/scripts/reconcile-state.mjs"
+      ],
+      "dependencies": [
+        2,
+        3
+      ],
+      "completedAt": "2026-06-13T01:39:22.458Z",
+      "summary": "install.js regen: 10 command mirrors + 5 scripts (.claude/commands/tiki + .claude/tiki/scripts incl. journaled state.mjs and journal-consuming reconcile-state.mjs); settings.json line-ending churn restored. LIVE-FIRE: `state.mjs journal issue:272 --step EXECUTE` wrote a real NDJSON line to .tiki/journal.ndjson; --print showed issue:272 in-sync (executing/EXECUTE 4/4, journal floor ties, no drift); real pass returned {changes: [], journalPruned: 0}. Full gates: framework 139/139 (commands-sync + dogfood-parity guards now green), shared 86, desktop vitest 211, cargo 58+7, pnpm build clean. testResults: { framework: \"node+vitest+cargo\", command: \"pnpm test && pnpm build\", passed: 501, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2,
+      4
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      3
+    ],
+    "SC5": [
+      3
+    ],
+    "SC6": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T01:20:35.791Z"
+}

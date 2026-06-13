@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 271,
-      "title": "Reconciler: derive SHIP/completed from archived plan + closed GitHub issue; reconcile release entries",
-      "completedAt": "2026-06-13T01:17:29.449Z"
+      "number": 272,
+      "title": "Intent journal: append-only .tiki/journal.ndjson as primary tracking signal",
+      "completedAt": "2026-06-13T01:40:17.082Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.2",
@@ -16,6 +16,11 @@
       "tag": "v0.9.2"
     },
     "recentIssues": [
+      {
+        "number": 272,
+        "title": "Intent journal: append-only .tiki/journal.ndjson as primary tracking signal",
+        "completedAt": "2026-06-13T01:40:17.082Z"
+      },
       {
         "number": 271,
         "title": "Reconciler: derive SHIP/completed from archived plan + closed GitHub issue; reconcile release entries",
