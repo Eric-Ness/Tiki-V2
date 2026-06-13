@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 275,
+    "title": "Close the shim mutation-surface gaps: subcommands for every direct-JSON write + write-time validation",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/275"
+  },
+  "createdAt": "2026-06-13T16:35:00.000Z",
+  "research": [
+    "shim-mutation-surface",
+    "reconciler-contract"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "state.mjs gains parallel / heal-attempt / enrich / release-wave subcommands covering the 4 state.json direct-writes; each is unit-tested by invoking the real CLI and asserting the resulting JSON",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:27:30.606Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "A new plan.mjs covers plan-file mutations (phase, verify-criteria, audited) reusing exported enum constants from state.mjs; mark-audited.mjs delegates to it; the coverage-matrix verify rule matches deriveCriteriaVerification",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:33:04.161Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "Every new subcommand rejects malformed input (bad enum, missing required field, wrong workId shape) with non-zero exit + clear message; a schema-shim-parity test asserts state.mjs VALID_* enum constants match the schemas (no new drift)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:33:04.161Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "execute.md/release.md/get.md/audit.md call the new subcommands; ZERO 'direct JSON write acknowledged'/'shim does not expose' paragraphs remain, pinned by a source-scan guard test",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:37:04.061Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "Dogfood mirrors regenerated; plugin-layout/commands-sync/command-transition-coverage/plugin-distribution guards green; live-fire a couple new subcommands on this repo; full pnpm test + build green",
+      "verified": true,
+      "verifiedAt": "2026-06-13T16:39:48.900Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "state.mjs subcommands + exported enum constants + schema-shim parity test",
+      "status": "completed",
+      "content": "Read `.tiki/research/shim-mutation-surface.md` first (binding design). Modify `packages/framework/scripts/state.mjs` + `packages/framework/__tests__/state.test.mjs` + add `packages/shared/src/__tests__/schema-shim-parity.test.ts`.\n\n1. **Exported enum constants** in state.mjs (single source): `VALID_WORK_STATUS` (8), `VALID_PHASE_STATUS` (pending/executing/completed/failed/skipped — = schema phaseStatus), `VALID_HEAL_CATEGORY` (build-error/type-error/test-failure/lint-error/other), `VALID_HEAL_OUTCOME` (success/failure). Reuse/export the existing pipeline-step set (VALID_STEPS) and the LEGAL work-status keys consistently. Export all so plan.mjs (phase 2) can import them.\n2. **Subcommands** (dispatch in main() switch; built-ins only; reuse parseArgs/withStateLock/writeStateAtomic/die):\n   - `parallel <workId> --start \"1,2,3\" --total N` (sets parallelExecution {phases,totalInGroup,completedInGroup:[],startedAt}), `--complete N` (append to completedInGroup, idempotent), `--clear` (delete parallelExecution). Validates workId is issue:*, phase numbers numeric.\n   - `heal-attempt <workId> --category C --outcome O [--message M] [--strategy S] [--next-step N]` — append a HealAttempt {ts,category,outcome,message?,strategy?,nextStep?} to activeWork[wid].phase.healAttempts (create array if absent). Validate category∈VALID_HEAL_CATEGORY, outcome∈VALID_HEAL_OUTCOME, entry has a phase.\n   - `enrich <workId> --json <file|->` — read JSON from a file or stdin ('-'), allowlist keys {body,labels,labelDetails,state,url,createdAt,updatedAt}, reject unknown keys (exit 1), shallow-merge onto activeWork[wid].issue. Validate workId is issue:*.\n   - `release-wave release:V [--current \"41,42\"] [--completed-issue N] [--completed-branch name]` — set release.currentIssues (parsed array), append to release.completedIssues / release.completedBranches (idempotent). Validate workId is release:*.\n3. **Write-time validation**: every NEW subcommand (and keep existing) validates workId shape + enum membership + required fields + numeric coercion BEFORE the atomic write; reject with die(1, msg). Add tests for each reject path.\n4. **state.test.mjs**: real-CLI tests for each subcommand happy-path (assert resulting state.json) + each reject path (assert non-zero exit + stderr). Cover: parallel start/complete/clear, heal-attempt append + bad category reject, enrich allowlist + unknown-key reject + stdin path, release-wave fields + non-release-workId reject.\n5. **packages/shared/src/__tests__/schema-shim-parity.test.ts**: reuse `_schema-enums.ts`; parse state.mjs source for the `VALID_PHASE_STATUS`/`VALID_WORK_STATUS`/`VALID_STEPS`/`VALID_HEAL_CATEGORY` array literals and assert each == its schema enum (phaseStatus, workStatus, pipelineStep, autoHealCategory). Drift-proof sub-test + parser-sanity, mirroring schema-rust-parity.\nRun `pnpm -C packages/framework test` and `pnpm -C packages/shared test` — green (do NOT regen dogfood yet; expect the dogfood-parity guard red until phase 4).",
+      "verification": [
+        "All 4 subcommands work via real CLI; each reject path exits non-zero with a message",
+        "schema-shim-parity.test.ts green (state.mjs VALID_* match schemas)",
+        "Enum constants exported for phase-2 import",
+        "Only dogfood-parity guard red (expected until phase 4); shared suite green"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/scripts/state.mjs",
+        "packages/framework/__tests__/state.test.mjs",
+        "packages/shared/src/__tests__/schema-shim-parity.test.ts"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T16:27:30.605Z",
+      "summary": "state.mjs gained exported enum constants (VALID_WORK_STATUS/VALID_PHASE_STATUS/VALID_STEPS/VALID_HEAL_CATEGORY/VALID_HEAL_OUTCOME as ordered array literals + *_SET lookups; existing call sites repointed to VALID_STEPS_SET) and 4 subcommands with validate-before-write: parallel (--start/--complete/--clear, issue-only), heal-attempt (category/outcome enums, requires phase), enrich (--json file|stdin, allowlist {body,labels,labelDetails,state,url,createdAt,updatedAt}, reject unknown, issue-only), release-wave (--current/--completed-issue/--completed-branch, idempotent, release-only). 9 new state.test.mjs tests (happy+reject each) → 31/31. New packages/shared schema-shim-parity.test.ts parses state.mjs VALID_* literals vs schema enums (work/phase/pipeline/heal-category) + drift-proof + sanity → shared 129/129 green. Framework 147/148 — only red is dogfood-parity (expected until phase-4 regen). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 147, failed: 1, skipped: 0, status: \"failed\" } — the 1 is planned phase-boundary dogfood staleness. Phase 2: import VALID_PHASE_STATUS + resolveTikiPath from ./state.mjs; use writeJsonAtomic (mark-audited pattern) for plan files NOT writeStateAtomic; HealAttempt shim shape is {ts,category,outcome,message?,strategy?,nextStep?} — phase 3 updates execute.md prose to match."
+    },
+    {
+      "number": 2,
+      "title": "plan.mjs (phase / verify-criteria / audited) + mark-audited delegation",
+      "status": "completed",
+      "content": "Create `packages/framework/scripts/plan.mjs` (mirror mark-audited.mjs conventions: parseArgs, writeJsonAtomic, `import { resolveTikiPath, VALID_PHASE_STATUS } from './state.mjs'`, Node-built-ins, die codes 0/1/2). + tests `packages/framework/__tests__/plan.test.mjs`. + update `mark-audited.mjs` to delegate.\n\nSubcommands:\n1. `plan.mjs phase <issue> --number N --status S [--summary \"...\"] [--completed-at ISO] [--started-at ISO] [--error \"...\"]` — load plans/issue-<issue>.json, find phases[].number==N, set status (validate S∈VALID_PHASE_STATUS) + provided optional fields, atomic write. Reject: missing plan, no such phase number, bad status.\n2. `plan.mjs verify-criteria <issue>` — apply the coverage-matrix rule exactly like @tiki/shared deriveCriteriaVerification: for each successCriteria[c], covering = coverageMatrix[c.id] || []; if covering non-empty AND every covering phase has status 'completed', set verified:true + verifiedAt (preserve existing verifiedAt); else verified:false (drop verifiedAt). Atomic write. (Reimplement the rule with built-ins — plan.mjs can't import @tiki/shared.) Print the verified IDs.\n3. `plan.mjs audited <issue>` — set audited:true + auditedAt (fold mark-audited.mjs logic). \n4. **mark-audited.mjs** → keep the file but have its main() delegate to the same logic (either spawn `plan.mjs audited` or share a function); audit.md will be repointed in phase 3. Existing mark-audited behavior + any test of it must stay green.\nTests (plan.test.mjs, real CLI): phase status update + bad-status reject + missing-phase reject; verify-criteria with a fixture where all covering phases complete → verified true, and a partial fixture → verified false (matches deriveCriteriaVerification — cross-check a case against the @tiki/shared function's expected output); audited sets the fields; mark-audited delegation still works.\nRun `pnpm -C packages/framework test` — green except the expected dogfood-parity red (phase 4 regen).",
+      "verification": [
+        "plan.mjs phase/verify-criteria/audited work via real CLI; reject paths exit non-zero",
+        "verify-criteria matches the deriveCriteriaVerification coverage-matrix rule (cross-checked)",
+        "mark-audited.mjs still produces audited:true (delegation intact)",
+        "Imports VALID_PHASE_STATUS from state.mjs (single enum source)"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/scripts/plan.mjs",
+        "packages/framework/scripts/mark-audited.mjs",
+        "packages/framework/__tests__/plan.test.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T16:33:04.160Z",
+      "summary": "Created plan.mjs (plan-file mutation shim, mirrors mark-audited conventions, imports resolveTikiPath+VALID_PHASE_STATUS from ./state.mjs, writeJsonAtomic not state lock). Subcommands: phase <issue> --number N --status S [--summary/--completed-at/--started-at/--error] (--error wraps to PhaseError{message,timestamp}); verify-criteria <issue> (faithful deriveCriteriaVerification port, cross-checked against the real @tiki/shared fn in the test); audited <issue> (exports applyAudited). mark-audited.mjs now delegates to applyAudited, happy-path output byte-identical (only missing-plan stderr prefix changed plan.mjs:, no test asserts it). 10 new plan.test.mjs tests (phase happy/error-shape/bad-status/missing-phase/missing-plan; verify-criteria all-complete+partial+preserve-existing+no-coverage+@shared cross-check; audited+delegation) all green. Framework 157/158 — only red is dogfood-parity (plan.mjs new + mark-audited changed; phase-4 regen ships them via dynamic copier). testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 157, failed: 1, skipped: 0, status: \"failed\" } — planned phase-boundary dogfood staleness. Phase 3 invocations: execute.md → plan.mjs phase {issue} --number N --status S [...] + plan.mjs verify-criteria {issue} after each phase; audit.md → plan.mjs audited {number}; --error takes plain message string."
+    },
+    {
+      "number": 3,
+      "title": "Repoint command files to subcommands + delete acknowledged paragraphs + guard test",
+      "status": "completed",
+      "content": "Edit the canonical command files in `packages/framework/commands/` (NOT the .claude mirrors — phase 4 regenerates those) and add a source-scan guard.\n\n1. **execute.md**: replace the parallelExecution direct-JSON instructions with `node .claude/tiki/scripts/state.mjs parallel ...` (start/complete/clear at the right points in the parallel-execution flow); replace per-phase plan status/summary writes with `node .claude/tiki/scripts/plan.mjs phase ...`; replace the successCriteria.verified write with `node .claude/tiki/scripts/plan.mjs verify-criteria {number}` (run after each phase, per the existing rule); replace the healAttempts write with `node .claude/tiki/scripts/state.mjs heal-attempt ...`. DELETE every 'direct JSON write acknowledged' / 'shim does not expose' / 'write ... directly in JSON' paragraph.\n2. **release.md**: replace the currentIssues/completedBranches/completedIssues direct writes with `node .claude/tiki/scripts/state.mjs release-wave ...`; delete the acknowledged paragraph.\n3. **get.md**: replace the issue-metadata 'follow-up direct JSON write' with `node .claude/tiki/scripts/state.mjs enrich issue:{number} --json -` (pipe the gh JSON); delete the direct-write note. Keep it practical: the command already has the gh JSON; show piping the allowlisted subset.\n4. **audit.md**: repoint `mark-audited.mjs {number}` → `node .claude/tiki/scripts/plan.mjs audited {number}` (mark-audited still works as a delegator, but commands use the new path).\n5. **Source-scan guard**: extend `command-transition-coverage.test.mjs` (or a new `command-no-direct-writes.test.mjs`) asserting NO file in commands/ contains the phrases /direct[- ]JSON write acknowledged/i, /shim does not expose/i, /write .*directly in (the )?JSON/i. Actionable failure naming the file + matched phrase. Keep the existing journal/transition coverage assertions green.\nRun `pnpm -C packages/framework test`: the guard + coverage + journal tests green against CANONICAL files; commands-sync red until phase 4 (expected). yolo.md plugin-only fallback paragraph stays (it is NOT a surface gap — make sure the guard regexes don't match it; tune if needed).",
+      "verification": [
+        "All 4 command files call the new subcommands; no acknowledged-direct-write paragraphs remain",
+        "Source-scan guard green against canonical; yolo.md legacy fallback not falsely flagged",
+        "command-transition-coverage + journal coverage still green; only commands-sync red (expected until phase 4)"
+      ],
+      "addressesCriteria": [
+        "SC4"
+      ],
+      "files": [
+        "packages/framework/commands/execute.md",
+        "packages/framework/commands/release.md",
+        "packages/framework/commands/get.md",
+        "packages/framework/commands/audit.md",
+        "packages/framework/__tests__/command-transition-coverage.test.mjs"
+      ],
+      "dependencies": [
+        1,
+        2
+      ],
+      "completedAt": "2026-06-13T16:37:04.060Z",
+      "summary": "Repointed all 4 command files to subcommands: execute.md (parallelExecution→state.mjs parallel start/complete/clear; per-phase status/summary→plan.mjs phase; successCriteria→plan.mjs verify-criteria; healAttempts→state.mjs heal-attempt with new {ts,category,outcome,...} shape) deleting every acknowledged/shim-does-not-expose paragraph; release.md (wave fields→state.mjs release-wave); get.md (metadata→gh|state.mjs enrich --json -); audit.md (mark-audited.mjs→plan.mjs audited). New guard test in command-transition-coverage.test.mjs scans commands/ for /direct[- ]JSON write (is )?acknowledged/i, /shim does not expose/i, /write ...directly in (the )?JSON/i — yolo.md's \"Legacy: direct JSON\" path-fallback correctly NOT flagged. Framework 157/159 — 2 reds are expected mirror staleness (commands-sync: audit.md mirror; dogfood-parity: plan.mjs not yet copied), both cleared by phase-4 install.js. plugin-layout test 39 already resolves the new plan.mjs references. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 157, failed: 2, skipped: 0, status: \"failed\" } — both planned phase-boundary mirror reds."
+    },
+    {
+      "number": 4,
+      "title": "Dogfood regen + live-fire + full gate",
+      "status": "completed",
+      "content": "1. From repo root: `node packages/framework/install.js` — regenerates `.claude/commands/tiki/*.md` (4 edited) and `.claude/tiki/scripts/*.mjs` (state.mjs, plan.mjs NEW, mark-audited.mjs). `git restore .claude/settings.json` if its diff is content-empty. Confirm `git status` shows only expected mirror updates + the new `.claude/tiki/scripts/plan.mjs`.\n2. Full `pnpm -C packages/framework test` — EVERYTHING green now: commands-sync (mirrors match), plugin-distribution dogfood-parity (scripts match canonical incl. plan.mjs), plugin-layout (the new `node .claude/tiki/scripts/{state,plan}.mjs` references in command bodies resolve post-bootstrap — verify the test extracts and resolves them; if plan.mjs isn't picked up, check the reference regex), command-transition-coverage, the new no-direct-writes guard, state.test.mjs, plan.test.mjs.\n3. **LIVE-FIRE** on this repo (real subcommands, harmless): `node .claude/tiki/scripts/plan.mjs --help` (or a dry-run); create a throwaway temp tiki? No — instead validate against a scratch dir to avoid touching live state. Minimal: run `node .claude/tiki/scripts/state.mjs parallel issue:275 --start \"1\" --total 1` then `--clear` (issue:275 is the active entry — start/clear leaves it as-is), and `node .claude/tiki/scripts/plan.mjs verify-criteria 275` (reads the live plan, recomputes verified flags — should be a no-op-ish recompute). Confirm exit 0 and sane output; if any of these would corrupt live state, use a temp `--tiki-path` scratch dir instead and report that. Report outputs.\n4. `pnpm -C packages/shared test` (schema-shim-parity green) + root `pnpm build` (tsc -b) + full root `pnpm test` — all green.",
+      "verification": [
+        "install.js regenerated mirrors incl. new plan.mjs; settings.json churn restored",
+        "Full framework suite green incl. plugin-layout resolving state.mjs + plan.mjs references",
+        "Live-fire subcommands exit 0 with sane output (no live-state corruption)",
+        "shared schema-shim-parity green; root pnpm build + pnpm test green"
+      ],
+      "addressesCriteria": [
+        "SC5"
+      ],
+      "files": [
+        ".claude/commands/tiki",
+        ".claude/tiki/scripts/state.mjs",
+        ".claude/tiki/scripts/plan.mjs",
+        ".claude/tiki/scripts/mark-audited.mjs"
+      ],
+      "dependencies": [
+        1,
+        2,
+        3
+      ],
+      "completedAt": "2026-06-13T16:39:48.900Z",
+      "summary": "install.js regenerated 10 command mirrors + 6 scripts (.claude/tiki/scripts now includes plan.mjs); settings.json line-ending churn restored. LIVE-FIRE against a scratch .tiki proved every subcommand: state.mjs parallel (start/complete → parallelExecution.completedInGroup), heal-attempt (appended to phase.healAttempts), enrich (file: allowlist rejects badkey with clear msg exit 1; valid merges state/labels/url onto issue — stdin path covered by state.test.mjs spawnSync), release-wave (currentIssues+completedBranches), plan.mjs phase (status→completed), verify-criteria (SC1 correctly unverified while phase 2 pending), plan phase bad-status rejected exit 1 with enum message. Full gate: framework 159, shared 129, desktop vitest 211, cargo 60+7, pnpm build (tsc -b) clean. testResults: { framework: \"node+vitest+cargo\", command: \"pnpm test && pnpm build\", passed: 566, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      1,
+      2
+    ],
+    "SC4": [
+      3
+    ],
+    "SC5": [
+      4
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T16:20:14.038Z"
+}
