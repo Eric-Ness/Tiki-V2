@@ -1,7 +1,7 @@
 ---
 topic: reconciler-contract
 tags: [reconciler, state, framework, hooks]
-issues: [270]
+issues: [270, 271]
 created: 2026-06-13T01:00:00Z
 ---
 
@@ -23,6 +23,17 @@ Facts verified against `packages/framework/scripts/reconcile-state.mjs` (2026-06
 - **`reconcile()` pass loop** iterates `Object.entries(state.activeWork)` filtering `issue:*` — bootstrap must run as a separate scan of `.tiki/plans/*.json` BEFORE/AFTER that loop, inside the same locked pass. Plans dir contains an `archive/` subdir — match files only via `/^issue-(\d+)\.json$/` on readdir entries.
 - **`buildReport(state, tikiPath)`** is the read-only mirror powering `--print`; any new reconcile behavior MUST be mirrored there (drift/"would create" rows) or the doctor lies. `formatReport` renders rows; "would create" rows need a workId-like label + note.
 - **Write-only-on-change:** `reconcile()` writes state only when `result.changes.length > 0` — bootstrap changes must push into `result.changes` to be persisted.
+
+## 2026-06-13 findings (#271 REVIEW decisions)
+
+- **Ship signal for issues** = `.tiki/plans/archive/issue-N.json` exists (active plan may also linger — archive presence wins) AND GitHub reports the issue closed. Both required; either alone is not enough (archive can exist while the issue reopened; closed-without-archive means ship never ran its teardown — that's #247 foreground territory).
+- **gh budget rule:** gh is called ONLY for entries that are already "ship-shaped" (archived plan present, not frozen, not in history). Normal in-flight passes make ZERO gh calls — the Stop hook stays fast.
+- **Injectable fetcher:** the gh call must be injectable for tests AND for --print: `reconcile(tikiPath, { fetchIssueState })` / `buildReport(state, tikiPath, { fetchIssueState })`; default impl spawns `gh issue view N --json state` via spawnSync with `shell: process.platform === "win32"` (PATHEXT) and a hard timeout (5s); ANY failure (no gh, offline, non-zero, parse error, timeout) → returns null → no change (degrade silently, rule 6).
+- **History append from the reconciler:** state.mjs does not export its append-history internals; the reconciler implements the same idempotent shape (filter prior record for N, unshift `{number, title, completedAt, parentRelease?}`). Title source: entry.issue.title.
+- **Ship-derivation actions** mirror the existing history path: standalone → append history + delete entry; release child (parentRelease) → append history + applyTransition to completed/SHIP (legal from executing AND shipping ✓).
+- **Release reconciliation scope (kept tight):** (a) version in `history.recentReleases` → delete `release:*` entry; (b) NOT in history but def archived at `.tiki/releases/archive/<version>.json` → append release history record `{version, issues (from archived def), completedAt, tag: version}` + delete entry; (c) in-flight releases left untouched (no progress healing this issue — advance-only semantics for release progress deferred). FROZEN_STATUSES applies to releases too.
+- **buildReport gains release rows** (currently `continue`s on non-issue keys): recorded triple as-is; derived = teardown verdict when (a)/(b) applies, else recorded (in-sync). Plus ship-derivation rows for issues need the fetcher; --print accepts the same injection and tolerates fetcher absence (rows then show "gh unavailable" note rather than fabricating drift).
+- **Version key normalization:** state key is `release:<version>`; def files live at `releases/<version>.json` with or without `v` prefix historically — check both (mirror check-release-readiness.mjs which accepts both).
 
 ## Test conventions (`__tests__/reconcile-state.test.mjs`)
 - Imports `reconcile`/`buildReport` directly (ESM import, no spawn) + fixture `.tiki` trees in tmp dirs; 16 existing scenarios incl. TRAP tests (frozen, stale-plan-not-resurrected — that one currently asserts NO entry creation for an issue NOT in activeWork **with the issue in history**... verify exact fixture before changing semantics; #270 must keep the not-in-history+archived-plan resurrection guard intact and re-pin the TRAP test for the new rule: archived plan → never bootstrap, history member → never bootstrap).

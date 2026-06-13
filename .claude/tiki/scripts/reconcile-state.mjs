@@ -52,9 +52,33 @@
  *   4. Completion comes from history, not plan phases. "All phases complete"
  *      does NOT mean shipped (no ship/archive artifact is reliable). The
  *      authoritative done-signal is membership in history.recentIssues.
+ *      4a. AMENDMENT (#271): completion may ALSO be derived from the PAIR of
+ *          ship signals: plans/archive/issue-N.json exists AND GitHub reports
+ *          the issue CLOSED. Both are required — the archive alone can linger
+ *          past a reopen, and closed-without-archive means ship's teardown
+ *          never ran (that's #247 foreground territory). gh BUDGET RULE: the
+ *          gh fetcher is invoked ONLY for entries that are already ship-shaped
+ *          (not frozen, not in history, archived plan present), so normal
+ *          in-flight passes make ZERO gh calls and the Stop hook stays fast.
+ *          DEGRADE SILENTLY: any fetcher failure (no gh, offline, non-zero,
+ *          parse error, timeout) yields null → no change (see rule 6). The
+ *          fetcher is injectable for tests and --print via
+ *          reconcile(tikiPath, { fetchIssueState }).
  *   5. Legality pre-guarded. Every advance is checked with isLegalTransition
  *      BEFORE applyTransition, so applyTransition can never die() and crash the
- *      hook. release:* entries and parentRelease are left untouched.
+ *      hook. parentRelease is always preserved.
+ *      5a. AMENDMENT (#271): release:* entries are no longer skipped wholesale —
+ *          they get TEARDOWN-ONLY reconciliation (reconcileReleaseEntry):
+ *          (a) version already in history.recentReleases → the entry is a
+ *              lingering leftover of a dropped teardown → removed;
+ *          (b) NOT in history but the release def is archived at
+ *              releases/archive/<version>.json (v-prefix variance tolerated,
+ *              mirroring check-release-readiness.mjs) → reconstruct the release
+ *              history record (issues from the archived def, tag = version,
+ *              idempotent filter+unshift) and remove the entry;
+ *          (c) anything else is in flight → untouched. No release PROGRESS is
+ *          ever healed (advance-only semantics for releases deferred), and
+ *          FROZEN_STATUSES applies to releases too.
  *   6. Never blocks. Lenient locking (skip on contention) + a top-level guard so
  *      --quiet always exits 0. A missed pass is harmless; the next turn retries.
  *
@@ -68,6 +92,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { spawnSync } from "node:child_process";
 import {
   resolveTikiPath,
   withStateLock,
@@ -151,6 +176,89 @@ function inHistory(history, number) {
     if (r && r.number === number) return true;
   }
   return false;
+}
+
+/** On-disk ship signal (#271 / contract 4a, also bootstrap guard 3). */
+function hasArchivedPlan(tikiPath, number) {
+  return fs.existsSync(path.join(tikiPath, "plans", "archive", `issue-${number}.json`));
+}
+
+/**
+ * Default issue-state fetcher (#271, contract amendment 4a): asks the gh CLI
+ * whether the issue is open or closed. Returns "OPEN" | "CLOSED" | null and
+ * NEVER throws — any failure (gh missing, offline, non-zero exit, timeout,
+ * parse error) degrades to null so the hook can never block (rule 6).
+ * Injectable via reconcile(tikiPath, { fetchIssueState }) for tests/--print.
+ */
+export function fetchIssueStateViaGh(number) {
+  try {
+    const res = spawnSync("gh", ["issue", "view", String(number), "--json", "state"], {
+      shell: process.platform === "win32", // PATHEXT resolution for gh.exe shims
+      timeout: 5000,
+      encoding: "utf-8",
+    });
+    if (res.error || res.status !== 0) return null;
+    const parsed = JSON.parse(res.stdout);
+    const s = typeof parsed.state === "string" ? parsed.state.toUpperCase() : null;
+    return s === "OPEN" || s === "CLOSED" ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Idempotent history append for ship-derivation. state.mjs does not export its
+ * append-history internals, so this mirrors the same shape: any prior record
+ * for the same number is dropped, the fresh record is unshifted to the front.
+ * Mutates `history` (the live state.history object) in place.
+ */
+function appendShipHistoryRecord(history, record) {
+  const prior = Array.isArray(history.recentIssues) ? history.recentIssues : [];
+  history.recentIssues = [record, ...prior.filter((r) => !(r && r.number === record.number))];
+}
+
+/** The history record shape state.mjs would have written on a real ship. */
+function shipHistoryRecord(entry, number) {
+  return {
+    number,
+    title: entry.issue.title,
+    completedAt: new Date().toISOString(),
+    ...(entry.parentRelease ? { parentRelease: entry.parentRelease } : {}),
+  };
+}
+
+function inReleaseHistory(history, version) {
+  if (!history) return false;
+  const recent = Array.isArray(history.recentReleases) ? history.recentReleases : [];
+  for (const r of recent) {
+    if (r && r.version === version) return true;
+  }
+  return false;
+}
+
+/**
+ * Archived release-def lookup (#271, contract amendment 5a case b). Def files
+ * historically live with OR without the leading 'v' (releases/v1.2.json vs
+ * releases/1.2.json) — check the version as-recorded AND the v-toggled variant,
+ * mirroring check-release-readiness.mjs. Returns the file path or null.
+ */
+function findArchivedReleaseDefFile(tikiPath, version) {
+  const toggled = version.startsWith("v") ? version.slice(1) : `v${version}`;
+  for (const name of [version, toggled]) {
+    const file = path.join(tikiPath, "releases", "archive", `${name}.json`);
+    if (fs.existsSync(file)) return file;
+  }
+  return null;
+}
+
+/**
+ * Idempotent release history append — mirrors state.mjs append-history release
+ * (filter any prior record for the same version, unshift the fresh record).
+ * Mutates `history` (the live state.history object) in place.
+ */
+function appendReleaseHistoryRecord(history, record) {
+  const prior = Array.isArray(history.recentReleases) ? history.recentReleases : [];
+  history.recentReleases = [record, ...prior.filter((r) => !(r && r.version === record.version))];
 }
 
 /**
@@ -238,7 +346,7 @@ export function findBootstrapCandidates(state, tikiPath, now) {
     // Guard 2: already shipped per history.
     if (inHistory(history, number)) continue;
     // Guard 3: archived copy = shipped, even where history predates the record.
-    if (fs.existsSync(path.join(plansDir, "archive", `issue-${number}.json`))) continue;
+    if (hasArchivedPlan(tikiPath, number)) continue;
 
     // Guard 5 (parse) is needed before guard 4 can read timestamps.
     const plan = readPlanSafe(tikiPath, number);
@@ -268,7 +376,56 @@ function phaseEqual(a, b) {
 }
 
 /**
- * Build a recorded-vs-derived report for every issue:* entry in activeWork.
+ * Read-only report row for a release:* entry (#271) — mirrors
+ * reconcileReleaseEntry's verdict without applying it. Returns null for
+ * malformed entries (which the reconciler also skips).
+ */
+function buildReleaseRow(workId, entry, history, tikiPath) {
+  if (!entry || entry.type !== "release") return null;
+
+  const recordedStatus = entry.status ?? null;
+  const recordedStep = entry.pipelineStep ?? null;
+  const version = entry.release?.version;
+
+  let derivedStatus = recordedStatus;
+  let derivedStep = recordedStep;
+  let note = "";
+
+  if (FROZEN_STATUSES.has(recordedStatus)) {
+    note = `frozen (${recordedStatus})`;
+  } else if (typeof version !== "string" || version === "") {
+    note = "no version recorded";
+  } else if (inReleaseHistory(history, version)) {
+    derivedStatus = "(shipped → remove)";
+    derivedStep = "SHIP";
+    note = "in release history";
+  } else if (findArchivedReleaseDefFile(tikiPath, version)) {
+    derivedStatus = "(shipped → remove)";
+    derivedStep = "SHIP";
+    note = "archived release def";
+  } else {
+    note = "release in flight";
+  }
+
+  const drift = derivedStatus !== recordedStatus || derivedStep !== recordedStep;
+
+  return {
+    workId,
+    number: null,
+    recordedStatus,
+    recordedStep,
+    recordedPhase: null,
+    derivedStatus,
+    derivedStep,
+    derivedPhase: null,
+    drift,
+    note,
+  };
+}
+
+/**
+ * Build a recorded-vs-derived report for every issue:* and release:* entry in
+ * activeWork.
  *
  * PURE / READ-ONLY: reads plan files but never mutates state. This powers the
  * `--print` "reconciler doctor" — a human-readable snapshot of what state.json
@@ -281,17 +438,33 @@ function phaseEqual(a, b) {
  *     reconciler never touches these), so drift is false by construction.
  *   - in history → derived is SHIP (completed for a release child, otherwise the
  *     entry would be removed).
+ *   - ship-shaped (#271: archived plan, not in history) → IF a fetcher was
+ *     injected via `options.fetchIssueState` AND it reports CLOSED, derived is
+ *     the ship-derivation verdict; a missing fetcher or an OPEN/null answer
+ *     keeps the row in-sync with an explanatory note — drift is NEVER
+ *     fabricated from an unconfirmable signal (SC5). There is deliberately NO
+ *     default fetcher here: only --print (main) passes fetchIssueStateViaGh,
+ *     so programmatic buildReport callers stay gh-free.
  *   - otherwise → deriveTarget(plan); a null target (pre-PLAN) is left as-is.
+ *
+ * Release rows (#271, amendment 5a) mirror reconcileReleaseEntry: recorded
+ * triple as-is; derived shows the teardown verdict when the version is in
+ * history.recentReleases or the def is archived, else derived == recorded.
  *
  * Also appends one "would create (bootstrap #270)" row per bootstrap candidate
  * (recorded -/- since no entry exists yet) so --print previews entry creation.
  */
-export function buildReport(state, tikiPath) {
+export function buildReport(state, tikiPath, { fetchIssueState = null } = {}) {
   const rows = [];
   const activeWork = (state && state.activeWork) || {};
   const history = (state && state.history) || {};
 
   for (const [workId, entry] of Object.entries(activeWork)) {
+    if (workId.startsWith("release:")) {
+      const row = buildReleaseRow(workId, entry, history, tikiPath);
+      if (row) rows.push(row);
+      continue;
+    }
     if (!workId.startsWith("issue:")) continue;
     if (!entry || entry.type !== "issue" || !entry.issue) continue;
     const number = entry.issue.number;
@@ -318,6 +491,26 @@ export function buildReport(state, tikiPath) {
       derivedStep = "SHIP";
       derivedPhase = null;
       note = "in history";
+    } else if (typeof number === "number" && hasArchivedPlan(tikiPath, number)) {
+      // Ship-shaped (#271): the fetcher is only consulted HERE (gh budget rule).
+      let ghState = null;
+      if (typeof fetchIssueState === "function") {
+        try {
+          ghState = fetchIssueState(number);
+        } catch {
+          ghState = null; // degrade silently, like the reconcile pass
+        }
+      }
+      if (ghState === "CLOSED") {
+        derivedStatus = entry.parentRelease ? "completed" : "(ship-derived → remove)";
+        derivedStep = "SHIP";
+        derivedPhase = null;
+        note = "archived plan; gh closed";
+      } else {
+        // Fetcher absent, failed, or the issue is genuinely open: the ship
+        // signal is unconfirmed — stay in-sync, never fabricate drift (SC5).
+        note = "archived plan; gh unavailable/open";
+      }
     } else {
       const plan = readPlanSafe(tikiPath, number);
       const target = deriveTarget(plan);
@@ -379,10 +572,10 @@ function fmtCell(status, step, phase) {
 /** Render buildReport() rows as a human-readable, ASCII-only table. */
 export function formatReport(rows) {
   if (!rows || rows.length === 0) {
-    return "Reconciler doctor: no active issues to report.";
+    return "Reconciler doctor: no active entries to report.";
   }
   const lines = [
-    `Reconciler doctor — ${rows.length} active issue${rows.length === 1 ? "" : "s"}`,
+    `Reconciler doctor — ${rows.length} active entr${rows.length === 1 ? "y" : "ies"}`,
     "",
   ];
   for (const r of rows) {
@@ -404,8 +597,8 @@ export function formatReport(rows) {
   lines.push("");
   lines.push(
     driftCount === 0
-      ? "All active issues are in sync with their artifacts."
-      : `${driftCount} issue${driftCount === 1 ? "" : "s"} drifted — the reconciler will heal on its next pass.`
+      ? "All active entries are in sync with their artifacts."
+      : `${driftCount} entr${driftCount === 1 ? "y" : "ies"} drifted — the reconciler will heal on its next pass.`
   );
   return lines.join("\n");
 }
@@ -413,8 +606,11 @@ export function formatReport(rows) {
 /**
  * Reconcile a single issue entry in place. Returns a small change record or null
  * if nothing changed. Mutates `state` only via guarded applyTransition / delete.
+ * Ordering is contractual: history check FIRST (rule 4), then ship-derivation
+ * (amendment 4a), then the in-flight artifact advance — an entry healed by
+ * ship-derivation returns immediately and is never also advanced.
  */
-function reconcileEntry(state, workId, entry, history, tikiPath) {
+function reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState) {
   if (!entry || entry.type !== "issue" || !entry.issue) return null;
   const number = entry.issue.number;
   if (typeof number !== "number") return null;
@@ -445,6 +641,47 @@ function reconcileEntry(state, workId, entry, history, tikiPath) {
     // the display stops showing a stale "executing" for a closed issue.
     delete state.activeWork[workId];
     return { workId, action: "removed" };
+  }
+
+  // --- Ship-derivation (#271, contract amendment 4a) -------------------------
+  // Not frozen, not in history. The archived plan is the on-disk ship signal;
+  // gh confirms the issue actually closed (the archive alone can linger past a
+  // reopen). BUDGET RULE: the fetcher only runs PAST the archive check, so a
+  // normal in-flight pass makes zero gh calls.
+  if (hasArchivedPlan(tikiPath, number)) {
+    let ghState = null;
+    try {
+      ghState = typeof fetchIssueState === "function" ? fetchIssueState(number) : null;
+    } catch {
+      ghState = null; // degrade silently (rule 6)
+    }
+    if (ghState === "CLOSED") {
+      if (entry.parentRelease) {
+        // Release child: keep the entry for the release teardown, mark it done.
+        // Legality pre-guard so applyTransition can never die() (rule 5).
+        if (status !== "completed" && isLegalTransition(status, "completed")) {
+          appendShipHistoryRecord(history, shipHistoryRecord(entry, number));
+          applyTransition(state, {
+            workId,
+            toStatus: "completed",
+            toStep: "SHIP",
+            phase: null,
+            parallelExecution: null,
+            parentRelease: undefined, // preserve
+            issue: null,
+            release: null,
+          });
+          return { workId, action: "ship-derived: completed" };
+        }
+        return null; // illegal from here — leave it alone, never crash the hook
+      }
+      // Standalone: record the ship in history, drop the lingering entry.
+      appendShipHistoryRecord(history, shipHistoryRecord(entry, number));
+      delete state.activeWork[workId];
+      return { workId, action: "ship-derived: removed" };
+    }
+    // "OPEN" or null (gh unavailable/failed): no ship change — fall through to
+    // the in-flight advance (a genuinely reopened issue is in flight again).
   }
 
   // --- In-flight: advance from artifacts ------------------------------------
@@ -485,23 +722,75 @@ function reconcileEntry(state, workId, entry, history, tikiPath) {
 }
 
 /**
+ * Reconcile a single release entry in place (#271, contract amendment 5a).
+ * TEARDOWN-ONLY: (a) version already in history.recentReleases → remove the
+ * lingering entry; (b) def archived but the history append was dropped →
+ * reconstruct the release history record from the archived def, then remove;
+ * (c) in-flight → untouched (no release progress healing). Returns a change
+ * record or null.
+ */
+function reconcileReleaseEntry(state, workId, entry, history, tikiPath) {
+  if (!entry || entry.type !== "release") return null;
+  if (FROZEN_STATUSES.has(entry.status)) return null; // frozen releases too
+  const version = entry.release?.version;
+  if (typeof version !== "string" || version === "") return null;
+
+  // (a) Already in history — the teardown ran but the entry deletion dropped.
+  if (inReleaseHistory(history, version)) {
+    delete state.activeWork[workId];
+    return { workId, action: "release: removed (in history)" };
+  }
+
+  // (b) Def archived (the on-disk ship signal for releases) but history record
+  // missing — reconstruct it, then drop the entry.
+  const defFile = findArchivedReleaseDefFile(tikiPath, version);
+  if (defFile) {
+    let def = null;
+    try {
+      def = JSON.parse(fs.readFileSync(defFile, "utf-8"));
+    } catch {
+      def = null; // corrupt def — fall back to the entry's own issue list
+    }
+    appendReleaseHistoryRecord(history, {
+      version,
+      issues: def?.issues ?? entry.release?.issues ?? [],
+      completedAt: new Date().toISOString(),
+      tag: version,
+    });
+    delete state.activeWork[workId];
+    return { workId, action: "release: torn down (archived def)" };
+  }
+
+  // (c) In-flight release — left alone.
+  return null;
+}
+
+/**
  * Run one reconcile pass. Returns { changes: [...] } (changes empty if nothing
  * to do or the lock was contended). Writes state.json only when something
  * actually changed (so the watcher isn't churned every turn).
  */
-export function reconcile(tikiPath, { dryRun = false } = {}) {
+export function reconcile(tikiPath, { dryRun = false, fetchIssueState = fetchIssueStateViaGh } = {}) {
   const result = { changes: [] };
 
   const pass = () => {
     const state = readStateSafe(tikiPath);
     if (!state || typeof state !== "object") return;
     state.activeWork = state.activeWork || {};
-    const history = state.history || {};
+    // Attach history to the state object so ship-derivation appends (#271)
+    // land in the same object that gets written back.
+    state.history = state.history || {};
+    const history = state.history;
 
     for (const [workId, entry] of Object.entries(state.activeWork)) {
-      if (!workId.startsWith("issue:")) continue; // leave release:* untouched
-      const change = reconcileEntry(state, workId, entry, history, tikiPath);
-      if (change) result.changes.push(change);
+      if (workId.startsWith("issue:")) {
+        const change = reconcileEntry(state, workId, entry, history, tikiPath, fetchIssueState);
+        if (change) result.changes.push(change);
+      } else if (workId.startsWith("release:")) {
+        // Teardown-only release reconciliation (#271, contract amendment 5a).
+        const change = reconcileReleaseEntry(state, workId, entry, history, tikiPath);
+        if (change) result.changes.push(change);
+      }
     }
 
     // Bootstrap (#270, contract rule 1a): create entries for recent plans whose
@@ -549,7 +838,9 @@ function main() {
     // state and exit WITHOUT reconciling (never mutates state.json).
     if (args.print === true) {
       const state = readStateSafe(tikiPath);
-      const rows = state ? buildReport(state, tikiPath) : [];
+      // --print is the ONE buildReport caller that gets the real gh fetcher
+      // (#271): it's interactive, so the ship-shaped gh lookups are wanted.
+      const rows = state ? buildReport(state, tikiPath, { fetchIssueState: fetchIssueStateViaGh }) : [];
       process.stdout.write(formatReport(rows) + "\n");
       process.exit(0);
     }
