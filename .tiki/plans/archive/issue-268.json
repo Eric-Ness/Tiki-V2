@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 268,
+    "title": "Plugin-only install: pipeline state-tracking silently dead (command bodies reference unresolvable .claude/tiki/scripts/state.mjs)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/268"
+  },
+  "createdAt": "2026-06-13T00:32:00.000Z",
+  "research": [
+    "plugin-distribution-channels",
+    "tiki-doctor-diagnostics"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "On a simulated plugin-only layout, the SessionStart bootstrap script populates .claude/tiki/scripts/ with all canonical scripts, and a real state.mjs transition invoked from that project then succeeds and writes activeWork",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:38:22.811Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "The bootstrap copy is idempotent and version-aware (re-run at same version is a no-op; version change refreshes scripts) and never creates .tiki/ in a project that lacks it",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:38:22.811Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "tiki_doctor reports missing framework scripts as unresolvedScriptPaths (non-empty on a broken layout, empty on a healthy one), always checking the canonical four scripts plus any node .claude/*.mjs references found in installed command files",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:34:27.111Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functionality",
+      "description": "Settings -> Diagnostics renders unresolved scripts as a warn finding listing the paths; healthy projects show a pass; the reconciler-hook finding no longer false-warns on plugin-only installs (info instead of warn when no copy-install is detected)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:38:23.112Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "New tests pass: bootstrap-script unit tests, plugin-only-layout behavioral test (Fix C), cargo tests for unresolvedScriptPaths, vitest cases for the new findings; all existing suites stay green",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:38:23.112Z"
+    },
+    {
+      "id": "SC6",
+      "category": "testing",
+      "description": "pnpm build (tsc -b) clean and cargo test --lib clean at the end",
+      "verified": true,
+      "verifiedAt": "2026-06-13T00:38:23.112Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "SessionStart bootstrap script + plugin hook (Fix A)",
+      "status": "completed",
+      "content": "Create `packages/framework/scripts/bootstrap-scripts.mjs` — the plugin-channel equivalent of install.js's script-copy. Node built-ins only (mirror state.mjs conventions). Behavior:\n\n1. Resolve its own directory via `import.meta.url` (= the plugin's `scripts/` dir; works identically in the monorepo). Plugin root = parent dir; read `version` from `<root>/.claude-plugin/plugin.json` (tolerate absence -> version null).\n2. Target = `<process.cwd()>/.claude/tiki/scripts/`. Idempotency: write a `.version` marker file inside the target dir after copying; if the marker exists and equals the plugin version, exit 0 silently (no output — SessionStart hooks should not spam every session).\n3. Copy every `*.mjs` sibling from its own dir into the target (mkdir -p). This includes itself — harmless and keeps the 'dogfood matches canonical' dist test simple.\n4. NEVER create `.tiki/` — only if `<cwd>/.tiki/` already exists, stamp `<cwd>/.tiki/.framework-version` with the plugin version (matches install.js stamping).\n5. Do NOT write `.claude/settings.json` (decision recorded in research doc: the plugin already delivers the reconciler hook via hooks.json; writing settings.json from a SessionStart that fires in every project is too invasive).\n6. On success after an actual copy, print one line: `tiki: installed framework scripts -> .claude/tiki/scripts/ (v<version>)`. Never exit non-zero for a degraded situation (missing plugin.json etc.) — a SessionStart failure must not break the user's session; print a warning to stderr and exit 0.\n\nAdd a `SessionStart` entry to `packages/framework/hooks/hooks.json` following the existing Stop/SubagentStop shape: command `node \"${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-scripts.mjs\"`.\n\nWrite `packages/framework/__tests__/bootstrap-scripts.test.mjs` (node:test, follow state.test.mjs conventions — execFileSync the real script): (a) fresh temp project cwd -> all canonical .mjs files appear in .claude/tiki/scripts/ + .version marker written; (b) re-run -> no-op (assert via mtime or sentinel content unchanged); (c) bump marker to a different version -> re-copy happens; (d) temp project WITHOUT .tiki/ -> no .tiki/ created; (e) temp project WITH .tiki/ -> .framework-version stamped.\n\nUpdate `packages/framework/__tests__/plugin-distribution.test.mjs`: extend the hooks.json test to require the SessionStart entry referencing bootstrap-scripts.mjs via ${CLAUDE_PLUGIN_ROOT}, and assert `scripts/bootstrap-scripts.mjs` exists.\n\nFinally re-run `node packages/framework/install.js` from the repo root so the committed dogfood copy `.claude/tiki/scripts/` gains bootstrap-scripts.mjs (the 'dogfood matches canonical' test enforces this).",
+      "verification": [
+        "node packages/framework/__tests__ suite passes (new bootstrap-scripts.test.mjs green, plugin-distribution.test.mjs green)",
+        "Fresh temp dir run: .claude/tiki/scripts/ contains state.mjs, reconcile-state.mjs, run-hook.mjs, mark-audited.mjs, bootstrap-scripts.mjs + .version marker",
+        "Re-run at same version produces no output and changes nothing; no .tiki/ created in a bare project",
+        ".claude/tiki/scripts/ dogfood copy regenerated and identical to canonical"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "packages/framework/scripts/bootstrap-scripts.mjs",
+        "packages/framework/hooks/hooks.json",
+        "packages/framework/__tests__/bootstrap-scripts.test.mjs",
+        "packages/framework/__tests__/plugin-distribution.test.mjs",
+        ".claude/tiki/scripts/bootstrap-scripts.mjs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T00:34:26.755Z",
+      "summary": "Created packages/framework/scripts/bootstrap-scripts.mjs (SessionStart bootstrap: import.meta.url-relative source, .version idempotency marker, never creates .tiki/, never exits non-zero, stamps .framework-version only when .tiki/ exists, never touches settings.json). Added SessionStart entry to hooks/hooks.json via ${CLAUDE_PLUGIN_ROOT}. New bootstrap-scripts.test.mjs (5 tests: fresh copy, idempotent no-op via garbage sentinel, version-bump re-copy, no-.tiki/ guarantee, .framework-version stamping). plugin-distribution.test.mjs extended (SessionStart entry + script existence). Regenerated dogfood .claude/tiki/scripts/ (5 scripts) via install.js. Framework suite 71/71 (was 65). testResults: { framework: \"node\", command: \"framework test suite\", passed: 71, failed: 0, skipped: 0, status: \"passed\" }. Note: dogfood/copy-install targets have no .version marker, so the first plugin-hook run re-copies once then converges (harmless)."
+    },
+    {
+      "number": 2,
+      "title": "Plugin-only layout behavioral test (Fix C)",
+      "status": "completed",
+      "content": "Create `packages/framework/__tests__/plugin-layout.test.mjs` — the behavior-level regression guard the architecture review identified as the missing test class (tests must exercise runtime behavior, not just artifact presence).\n\nSetup per test: build a temp PLUGIN ROOT that mirrors the real plugin layout (copy `packages/framework/scripts/*.mjs` into `<pluginRoot>/scripts/`, copy `.claude-plugin/plugin.json` into `<pluginRoot>/.claude-plugin/`), and a temp PROJECT dir containing a `.git/` directory (so resolveTikiPath anchors there) and NOTHING else — no .claude/, no .tiki/. This simulates a fresh plugin-only install.\n\nTests:\n1. **Bootstrap from plugin layout**: execFileSync `node <pluginRoot>/scripts/bootstrap-scripts.mjs` with cwd=<project>. Assert `.claude/tiki/scripts/` now contains every canonical script (this validates import.meta.url-relative source resolution in a true plugin layout, not just the monorepo).\n2. **State tracking actually works (the #268 acceptance test)**: from cwd=<project>, run `node .claude/tiki/scripts/state.mjs transition issue:1 --to-status pending --to-step GET --issue-number 1 --issue-title \"Test\"`. Assert exit 0 and `<project>/.tiki/state.json` parses with `activeWork[\"issue:1\"]` present with status pending / pipelineStep GET.\n3. **Every command-referenced script resolves**: regex-scan `packages/framework/commands/*.md` for `node (\\.claude/[^\\s\"'`]+\\.mjs)` invocations; assert each extracted path exists under the bootstrapped <project>. This pins the invariant 'no command body may reference a script the bootstrap does not deliver' — if a future command adds a new script, this test fails until the script ships.\n\nFollow state.test.mjs conventions (node:test, temp dirs under os.tmpdir(), cleanup in after()).",
+      "verification": [
+        "plugin-layout.test.mjs passes via the framework test suite",
+        "Test 2 asserts on the actual state.json content written by the real state.mjs (not a mock)",
+        "Test 3 extracts at least the known invocation count (>= 20 references across 8 command files) to prove the regex actually matches"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "packages/framework/__tests__/plugin-layout.test.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T00:38:22.810Z",
+      "summary": "Created packages/framework/__tests__/plugin-layout.test.mjs — the #268 regression guard (behavior-level, no mocks). makePluginRoot() mirrors the real plugin tree (5 canonical scripts + plugin.json), makeProject() is a bare dir with only .git/. Test 1: bootstrap from a true plugin layout delivers the full canonical script set. Test 2 (acceptance): real `state.mjs transition issue:1` from the bootstrapped project exits 0 and writes activeWork[\"issue:1\"] pending/GET to real state.json. Test 3: regex-extracts every `node .claude/...mjs` invocation from the 8 command files (found 32: yolo 7, release 6, execute 6, ship 6, audit 3, plan 2, get 1, review 1; >=20 floor + per-file >=1 anti-no-op guard) and asserts each resolves post-bootstrap; only state.mjs/run-hook.mjs/mark-audited.mjs are referenced — all delivered. Framework suite 74/74. testResults: { framework: \"node\", command: \"pnpm -C packages/framework test\", passed: 74, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 3,
+      "title": "tiki_doctor: unresolvedScriptPaths + copyInstallDetected (Fix B backend)",
+      "status": "completed",
+      "content": "Extend the Rust doctor (read-only rule: report in fields, never Err for a degraded workspace).\n\n`apps/desktop/src-tauri/src/state.rs` — add to `DiagnosticsReport` (camelCase serde, doc comments matching existing style):\n- `unresolved_script_paths: Vec<String>` — project-relative script paths that command bodies depend on but that do not exist on disk. Empty = healthy.\n- `copy_install_detected: bool` — whether `.claude/commands/tiki/` exists (the copy-install channel marker). The frontend uses this to judge whether a missing settings.json reconciler hook is a real problem (copy-install: yes) or expected (plugin-only: the plugin's hooks.json provides it, which the doctor cannot inspect).\n\n`apps/desktop/src-tauri/src/commands.rs` — new helper `fn compute_unresolved_script_paths(project_root: &Path) -> Vec<String>`:\n1. ALWAYS check the canonical required list at `.claude/tiki/scripts/`: state.mjs, reconcile-state.mjs, run-hook.mjs, mark-audited.mjs (plugin-only projects have no installed command files to parse, so the canonical list is the floor — constraint from the research doc).\n2. ADDITIONALLY, if `.claude/commands/tiki/` exists, scan each `*.md` for `node <path>.mjs` invocations where <path> starts with `.claude/` (simple line scan or regex; ignore ${CLAUDE_PLUGIN_ROOT} references), and existsSync-check each extracted path.\n3. Dedupe + sort; paths reported project-relative with forward slashes (stable across OS for the frontend).\nWire both fields into `tiki_doctor` (project root = tiki_path.parent(), same as reconciler_hook_installed).\n\nCargo tests (reuse temp_project()/temp_tiki_with_releases() infra in commands.rs tests):\n- healthy layout (scripts present) -> unresolved empty;\n- missing .claude/tiki/scripts/ entirely -> exactly the 4 canonical paths reported;\n- installed command file referencing an extra missing `.claude/tiki/scripts/extra.mjs` -> that path included;\n- copy_install_detected true iff .claude/commands/tiki/ exists.\nRun `cargo test --lib` from apps/desktop/src-tauri (NOT plain cargo test — dodges the running-app exe lock).",
+      "verification": [
+        "cargo test --lib passes with the new doctor tests",
+        "DiagnosticsReport serializes the new fields in camelCase (assert in a test via serde_json::to_value, the #259 lesson: check the key survives serialization)",
+        "tiki_doctor on this dogfood repo returns unresolvedScriptPaths: [] and copyInstallDetected: true"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T00:34:27.109Z",
+      "summary": "DiagnosticsReport (state.rs) gained unresolved_script_paths: Vec<String> and copy_install_detected: bool (both #[serde(default)], camelCase wire names unresolvedScriptPaths/copyInstallDetected). commands.rs: CANONICAL_TIKI_SCRIPTS floor (state/reconcile-state/run-hook/mark-audited .mjs), compute_unresolved_script_paths(project_root) — always checks the floor at .claude/tiki/scripts/, additionally scans .claude/commands/tiki/*.md for node .claude/...mjs invocations (skips CLAUDE_PLUGIN_ROOT), BTreeSet dedupe+sort, forward-slash, never Err/panic; wired into tiki_doctor via path.parent(). copy_install_detected = .claude/commands/tiki/ is_dir(). 5 new cargo tests incl. serde key-survival (#259 lesson) and dogfood-mirror + plugin-only fixtures. cargo test --lib 58/58 (was 53), clippy --lib -D warnings clean. testResults: { framework: \"cargo\", command: \"cargo test --lib\", passed: 58, failed: 0, skipped: 0, status: \"passed\" }. Phase 4 must mirror: unresolvedScriptPaths (empty = healthy; non-empty lists missing project-relative paths) and copyInstallDetected (judge reconcilerHookInstalled=false as warn only when true, info when false)."
+    },
+    {
+      "number": 4,
+      "title": "Diagnostics panel surfaces the signal (Fix B frontend) + full gate",
+      "status": "completed",
+      "content": "Update the documented TS mirror `apps/desktop/src/utils/diagnosticsSummary.ts`:\n- Add `unresolvedScriptPaths: string[]` and `copyInstallDetected: boolean` to the `DiagnosticsReport` interface (keep the mirror-discipline doc comment current).\n- New findings logic:\n  - `unresolvedScriptPaths.length > 0` -> WARN: `N framework script(s) missing: <paths joined>; run the Tiki installer or restart the session (plugin bootstraps on SessionStart)` (message wording may be tuned; must include the paths). Else PASS: `Framework scripts resolvable`.\n  - Reconciler-hook finding becomes channel-aware: hook missing AND copyInstallDetected -> WARN (unchanged semantics for copy-installs); hook missing AND NOT copyInstallDetected -> INFO `Reconciler hook not in .claude/settings.json (expected for plugin installs — the plugin provides it)`. Hook present -> PASS (unchanged). This fixes the permanent false warning a plugin-only install would otherwise show (decision recorded in research doc).\n- The script check is the authoritative install-health signal.\n\nUpdate `apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts`: existing fixtures gain the two new required fields; new cases: (a) unresolved paths -> status warnings + message lists paths; (b) empty unresolved -> pass present; (c) hook missing + copyInstallDetected=false -> status stays healthy with the info finding; (d) hook missing + copyInstallDetected=true -> warnings (regression-pin the old behavior).\n\n`DiagnosticsPanel.tsx` renders findings generically — verify no change needed (do not touch unless required).\n\nFinal gate for the whole issue: `pnpm build` from root (tsc -b, stricter than typecheck), full `pnpm test` (shared + framework + desktop vitest + cargo).",
+      "verification": [
+        "diagnosticsSummary vitest cases pass including the four new cases",
+        "pnpm build clean from root",
+        "pnpm test all suites green (framework includes phases 1-2 tests, cargo includes phase 3 tests)"
+      ],
+      "addressesCriteria": [
+        "SC4",
+        "SC5",
+        "SC6"
+      ],
+      "files": [
+        "apps/desktop/src/utils/diagnosticsSummary.ts",
+        "apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts"
+      ],
+      "dependencies": [
+        3
+      ],
+      "completedAt": "2026-06-13T00:38:23.111Z",
+      "summary": "diagnosticsSummary.ts mirror gained unresolvedScriptPaths: string[] + copyInstallDetected: boolean (header doc updated; unresolvedScriptPaths documented as the authoritative install-health signal). New finding pair: non-empty -> WARN \"N framework script(s) missing: <paths> — run the Tiki installer or restart the session (plugin installs bootstrap on SessionStart)\"; empty -> PASS \"Framework scripts resolvable\". Channel-aware reconciler-hook rule: missing+copyInstallDetected -> WARN (regression-pinned); missing+plugin-only -> INFO \"(expected for plugin installs — the plugin provides it)\", never flips status; present -> PASS. DiagnosticsPanel.tsx confirmed unchanged (renders findings generically). Desktop vitest 30 files / 211 tests pass (was 208); root pnpm build (tsc -b + vite) clean. testResults: { framework: \"vitest\", command: \"desktop vitest + pnpm build\", passed: 211, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2
+    ],
+    "SC2": [
+      1,
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      4
+    ],
+    "SC5": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "SC6": [
+      4
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T00:27:23.826Z"
+}

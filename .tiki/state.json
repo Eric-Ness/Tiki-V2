@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 267,
-      "title": "Test Issue",
-      "completedAt": "2026-06-03T22:39:50.304Z"
+      "number": 268,
+      "title": "Plugin-only install: pipeline state-tracking silently dead (command bodies reference unresolvable .claude/tiki/scripts/state.mjs)",
+      "completedAt": "2026-06-13T00:41:59.303Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.2",
@@ -16,6 +16,11 @@
       "tag": "v0.9.2"
     },
     "recentIssues": [
+      {
+        "number": 268,
+        "title": "Plugin-only install: pipeline state-tracking silently dead (command bodies reference unresolvable .claude/tiki/scripts/state.mjs)",
+        "completedAt": "2026-06-13T00:41:59.303Z"
+      },
       {
         "number": 267,
         "title": "Test Issue",
