@@ -1865,3 +1865,551 @@ mod tests {
         std::fs::remove_dir_all(&project).ok();
     }
 }
+
+/// #278 — serde wire-shape guard for EVERY struct returned across the Tauri IPC
+/// boundary. Generalizes the #259 `tiki_release_archived_survives_serialization`
+/// lesson (one field, one struct) into a contract over the whole IPC surface.
+///
+/// Tauri serializes a `#[tauri::command]` return value with the type's derived
+/// `Serialize` impl, so the JSON the React frontend receives IS exactly
+/// `serde_json::to_value(&value)`. These tests pin that JSON:
+///   - expected camelCase keys are PRESENT (a dropped/mis-renamed field fails here);
+///   - `skip_serializing_if = "Option::is_none"` fields are present-when-Some and
+///     ABSENT-when-None (asserted both directions);
+///   - non-optional and `#[serde(default)]` fields are ALWAYS present, even at their
+///     default/false value (the #259 invariant — `archived:false`,
+///     `unresolvedScriptPaths:[]`);
+///   - the `#[serde(tag = "type")]` `WorkContext` union emits `type:"issue"` /
+///     `type:"release"`.
+///
+/// If a field is renamed, dropped, or re-tagged on the wire, one of these fails
+/// even when every behavioral test stays green — do not relax the assertions.
+#[cfg(test)]
+mod ipc_serialization {
+    use crate::github::{
+        GitHubComment, GitHubCommentAuthor, GitHubIssue, GitHubLabel, GitHubPrAuthor,
+        GitHubPrDetail, GitHubPrFile, GitHubPrReview, GitHubPrStatusCheck, GitHubPullRequest,
+        GitHubRelease,
+    };
+    use crate::state::{
+        DiagnosticsReport, IssueContext, IssueRef, Phase, PhaseProgress, PhaseProgressStatus,
+        PhaseStatus, PipelineStep, ReleaseCheck, ReleaseContext, ReleaseRef, TikiPlan, TikiRelease,
+        TikiReleaseIssue, TikiReleaseStatus, TikiState, WorkContext, WorkStatus,
+    };
+    use serde_json::Value;
+    use std::collections::HashMap;
+
+    /// Assert every name in `keys` is a present key on the serialized object.
+    fn assert_keys_present(value: &Value, keys: &[&str]) {
+        let obj = value
+            .as_object()
+            .unwrap_or_else(|| panic!("expected a JSON object, got {value}"));
+        for k in keys {
+            assert!(
+                obj.contains_key(*k),
+                "expected camelCase key `{k}` present; got keys {:?}",
+                obj.keys().collect::<Vec<_>>()
+            );
+        }
+    }
+
+    fn assert_key_absent(value: &Value, key: &str) {
+        let obj = value.as_object().expect("expected a JSON object");
+        assert!(
+            !obj.contains_key(key),
+            "key `{key}` must be ABSENT when None (skip_serializing_if), got {:?}",
+            obj.keys().collect::<Vec<_>>()
+        );
+    }
+
+    // ── TikiRelease — folds in the #259 `archived` invariant ───────────────────
+    #[test]
+    fn tiki_release_wire_shape() {
+        // Fully populated (name/updatedAt Some).
+        let full = TikiRelease {
+            version: "v1.2.3".to_string(),
+            name: Some("Tiki v1.2.3".to_string()),
+            status: TikiReleaseStatus::Shipped,
+            issues: vec![TikiReleaseIssue {
+                number: 7,
+                title: "thing".to_string(),
+            }],
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: Some("2026-01-02T00:00:00Z".to_string()),
+            archived: true,
+        };
+        let v = serde_json::to_value(&full).unwrap();
+        assert_keys_present(
+            &v,
+            &["version", "name", "status", "issues", "createdAt", "updatedAt", "archived"],
+        );
+        // Nested TikiReleaseIssue camelCase keys.
+        assert_keys_present(&v["issues"][0], &["number", "title"]);
+
+        // #259 invariant (folded): `archived` is non-Option + #[serde(default)],
+        // so it MUST be present even when false — this is the exact check the old
+        // `tiki_release_archived_survives_serialization` test asserted, kept here.
+        let archived_false = TikiRelease {
+            version: "v1.0.0".to_string(),
+            name: None,
+            status: TikiReleaseStatus::Active,
+            issues: vec![],
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: None,
+            archived: false,
+        };
+        let v0 = serde_json::to_value(&archived_false).unwrap();
+        assert_eq!(
+            v0.get("archived").and_then(Value::as_bool),
+            Some(false),
+            "`archived` must be present in the serialized TikiRelease even when false \
+             so it crosses the Tauri IPC boundary — the stale `status` must not become \
+             the only completed-signal the UI receives (#255/#258/#259)"
+        );
+        // Mirror #259 directly: present == true when archived.
+        assert_eq!(v.get("archived").and_then(Value::as_bool), Some(true));
+        // skip_serializing_if Option::is_none — name/updatedAt absent when None.
+        assert_key_absent(&v0, "name");
+        assert_key_absent(&v0, "updatedAt");
+        // snake_case enum value for status.
+        assert_eq!(v0["status"], "active");
+        assert_eq!(v["status"], "shipped");
+    }
+
+    // ── TikiState ──────────────────────────────────────────────────────────────
+    #[test]
+    fn tiki_state_wire_shape() {
+        let mut active = HashMap::new();
+        active.insert(
+            "issue:42".to_string(),
+            WorkContext::Issue(sample_issue_context(true)),
+        );
+        let state = TikiState {
+            schema_version: 2,
+            active_work: active,
+            history: None,
+        };
+        let v = serde_json::to_value(&state).unwrap();
+        // schemaVersion + activeWork always present; history absent when None.
+        assert_keys_present(&v, &["schemaVersion", "activeWork"]);
+        assert_key_absent(&v, "history");
+        assert_eq!(v["schemaVersion"], 2);
+        assert!(v["activeWork"]["issue:42"].is_object());
+    }
+
+    // ── WorkContext union (#[serde(tag = "type")]) + IssueContext ──────────────
+    fn sample_issue_context(with_optionals: bool) -> IssueContext {
+        IssueContext {
+            issue: IssueRef {
+                number: 42,
+                title: Some("an issue".to_string()),
+                body: None,
+                state: None,
+                labels: None,
+                label_details: None,
+                url: None,
+                created_at: None,
+                updated_at: None,
+            },
+            status: WorkStatus::Executing,
+            pipeline_step: if with_optionals {
+                Some(PipelineStep::Execute)
+            } else {
+                None
+            },
+            pipeline_history: None,
+            phase: if with_optionals {
+                Some(PhaseProgress {
+                    total: 3,
+                    current: 2,
+                    status: PhaseProgressStatus::Executing,
+                })
+            } else {
+                None
+            },
+            parallel_execution: None,
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            last_activity: None,
+            audit_passed: if with_optionals { Some(true) } else { None },
+            yolo: None,
+            commit: None,
+            parent_release: None,
+        }
+    }
+
+    #[test]
+    fn work_context_issue_tag_and_issue_context_wire_shape() {
+        let ctx = WorkContext::Issue(sample_issue_context(true));
+        let v = serde_json::to_value(&ctx).unwrap();
+        // #[serde(tag = "type")] discriminant.
+        assert_eq!(v["type"], "issue");
+        // IssueContext fields are flattened alongside `type`.
+        assert_keys_present(
+            &v,
+            &["type", "issue", "status", "pipelineStep", "phase", "createdAt", "auditPassed"],
+        );
+        // Enum rename values.
+        assert_eq!(v["status"], "executing"); // WorkStatus lowercase
+        assert_eq!(v["pipelineStep"], "EXECUTE"); // PipelineStep SCREAMING_SNAKE_CASE
+        // Nested IssueRef camelCase: present `number`/`title`, absent optionals.
+        assert_keys_present(&v["issue"], &["number", "title"]);
+        assert_key_absent(&v["issue"], "body");
+        assert_key_absent(&v["issue"], "createdAt");
+        // Nested PhaseProgress.
+        assert_keys_present(&v["phase"], &["total", "current", "status"]);
+    }
+
+    #[test]
+    fn issue_context_optionals_absent_when_none() {
+        // Same struct, optionals = None: skip_serializing_if drops them entirely.
+        let ctx = WorkContext::Issue(sample_issue_context(false));
+        let v = serde_json::to_value(&ctx).unwrap();
+        assert_eq!(v["type"], "issue");
+        // Required survive.
+        assert_keys_present(&v, &["type", "issue", "status", "createdAt"]);
+        // skip_serializing_if = Option::is_none — both directions asserted vs the
+        // Some-variant test above. pipelineStep/phase/auditPassed must vanish.
+        assert_key_absent(&v, "pipelineStep");
+        assert_key_absent(&v, "phase");
+        assert_key_absent(&v, "auditPassed");
+        assert_key_absent(&v, "lastActivity");
+        assert_key_absent(&v, "parentRelease");
+    }
+
+    #[test]
+    fn work_context_release_tag_wire_shape() {
+        let ctx = WorkContext::Release(ReleaseContext {
+            release: ReleaseRef {
+                version: "v1.2.0".to_string(),
+                issues: vec![1, 2],
+                current_issue: Some(1),
+                completed_issues: vec![],
+                milestone: None,
+            },
+            status: WorkStatus::Shipping,
+            pipeline_step: Some(PipelineStep::Ship),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            last_activity: None,
+        });
+        let v = serde_json::to_value(&ctx).unwrap();
+        assert_eq!(v["type"], "release");
+        assert_keys_present(&v, &["type", "release", "status", "pipelineStep", "createdAt"]);
+        assert_keys_present(
+            &v["release"],
+            &["version", "issues", "currentIssue", "completedIssues"],
+        );
+        assert_key_absent(&v["release"], "milestone");
+    }
+
+    // ── TikiPlan + Phase ───────────────────────────────────────────────────────
+    #[test]
+    fn tiki_plan_and_phase_wire_shape() {
+        let plan = TikiPlan {
+            issue: None,
+            issue_number: None,
+            title: None,
+            description: None,
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            schema_version: Some(1),
+            success_criteria: None,
+            phases: vec![Phase {
+                number: 1,
+                title: "phase one".to_string(),
+                status: PhaseStatus::Completed,
+                content: Some("body".to_string()),
+                verification: Some(vec!["check".to_string()]),
+                addresses_criteria: Some(vec!["SC1".to_string()]),
+                files: Some(vec!["a.rs".to_string()]),
+                tasks: None,
+                dependencies: Some(vec![]),
+                started_at: None,
+                completed_at: Some("2026-01-02T00:00:00Z".to_string()),
+                summary: None,
+            }],
+            coverage_matrix: None,
+            audited: Some(true),
+            audited_at: None,
+        };
+        let v = serde_json::to_value(&plan).unwrap();
+        // createdAt always present; phases array present; optional-None keys absent.
+        assert_keys_present(&v, &["createdAt", "schemaVersion", "phases", "audited"]);
+        assert_key_absent(&v, "issue");
+        assert_key_absent(&v, "coverageMatrix");
+        assert_key_absent(&v, "auditedAt");
+
+        let phase = &v["phases"][0];
+        assert_keys_present(
+            phase,
+            &[
+                "number",
+                "title",
+                "status",
+                "content",
+                "verification",
+                "addressesCriteria",
+                "files",
+                "dependencies",
+                "completedAt",
+            ],
+        );
+        assert_eq!(phase["status"], "completed"); // PhaseStatus lowercase
+        // skip_serializing_if None on Phase.
+        assert_key_absent(phase, "tasks");
+        assert_key_absent(phase, "startedAt");
+        assert_key_absent(phase, "summary");
+    }
+
+    // ── DiagnosticsReport + ReleaseCheck ───────────────────────────────────────
+    #[test]
+    fn diagnostics_report_and_release_check_wire_shape() {
+        let report = DiagnosticsReport {
+            framework_version: Some("9.9.9".to_string()),
+            state_valid: true,
+            schema_version: Some(1),
+            active_work_count: 0,
+            release_checks: vec![ReleaseCheck {
+                version: "v1.0.0".to_string(),
+                location: "archive".to_string(),
+                status: "active".to_string(),
+                archived_but_active: true,
+            }],
+            recent_releases_missing_json: vec![],
+            reconciler_hook_installed: false,
+            // #[serde(default)] empty vec — must still serialize as `[]`, not vanish.
+            unresolved_script_paths: vec![],
+            copy_install_detected: false,
+        };
+        let v = serde_json::to_value(&report).unwrap();
+        assert_keys_present(
+            &v,
+            &[
+                "frameworkVersion",
+                "stateValid",
+                "schemaVersion",
+                "activeWorkCount",
+                "releaseChecks",
+                "recentReleasesMissingJson",
+                "reconcilerHookInstalled",
+                "unresolvedScriptPaths",
+                "copyInstallDetected",
+            ],
+        );
+        // #[serde(default)] / non-optional: present even at default value.
+        assert_eq!(
+            v["unresolvedScriptPaths"],
+            serde_json::json!([]),
+            "unresolvedScriptPaths must serialize as [] even when empty (#268)"
+        );
+        assert_eq!(v["copyInstallDetected"], false);
+        assert_eq!(v["reconcilerHookInstalled"], false);
+
+        let check = &v["releaseChecks"][0];
+        assert_keys_present(
+            check,
+            &["version", "location", "status", "archivedButActive"],
+        );
+        assert_eq!(check["archivedButActive"], true);
+    }
+
+    // ── GitHubRelease — Some + None both directions ────────────────────────────
+    #[test]
+    fn github_release_optionals_both_directions() {
+        // Some: name/publishedAt/url present.
+        let full = GitHubRelease {
+            tag_name: "v0.7.3".to_string(),
+            name: Some("Tiki v0.7.3".to_string()),
+            is_draft: false,
+            is_prerelease: false,
+            published_at: Some("2026-05-22T09:00:00Z".to_string()),
+            url: Some("https://github.com/o/r/releases/tag/v0.7.3".to_string()),
+        };
+        let v = serde_json::to_value(&full).unwrap();
+        assert_keys_present(
+            &v,
+            &["tagName", "name", "isDraft", "isPrerelease", "publishedAt", "url"],
+        );
+        assert_eq!(v["isDraft"], false);
+
+        // None: name/publishedAt/url ABSENT (skip_serializing_if), required survive.
+        let draft = GitHubRelease {
+            tag_name: "v0.8.0-draft".to_string(),
+            name: None,
+            is_draft: true,
+            is_prerelease: true,
+            published_at: None,
+            url: None,
+        };
+        let v2 = serde_json::to_value(&draft).unwrap();
+        assert_keys_present(&v2, &["tagName", "isDraft", "isPrerelease"]);
+        assert_key_absent(&v2, "name");
+        assert_key_absent(&v2, "publishedAt");
+        assert_key_absent(&v2, "url");
+    }
+
+    // ── GitHubIssue ────────────────────────────────────────────────────────────
+    #[test]
+    fn github_issue_wire_shape() {
+        let issue = GitHubIssue {
+            number: 233,
+            title: "Split github.rs".to_string(),
+            body: Some("Refactor.".to_string()),
+            state: "OPEN".to_string(),
+            labels: vec![GitHubLabel {
+                id: "L_1".to_string(),
+                name: "refactor".to_string(),
+                color: "ededed".to_string(),
+                description: Some("code cleanup".to_string()),
+            }],
+            url: "https://github.com/o/r/issues/233".to_string(),
+            created_at: "2026-05-22T10:00:00Z".to_string(),
+            updated_at: "2026-05-22T11:30:00Z".to_string(),
+        };
+        let v = serde_json::to_value(&issue).unwrap();
+        assert_keys_present(
+            &v,
+            &["number", "title", "body", "state", "labels", "url", "createdAt", "updatedAt"],
+        );
+        // Nested GitHubLabel.
+        assert_keys_present(&v["labels"][0], &["id", "name", "color", "description"]);
+
+        // body None -> absent.
+        let no_body = GitHubIssue {
+            body: None,
+            ..issue
+        };
+        let v2 = serde_json::to_value(&no_body).unwrap();
+        assert_key_absent(&v2, "body");
+    }
+
+    // ── GitHubPullRequest ──────────────────────────────────────────────────────
+    #[test]
+    fn github_pull_request_wire_shape() {
+        let pr = GitHubPullRequest {
+            number: 42,
+            title: "Add feature".to_string(),
+            state: "OPEN".to_string(),
+            head_ref_name: "feature/add".to_string(),
+            base_ref_name: "main".to_string(),
+            url: "https://github.com/o/r/pull/42".to_string(),
+            is_draft: false,
+            review_decision: Some("APPROVED".to_string()),
+            author: Some(GitHubPrAuthor {
+                login: "octocat".to_string(),
+            }),
+            labels: vec![GitHubLabel {
+                id: "L_1".to_string(),
+                name: "enhancement".to_string(),
+                color: "a2eeef".to_string(),
+                description: None,
+            }],
+            body: Some("Implements.".to_string()),
+            status_check_rollup: vec![GitHubPrStatusCheck {
+                context: None,
+                name: Some("build".to_string()),
+                state: None,
+                status: Some("COMPLETED".to_string()),
+                conclusion: Some("SUCCESS".to_string()),
+                details_url: Some("https://github.com/o/r/actions/runs/1".to_string()),
+            }],
+        };
+        let v = serde_json::to_value(&pr).unwrap();
+        assert_keys_present(
+            &v,
+            &[
+                "number",
+                "title",
+                "state",
+                "headRefName",
+                "baseRefName",
+                "url",
+                "isDraft",
+                "reviewDecision",
+                "author",
+                "labels",
+                "body",
+                "statusCheckRollup",
+            ],
+        );
+        assert_keys_present(&v["author"], &["login"]);
+        // Nested status check camelCase (detailsUrl).
+        assert_keys_present(&v["statusCheckRollup"][0], &["name", "status", "conclusion", "detailsUrl"]);
+    }
+
+    // ── GitHubPrDetail (+ nested GitHubPrFile / GitHubPrReview) ────────────────
+    #[test]
+    fn github_pr_detail_wire_shape() {
+        let detail = GitHubPrDetail {
+            number: 99,
+            title: "Big change".to_string(),
+            body: Some("Detailed.".to_string()),
+            state: "MERGED".to_string(),
+            head_ref_name: "big/change".to_string(),
+            base_ref_name: "main".to_string(),
+            url: "https://github.com/o/r/pull/99".to_string(),
+            is_draft: false,
+            review_decision: Some("APPROVED".to_string()),
+            author: Some(GitHubPrAuthor {
+                login: "dev".to_string(),
+            }),
+            labels: vec![],
+            status_check_rollup: vec![],
+            additions: 120,
+            deletions: 30,
+            commits: serde_json::json!([{ "oid": "abc123" }]),
+            files: vec![GitHubPrFile {
+                path: "src/lib.rs".to_string(),
+                additions: 10,
+                deletions: 2,
+            }],
+            reviews: vec![GitHubPrReview {
+                author: Some(GitHubPrAuthor {
+                    login: "reviewer".to_string(),
+                }),
+                state: "APPROVED".to_string(),
+                body: Some("LGTM".to_string()),
+            }],
+        };
+        let v = serde_json::to_value(&detail).unwrap();
+        assert_keys_present(
+            &v,
+            &[
+                "number",
+                "title",
+                "body",
+                "state",
+                "headRefName",
+                "baseRefName",
+                "url",
+                "isDraft",
+                "reviewDecision",
+                "author",
+                "labels",
+                "statusCheckRollup",
+                "additions",
+                "deletions",
+                "commits",
+                "files",
+                "reviews",
+            ],
+        );
+        assert_keys_present(&v["files"][0], &["path", "additions", "deletions"]);
+        assert_keys_present(&v["reviews"][0], &["author", "state", "body"]);
+    }
+
+    // ── GitHubComment ──────────────────────────────────────────────────────────
+    #[test]
+    fn github_comment_wire_shape() {
+        let comment = GitHubComment {
+            id: "IC_1".to_string(),
+            author: GitHubCommentAuthor {
+                login: "octocat".to_string(),
+            },
+            body: "Looks good.".to_string(),
+            created_at: "2026-05-22T12:00:00Z".to_string(),
+            url: "https://github.com/o/r/issues/233#issuecomment-1".to_string(),
+        };
+        let v = serde_json::to_value(&comment).unwrap();
+        assert_keys_present(&v, &["id", "author", "body", "createdAt", "url"]);
+        assert_keys_present(&v["author"], &["login"]);
+    }
+}
