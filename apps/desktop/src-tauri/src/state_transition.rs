@@ -30,6 +30,7 @@
 //! drifted formats from older framework versions. Removing those shims is
 //! deliberately out of scope (separate issue).
 
+use crate::commands::resolve_tiki_path;
 use crate::fs_utils;
 use crate::state::{
     IssueContext, IssueRef, ParallelExecution, PhaseProgress, PipelineStep,
@@ -37,7 +38,6 @@ use crate::state::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 /// Input for a state transition. Marshalled from the frontend (or the CLI
 /// shim, which produces the same JSON shape).
@@ -278,18 +278,6 @@ pub fn apply_transition(state: &mut TikiState, input: TransitionInput) -> Result
 
     state.active_work.insert(input.work_id.clone(), new_entry);
     Ok(())
-}
-
-/// Resolve the `.tiki/` directory for this transition. Mirrors the helper in
-/// `commands.rs` but private so we don't add cross-module visibility.
-fn resolve_tiki_path(tiki_path: Option<String>) -> Result<PathBuf, String> {
-    match tiki_path {
-        Some(p) => Ok(PathBuf::from(p)),
-        None => {
-            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-            Ok(cwd.join(".tiki"))
-        }
-    }
 }
 
 /// Tauri command: apply a typed state transition and persist it atomically.

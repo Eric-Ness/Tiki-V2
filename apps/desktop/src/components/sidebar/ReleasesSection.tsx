@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { compareSemver } from "@tiki/shared";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { ReleaseDialog } from "../releases";
 import { useContextMenu, ContextMenu, type ContextMenuEntry } from "../ui/ContextMenu";
@@ -15,16 +16,6 @@ import {
 } from "../../stores";
 import { isReleaseCompleted } from "../../utils/releaseDisplayStatus";
 import "./ReleasesSection.css";
-
-/** Compare two version strings by semver (descending). */
-function compareSemver(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map(Number);
-  const pb = b.replace(/^v/, "").split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
-  }
-  return 0;
-}
 
 /** Merged release combining GitHub + local tiki data */
 interface MergedRelease {

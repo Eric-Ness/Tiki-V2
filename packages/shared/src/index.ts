@@ -9,6 +9,9 @@ export * from './types/index.js';
 // Re-export validation utilities
 export * from './validation/index.js';
 
+// Re-export shared utilities
+export * from './utils/semver.js';
+
 // Schema paths (relative to package root)
 export const SCHEMA_PATHS = {
   state: 'schemas/state.schema.json',

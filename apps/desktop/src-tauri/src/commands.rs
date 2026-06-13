@@ -1201,6 +1201,20 @@ fn extract_script_invocations(content: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn resolve_tiki_path_returns_explicit_override() {
+        let explicit = "/some/explicit/.tiki".to_string();
+        let resolved = resolve_tiki_path(Some(explicit.clone())).unwrap();
+        assert_eq!(resolved, PathBuf::from(explicit));
+    }
+
+    #[test]
+    fn resolve_tiki_path_falls_back_to_cwd_dot_tiki() {
+        let resolved = resolve_tiki_path(None).unwrap();
+        let expected = std::env::current_dir().unwrap().join(".tiki");
+        assert_eq!(resolved, expected);
+    }
+
     fn temp_project(tag: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
