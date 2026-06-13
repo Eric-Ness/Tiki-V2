@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 278,
-      "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new",
-      "completedAt": "2026-06-13T19:56:52.155Z"
+      "number": 279,
+      "title": "Build the three declined abstractions: shared compareSemver, dedup resolve_tiki_path, ESLint fresh-ref rule",
+      "completedAt": "2026-06-13T20:13:24.023Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.3",
@@ -22,6 +22,11 @@
       "tag": "v0.9.3"
     },
     "recentIssues": [
+      {
+        "number": 279,
+        "title": "Build the three declined abstractions: shared compareSemver, dedup resolve_tiki_path, ESLint fresh-ref rule",
+        "completedAt": "2026-06-13T20:13:24.023Z"
+      },
       {
         "number": 278,
         "title": "Rust behavior-guard tests: serde IPC round-trip per struct + ban raw Command::new",

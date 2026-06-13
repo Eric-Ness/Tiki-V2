@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 279,
+    "title": "Build the three declined abstractions: shared compareSemver, dedup resolve_tiki_path, ESLint fresh-ref rule",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/279"
+  },
+  "createdAt": "2026-06-13T20:10:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functionality",
+      "description": "One compareSemver lives in @tiki/shared and is consumed at the frontend version-sort site(s); the local copy is deleted; unit-tested incl. the multi-digit case (v0.2.10 sorts after v0.2.9)",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:03:37.916Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functionality",
+      "description": "One resolve_tiki_path Rust impl; commands.rs and state_transition.rs both call it; behavior unchanged; cargo test covers it",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:03:38.032Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functionality",
+      "description": "An ESLint rule flags inline ?? {}/?? []/|| {}/|| [] in Zustand selector (use*Store) calls and React hook dependency arrays, scoped to NOT false-flag the safe inline fallbacks in store action bodies; wired into pnpm lint",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:11:42.608Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "The ESLint rule is demonstrated firing on a planted violation and clean on the real tree; pnpm build + pnpm lint + full pnpm test + cargo green; freshRefGuard + transitions tests still green",
+      "verified": true,
+      "verifiedAt": "2026-06-13T20:11:42.608Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Shared compareSemver in @tiki/shared + consume in ReleasesSection",
+      "status": "completed",
+      "content": "Extract the version comparator into @tiki/shared so it stops being a per-file local (the #120→#148 declined-abstraction class).\n\n1. Add `compareSemver(a: string, b: string): number` to @tiki/shared (e.g. a new `src/utils/semver.ts` re-exported from index.ts, OR alongside existing helpers). Port the EXACT logic currently in `apps/desktop/src/components/sidebar/ReleasesSection.tsx:20` (strip leading 'v', split on '.', numeric-compare 3 parts, DESCENDING: returns pb[i]-pa[i]). Also export a tiny `sortBySemverDesc<T>(items, getVersion)` if it reduces call-site noise (optional). Keep the public @tiki/shared API additive (new export, nothing removed/renamed).\n2. Delete the local `compareSemver` in ReleasesSection.tsx and import from @tiki/shared; update both call sites (lines ~329, ~488). Verify behavior identical.\n3. Unit test in packages/shared (vitest): assert descending order, the multi-digit case (v0.2.10 before v0.2.9 in descending → compareSemver('v0.2.10','v0.2.9') < 0), missing-patch (v1.2 vs v1.2.0), and the 'v' prefix tolerance. This is the #120/#148 regression case.\n4. NOTE: DependencyGraph.tsx does NOT sort by semver (it only promotes active-to-top, trusting backend descending order) — do NOT change it; it has no version comparator to consolidate. Just confirm there are no OTHER local semver comparators in apps/desktop/src (grep) and report.\nGates: `pnpm -C packages/shared test` + `pnpm -C apps/desktop test` green; `pnpm build` (tsc -b) clean. @tiki/shared exports remain a superset (additive).",
+      "verification": [
+        "compareSemver in @tiki/shared, unit-tested incl. v0.2.10/v0.2.9 multi-digit case",
+        "ReleasesSection imports it; local copy deleted; both call sites updated; behavior identical",
+        "no other local semver comparators remain in apps/desktop/src (grep reported)",
+        "shared + desktop vitest + tsc -b green"
+      ],
+      "addressesCriteria": [
+        "SC1"
+      ],
+      "files": [
+        "packages/shared/src/utils/semver.ts",
+        "packages/shared/src/index.ts",
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T20:03:37.915Z",
+      "summary": "Created packages/shared/src/utils/semver.ts compareSemver (ported byte-identical from ReleasesSection: strip v, split ., numeric 3-part descending) + optional sortBySemverDesc; re-exported from index.ts (additive). ReleasesSection deleted its local copy, imports from @tiki/shared, both call sites (~320 sort, ~479 sort) unchanged. 6 vitest cases incl. multi-digit v0.2.10<v0.2.9 (#120/#148), missing-patch equality, v-prefix, full sort. Grep: no other local semver comparators (DependencyGraph only promotes active-to-top, not semver). shared 126->135, desktop vitest 214, tsc -b clean. testResults: { framework: \"vitest\", command: \"pnpm -C packages/shared test\", passed: 135, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 2,
+      "title": "Dedup resolve_tiki_path into one Rust impl",
+      "status": "completed",
+      "content": "There are two identical private `resolve_tiki_path` impls: `commands.rs:701` (pub(crate)) and `state_transition.rs:285` (private fn). Collapse to one (E21).\n\n1. Keep ONE canonical impl — simplest: make `commands.rs`'s `pub(crate) fn resolve_tiki_path` the single source (it's already pub(crate)), OR move it to a more neutral module (e.g. fs_utils.rs) if that reads better; either is fine. Delete the `state_transition.rs` copy and have state_transition.rs call the canonical one (`use crate::commands::resolve_tiki_path;` or via the chosen module). Confirm the two impls are byte-identical in behavior first (read both) — if they differ subtly, preserve the superset behavior and note it.\n2. Any TIKI_PATH env override or default-resolution logic now lives in exactly one place.\n3. cargo test (`cargo test --lib`): a test exercising resolve_tiki_path (explicit override path returns it; None falls back to cwd/.tiki) — if such a test exists, ensure it still passes; add one if absent.\nGates: `cargo test --lib` (from apps/desktop/src-tauri) green; `cargo clippy --lib -- -D warnings` clean. Behavior unchanged (the state_transition IPC still resolves the same path).",
+      "verification": [
+        "One resolve_tiki_path; state_transition.rs calls the canonical impl; the duplicate is deleted",
+        "behavior unchanged (override + cwd-fallback) — cargo test covers it",
+        "cargo --lib + clippy green"
+      ],
+      "addressesCriteria": [
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/state_transition.rs"
+      ],
+      "dependencies": [],
+      "completedAt": "2026-06-13T20:03:38.031Z",
+      "summary": "resolve_tiki_path: the two impls (commands.rs:701 pub(crate), state_transition.rs:285 private) were byte-identical (Some->that path, None->cwd/.tiki, same err map; no env override). Deleted state_transition.rs copy, added use crate::commands::resolve_tiki_path (path verified vs config.rs:12), removed now-unused use PathBuf. All callers (config.rs 2, commands.rs 12, state_transition.rs 1) resolve to the one fn. Added 2 cargo tests (explicit override returns path; None -> cwd/.tiki). cargo --lib 75->77, clippy clean. testResults: { framework: \"cargo\", command: \"cargo test --lib\", passed: 77, failed: 0, skipped: 0, status: \"passed\" }."
+    },
+    {
+      "number": 3,
+      "title": "ESLint fresh-ref rule scoped to selectors + hook deps",
+      "status": "completed",
+      "content": "Add an ESLint rule catching the #210→#212 fresh-ref class — inline empty-collection fallbacks in render-critical positions — WITHOUT false-flagging the safe inline `?? {}` in store action bodies (which freshRefGuard correctly allows; e.g. kanbanStore.ts:66/127, selectionStore.ts:74 spread `?? {}` into a NEW stored object — those are fine).\n\n1. In `apps/desktop/eslint.config.js`, add a rule block (scoped to `**/*.{ts,tsx}`) using `no-restricted-syntax` with esquery selectors that fire ONLY in the dangerous positions:\n   - Inside a Zustand selector call: a `LogicalExpression` with operator `??` or `||` whose right side is an empty `ObjectExpression`/`ArrayExpression`, DESCENDANT of a `CallExpression` whose callee name matches `/^use[A-Z].*Store$/`. Selector sketch: `CallExpression[callee.name=/^use[A-Z].*Store$/] LogicalExpression[operator=/^(\\?\\?|\\|\\|)$/] > ObjectExpression[properties.length=0]` and the `ArrayExpression[elements.length=0]` variant.\n   - Inside a React hook dependency array: same LogicalExpression→empty-literal, as a DESCENDANT of the `ArrayExpression` that is the LAST argument of a `CallExpression[callee.name=/^use(Effect|Memo|Callback|LayoutEffect|ImperativeHandle)$/]`. (A pragmatic selector: `CallExpression[callee.name=/^use(Effect|Memo|Callback|LayoutEffect)$/] > ArrayExpression LogicalExpression[operator=/^(\\?\\?|\\|\\|)$/] > ObjectExpression[properties.length=0]` + array variant.)\n   Each with a clear message: 'inline ?? {} / ?? [] in a Zustand selector or hook dep creates a fresh reference every render (the #210/#212 blank-screen class) — use a module-level EMPTY_* constant.'\n2. Run `pnpm -C apps/desktop lint` — it MUST be clean on the real tree (the EMPTY_* convention means selectors/deps don't use inline fallbacks; the store-action `?? {}` sites are NOT inside use*Store calls or hook-dep arrays, so they won't match). If a REAL violation surfaces, fix it with an EMPTY_* constant (and report it — that's a latent bug the rule just caught).\n3. SC4 proof: temporarily plant a violation (e.g. `useKanbanStore((s) => s.foo ?? [])` in a scratch location or an existing selector), run lint, confirm it's flagged, then REVERT. Report the exact lint output proving the rule fires. Do NOT leave the planted violation.\n4. Keep `freshRefGuard.test.ts` (belt-and-suspenders source-scan) untouched and green.\nGates: `pnpm -C apps/desktop lint` clean; `pnpm build` clean; desktop vitest green.",
+      "verification": [
+        "ESLint rule added to eslint.config.js, scoped to use*Store selectors + hook-dep arrays (no store-action false positives)",
+        "pnpm lint clean on the real tree; any real violation found is fixed + reported",
+        "rule demonstrated firing on a planted violation (lint output shown), then reverted",
+        "freshRefGuard.test.ts still green; build + vitest green"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/eslint.config.js"
+      ],
+      "dependencies": [
+        1
+      ],
+      "completedAt": "2026-06-13T20:11:42.607Z",
+      "summary": "Added a no-restricted-syntax fresh-ref rule to apps/desktop/eslint.config.js with 4 esquery selectors scoped to Zustand use*Store selector calls + React hook-dep arrays (Effect/Memo/Callback/LayoutEffect/ImperativeHandle), flagging inline ?? {} / ?? [] / || {} / || [] — the #210/#212 blank-screen class — pointing to module-level EMPTY_* constants. Proven: fires on a planted useIssuesStore((s)=>s.issues ?? []) with the exact message then reverted; ZERO findings on the real tree; safe store-action ?? {} sites (kanbanStore:66/127, selectionStore:74) correctly NOT flagged. freshRefGuard.test.ts untouched + green. HONEST CAVEAT: pnpm -C apps/desktop lint overall reports 36 PRE-EXISTING errors (no-unused-vars, react-hooks/*) that pre-date this work and are NOT in CI (CI = build + test:ts + test:rust, no lint) — A/B stash-verified identical with/without my change. Filed as follow-up #282 (clear them + gate lint in CI). My rule adds 0 findings; \"pnpm lint fully green\" is NOT claimed (pre-existing debt, out of scope). Real CI gate (build/test/cargo) green; build clean; desktop vitest 214; freshRefGuard 6/6. testResults: { framework: \"eslint+vitest\", command: \"pnpm -C apps/desktop lint (rule-scoped) + test\", passed: 214, failed: 0, skipped: 0, status: \"passed\" }."
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-13T20:00:37.972Z"
+}
