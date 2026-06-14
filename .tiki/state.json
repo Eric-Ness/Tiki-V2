@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 294,
-      "title": "Generate CLAUDE.md from the greenfield project brief",
-      "completedAt": "2026-06-14T13:45:49.058Z"
+      "number": 285,
+      "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder",
+      "completedAt": "2026-06-14T13:47:10.726Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 285,
+        "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder",
+        "completedAt": "2026-06-14T13:47:10.726Z"
+      },
       {
         "number": 294,
         "title": "Generate CLAUDE.md from the greenfield project brief",
