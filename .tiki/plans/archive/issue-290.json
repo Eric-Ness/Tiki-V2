@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 290,
+    "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/290"
+  },
+  "createdAt": "2026-06-14T14:20:00.000Z",
+  "research": [
+    "scaffold-interview-design",
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "A small-spine draft tree is written to .tiki/onboarding/draft/ with a manifest.json + one body file per issue, symbolic dependency edges, and per-issue success criteria.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:32:21.107Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "The tree renders for review and gates on one explicit confirm; nothing touches GitHub at this stage.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:32:21.107Z"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "scaffold.md still passes commands-sync (dogfood parity) + the forbidden-phrase scan; framework suite green; still zero state.mjs.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:32:21.107Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Append draft-spine + staging + review-gate to scaffold.md",
+      "status": "completed",
+      "content": "APPEND to packages/framework/commands/scaffold.md (created in #289) the draft-spine stage, per .tiki/research/scaffold-interview-design.md Synthesis 2-4. Read the existing scaffold.md first and the design doc. Add <step>s that, AFTER the brief is written (#289), continue: (1) DECOMPOSE into a small spine — 2-4 epics (Epic 1 is almost always Foundation/scaffolding), ~3-8 first-wave issues total; each issue gets a title, body, labels, an epicKey, and SYMBOLIC dependencies (localIds, not #N). Enforce the small-spine ceiling as a hard cap in the prose (converge, not exhaust). (2) STAGE to .tiki/onboarding/draft/: a manifest.json with shape { version, slug, createdAt, milestone?, epics: [{key,title,label}], issues: [{localId, title, epicKey, labels, dependsOn: [localId], bodyFile}] } and one issue-<localId>.md per issue whose body has ## Context / ## Scope / ## Success criteria (markdown lines like '- [functional] SC1: ...', using the 'functional' category, NEVER 'functionality') / ## Dependencies (using the PLACEHOLDER form 'Depends on {{localId}}', NOT a #N — real numbers don't exist until #291's push). Write all of these with the Write tool. (3) VALIDATE every issue's dependsOn localId resolves to an existing manifest issue (else #291's token swap would leave a dangling {{token}}). (4) RENDER the tree (epics -> issues -> deps -> labels -> target release) in chat, then ONE AskUserQuestion review gate with options: Push to GitHub [#291] / Edit a draft (edit the file then /tiki:scaffold resume) / Save draft & exit / Discard (removes the draft dir). Add a note that .tiki/onboarding/ is transient scratch. End with the Push branch handing off to #291 (not implemented yet — just the handoff point). KEEP the hard constraints: ZERO 'state.mjs' strings anywhere in the file; AVOID the forbidden ack-phrases (esp. /write .* directly in (the )?JSON/i) — describe writes as 'Write ... with the Write tool'. After editing, run `node packages/framework/install.js` to regen the dogfood copy and REVERT any non-scaffold.md changes it makes (settings.json/.framework-version) so the change set is just the two scaffold.md files.",
+      "verification": [
+        ".claude/commands/tiki/scaffold.md is byte-identical to packages/framework/commands/scaffold.md (diff empty)",
+        "pnpm -C packages/framework test passes (commands-sync + forbidden-phrase + the rest) — report pass count",
+        "grep -c 'state.mjs' packages/framework/commands/scaffold.md == 0; no forbidden ack-phrases present; the brief/draft writes are described as Write-tool writes",
+        "git status shows only the two scaffold.md files changed (plus .tiki workflow files)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/commands/scaffold.md",
+        ".claude/commands/tiki/scaffold.md"
+      ],
+      "summary": "Appended draft-spine stage to scaffold.md: decompose to small spine (2-4 epics, 3-8 issues, symbolic dependsOn) + stage manifest.json + issue-<localId>.md to .tiki/onboarding/draft/ (per-issue [functional] SCs, Depends on {{localId}} placeholders) + dangling-dep validation + single review-gate AskUserQuestion + push handoff. Framework 166 pass, dogfood identical, zero state.mjs. SC1/SC2 runtime-LLM",
+      "completedAt": "2026-06-14T14:30:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:27:45.568Z"
+}

@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 289,
-      "title": "/tiki:scaffold: bounded interview loop to project brief",
-      "completedAt": "2026-06-14T13:26:18.343Z"
+      "number": 290,
+      "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate",
+      "completedAt": "2026-06-14T13:32:52.007Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 290,
+        "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate",
+        "completedAt": "2026-06-14T13:32:52.007Z"
+      },
       {
         "number": 289,
         "title": "/tiki:scaffold: bounded interview loop to project brief",
