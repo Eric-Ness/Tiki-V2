@@ -10,6 +10,7 @@ import {
   useKanbanStore,
   useToastStore,
   useLayoutStore,
+  requestRepoVisibility,
 } from "../../stores";
 import { terminalFocusRegistry, EMPTY_TABS } from "../../stores/terminalStore";
 import "./ProjectsSection.css";
@@ -185,17 +186,17 @@ export function ProjectsSection() {
         });
         if (remote) return; // already has a remote — nothing to offer.
 
-        // `gh repo create --source=. --remote=origin` creates the repo AND
-        // wires `origin` in one shot. The gh command prompts for auth in the
+        // `gh repo create --source=. --remote=origin --<vis>` creates the repo
+        // AND wires `origin` in one shot. gh REQUIRES a `--public`/`--private`
+        // visibility flag (the bare command stalls), so ask first via the
+        // visibility chooser (#299). The gh command prompts for auth in the
         // terminal itself, so no auth preflight here.
-        const createRepo = window.confirm(
-          `Create a GitHub repo for ${offer.name} now?`
-        );
-        if (!createRepo) return;
+        const vis = await requestRepoVisibility(offer.name);
+        if (vis === null) return; // user cancelled the chooser — no-op.
 
         const terminalId = await writeToProjectTerminal(
           offer.projectId,
-          "gh repo create --source=. --remote=origin\n"
+          `gh repo create --source=. --remote=origin --${vis}\n`
         );
         if (terminalId === null) {
           useToastStore

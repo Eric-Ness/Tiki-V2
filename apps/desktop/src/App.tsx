@@ -33,6 +33,7 @@ const SettingsPage = lazy(() => import("./components/settings").then((m) => ({ d
 import { ToastContainer } from "./components/ui/ToastContainer";
 import { BulkActionToolbar } from "./components/BulkActionToolbar";
 import { BulkYoloDialog } from "./components/BulkYoloDialog";
+import { CreateRepoDialog } from "./components/CreateRepoDialog";
 import { CommandPalette, ErrorBoundary, KeyboardShortcuts } from "./components/ui";
 import { useCommandActions, useStaleWorkDetection, useTikiFileSync, useGithubFreshness, useBulkYoloCascade } from "./hooks";
 import { StateRecoveryDialog } from "./components/recovery";
@@ -477,6 +478,7 @@ function App() {
       <ToastContainer />
       <BulkActionToolbar />
       <BulkYoloDialog />
+      <CreateRepoDialog />
       <CommandPalette actions={actions} />
       <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 

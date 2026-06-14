@@ -52,6 +52,12 @@ export {
 export { useReleaseDialogStore } from './releaseDialogStore';
 
 export {
+  useCreateRepoDialogStore,
+  requestRepoVisibility,
+  type RepoVisibility,
+} from './createRepoDialogStore';
+
+export {
   usePullRequestsStore,
   filterPrsBySearch,
   type GitHubPullRequest,

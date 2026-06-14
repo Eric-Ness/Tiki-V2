@@ -5,6 +5,7 @@ import {
   useTerminalStore,
   useToastStore,
   useLayoutStore,
+  requestRepoVisibility,
 } from "../../stores";
 import { terminalFocusRegistry } from "../../stores/terminalStore";
 import {
@@ -60,6 +61,7 @@ async function writeToActiveTerminal(command: string): Promise<string | null> {
 export function GreenfieldChecklist() {
   const activeProject = useProjectsStore((s) => s.getActiveProject());
   const projectPath = activeProject?.path;
+  const projectName = activeProject?.name;
 
   const [report, setReport] = useState<GreenfieldReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,14 +117,22 @@ export function GreenfieldChecklist() {
               .addToast("Authenticate with GitHub first", "warning", 6000);
           }
 
-          // `gh repo create --source=. --remote=origin` creates the repo AND wires
-          // `origin` in one shot — no separate git-add-remote (that double-wire
-          // errors "remote origin already exists"). No `--push`: defer the initial
-          // push so a failed push can't poison the "origin wired" state.
-          const command =
-            row.action === "ghAuthLogin" || authFirst
-              ? "gh auth login\n"
-              : "gh repo create --source=. --remote=origin\n";
+          // `gh repo create --source=. --remote=origin --<vis>` creates the repo
+          // AND wires `origin` in one shot — no separate git-add-remote (that
+          // double-wire errors "remote origin already exists"). No `--push`: defer
+          // the initial push so a failed push can't poison the "origin wired"
+          // state. gh REQUIRES a `--public`/`--private` visibility flag, so the
+          // repo-create path asks first via the visibility chooser (#299).
+          let command: string;
+          if (row.action === "ghAuthLogin" || authFirst) {
+            // Auth path (or auth-first reroute): never the repo-create path, so
+            // skip the visibility chooser entirely.
+            command = "gh auth login\n";
+          } else {
+            const vis = await requestRepoVisibility(projectName ?? "this project");
+            if (vis === null) return; // user cancelled the chooser — no-op.
+            command = `gh repo create --source=. --remote=origin --${vis}\n`;
+          }
           const terminalId = await writeToActiveTerminal(command);
           if (terminalId === null) {
             useToastStore
@@ -172,7 +182,7 @@ export function GreenfieldChecklist() {
         });
       }
     },
-    [projectPath, pending, load, report]
+    [projectPath, projectName, pending, load, report]
   );
 
   return (

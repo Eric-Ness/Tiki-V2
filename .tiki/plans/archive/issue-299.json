@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 299,
+    "title": "Let the user choose Public/Private when creating the GitHub repo (gh needs a visibility flag)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/299"
+  },
+  "createdAt": "2026-06-14T17:05:00.000Z",
+  "research": [
+    "greenfield-onboarding"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Creating a GitHub repo (from the post-Initialize prompt OR the Settings checklist) first lets the user choose Public or Private, and the emitted gh repo create command includes the matching --public/--private flag.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:57:05.956Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "Cancelling the chooser is a clean no-op; the chooser is shared by both call sites (no duplicated UI); the command is never emitted without a visibility flag.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:57:05.956Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Shared Public/Private visibility chooser (imperative dialog + store + root mount)",
+      "status": "completed",
+      "content": "Add a reusable visibility chooser so both create-repo call sites can ask Public vs Private. MIRROR the existing imperative-dialog pattern — read apps/desktop/src/stores/releaseDialogStore.ts and its ReleaseDialog component (find where it is mounted, likely App.tsx) to match conventions. Create: (1) a small store (e.g. apps/desktop/src/stores/createRepoDialogStore.ts) holding { open: boolean, projectName: string|null, resolve: ((v:'public'|'private'|null)=>void)|null } with an imperative async API `requestRepoVisibility(projectName: string): Promise<'public'|'private'|null>` that opens the dialog and returns a promise resolved by the user's choice (public/private) or null (cancel/close); export it from the stores index if that is the convention. (2) a CreateRepoDialog component (apps/desktop/src/components/... matching where ReleaseDialog lives) + .css: a small modal titled e.g. 'Create GitHub repo for <projectName>' with two clear choices Public and Private (buttons or a radio + Create), and Cancel/close; choosing resolves the promise with 'public'/'private', Cancel/Escape/backdrop resolves null. (3) Mount <CreateRepoDialog/> once at the app root next to where <ReleaseDialog/> (or equivalent dialogs) is mounted. Keep styling consistent with existing dialogs. No fresh-ref violations; keep the store minimal.",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors",
+        "createRepoDialogStore exposes requestRepoVisibility(projectName) returning Promise<'public'|'private'|null>; CreateRepoDialog is mounted once at app root"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/stores/createRepoDialogStore.ts",
+        "apps/desktop/src/components/CreateRepoDialog.tsx",
+        "apps/desktop/src/components/CreateRepoDialog.css",
+        "apps/desktop/src/stores/index.ts",
+        "apps/desktop/src/App.tsx"
+      ],
+      "dependencies": [],
+      "summary": "createRepoDialogStore (requestRepoVisibility(name): Promise<'public'|'private'|null>) + CreateRepoDialog.tsx/.css (Public/Private buttons, Cancel/Esc/backdrop→null) mounted at app root by ReleaseDialog pattern; exported via stores index. build clean, vitest 272, lint 0 new",
+      "completedAt": "2026-06-14T17:15:00.000Z"
+    },
+    {
+      "number": 2,
+      "title": "Wire the chooser into both create-repo call sites + append the flag",
+      "status": "completed",
+      "content": "Use the Phase-1 chooser at BOTH places that emit `gh repo create`, replacing the bare command with one that carries the chosen visibility flag. (1) apps/desktop/src/components/sidebar/ProjectsSection.tsx — in the #298 readiness-gated create-repo effect, replace the `window.confirm(\"Create a GitHub repo...\")` with `const vis = await requestRepoVisibility(pending.name)`; if vis is 'public'|'private' -> writeToProjectTerminal(pending.projectId, `gh repo create --source=. --remote=origin --${vis}\\n`) + switch to terminal view; if null -> clean no-op. Preserve the fire-once clearing + re-entry guard + the no-remote (git_remote_get) gate. (2) apps/desktop/src/components/settings/GreenfieldChecklist.tsx — in the createRemote Fix handler (#287), replace the direct write with `const vis = await requestRepoVisibility(<project name or 'this project'>)`; on a choice write `gh repo create --source=. --remote=origin --${vis}\\n` to the terminal (keep the existing auth-first guard + switch-to-terminal-view + no-terminal toast); on null no-op. The command must NEVER be emitted without a --public/--private flag. Keep both flows otherwise unchanged (selection, terminal targeting, etc.).",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (fresh-ref + exhaustive-deps on the #298 effect with the new async call)",
+        "grep confirms neither call site emits 'gh repo create' without a --public/--private flag",
+        "VISUAL (tauri:dev): both the post-Initialize prompt and the Settings checklist Fix first show the Public/Private chooser; choosing writes 'gh repo create --source=. --remote=origin --public' (or --private); cancel is a no-op"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx",
+        "apps/desktop/src/components/settings/GreenfieldChecklist.tsx"
+      ],
+      "dependencies": [
+        1
+      ],
+      "summary": "Wired requestRepoVisibility into both call sites: ProjectsSection #298 effect (window.confirm → chooser, append --public/--private, fire-once+guards preserved) + GreenfieldChecklist #287 Fix (auth-first kept, repo-create branch asks visibility). No bare 'gh repo create' remains. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T17:24:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      2
+    ],
+    "SC2": [
+      1,
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T16:45:19.223Z"
+}

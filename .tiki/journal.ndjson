@@ -1,10 +1,5 @@
-{"ts":"2026-06-14T15:56:44.940Z","workId":"issue:297","step":"GET","event":"start","title":"Initialize flow: select new project + send create-repo to the correct terminal"}
-{"ts":"2026-06-14T15:56:45.987Z","workId":"issue:297","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T15:57:56.797Z","workId":"issue:297","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T15:57:57.321Z","workId":"issue:297","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T16:01:30.587Z","workId":"issue:297","step":"SHIP","event":"start"}
-{"ts":"2026-06-14T16:11:24.968Z","workId":"issue:298","step":"GET","event":"start","title":"Defer post-Initialize create-repo prompt until the new project + terminal are loaded"}
-{"ts":"2026-06-14T16:11:26.078Z","workId":"issue:298","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T16:12:16.284Z","workId":"issue:298","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T16:12:16.714Z","workId":"issue:298","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T16:15:43.532Z","workId":"issue:298","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T16:44:24.075Z","workId":"issue:299","step":"GET","event":"start","title":"Let the user choose Public/Private when creating the GitHub repo (gh needs a visibility flag)"}
+{"ts":"2026-06-14T16:44:25.137Z","workId":"issue:299","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T16:45:19.029Z","workId":"issue:299","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T16:45:19.638Z","workId":"issue:299","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T16:57:07.047Z","workId":"issue:299","step":"SHIP","event":"start"}

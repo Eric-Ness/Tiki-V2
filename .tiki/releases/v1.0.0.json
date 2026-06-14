@@ -14,7 +14,8 @@
     { "number": 295, "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)" },
     { "number": 296, "title": "Preserve terminal state across project switches (don't unmount on switch)" },
     { "number": 297, "title": "Initialize flow: select new project + send create-repo to the correct terminal" },
-    { "number": 298, "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded" }
+    { "number": 298, "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded" },
+    { "number": 299, "title": "Let the user choose Public/Private when creating the GitHub repo (gh needs a visibility flag)" }
   ],
   "createdAt": "2026-06-14T12:25:00.000Z"
 }

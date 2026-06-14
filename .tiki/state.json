@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 298,
-      "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded",
-      "completedAt": "2026-06-14T16:16:11.201Z"
+      "number": 299,
+      "title": "Let the user choose Public/Private when creating the GitHub repo (gh needs a visibility flag)",
+      "completedAt": "2026-06-14T16:57:48.952Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 299,
+        "title": "Let the user choose Public/Private when creating the GitHub repo (gh needs a visibility flag)",
+        "completedAt": "2026-06-14T16:57:48.952Z"
+      },
       {
         "number": 298,
         "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded",
