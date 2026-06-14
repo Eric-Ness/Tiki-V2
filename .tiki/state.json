@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 287,
-      "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)",
-      "completedAt": "2026-06-14T13:19:35.118Z"
+      "number": 289,
+      "title": "/tiki:scaffold: bounded interview loop to project brief",
+      "completedAt": "2026-06-14T13:26:18.343Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 289,
+        "title": "/tiki:scaffold: bounded interview loop to project brief",
+        "completedAt": "2026-06-14T13:26:18.343Z"
+      },
       {
         "number": 287,
         "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)",

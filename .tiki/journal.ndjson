@@ -8,3 +8,8 @@
 {"ts":"2026-06-14T13:16:25.568Z","workId":"issue:287","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T13:16:25.947Z","workId":"issue:287","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T13:19:08.633Z","workId":"issue:287","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T13:20:47.981Z","workId":"issue:289","step":"GET","event":"start","title":"/tiki:scaffold: bounded interview loop to project brief"}
+{"ts":"2026-06-14T13:20:48.746Z","workId":"issue:289","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T13:21:47.752Z","workId":"issue:289","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T13:21:48.128Z","workId":"issue:289","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T13:25:51.204Z","workId":"issue:289","step":"SHIP","event":"start"}

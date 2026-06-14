@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 289,
+    "title": "/tiki:scaffold: bounded interview loop to project brief",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/289"
+  },
+  "createdAt": "2026-06-14T14:05:00.000Z",
+  "research": [
+    "scaffold-interview-design",
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "The command runs the bounded interview and writes a valid project brief to .tiki/research/<slug>-brief.md (research-doc format).",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:25:50.989Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "The interview converges (~<=8 questions), never re-asks known facts, and locks scope at the Q8 checkpoint before writing anything.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:25:50.989Z"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "commands-sync (dogfood copy parity) and the forbidden-phrase scan pass with the new command; the framework suite stays green.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:25:50.989Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Author scaffold.md (preflight + Q1-Q8 interview + brief emission) + regen dogfood copy",
+      "status": "completed",
+      "content": "Create packages/framework/commands/scaffold.md following .tiki/research/scaffold-interview-design.md (the authoritative design — read it fully). This is issue #289: ONLY the interview + brief portion (issues #290/#291 will later append the draft-spine and the GitHub push to the SAME file, so end with a clean post-brief next-actions handoff). Structure: (a) YAML frontmatter exactly: name: scaffold, description, argument: [one-line description] (singular), tools: Bash, Read, Write, AskUserQuestion. (b) An <instructions> block with Stage-0 preflight (resume detection of .tiki/onboarding/draft/manifest.json -> offer resume; run `gh auth status` + `git remote -v` via Bash but WARN-but-proceed, never abort; reuse research.md's slug rule + path-traversal guard + existing-doc Merge/Overwrite gate; fold the argument / prior conversation into Q1 so nothing already known is re-asked). (c) The adaptive interview arc Q1-Q8 (vision -> project type -> users & core job -> stack & constraints -> must-haves -> non-functional -> ordering -> synthesis checkpoint) authored as <step>s, each issuing one AskUserQuestion, with HARD convergence imperatives in prose: 'ask at most 8 turns; skip any stage already answered; if N>=6 force the synthesis checkpoint; on \"you decide\" stop asking and fill the gap, surfacing the assumption at Q8'. Q8 is the SINGLE write-gate (nothing is written before Q8 approval; bailing before Q8 writes nothing). (d) After Q8 approval, Write the project brief to .tiki/research/<slug>-brief.md using the research-doc frontmatter (topic/tags/issues:[]/created) PLUS machine-readable type: and stack: keys (for #293/#294), and the section skeleton incl. the project-wide 'What needs to be true' section. (e) An <output> template and a <next-actions> menu (continue to draft the spine / save brief & exit) — the draft step itself is #290, so just hand off. HARD CONSTRAINTS: the file must contain ZERO 'state.mjs' strings (scaffold never drives the pipeline); avoid the forbidden ack-phrases the source scan bans (esp. anything matching /write .* directly in (the )?JSON/i and /direct[- ]JSON write acknowledged/i). After writing scaffold.md, run `node packages/framework/install.js` from the repo root to regenerate the dogfood copy at .claude/commands/tiki/scaffold.md; then `git status` and REVERT any files install.js touched OTHER than the two scaffold.md files (e.g. git checkout -- .claude/settings.json .tiki/.framework-version and any unchanged re-copied scripts) so the change set is exactly the two scaffold.md files.",
+      "verification": [
+        "node packages/framework/install.js ran; .claude/commands/tiki/scaffold.md exists and is byte-identical to packages/framework/commands/scaffold.md",
+        "pnpm -C packages/framework test passes — especially commands-sync.test.mjs (dogfood parity) and command-transition-coverage.test.mjs (forbidden-phrase scan + scaffold.md correctly absent from the transition tables since it drives no pipeline)",
+        "grep confirms scaffold.md contains no 'state.mjs' string and none of the forbidden ack-phrases",
+        "git status shows ONLY packages/framework/commands/scaffold.md and .claude/commands/tiki/scaffold.md changed (plus the plan/state workflow files) — no spurious settings.json/.framework-version diff"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/commands/scaffold.md",
+        ".claude/commands/tiki/scaffold.md"
+      ],
+      "summary": "Authored scaffold.md (frontmatter + Stage-0 preflight + Q1-Q8 interview w/ convergence imperatives + Q8 single write-gate + brief emission to .tiki/research/<slug>-brief.md w/ type:/stack: frontmatter + next-actions handoff); zero state.mjs, no forbidden phrases; install.js regen dogfood copy byte-identical; framework suite 166 pass. SC1/SC2 runtime-LLM (design-verified)",
+      "completedAt": "2026-06-14T14:12:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:21:47.898Z"
+}
