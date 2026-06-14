@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 284,
-      "title": "Greenfield readiness checklist: per-row detect + Fix (extend DiagnosticsPanel)",
-      "completedAt": "2026-06-14T13:09:19.901Z"
+      "number": 287,
+      "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)",
+      "completedAt": "2026-06-14T13:19:35.118Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 287,
+        "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)",
+        "completedAt": "2026-06-14T13:19:35.118Z"
+      },
       {
         "number": 284,
         "title": "Greenfield readiness checklist: per-row detect + Fix (extend DiagnosticsPanel)",

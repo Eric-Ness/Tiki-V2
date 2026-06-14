@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 287,
+    "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/287"
+  },
+  "createdAt": "2026-06-14T13:50:00.000Z",
+  "research": [
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "From a git-initialized, remote-less project, the user can create a GitHub repo and wire origin end-to-end, reaching a pushable state.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:19:08.447Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "gh repo create / gh auth login run as terminal handoffs (not Rust); the app refreshes the checklist on manual Re-check after completion.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:19:08.447Z"
+    },
+    {
+      "id": "SC3",
+      "category": "other",
+      "description": "If origin already exists or gh is unauthenticated, the flow detects it and guides rather than erroring.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:19:08.447Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Guided GitHub-remote setup in GreenfieldChecklist",
+      "status": "completed",
+      "content": "Enhance apps/desktop/src/components/settings/GreenfieldChecklist.tsx (shipped in #284) so the GitHub-remote row is a GUIDED create-repo flow rather than a bare handoff. Reuse #284's check_greenfield_readiness report (already loaded) — do NOT add a separate resolver. Changes: (1) The createRemote Fix must write the WIRE-ORIGIN form to the terminal: `gh repo create --source=. --remote=origin` (gh-native: this creates the repo AND wires origin in one shot — do NOT also call git_add_remote, which would error 'remote origin already exists'). Keep the initial push OUT of this command (defer --push) so a failed push can't poison the 'origin wired' state; optionally add a note/secondary affordance for pushing. (2) AUTH-FIRST GUARD (SC3): if the report's ghAuthenticated is false when the user triggers createRemote, do NOT write the repo-create command — instead guide to auth: toast 'Authenticate with GitHub first' and trigger the ghAuthLogin handoff (`gh auth login`). (3) EXISTING-REMOTE SHORT-CIRCUIT (SC3): when report.hasRemote is already true, the remote row renders as pass (no Fix) — confirm the reducer/row already does this (hasRemote -> status 'pass'); if a stale remote URL should be shown, display report.origin or just the pass state. (4) Completion is detected via the existing manual Re-check / load() refresh (there is no PTY completion event) — ensure the remote/auth handoff hints tell the user to click Re-check after the terminal flow. Keep all the #284 conventions: per-row pending in component useState (no fresh-ref), writeToActiveTerminal null -> toast, switch to terminal view on handoff. If a small piece of ordering metadata helps, you may touch greenfieldReadiness.ts, but prefer keeping logic in the component.",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression; add a focused unit test if you extract any pure helper)",
+        "pnpm -C apps/desktop lint adds zero new errors (baseline 0 errors / 31 warnings)",
+        "VISUAL (tauri:dev): on a git repo with no origin + authed gh, the remote Fix writes 'gh repo create --source=. --remote=origin' to the terminal; if unauthed it routes to gh auth login first; if origin already exists the row shows pass; Re-check refreshes the checklist after the flow"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/settings/GreenfieldChecklist.tsx"
+      ],
+      "summary": "GreenfieldChecklist remote flow: createRemote writes 'gh repo create --source=. --remote=origin' (gh-native wire, no --push, no double git_add_remote); auth-first guard routes unauthed→gh auth login; hasRemote→pass short-circuit confirmed; manual Re-check. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T13:55:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:16:25.702Z"
+}

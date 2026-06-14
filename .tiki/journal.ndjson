@@ -3,3 +3,8 @@
 {"ts":"2026-06-14T13:11:14.625Z","workId":"issue:285","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T13:11:14.981Z","workId":"issue:285","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T13:13:51.296Z","workId":"issue:285","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T13:15:25.795Z","workId":"issue:287","step":"GET","event":"start","title":"Guided 'Create GitHub repo' + wire origin (terminal-assisted)"}
+{"ts":"2026-06-14T13:15:26.630Z","workId":"issue:287","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T13:16:25.568Z","workId":"issue:287","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T13:16:25.947Z","workId":"issue:287","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T13:19:08.633Z","workId":"issue:287","step":"SHIP","event":"start"}

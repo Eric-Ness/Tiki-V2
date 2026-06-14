@@ -103,8 +103,26 @@ export function GreenfieldChecklist() {
         // Interactive handoff: write the command, let the user run it, then
         // re-check manually. We can't auto-await an interactive terminal flow.
         if (row.handoff) {
+          // Auth-first guard (SC3): creating a remote requires gh auth. If the
+          // user clicks "create remote" while unauthenticated, don't write the
+          // repo-create command (it would error confusingly) — route them to the
+          // SAME `gh auth login` handoff instead and tell them why.
+          const authFirst =
+            row.action === "createRemote" && report?.ghAuthenticated === false;
+          if (authFirst) {
+            useToastStore
+              .getState()
+              .addToast("Authenticate with GitHub first", "warning", 6000);
+          }
+
+          // `gh repo create --source=. --remote=origin` creates the repo AND wires
+          // `origin` in one shot — no separate git-add-remote (that double-wire
+          // errors "remote origin already exists"). No `--push`: defer the initial
+          // push so a failed push can't poison the "origin wired" state.
           const command =
-            row.action === "ghAuthLogin" ? "gh auth login\n" : "gh repo create\n";
+            row.action === "ghAuthLogin" || authFirst
+              ? "gh auth login\n"
+              : "gh repo create --source=. --remote=origin\n";
           const terminalId = await writeToActiveTerminal(command);
           if (terminalId === null) {
             useToastStore
@@ -112,6 +130,8 @@ export function GreenfieldChecklist() {
               .addToast("Open a terminal first", "warning", 6000);
           } else {
             // Surface the terminal so the user can complete the interactive flow.
+            // There's no PTY-completion event, so the refresh is manual: the hint
+            // tells the user to click "Re-check" once the terminal flow finishes.
             useLayoutStore.getState().setActiveView("terminal");
             useToastStore
               .getState()
@@ -152,7 +172,7 @@ export function GreenfieldChecklist() {
         });
       }
     },
-    [projectPath, pending, load]
+    [projectPath, pending, load, report]
   );
 
   return (
