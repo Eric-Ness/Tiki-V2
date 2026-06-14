@@ -11,7 +11,9 @@
     { "number": 290, "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate" },
     { "number": 291, "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff" },
     { "number": 294, "title": "Generate CLAUDE.md from the greenfield project brief" },
-    { "number": 295, "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)" }
+    { "number": 295, "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)" },
+    { "number": 296, "title": "Preserve terminal state across project switches (don't unmount on switch)" },
+    { "number": 297, "title": "Initialize flow: select new project + send create-repo to the correct terminal" }
   ],
   "createdAt": "2026-06-14T12:25:00.000Z"
 }

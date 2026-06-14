@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 295,
-      "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)",
-      "completedAt": "2026-06-14T15:01:50.991Z"
+      "number": 296,
+      "title": "Preserve terminal state across project switches (don't unmount on switch)",
+      "completedAt": "2026-06-14T15:55:37.020Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 296,
+        "title": "Preserve terminal state across project switches (don't unmount on switch)",
+        "completedAt": "2026-06-14T15:55:37.020Z"
+      },
       {
         "number": 295,
         "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)",

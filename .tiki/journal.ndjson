@@ -3,3 +3,8 @@
 {"ts":"2026-06-14T14:58:28.799Z","workId":"issue:295","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T14:58:29.204Z","workId":"issue:295","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T15:01:12.708Z","workId":"issue:295","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T15:49:54.866Z","workId":"issue:296","step":"GET","event":"start","title":"Preserve terminal state across project switches (don't unmount on switch)"}
+{"ts":"2026-06-14T15:49:55.937Z","workId":"issue:296","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T15:50:32.171Z","workId":"issue:296","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T15:50:32.554Z","workId":"issue:296","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T15:54:54.635Z","workId":"issue:296","step":"SHIP","event":"start"}

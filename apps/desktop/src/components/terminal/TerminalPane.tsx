@@ -6,12 +6,22 @@ import './Terminal.css';
 
 export function TerminalPane() {
   const projectId = useProjectsStore((s) => s.activeProjectId) ?? 'default';
-  const tabs = useTerminalStore((s) => s.tabsByProject[projectId] ?? EMPTY_TABS);
-  const activeTabId = useTerminalStore((s) => s.activeTabByProject[projectId] ?? null);
+  // #296: read the FULL maps, not just the active project's slice, so every
+  // VISITED project's terminal instances stay mounted across project switches
+  // (scrollback / scroll position / running session view persist). Both are
+  // stable references from the store, safe to select directly.
+  const tabsByProject = useTerminalStore((s) => s.tabsByProject);
+  const activeTabByProject = useTerminalStore((s) => s.activeTabByProject);
   const { addTab, removeTab, setActiveTab, splitTerminal } = useTerminalStore();
   const hasInitialized = useRef(false);
 
-  // Create initial tab if none exist
+  // Active project's tabs / active tab — drives the keyboard handler and the
+  // "create initial tab if none" effect. The full maps above own rendering.
+  const tabs = tabsByProject[projectId] ?? EMPTY_TABS;
+  const activeTabId = activeTabByProject[projectId] ?? null;
+
+  // Create initial tab for the ACTIVE project if it has none (so a freshly
+  // activated project gets a terminal) without disturbing other projects' tabs.
   useEffect(() => {
     if (!hasInitialized.current && tabs.length === 0) {
       hasInitialized.current = true;
@@ -104,15 +114,39 @@ export function TerminalPane() {
     <div className="terminal-pane">
       <TerminalTabs />
       <div className="terminal-instances">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className="terminal-instance"
-            style={{ display: tab.id === activeTabId ? 'flex' : 'none' }}
-          >
-            <TerminalSplit tabId={tab.id} node={tab.splitRoot} />
-          </div>
-        ))}
+        {/*
+          #296: one group per VISITED project (a project only appears in
+          tabsByProject once it has been activated, so never-opened projects
+          render nothing and spawn no PTY — lazy mount for free). Each group is
+          shown only when its project is active, the rest hidden via display:none
+          so their xterm instances stay mounted and keep their scrollback. The
+          Terminal's ResizeObserver refits when a hidden group becomes visible
+          again, so a project switch re-sizes correctly with no extra wiring.
+        */}
+        {Object.entries(tabsByProject).map(([groupProjectId, groupTabs]) => {
+          const groupActiveTabId = activeTabByProject[groupProjectId] ?? null;
+          return (
+            <div
+              key={groupProjectId}
+              className="terminal-project-group"
+              style={{
+                display: groupProjectId === projectId ? 'block' : 'none',
+                position: 'absolute',
+                inset: 0,
+              }}
+            >
+              {groupTabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className="terminal-instance"
+                  style={{ display: tab.id === groupActiveTabId ? 'flex' : 'none' }}
+                >
+                  <TerminalSplit tabId={tab.id} node={tab.splitRoot} />
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

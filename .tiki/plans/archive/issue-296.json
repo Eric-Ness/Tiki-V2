@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 296,
+    "title": "Preserve terminal state across project switches (don't unmount on switch)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/296"
+  },
+  "createdAt": "2026-06-14T16:00:00.000Z",
+  "research": [
+    "greenfield-onboarding"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Switching from project A to B and back preserves A's terminal scrollback, scroll position, and running session (not reset to a fresh terminal).",
+      "verified": true,
+      "verifiedAt": "2026-06-14T15:54:54.191Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "Never-activated projects spawn no terminals/PTYs (lazy mount); no regression in tab create/split/close within a project.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T15:54:54.191Z"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "build + test suite green; lint 0 new.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T15:54:54.191Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Render terminal groups per visited project (mounted, hidden when inactive)",
+      "status": "completed",
+      "content": "Refactor apps/desktop/src/components/terminal/TerminalPane.tsx so terminal instances PERSIST across project switches. Today the terminal-instances area renders only the active project's tabs (`tabsByProject[activeProjectId].map(...)`, TerminalPane.tsx:107-115), so switching projects unmounts the old project's xterm instances and their scrollback/scroll-position/running view are lost. CHANGE it to render one terminal-instances GROUP per project that has tabs — iterate the projects present in `tabsByProject` (this gives lazy mounting for free: a project has no tabs until first activated, so never-opened projects render nothing and spawn no PTY) — and show only the ACTIVE project's group via `display` (hide the others with display:none, the SAME mechanism already used for inactive tabs at line 111). Within each project group, map that project's tabs to TerminalSplit keyed by tab.id, visible only for that project's active tab. This keeps every visited project's xterm instances MOUNTED so their state persists when you switch away and back. Keep the tab BAR (TerminalTabs) scoped to the active project (unchanged). Relocate the 'create initial tab if none' effect (TerminalPane.tsx:15-25, keyed on projectId) so the ACTIVE project still gets an initial tab when it has none, without disturbing other projects. IMPORTANT xterm gotcha: a terminal inside a display:none container cannot measure its size, so when a project becomes visible again its terminal must REFIT — the code already hides inactive tabs the same way, so a show-refit/resize path should already exist (verify it fires on project switch for the now-visible terminal; if TerminalSplit/the xterm wrapper refits on becoming visible via a ResizeObserver or visibility effect, switching projects should trigger it). Keep the keyboard-shortcut handler working for the active project's tabs. Do NOT change the PTY lifecycle beyond keeping instances mounted; do not change terminalStore shape unless necessary (deriving groups from tabsByProject keys is sufficient).",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (fresh-ref + exhaustive-deps)",
+        "VISUAL (tauri:dev): in project A open a terminal, run a command + scroll; switch to B; switch back to A → A's scrollback, scroll position, and running session are PRESERVED (not a fresh terminal). A never-opened project spawns no terminal/PTY. Tab create/split/close within a project still work, and the now-visible terminal is correctly sized (refit) after switching."
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src/components/terminal/TerminalPane.tsx"
+      ],
+      "summary": "TerminalPane renders one group per visited project (Object.entries(tabsByProject)), shown only when active (display:none for others) → xterm instances stay mounted across project switches → scrollback/state preserved; lazy-mount via tabsByProject presence; refit-on-visible already handled by Terminal.tsx ResizeObserver. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T16:08:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T15:50:32.344Z"
+}
