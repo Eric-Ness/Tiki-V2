@@ -4,6 +4,8 @@
 
 Tiki turns a GitHub issue into a shipped commit through a deterministic pipeline — **GET → REVIEW → PLAN → AUDIT → EXECUTE → SHIP** — and gives you a desktop app that shows exactly where every issue is in that pipeline in real time.
 
+**New in 1.0:** Tiki can also take you from a **blank folder** to a working, GitHub-wired project with a scoped backlog — see [Start from a blank folder](#start-from-a-blank-folder-new-in-10).
+
 ![Tiki desktop app running a /tiki:yolo cascade in the Terminal view](docs/images/1.png)
 
 ---
@@ -73,6 +75,19 @@ When one issue has to ship before another, declare it in the issue body (`Depend
 
 ---
 
+## Start from a blank folder (new in 1.0)
+
+Tiki no longer assumes you already have a repo full of issues. Point the desktop app at an **empty directory** and it will bootstrap a complete, GitHub-wired project — then help you generate the backlog to work through.
+
+1. **Initialize.** In the desktop app, **Add Project** → pick a blank folder. Instead of dead-ending, Tiki offers to **"Initialize Tiki here"**: it installs the framework, seeds `.tiki/state.json`, writes a starter `.gitignore`, and runs `git init`.
+2. **Get GitHub-ready.** A **readiness checklist** (Settings) shows what's still missing — git repo, GitHub remote, `gh` auth, `.gitignore` — each with a one-click **Fix**. Right after init, Tiki offers to **create the GitHub repo** for you (choose **Public** or **Private**); it runs `gh repo create --source=. --remote=origin` in the new project's terminal and wires `origin`.
+3. **Scope the work — `/tiki:scaffold`.** A conversational command interviews you about the project (what it is, who it's for, the must-haves, the ordering), writes a **project brief** to `.tiki/research/`, drafts a small **spine of epics → issues** (with success criteria and dependency edges), shows it for review, and — only on your confirm — pushes them to GitHub as real issues grouped into a release.
+4. **Seed the docs — `/tiki:claudemd`.** Generates a project `CLAUDE.md` straight from that brief (no re-interviewing), so every future Claude Code session starts with real context.
+
+From there it's the normal pipeline: `/tiki:get` the first issue and run it through GET → … → SHIP. (Already have a project with issues? Skip straight to [the pipeline](#the-pipeline).)
+
+---
+
 ## Install
 
 ### Desktop app (most users)
@@ -115,6 +130,8 @@ Once installed, the `/tiki:*` commands are available in any Claude Code session.
 | `/tiki:ship <N>` | Commit, push, close the GitHub issue |
 | `/tiki:yolo <N>` | Full automated pipeline (all of the above) |
 | `/tiki:release <ver>` | Execute a release grouping multiple issues |
+| `/tiki:scaffold [desc]` | Greenfield: interview a new project into a brief + draft epic/issue spine, then push to GitHub |
+| `/tiki:claudemd [slug]` | Generate a project `CLAUDE.md` from a `/tiki:scaffold` brief (no re-interviewing) |
 | `/tiki:research <topic>` | Capture domain knowledge into `.tiki/research/` for future sub-agents to consume |
 | `/tiki:version` | Show installed versions, check for updates |
 
@@ -136,7 +153,8 @@ All Tiki workflow state lives in a `.tiki/` directory at the root of the project
     vX.Y.Z-changelog.md   # release changelog (auto-used as GitHub release body)
     archive/              # shipped releases
   research/
-    *.md                  # domain knowledge docs (passed into sub-agent prompts)
+    *.md                  # domain knowledge docs + /tiki:scaffold project briefs
+  onboarding/             # /tiki:scaffold draft issue spine (draft/ → pushed/)
   backups/                # automatic state.json snapshots before destructive ops
   hooks/
     hooks.json            # lifecycle hooks registry (pre-execute, phase-start, etc.)
@@ -185,7 +203,7 @@ pnpm tauri:build
 pnpm lint
 
 # Bump version across every file in the workspace
-pnpm version-bump 0.9.3
+pnpm version-bump 1.0.0
 ```
 
 ### Tests
@@ -221,8 +239,8 @@ If you add a new module under `apps/desktop/src/stores/` or `apps/desktop/src/co
 Releases trigger on a `v*` tag push, or via the GitHub Actions workflow dispatch UI.
 
 ```bash
-git tag v0.9.3
-git push origin v0.9.3
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
 The release workflow ([`.github/workflows/release.yml`](.github/workflows/release.yml)):

@@ -10,6 +10,26 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ---
 
+## [v1.0.0] — 2026-06-14
+
+**Greenfield onboarding.** Go from a blank folder to a working, GitHub-wired project with a scoped backlog, without leaving the app. Full detail: [`.tiki/releases/v1.0.0-changelog.md`](.tiki/releases/v1.0.0-changelog.md).
+
+### Added
+- **Blank-folder initialization** (#283, #285). Add Project on an empty directory now offers **"Initialize Tiki here"** instead of dead-ending — installs the framework, seeds `state.json`, writes a starter `.gitignore`, and `git init`s the repo (new `init_tiki_project` + a git-write layer, every spawn through the sanctioned `hidden_command`).
+- **Greenfield readiness checklist** (#284). A Settings panel reports framework / state / git repo / remote / `gh` auth / `.gitignore` status, each with a per-row **Fix** (new `check_greenfield_readiness`).
+- **Guided GitHub repo creation** (#287, #295, #298, #299). After init, Tiki offers to create the GitHub repo once the new project is focused and its terminal is ready, with a **Public/Private** chooser, then wires `origin` (`gh repo create --source=. --remote=origin --<visibility>`).
+- **`/tiki:scaffold`** (#289, #290, #291). A conversational command that interviews a new project into a brief, drafts a small spine of epics → issues (success criteria + dependency edges), reviews it, and — only on explicit confirm — pushes them to GitHub via an idempotent two-pass create, grouped into a release.
+- **`/tiki:claudemd`** (#294). Generates a project `CLAUDE.md` from the scaffold brief, with no re-interviewing.
+
+### Fixed
+- **Terminal state persists across project switches** (#296). Terminals no longer reset when you switch projects — each visited project's instances stay mounted.
+
+### Notes
+- Project/language starter templates (#293) are deferred to a later release.
+- Per-release changelogs for v0.7.4–v0.9.4 live in [`.tiki/releases/`](.tiki/releases/) and on the [Releases page](https://github.com/Eric-Ness/Tiki-V2/releases).
+
+---
+
 ## [v0.7.3] — 2026-05-22
 
 Release-tooling fix, dogfooded by its own release. Full detail: [`.tiki/releases/v0.7.3-changelog.md`](.tiki/releases/v0.7.3-changelog.md).
