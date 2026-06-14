@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 285,
+    "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/285"
+  },
+  "createdAt": "2026-06-14T13:35:00.000Z",
+  "research": [
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "Selecting a blank folder offers to initialize; confirming produces a tracked, valid project with no error dead-end.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:13:51.042Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "The flow is discoverable and the existing add-a-valid-project path is unchanged.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:13:51.042Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Replace the blank-folder dead-end with an Initialize flow",
+      "status": "completed",
+      "content": "Modify apps/desktop/src/components/sidebar/ProjectsSection.tsx handleAddProject (the dead-end is at :110-114 where validate_tiki_directory===false sets an error and returns). When the selected folder is NOT a valid Tiki project, instead of erroring: show window.confirm('This folder is not a Tiki project yet. Initialize Tiki here?') (matches the existing handleRemoveProject window.confirm convention at :138). On DECLINE: keep the current cancel behavior (clear, return — no error). On CONFIRM: in a try/catch, `await invoke('init_tiki_project', { projectPath: selectedPath })` (the command shipped in #283 — composes framework install + guarded state seed + .gitignore + best-effort git), then `await invoke('switch_project', { path: selectedPath })` (ordering matters: init creates .tiki FIRST so switch_project's .tiki-exists check passes — commands.rs:225), then `addProject(selectedPath, folderName)`. Add an `isInitializing` boolean state mirroring the existing `isAdding` for button feedback ('Initializing...'). Surface init/switch failures via the existing `error` state (rendered :183-195) — e.g. setError(`Failed to initialize Tiki: ${String(err)}`); init is idempotent so a retry is safe. Keep the existing 'already added' dedupe (:121-126) ahead of the init branch. Do NOT change the valid-project (isValid===true) path. NOTE the init_tiki_project return is a warnings string[] — optionally toast any warnings (e.g. git identity missing), but that's optional polish.",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (baseline 0 errors / 31 warnings; watch fresh-ref + exhaustive-deps)",
+        "VISUAL (tauri:dev): selecting a blank folder prompts to initialize; confirming yields a tracked valid project with populated .tiki and no dead-end error; the existing add-a-valid-project path is unchanged"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx"
+      ],
+      "summary": "handleAddProject: blank folder → window.confirm Initialize → init_tiki_project → switch_project → addProject (correct ordering); isInitializing state; errors via error state, warnings toasted; valid path unchanged. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T13:42:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:11:14.764Z"
+}

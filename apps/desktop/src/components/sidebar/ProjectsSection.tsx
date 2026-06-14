@@ -25,6 +25,7 @@ export function ProjectsSection() {
 
   const [error, setError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const previousActiveIdRef = useRef<string | null>(null);
 
   // Switch file watcher and refresh framework version when active project changes
@@ -102,26 +103,64 @@ export function ProjectsSection() {
         return;
       }
 
+      // Extract folder name from path
+      const pathParts = selectedPath.replace(/\\/g, "/").split("/");
+      const folderName = pathParts[pathParts.length - 1] || "Unknown";
+
+      // Check if project already exists (keep dedupe ahead of init)
+      const existingProject = projects.find((p) => p.path === selectedPath);
+      if (existingProject) {
+        setError("This project has already been added");
+        setIsAdding(false);
+        return;
+      }
+
       // Validate the directory contains .tiki
       const isValid = await invoke<boolean>("validate_tiki_directory", {
         path: selectedPath,
       });
 
       if (!isValid) {
-        setError("Selected folder is not a valid Tiki project (no .tiki directory found)");
-        setIsAdding(false);
-        return;
-      }
+        // Not a Tiki project yet — offer to initialize one here instead of
+        // dead-ending. Matches the window.confirm convention used elsewhere.
+        const confirmed = window.confirm(
+          "This folder is not a Tiki project yet. Initialize Tiki here?"
+        );
 
-      // Extract folder name from path
-      const pathParts = selectedPath.replace(/\\/g, "/").split("/");
-      const folderName = pathParts[pathParts.length - 1] || "Unknown";
+        if (!confirmed) {
+          // User declined — cancel quietly, no error.
+          setIsAdding(false);
+          return;
+        }
 
-      // Check if project already exists
-      const existingProject = projects.find((p) => p.path === selectedPath);
-      if (existingProject) {
-        setError("This project has already been added");
-        setIsAdding(false);
+        try {
+          setIsInitializing(true);
+          // 1. Initialize the project (creates .tiki first); returns warnings.
+          const warnings = await invoke<string[]>("init_tiki_project", {
+            projectPath: selectedPath,
+          });
+          // 2. Switch the watcher — must come AFTER init since switch_project
+          //    hard-requires .tiki to exist.
+          await invoke("switch_project", { path: selectedPath });
+          // 3. Add to the store.
+          addProject(selectedPath, folderName);
+
+          // Surface any non-fatal init warnings as a toast.
+          if (warnings.length > 0) {
+            useToastStore
+              .getState()
+              .addToast(
+                `Tiki initialized with warnings: ${warnings.join("; ")}`,
+                "warning",
+                8000
+              );
+          }
+        } catch (err) {
+          // init is idempotent, so a retry is safe.
+          setError(`Failed to initialize Tiki: ${String(err)}`);
+        } finally {
+          setIsInitializing(false);
+        }
         return;
       }
 
@@ -215,7 +254,7 @@ export function ProjectsSection() {
         <button
           className="projects-section-add"
           onClick={handleAddProject}
-          disabled={isAdding}
+          disabled={isAdding || isInitializing}
           type="button"
         >
           <svg
@@ -232,7 +271,11 @@ export function ProjectsSection() {
               strokeLinecap="round"
             />
           </svg>
-          {isAdding ? "Adding..." : "Add Project"}
+          {isInitializing
+            ? "Initializing..."
+            : isAdding
+              ? "Adding..."
+              : "Add Project"}
         </button>
       </div>
     </CollapsibleSection>
