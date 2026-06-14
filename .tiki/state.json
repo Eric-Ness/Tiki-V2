@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 282,
-      "title": "pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint",
-      "completedAt": "2026-06-13T20:58:31.624Z"
+      "number": 283,
+      "title": "Greenfield foundation: init_tiki_project + git-write layer + .gitignore + guarded state seed",
+      "completedAt": "2026-06-14T12:51:30.151Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 283,
+        "title": "Greenfield foundation: init_tiki_project + git-write layer + .gitignore + guarded state seed",
+        "completedAt": "2026-06-14T12:51:30.151Z"
+      },
       {
         "number": 282,
         "title": "pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint",

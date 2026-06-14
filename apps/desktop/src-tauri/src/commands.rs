@@ -718,6 +718,17 @@ pub fn install_framework(app: AppHandle, project_path: String) -> Result<String,
         return Err(format!("Project path does not exist: {}", project_path));
     }
 
+    let version = app.package_info().version.to_string();
+    install_framework_inner(&project, &version)?;
+    Ok(version)
+}
+
+/// Write the embedded Tiki framework into `project`: `.claude/commands/tiki/*`,
+/// `.claude/tiki/scripts/*`, the reconciler hook, and `.tiki/.framework-version`
+/// stamped with `version`. AppHandle-free so it can be reused by
+/// `init_tiki_project` and exercised directly in unit tests. Idempotent (overwrites
+/// the embedded files in place).
+fn install_framework_inner(project: &Path, version: &str) -> Result<(), String> {
     let commands_dir = project.join(".claude").join("commands").join("tiki");
     std::fs::create_dir_all(&commands_dir).map_err(|e| e.to_string())?;
 
@@ -747,12 +758,11 @@ pub fn install_framework(app: AppHandle, project_path: String) -> Result<String,
 
     // Register the reconciler Stop/SubagentStop hooks so pipeline state self-heals
     // even when an imperative transition is dropped (epic #244).
-    ensure_reconciler_hook(&project)?;
+    ensure_reconciler_hook(project)?;
 
-    let version = app.package_info().version.to_string();
     let tiki_dir = project.join(".tiki");
     std::fs::create_dir_all(&tiki_dir).map_err(|e| e.to_string())?;
-    std::fs::write(tiki_dir.join(".framework-version"), &version).map_err(|e| e.to_string())?;
+    std::fs::write(tiki_dir.join(".framework-version"), version).map_err(|e| e.to_string())?;
 
     log::info!(
         "Installed {} framework commands + {} scripts to {:?} (version {})",
@@ -761,7 +771,48 @@ pub fn install_framework(app: AppHandle, project_path: String) -> Result<String,
         commands_dir,
         version
     );
-    Ok(version)
+    Ok(())
+}
+
+/// Initialize a greenfield (or existing) project as a Tiki project: install the
+/// framework, seed a canonical `state.json` (never clobbering one that exists),
+/// write a starter `.gitignore`, and — unless the project is already a git repo —
+/// best-effort `git init` + an initial commit.
+///
+/// Returns a list of non-fatal warnings (e.g. a skipped git commit on a machine
+/// without `user.name`/`user.email`). A git failure NEVER aborts init. Does NOT
+/// call `switch_project` — the frontend sequences that after init (#285).
+#[tauri::command]
+pub fn init_tiki_project(
+    app: AppHandle,
+    project_path: String,
+    init_git: Option<bool>,
+) -> Result<Vec<String>, String> {
+    let project = PathBuf::from(&project_path);
+    if !project.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let mut warnings: Vec<String> = Vec::new();
+
+    install_framework_inner(&project, &app.package_info().version.to_string())?;
+    fs_utils::seed_state_if_absent(&project.join(".tiki"))?;
+    fs_utils::write_starter_gitignore(&project)?;
+
+    if init_git.unwrap_or(true) && !project.join(".git").exists() {
+        // Best-effort: a git failure (e.g. missing user.name/user.email, or git
+        // not installed) must not abort init — capture it as a warning.
+        if let Err(e) = crate::github::git_init(project_path.clone()) {
+            warnings.push(format!("git init/commit skipped: {e}"));
+        } else if let Err(e) = crate::github::git_commit_all(
+            project_path.clone(),
+            "chore: initialize Tiki project".into(),
+        ) {
+            warnings.push(format!("git init/commit skipped: {e}"));
+        }
+    }
+
+    Ok(warnings)
 }
 
 /// Ensure the reconciler Stop/SubagentStop hooks exist in the project's
@@ -2090,6 +2141,93 @@ mod tests {
             "copyInstallDetected must survive serialization, got keys {:?}",
             obj.keys().collect::<Vec<_>>()
         );
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    // ── #283 greenfield init ───────────────────────────────────────────────
+    // `init_tiki_project` takes an `AppHandle` (only the binary version is read
+    // from it), which is impractical to construct in a `#[cfg(test)]` unit test.
+    // So we exercise the AppHandle-free core directly: `install_framework_inner`
+    // for the framework files + `fs_utils::seed_state_if_absent` /
+    // `write_starter_gitignore` for the state/gitignore the command then calls.
+
+    #[test]
+    fn init_tiki_project_blank_folder_happy_path() {
+        let project = temp_project("init-happy");
+
+        // a. framework install (the AppHandle-free core).
+        install_framework_inner(&project, "9.9.9").unwrap();
+        // b. + c. seed state + starter .gitignore (idempotent helpers).
+        let seeded = fs_utils::seed_state_if_absent(&project.join(".tiki")).unwrap();
+        assert!(seeded, "fresh project must seed a new state.json");
+        let wrote_gitignore = fs_utils::write_starter_gitignore(&project).unwrap();
+        assert!(wrote_gitignore, "fresh project must write a starter .gitignore");
+
+        // .tiki/state.json exists with the EXACT canonical content.
+        let state = std::fs::read_to_string(project.join(".tiki").join("state.json")).unwrap();
+        assert_eq!(
+            state, "{\n  \"schemaVersion\": 1,\n  \"activeWork\": {}\n}\n",
+            "seeded state.json must be the canonical empty-state literal"
+        );
+
+        // .tiki/.framework-version exists and carries the version we passed.
+        let fw_version =
+            std::fs::read_to_string(project.join(".tiki").join(".framework-version")).unwrap();
+        assert_eq!(fw_version, "9.9.9");
+
+        // at least one installed command file and one script file.
+        let commands_dir = project.join(".claude").join("commands").join("tiki");
+        let has_cmd = std::fs::read_dir(&commands_dir)
+            .unwrap()
+            .flatten()
+            .any(|e| e.path().extension().is_some_and(|x| x == "md"));
+        assert!(has_cmd, "at least one .claude/commands/tiki/*.md must be installed");
+
+        let scripts_dir = project.join(".claude").join("tiki").join("scripts");
+        let has_script = std::fs::read_dir(&scripts_dir)
+            .unwrap()
+            .flatten()
+            .any(|e| e.path().extension().is_some_and(|x| x == "mjs"));
+        assert!(has_script, "at least one .claude/tiki/scripts/*.mjs must be installed");
+
+        // reconciler hook is registered in .claude/settings.json.
+        let settings = read_settings(&project);
+        assert!(
+            reconcile_groups(&settings, "Stop") >= 1,
+            "reconciler Stop hook must be present in settings.json"
+        );
+
+        // .gitignore ignores the volatile journal but NOT state.json.
+        let gitignore = std::fs::read_to_string(project.join(".gitignore")).unwrap();
+        assert!(gitignore.contains("journal.ndjson"));
+
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    #[test]
+    fn init_tiki_project_is_idempotent() {
+        let project = temp_project("init-idem");
+
+        // First init.
+        install_framework_inner(&project, "1.0.0").unwrap();
+        assert!(fs_utils::seed_state_if_absent(&project.join(".tiki")).unwrap());
+        assert!(fs_utils::write_starter_gitignore(&project).unwrap());
+
+        // Simulate real work: write an activeWork entry into state.json.
+        let with_work = r#"{"schemaVersion":1,"activeWork":{"issue:42":{"type":"issue","issue":{"number":42,"title":"keep me"},"status":"executing","createdAt":"2026-01-01T00:00:00.000Z","lastActivity":"2026-01-01T00:00:00.000Z"}}}"#;
+        std::fs::write(project.join(".tiki").join("state.json"), with_work).unwrap();
+
+        // Re-run the init core (idempotent path).
+        install_framework_inner(&project, "1.0.0").unwrap();
+        let reseeded = fs_utils::seed_state_if_absent(&project.join(".tiki")).unwrap();
+        assert!(!reseeded, "second seed must NOT write (state.json present)");
+        let wrote_gitignore_again = fs_utils::write_starter_gitignore(&project).unwrap();
+        assert!(!wrote_gitignore_again, "second .gitignore write must be a no-op");
+
+        // The activeWork entry must SURVIVE — seed never clobbered it.
+        let after = std::fs::read_to_string(project.join(".tiki").join("state.json")).unwrap();
+        assert_eq!(after, with_work, "existing activeWork must be preserved byte-for-byte");
+
         std::fs::remove_dir_all(&project).ok();
     }
 }

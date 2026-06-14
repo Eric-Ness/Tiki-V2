@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 283,
+    "title": "Greenfield foundation: init_tiki_project + git-write layer + .gitignore + guarded state seed",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/283"
+  },
+  "createdAt": "2026-06-14T12:20:00.000Z",
+  "research": [
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "init_tiki_project on a blank folder yields a valid .tiki/ (state.json {schemaVersion:1,activeWork:{}}, .framework-version, .claude/commands/tiki/*, .claude/tiki/scripts/*, reconciler hook) and is idempotent — re-running never clobbers an existing state.json.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T12:44:18.830Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "A git_init path initializes a repo and writes the policy .gitignore, with every git spawn routed through hidden_command.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T12:44:18.830Z"
+    },
+    {
+      "id": "SC3",
+      "category": "other",
+      "description": "The command-hygiene source-scan guard still passes (no raw Command::new outside hidden_command).",
+      "verified": true,
+      "verifiedAt": "2026-06-14T12:34:10.535Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "Tests cover the idempotency guard (existing state.json preserved, no backup created) and the blank-folder happy path.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T12:44:18.830Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Git-write layer in github/git.rs",
+      "status": "completed",
+      "content": "Add the net-new git-write layer to apps/desktop/src-tauri/src/github/git.rs (today read-only: only get_current_branch/list_git_branches). Add four functions, each built via super::hidden_command(\"git\") (NEVER raw Command::new — the source-scan guard at github/mod.rs:202-258 fails the build otherwise) with .current_dir(project_path) set UNCONDITIONALLY: (1) git_init(project_path) running `git init -b main` (dev=git 2.43 / CI>=2.40 support -b; an optional one-line `git symbolic-ref HEAD refs/heads/main` catch on -b failure is fine, but do NOT build an ancient-git <2.28 fallback phase/fixture); (2) git_add_remote(project_path, name, url); (3) git_commit_all(project_path, message) doing `git add -A` then `git commit -m <message>` — callers treat failure as non-fatal; (4) git_remote_get(project_path) -> Result<Option<String>, String> running `git remote get-url origin`, mapping the 'no such remote' non-zero exit to Ok(None) and real failures to Err. Mirror the existing error mapping (git.rs:14-28: ErrorKind::NotFound -> 'Git is not installed'; non-zero -> stderr-mapped). Register the public commands in lib.rs's generate_handler! list (append-only).",
+      "verification": [
+        "cargo build (project references, strict) is clean",
+        "cargo test --lib passes including new git tests: git_init creates .git/; git_add_remote + git_remote_get round-trips the origin URL; git_remote_get returns Ok(None) with no remote",
+        "the command-hygiene source-scan guard test (github/mod.rs:202) stays green",
+        "cargo clippy --all-targets --deny warnings is clean"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/github/git.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [],
+      "summary": "git-write layer (git_init -b main, git_add_remote, git_commit_all, git_remote_get) via hidden_command + registered in lib.rs; +3 tests, cargo test --lib 82 pass, clippy clean, hygiene guard green",
+      "completedAt": "2026-06-14T12:30:00.000Z"
+    },
+    {
+      "number": 2,
+      "title": "Guarded state seed + .gitignore writer in fs_utils.rs",
+      "status": "completed",
+      "content": "Add two helpers to apps/desktop/src-tauri/src/fs_utils.rs. (1) seed_state_if_absent(tiki_path: &Path) -> Result<bool, String>: if tiki_path/state.json exists, return Ok(false) WITHOUT writing (do NOT call write_fresh_state — it backs up + clobbers, fs_utils.rs:325-345); else create_dir_all(tiki_path) and atomic_write the EXACT canonical literal {\\n  \\\"schemaVersion\\\": 1,\\n  \\\"activeWork\\\": {}\\n}\\n (the same constant as fs_utils.rs:340) and return Ok(true). The state schema root is additionalProperties:false, so write EXACTLY {schemaVersion, activeWork} — no history/timestamps. (2) write_starter_gitignore(project_root: &Path) -> Result<bool, String>: skip (Ok(false)) if .gitignore exists; else write policy content as a const &str — IGNORE .tiki/journal.ndjson, .tiki/backups/, .tiki/*.broken.json, *.backup, node_modules/, target/, dist/; and COMMIT state.json/plans/releases/research by NOT ignoring them. Add unit tests using the existing harness (fs_utils.rs:391).",
+      "verification": [
+        "cargo test --lib passes including: seed writes the canonical literal when state.json is missing",
+        "seed PRESERVES an existing state.json byte-identical AND creates NO backup file (proves the destructive write_fresh_state path was not taken — the idempotency guard)",
+        "write_starter_gitignore skips when .gitignore present and writes the policy content when absent (asserts it ignores journal.ndjson and does NOT ignore state.json)",
+        "cargo build clean; cargo clippy --all-targets --deny warnings clean"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/fs_utils.rs"
+      ],
+      "dependencies": [],
+      "summary": "seed_state_if_absent (only-if-absent, exact canonical literal, no destructive path) + write_starter_gitignore (commit-state.json policy) in fs_utils.rs; +4 tests incl. idempotency guard (no backup created); cargo test --lib 86 pass; expected dead_code on the 2 helpers resolves in phase 3",
+      "completedAt": "2026-06-14T12:40:00.000Z"
+    },
+    {
+      "number": 3,
+      "title": "install_framework_inner refactor + init_tiki_project command + registration",
+      "status": "completed",
+      "content": "Refactor install_framework (commands.rs:715-765) by extracting its body into a private install_framework_inner(project: &Path, version: &str) -> Result<(), String> so init can call it without an AppHandle round-trip; keep the existing #[tauri::command] install_framework as a thin wrapper over it. Add #[tauri::command] init_tiki_project(app: AppHandle, project_path: String, init_git: Option<bool>) -> Result<Vec<String>, String> returning a warnings list (NOT the 5-boolean InitReport — no consumer renders it). Steps in order: (1) validate project_path exists (mirror install_framework:717); (2) install_framework_inner(&project, &app.package_info().version.to_string()); (3) fs_utils::seed_state_if_absent(&project.join(\".tiki\")); (4) fs_utils::write_starter_gitignore(&project); (5) if init_git (default true) and not already a repo, BEST-EFFORT github::git_init(&project) then git_commit_all(&project, \"chore: initialize Tiki project\") — on failure (e.g. missing git user.name/user.email) push a human-readable string into the warnings Vec and CONTINUE; never abort init. Do NOT call switch_project — the caller (#285) sequences it after, because switch_project (commands.rs:225) hard-requires .tiki to already exist. Register init_tiki_project in lib.rs. NOTE: check_greenfield_readiness is NOT part of this issue (it lives in #284).",
+      "verification": [
+        "cargo build (project references, strict) is clean",
+        "cargo test --lib passes including init_tiki_project_blank_folder_happy_path (asserts .tiki/state.json, .framework-version, at least one command + one script, reconciler hook in .claude/settings.json)",
+        "init_tiki_project_is_idempotent: an activeWork entry written between two init runs survives the second run (no clobber)",
+        "init_tiki_project is registered in lib.rs and callable; cargo clippy --all-targets --deny warnings clean"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [
+        1,
+        2
+      ],
+      "summary": "install_framework_inner refactor (behavior preserved) + init_tiki_project(app, projectPath, initGit) -> Vec<String> warnings: composes inner install + guarded seed + gitignore + best-effort git_init/commit (non-fatal), no switch_project; registered in lib.rs; +2 tests (happy path, idempotency); cargo test --lib 88 pass; clippy --all-targets --deny warnings CLEAN",
+      "completedAt": "2026-06-14T12:55:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      2,
+      3
+    ],
+    "SC2": [
+      1,
+      2,
+      3
+    ],
+    "SC3": [
+      1
+    ],
+    "SC4": [
+      2,
+      3
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T12:20:24.605Z"
+}

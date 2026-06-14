@@ -344,6 +344,72 @@ pub fn write_fresh_state(tiki_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Canonical empty state.json literal — `{"schemaVersion": 1, "activeWork":
+/// {}}`. The state schema root is `additionalProperties: false`, so this seed
+/// must contain EXACTLY these two keys (no `history`, no timestamps) or schema
+/// validation breaks. Identical to the literal `write_fresh_state` writes.
+const CANONICAL_FRESH_STATE: &str = "{\n  \"schemaVersion\": 1,\n  \"activeWork\": {}\n}\n";
+
+/// Starter `.gitignore` content for a freshly-initialized Tiki project.
+///
+/// Policy: ignore the volatile / machine-local files under `.tiki/` (the
+/// intent journal, backups, broken-state snapshots) plus the usual build
+/// artifacts. Everything else under `.tiki/` — `state.json`, `plans/`,
+/// `releases/`, `research/` — is DELIBERATELY committed (it is the durable,
+/// reviewable record of the work), so it is intentionally NOT ignored here.
+const STARTER_GITIGNORE: &str = "# Tiki — volatile / machine-local files (not committed)\n\
+.tiki/journal.ndjson\n\
+.tiki/backups/\n\
+.tiki/*.broken.json\n\
+*.backup\n\
+\n\
+# Note: .tiki/state.json, .tiki/plans/, .tiki/releases/, and .tiki/research/\n\
+# are deliberately COMMITTED (the durable record of the work) — do not ignore.\n\
+\n\
+# Build artifacts\n\
+node_modules/\n\
+target/\n\
+dist/\n";
+
+/// Seed a fresh, canonical `state.json` ONLY if one is absent — the
+/// idempotency guarantee for project init.
+///
+/// If `tiki_path/state.json` already exists, returns `Ok(false)` WITHOUT
+/// reading, backing up, or overwriting it (deliberately never goes through the
+/// destructive `write_fresh_state` path). Otherwise creates the directory tree
+/// and atomic-writes the canonical empty-state literal, returning `Ok(true)`.
+pub fn seed_state_if_absent(tiki_path: &Path) -> Result<bool, String> {
+    let state_file = tiki_path.join("state.json");
+    if state_file.exists() {
+        return Ok(false);
+    }
+
+    std::fs::create_dir_all(tiki_path)
+        .map_err(|e| format!("Failed to create tiki directory: {}", e))?;
+    atomic_write(&state_file, CANONICAL_FRESH_STATE)?;
+
+    log::info!("Seeded canonical state.json at {:?}", state_file);
+    Ok(true)
+}
+
+/// Write a starter `.gitignore` at the project root ONLY if one is absent.
+///
+/// If `project_root/.gitignore` already exists, returns `Ok(false)` and leaves
+/// the user's file untouched (never clobbers). Otherwise writes the starter
+/// content and returns `Ok(true)`.
+pub fn write_starter_gitignore(project_root: &Path) -> Result<bool, String> {
+    let gitignore = project_root.join(".gitignore");
+    if gitignore.exists() {
+        return Ok(false);
+    }
+
+    std::fs::write(&gitignore, STARTER_GITIGNORE)
+        .map_err(|e| format!("Failed to write .gitignore at {:?}: {}", gitignore, e))?;
+
+    log::info!("Wrote starter .gitignore at {:?}", gitignore);
+    Ok(true)
+}
+
 /// Read raw text content of a backup file. Used by the frontend recovery
 /// dialog to (a) preview content and (b) validate parseability before
 /// offering Restore.
@@ -602,5 +668,95 @@ mod tests {
         write_backup(&tiki, "state.2026-05-11T16-30-00.json", "hello world");
         let got = read_backup_content(&tiki, "state.2026-05-11T16-30-00.json").unwrap();
         assert_eq!(got, "hello world");
+    }
+
+    #[test]
+    fn seed_state_if_absent_writes_canonical_when_missing() {
+        let tiki = make_tiki_dir("seed-missing");
+        // Remove the dir entirely so seed must create it from scratch.
+        std::fs::remove_dir_all(&tiki).unwrap();
+
+        let wrote = seed_state_if_absent(&tiki).unwrap();
+        assert!(wrote, "seed should return Ok(true) when state.json was absent");
+
+        let after = std::fs::read_to_string(tiki.join("state.json")).unwrap();
+        // Exact canonical bytes.
+        assert_eq!(after, "{\n  \"schemaVersion\": 1,\n  \"activeWork\": {}\n}\n");
+
+        // Parsed: exactly the two keys, no extras (schema is
+        // additionalProperties:false at the root).
+        let parsed: serde_json::Value = serde_json::from_str(&after).unwrap();
+        let obj = parsed.as_object().unwrap();
+        assert_eq!(obj.len(), 2, "seed must have exactly schemaVersion + activeWork");
+        assert_eq!(parsed["schemaVersion"], 1);
+        assert_eq!(parsed["activeWork"].as_object().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn seed_state_if_absent_preserves_existing() {
+        let tiki = make_tiki_dir("seed-existing");
+        let existing = r#"{"schemaVersion":1,"activeWork":{"issue:42":{}}}"#;
+        write_state(&tiki, existing);
+
+        let wrote = seed_state_if_absent(&tiki).unwrap();
+        assert!(!wrote, "seed should return Ok(false) when state.json exists");
+
+        // File must be byte-identical — seed did not touch it.
+        let after = std::fs::read_to_string(tiki.join("state.json")).unwrap();
+        assert_eq!(
+            after, existing,
+            "existing state.json must be preserved byte-for-byte"
+        );
+
+        // Crucially: NO backup was created. The destructive write_fresh_state
+        // path backs up before overwriting; seed must never take that path.
+        let backups_dir = tiki.join("backups");
+        let backup_count = if backups_dir.exists() {
+            std::fs::read_dir(&backups_dir).unwrap().flatten().count()
+        } else {
+            0
+        };
+        assert_eq!(
+            backup_count, 0,
+            "seed must not create any backup (proves the destructive path was not taken)"
+        );
+    }
+
+    #[test]
+    fn write_starter_gitignore_skips_existing() {
+        let root = make_tiki_dir("gitignore-existing");
+        let sentinel = "# user's own gitignore\nmy-secret-file\n";
+        std::fs::write(root.join(".gitignore"), sentinel).unwrap();
+
+        let wrote = write_starter_gitignore(&root).unwrap();
+        assert!(!wrote, "should return Ok(false) when .gitignore already exists");
+
+        let after = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert_eq!(after, sentinel, "existing .gitignore must be left untouched");
+    }
+
+    #[test]
+    fn write_starter_gitignore_writes_when_absent() {
+        let root = make_tiki_dir("gitignore-absent");
+
+        let wrote = write_starter_gitignore(&root).unwrap();
+        assert!(wrote, "should return Ok(true) when .gitignore is absent");
+
+        let content = std::fs::read_to_string(root.join(".gitignore")).unwrap();
+        assert!(
+            content.contains("journal.ndjson"),
+            "starter .gitignore should ignore the intent journal"
+        );
+        // state.json is deliberately committed — there must be no line that
+        // ignores it.
+        let ignores_state = content
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .any(|l| l.contains("state.json"));
+        assert!(
+            !ignores_state,
+            "starter .gitignore must NOT ignore state.json (it is committed)"
+        );
     }
 }

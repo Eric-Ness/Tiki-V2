@@ -1,13 +1,5 @@
-{"ts":"2026-06-13T20:24:38.054Z","workId":"issue:281","step":"GET","event":"start","title":"Surface unverified visual success criteria in shipped plans (gate warn + desktop pending list)"}
-{"ts":"2026-06-13T20:24:38.822Z","workId":"issue:281","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T20:25:42.668Z","workId":"issue:281","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T20:26:38.455Z","workId":"issue:281","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T20:26:38.822Z","workId":"issue:281","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T20:44:34.649Z","workId":"issue:282","step":"GET","event":"start","title":"pnpm lint has 36 pre-existing errors and isn't in CI — clear them + gate lint"}
-{"ts":"2026-06-13T20:44:35.372Z","workId":"issue:282","step":"REVIEW","event":"start"}
-{"ts":"2026-06-13T20:50:26.055Z","workId":"issue:282","step":"PLAN","event":"start"}
-{"ts":"2026-06-13T20:51:20.635Z","workId":"issue:282","step":"AUDIT","event":"start"}
-{"ts":"2026-06-13T20:51:21.054Z","workId":"issue:282","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T20:56:59.385Z","workId":"issue:282","step":"SHIP","event":"start"}
-{"ts":"2026-06-13T20:59:20.279Z","workId":"release:v0.9.4","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-13T21:04:39.935Z","workId":"release:v0.9.4","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T03:00:03.669Z","workId":"issue:283","step":"GET","event":"start","title":"Greenfield foundation: init_tiki_project + git-write layer + .gitignore + guarded state seed"}
+{"ts":"2026-06-14T12:15:33.390Z","workId":"issue:283","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T12:19:52.990Z","workId":"issue:283","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T12:27:23.580Z","workId":"issue:283","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T12:47:32.565Z","workId":"issue:283","step":"SHIP","event":"start"}

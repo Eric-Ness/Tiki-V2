@@ -1,0 +1,16 @@
+{
+  "version": "v1.0.0",
+  "status": "active",
+  "description": "Greenfield onboarding — blank folder to a working, GitHub-wired Tiki project (Epic A skeleton) + the /tiki:scaffold scoping interview (Epic B) + CLAUDE.md generation from the brief (Epic C, #294). Templates (#293) deferred to v1.1.",
+  "issues": [
+    { "number": 283, "title": "Greenfield foundation: init_tiki_project + git-write layer + .gitignore + guarded state seed" },
+    { "number": 284, "title": "Greenfield readiness checklist: per-row detect + Fix (extend DiagnosticsPanel)" },
+    { "number": 285, "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder" },
+    { "number": 287, "title": "Guided 'Create GitHub repo' + wire origin (terminal-assisted)" },
+    { "number": 289, "title": "/tiki:scaffold: bounded interview loop to project brief" },
+    { "number": 290, "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate" },
+    { "number": 291, "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff" },
+    { "number": 294, "title": "Generate CLAUDE.md from the greenfield project brief" }
+  ],
+  "createdAt": "2026-06-14T12:25:00.000Z"
+}
