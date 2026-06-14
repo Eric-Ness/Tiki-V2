@@ -14,27 +14,46 @@ import {
 import { terminalFocusRegistry } from "../../stores/terminalStore";
 import "./ProjectsSection.css";
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Write a command to the active terminal and focus it. Mirrors the module-private
- * `writeToActiveTerminal` in `useCommandActions.ts` / `GreenfieldChecklist.tsx`
- * (getState() reads, not hooks). Returns the terminal id on success, or null when
- * no terminal exists for the active project.
+ * Resolve a specific project's active terminal id (getState() reads, not hooks).
+ * After `setActiveProject`, TerminalPane auto-creates the project's initial tab
+ * asynchronously, so this is wrapped in a short bounded retry by callers.
  */
-async function writeToActiveTerminal(command: string): Promise<string | null> {
-  const projectId = useProjectsStore.getState().activeProjectId ?? "default";
+function resolveActiveTerminalId(projectId: string): string | null {
   const termState = useTerminalStore.getState();
   const tabs = termState.tabsByProject[projectId] ?? [];
   const activeTabId = termState.activeTabByProject[projectId] ?? null;
-  const activeTab = tabs.find((t) => t.id === activeTabId);
-  if (!activeTab) return null;
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
+  return activeTab?.activeTerminalId ?? null;
+}
+
+/**
+ * Write a command to a SPECIFIC project's active terminal and focus it. Unlike
+ * the generic `writeToActiveTerminal` in `useCommandActions.ts`, this targets a
+ * project by id so the command can never land in a different project's terminal.
+ * Polls a handful of times (~1s total) to let TerminalPane's auto-created initial
+ * terminal appear after a project switch. Returns the terminal id on success, or
+ * null if no terminal materializes within the retry window.
+ */
+async function writeToProjectTerminal(
+  projectId: string,
+  command: string
+): Promise<string | null> {
+  let terminalId: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    terminalId = resolveActiveTerminalId(projectId);
+    if (terminalId) break;
+    await sleep(200);
+  }
+  if (!terminalId) return null;
 
   try {
-    await invoke("write_terminal", {
-      id: activeTab.activeTerminalId,
-      data: command,
-    });
-    terminalFocusRegistry.focus(activeTab.activeTerminalId);
-    return activeTab.activeTerminalId;
+    await invoke("write_terminal", { id: terminalId, data: command });
+    terminalFocusRegistry.focus(terminalId);
+    return terminalId;
   } catch {
     return null;
   }
@@ -170,8 +189,19 @@ export function ProjectsSection() {
           // 2. Switch the watcher — must come AFTER init since switch_project
           //    hard-requires .tiki to exist.
           await invoke("switch_project", { path: selectedPath });
-          // 3. Add to the store.
+          // 3. Add to the store and explicitly select the NEW project so it's
+          //    highlighted and `activeProjectId` points at it. addProject's
+          //    global rule only auto-selects when nothing is active, so when
+          //    another project is already active we must select it here — both
+          //    so the UI highlights it AND so the create-repo handoff below
+          //    targets the new project's terminal (#297).
           addProject(selectedPath, folderName);
+          const newProjectId = useProjectsStore
+            .getState()
+            .projects.find((p) => p.path === selectedPath)?.id;
+          if (newProjectId) {
+            setActiveProject(newProjectId);
+          }
 
           // Surface any non-fatal init warnings as a toast.
           if (warnings.length > 0) {
@@ -193,16 +223,22 @@ export function ProjectsSection() {
           if (createRepo) {
             // `gh repo create --source=. --remote=origin` creates the repo AND
             // wires `origin` in one shot. The gh command prompts for auth in the
-            // terminal itself, so no auth preflight here. Hand off to the active
-            // terminal and surface it; if none exists, guide the user.
-            const terminalId = await writeToActiveTerminal(
-              "gh repo create --source=. --remote=origin\n"
-            );
+            // terminal itself, so no auth preflight here. Hand off to the NEW
+            // project's terminal *by id* — never a different (previously-active)
+            // project's terminal (#297). setActiveProject above makes
+            // TerminalPane auto-create that terminal asynchronously, so the
+            // helper polls briefly for it to appear.
+            const terminalId = newProjectId
+              ? await writeToProjectTerminal(
+                  newProjectId,
+                  "gh repo create --source=. --remote=origin\n"
+                )
+              : null;
             if (terminalId === null) {
               useToastStore
                 .getState()
                 .addToast(
-                  "Open a terminal (Start Claude), then create the repo from Settings → readiness checklist",
+                  `Open a terminal in ${folderName}, then create the repo from Settings → readiness checklist`,
                   "warning",
                   8000
                 );

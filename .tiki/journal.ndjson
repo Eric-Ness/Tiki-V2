@@ -1,10 +1,5 @@
-{"ts":"2026-06-14T14:57:53.450Z","workId":"issue:295","step":"GET","event":"start","title":"Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)"}
-{"ts":"2026-06-14T14:57:54.376Z","workId":"issue:295","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T14:58:28.799Z","workId":"issue:295","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T14:58:29.204Z","workId":"issue:295","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T15:01:12.708Z","workId":"issue:295","step":"SHIP","event":"start"}
-{"ts":"2026-06-14T15:49:54.866Z","workId":"issue:296","step":"GET","event":"start","title":"Preserve terminal state across project switches (don't unmount on switch)"}
-{"ts":"2026-06-14T15:49:55.937Z","workId":"issue:296","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T15:50:32.171Z","workId":"issue:296","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T15:50:32.554Z","workId":"issue:296","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T15:54:54.635Z","workId":"issue:296","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T15:56:44.940Z","workId":"issue:297","step":"GET","event":"start","title":"Initialize flow: select new project + send create-repo to the correct terminal"}
+{"ts":"2026-06-14T15:56:45.987Z","workId":"issue:297","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T15:57:56.797Z","workId":"issue:297","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T15:57:57.321Z","workId":"issue:297","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T16:01:30.587Z","workId":"issue:297","step":"SHIP","event":"start"}

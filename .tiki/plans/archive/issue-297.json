@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 297,
+    "title": "Initialize flow: select new project + send create-repo to the correct terminal",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/297"
+  },
+  "createdAt": "2026-06-14T16:20:00.000Z",
+  "research": [
+    "greenfield-onboarding"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "After Initialize, the newly-added project is the selected/active (highlighted) project.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:01:30.370Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "The post-init 'create a GitHub repo' command runs in the NEW project's directory (its own terminal), never a previously-active project's; with no terminal available it toasts rather than misfiring.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:01:30.370Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Select the new project after init + target its terminal for the create-repo handoff",
+      "status": "completed",
+      "content": "Fix the Initialize flow in apps/desktop/src/components/sidebar/ProjectsSection.tsx (the branch from #285/#295). Two root causes: (1) projectsStore.addProject only auto-selects the new project when none is active (`activeProjectId: state.activeProjectId ?? newProject.id`), so adding a project while another is active leaves the OLD one highlighted; (2) the #295 create-repo handoff (and the local writeToActiveTerminal helper) targets `activeProjectId`'s terminal, so the gh command went to the OLD project's terminal/dir. FIX: (a) After a successful init (`init_tiki_project` -> `switch_project` -> `addProject`), explicitly call `setActiveProject(newProjectId)` from the projects store so the NEW project becomes selected/highlighted and `activeProjectId` is correct. Get the new project's id from the store (addProject generates the id; read it back — e.g. find the project whose path === selectedPath in useProjectsStore.getState().projects, or have addProject's selection be set explicitly). Do NOT globally change addProject's auto-select rule (other callers depend on it) — call setActiveProject explicitly in this flow. (b) Rework the post-init create-repo handoff so it targets the NEW project BY ID, never generic 'active': after setActiveProject(newId), the new project's initial terminal is auto-created asynchronously by TerminalPane's effect, so look up `tabsByProject[newId]` and its active terminal with a SHORT BOUNDED retry (e.g. poll a few times over ~1s) for the terminal to appear; once it has an activeTerminalId, invoke('write_terminal', {id, data:'gh repo create --source=. --remote=origin\\n'}) + focus it + switch to the terminal view. If after the bounded wait there is still no terminal, show a toast (e.g. 'Open a terminal in <project>, then create the repo from Settings > checklist') instead of writing to the wrong place. Keep the existing window.confirm prompt, the decline=no-op, and the isInitializing flow. Note: after #296 terminals persist per project, so the new project's terminal will be there once created. Keep no fresh-ref violations (helpers use getState(), not selectors).",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (fresh-ref + exhaustive-deps)",
+        "VISUAL (tauri:dev): with project A already active, Add+Initialize a blank folder B -> B becomes the selected/highlighted project; accepting the 'create a GitHub repo?' prompt writes 'gh repo create --source=. --remote=origin' into B's OWN terminal (B's directory), NOT A's; if B has no terminal a toast appears instead of a misfire"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx"
+      ],
+      "summary": "Init flow: read back new project id + setActiveProject(newId) (new project now selected/highlighted); create-repo handoff replaced with writeToProjectTerminal(newId) — id-targeted, bounded retry (~1s), toast fallback, never the stale active terminal. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T16:30:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T15:57:56.991Z"
+}

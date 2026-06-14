@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 296,
-      "title": "Preserve terminal state across project switches (don't unmount on switch)",
-      "completedAt": "2026-06-14T15:55:37.020Z"
+      "number": 297,
+      "title": "Initialize flow: select new project + send create-repo to the correct terminal",
+      "completedAt": "2026-06-14T16:02:20.300Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 297,
+        "title": "Initialize flow: select new project + send create-repo to the correct terminal",
+        "completedAt": "2026-06-14T16:02:20.300Z"
+      },
       {
         "number": 296,
         "title": "Preserve terminal state across project switches (don't unmount on switch)",
