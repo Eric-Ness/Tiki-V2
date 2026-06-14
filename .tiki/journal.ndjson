@@ -3,13 +3,8 @@
 {"ts":"2026-06-14T13:11:14.625Z","workId":"issue:285","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T13:11:14.981Z","workId":"issue:285","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T13:13:51.296Z","workId":"issue:285","step":"SHIP","event":"start"}
-{"ts":"2026-06-14T13:27:08.303Z","workId":"issue:290","step":"GET","event":"start","title":"/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate"}
-{"ts":"2026-06-14T13:27:09.174Z","workId":"issue:290","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T13:27:45.469Z","workId":"issue:290","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T13:27:45.794Z","workId":"issue:290","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T13:32:21.391Z","workId":"issue:290","step":"SHIP","event":"start"}
-{"ts":"2026-06-14T13:33:45.388Z","workId":"issue:291","step":"GET","event":"start","title":"/tiki:scaffold: two-pass GitHub push + release grouping + handoff"}
-{"ts":"2026-06-14T13:33:46.339Z","workId":"issue:291","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T13:34:26.951Z","workId":"issue:291","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T13:34:27.287Z","workId":"issue:291","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T13:39:25.192Z","workId":"issue:291","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T13:40:48.324Z","workId":"issue:294","step":"GET","event":"start","title":"Generate CLAUDE.md from the greenfield project brief"}
+{"ts":"2026-06-14T13:40:49.218Z","workId":"issue:294","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T13:41:28.968Z","workId":"issue:294","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T13:41:29.270Z","workId":"issue:294","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T13:45:20.413Z","workId":"issue:294","step":"SHIP","event":"start"}

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 294,
+    "title": "Generate CLAUDE.md from the greenfield project brief",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/294"
+  },
+  "createdAt": "2026-06-14T14:55:00.000Z",
+  "research": [
+    "scaffold-interview-design",
+    "greenfield-implementation-plans",
+    "greenfield-onboarding"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "A CLAUDE.md is generated from an existing project brief with NO duplicate interviewing (no AskUserQuestion in the synthesis path).",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:45:20.200Z"
+    },
+    {
+      "id": "SC2",
+      "category": "documentation",
+      "description": "The output covers overview + structure + conventions (+ what-needs-to-be-true) and is editable/reviewable before write.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:45:20.200Z"
+    },
+    {
+      "id": "SC3",
+      "category": "testing",
+      "description": "The new command passes commands-sync (dogfood parity) + the forbidden-phrase scan; framework suite green; contains zero state.mjs.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:45:20.200Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Author /tiki:claudemd command (read brief -> synthesize CLAUDE.md -> review gate)",
+      "status": "completed",
+      "content": "Create a NEW framework command packages/framework/commands/claudemd.md that generates a CLAUDE.md from a greenfield project brief (written by /tiki:scaffold #289). Read packages/framework/commands/research.md FIRST (frontmatter + the Merge/Overwrite/Cancel review-gate pattern at ~research.md:33) and the repo's own CLAUDE.md as the QUALITY BAR (Project Overview / Repository Structure / Development Commands / Architecture / conventions). Also read .tiki/research/scaffold-interview-design.md for the brief's section schema (Overview / Users & problem / Type & stack / Scope / Constraints / What needs to be true / Proposed epics) + the type:/stack: frontmatter keys #289 stamps. Author claudemd.md with: (a) frontmatter: name: claudemd, description, argument: [slug] (optional), tools: Bash, Read, Write, Glob, AskUserQuestion. (b) <instructions>: STEP 1 locate the brief — accept an optional <slug> arg; else Glob .tiki/research/*-brief.md; if exactly one, use it; if many, ask WHICH brief (a legitimate disambiguation, NOT a re-interview); if NONE, error with a 'run /tiki:scaffold first' hint. STEP 2 parse the brief frontmatter (topic/tags/type/stack) + the known section headings. STEP 3 synthesize a CLAUDE.md mapping brief -> Project Overview (Overview+Users) / Repository Structure (from type+stack; greenfield so MARK aspirational parts with 'TODO:' rather than inventing paths) / Development Commands (infer pnpm/cargo/uv from type+stack) / Conventions (Constraints + non-functional) / 'What needs to be true' (the brief's project-wide section). CRITICAL (SC1): the synthesis path must contain NO AskUserQuestion EXCEPT the final review gate and the multi-brief disambiguation — encode missing facts as 'TODO:' placeholders, NEVER ask the user a question already answered in the brief. STEP 4 review gate: render the synthesized CLAUDE.md and AskUserQuestion (Write it / Edit a section / Regenerate / Cancel), and if a CLAUDE.md already exists offer Merge/Overwrite/Cancel (clone research.md:33). On approval, Write to <project>/CLAUDE.md with the Write tool. (c) <output> + <errors> (no-brief / write-failed) + <next-actions>. HARD CONSTRAINTS (tested): ZERO 'state.mjs' strings (this command never drives the pipeline — like scaffold it stays OFF the transition-coverage tables); AVOID the forbidden ack-phrases (esp. /write .* directly in (the )?JSON/i) — describe writes as 'Write ... with the Write tool'. After writing claudemd.md, run `node packages/framework/install.js` to regen the dogfood copy at .claude/commands/tiki/claudemd.md, then revert any non-claudemd.md changes (settings.json/.framework-version) so the change set is the two claudemd.md files.",
+      "verification": [
+        "diff packages/framework/commands/claudemd.md .claude/commands/tiki/claudemd.md is empty (dogfood parity)",
+        "pnpm -C packages/framework test passes — commands-sync (now includes claudemd.md) + command-transition-coverage (forbidden-phrase scan) — report pass count",
+        "grep -c 'state.mjs' packages/framework/commands/claudemd.md == 0; no forbidden ack-phrases; AskUserQuestion appears ONLY in the final review gate + multi-brief disambiguation (not in synthesis)",
+        "the command documents: brief location/glob/disambiguation, the brief->CLAUDE.md section mapping with TODO placeholders for aspirational parts, the no-re-interview rule, and the review/Merge gate before write",
+        "git status shows only the two claudemd.md files changed (plus .tiki workflow files)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3"
+      ],
+      "files": [
+        "packages/framework/commands/claudemd.md",
+        ".claude/commands/tiki/claudemd.md"
+      ],
+      "summary": "Authored /tiki:claudemd: locate brief (slug/glob/disambiguate/no-brief err) -> parse frontmatter+sections -> synthesize CLAUDE.md (Overview/Structure[TODO aspirational]/Dev-Commands/Conventions/What-needs-to-be-true) -> review+Merge gate -> Write. No AskUserQuestion in synthesis (no re-interview). Framework 166 pass, dogfood identical, zero state.mjs, no forbidden phrases. SC1/SC2 runtime-LLM",
+      "completedAt": "2026-06-14T15:02:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:41:29.070Z"
+}

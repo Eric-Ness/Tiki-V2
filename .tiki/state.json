@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 291,
-      "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff",
-      "completedAt": "2026-06-14T13:39:53.953Z"
+      "number": 294,
+      "title": "Generate CLAUDE.md from the greenfield project brief",
+      "completedAt": "2026-06-14T13:45:49.058Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 294,
+        "title": "Generate CLAUDE.md from the greenfield project brief",
+        "completedAt": "2026-06-14T13:45:49.058Z"
+      },
       {
         "number": 291,
         "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff",
