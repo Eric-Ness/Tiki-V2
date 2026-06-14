@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 291,
+    "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/291"
+  },
+  "createdAt": "2026-06-14T14:38:00.000Z",
+  "research": [
+    "scaffold-interview-design",
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "On confirm, all draft issues are created on GitHub with labels (+ optional milestone) and their numbers captured.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:39:24.975Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "Dependents get 'Depends on #N' injected (pass B) and a .tiki/releases/{version}.json grouping is written (issues as {number,title}) so the dependency graph renders the edges.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:39:24.975Z"
+    },
+    {
+      "id": "SC3",
+      "category": "other",
+      "description": "Unauthenticated gh aborts with guidance; re-running on a fully OR partially pushed draft does not double-create issues (idempotent via an idmap + pre-create probe).",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:39:24.975Z"
+    },
+    {
+      "id": "SC4",
+      "category": "testing",
+      "description": "scaffold.md still passes commands-sync + the forbidden-phrase scan; framework suite green; still zero state.mjs.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T13:39:24.975Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Append the gated two-pass push + release grouping to scaffold.md",
+      "status": "completed",
+      "content": "APPEND to packages/framework/commands/scaffold.md the gated GitHub-push stage (the 'Push to GitHub' branch of #290's review gate), per .tiki/research/scaffold-interview-design.md 'Gated push'. Read the existing scaffold.md + design doc first. Add <step>s: (1) PREFLIGHT `gh auth status` — abort with a 'run gh auth login' hint on failure (SC3). (2) OPTIONAL milestone: if manifest.milestone is set and absent, create it via `gh api repos/{owner}/{repo}/milestones -f title=... -f state=open`. (3) PASS A — for each manifest issue: `gh issue create --title <t> --body-file .tiki/onboarding/draft/issue-<localId>.md --label <l>... [--milestone <m>]`; parse the new #N from the returned URL (the last path segment, mirroring how the desktop create_github_issue parses it). Build a localId->#N map. (4) PASS B — for every issue with dependsOn: re-render its body replacing each `{{localId}}` token with `Depends on #<resolved>` (inject into the DEPENDENT's body — verified edge direction N->X), then `gh issue edit <#N> --body-file <rerendered>`. (5) Write `.tiki/releases/{version}.json` with the Write tool: { version, status: 'active', issues: [{number,title}...ALL created], createdAt } — REQUIRED so the dependency graph renders the issues/edges (ungrouped issues are not even nodes). (6) Backfill the brief's issues:[] frontmatter with the real numbers. (7) Move .tiki/onboarding/draft/ -> .tiki/onboarding/pushed/ so a resume cannot double-create. (8) <next-actions>: /tiki:get <first-issue> / /tiki:release {version} / open the board.\n\nPARTIAL-PUSH HARDENING (the audit's top must-fix — SC3 covers the PARTIAL case, not just the clean re-run): the idmap (localId->#N) MUST be persisted to .tiki/onboarding/draft/idmap.json AFTER EACH create (not just at the end), AND before each Pass-A create do a pre-create existence probe `gh issue list --search \"<title> in:title\" --json number,title` (or check idmap.json) and SKIP creating any issue whose localId is already in idmap.json OR whose exact title already exists — so a re-run after a mid-push failure (create succeeded but URL-parse/idmap-write failed) does not create duplicates. Only move draft->pushed AFTER the release file is written and the brief backfilled.\n\nHARD CONSTRAINTS (tested): the file must STILL contain ZERO 'state.mjs' strings. AVOID the forbidden ack-phrases — when describing the release-file write, say 'Write the release definition file with the Write tool' (NEVER 'write ... directly in JSON', which matches the banned regex). After editing, run `node packages/framework/install.js`, then revert any non-scaffold.md changes (settings.json/.framework-version) so the change set is just the two scaffold.md files.",
+      "verification": [
+        "diff packages/framework/commands/scaffold.md .claude/commands/tiki/scaffold.md is empty (dogfood parity)",
+        "pnpm -C packages/framework test passes (commands-sync + command-transition-coverage incl. forbidden-phrase scan) — report pass count",
+        "grep -c 'state.mjs' packages/framework/commands/scaffold.md == 0; no forbidden ack-phrases (esp. /write .* directly in (the )?JSON/i); release-file write phrased as a Write-tool write",
+        "the push stage documents: gh auth preflight, two-pass create+edit, the idmap.json-after-each-create + pre-create existence probe (partial-push idempotency), the release-grouping write, brief backfill, draft->pushed move, and next-actions handoff",
+        "git status shows only the two scaffold.md files changed (plus .tiki workflow files)"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2",
+        "SC3",
+        "SC4"
+      ],
+      "files": [
+        "packages/framework/commands/scaffold.md",
+        ".claude/commands/tiki/scaffold.md"
+      ],
+      "summary": "Appended gated two-pass push to scaffold.md: gh auth preflight, optional milestone, Pass A create (parse #N from URL) w/ incremental idmap.json + pre-create existence probe (partial-push idempotency), Pass B inject Depends on #N into dependents, Write release def .tiki/releases/{version}.json, backfill brief, draft->pushed move, next-actions. Framework 166 pass, dogfood identical, zero state.mjs, no forbidden phrases. SC1-3 runtime-LLM",
+      "completedAt": "2026-06-14T14:48:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ],
+    "SC3": [
+      1
+    ],
+    "SC4": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T13:34:27.062Z"
+}

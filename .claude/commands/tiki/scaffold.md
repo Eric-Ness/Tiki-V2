@@ -100,7 +100,61 @@ separate capabilities that append to this same flow; this stage ends with a clea
     Nothing has touched GitHub at this point. Only **Push to GitHub** crosses into outward-facing work.
   </step>
 
-  <step>**Push-to-GitHub handoff (boundary of this stage).** If the user chose **Push to GitHub**, this stage's job is done: **hand off** to the downstream push capability rather than creating issues here. State clearly that the staged draft under `.tiki/onboarding/draft/` is ready to push, and that the push capability will create the GitHub issues, swap every `{{localId}}` token for the real `Depends on #N`, group the issues into a release, and backfill the brief's `issues:` front-matter. Present the `<next-actions>` handoff. (The actual `gh` create/edit two-pass is intentionally NOT implemented in this stage.)</step>
+  ## The gated push (two-pass GitHub create) — only on "Push to GitHub"
+
+  This is the final stage. It runs ONLY when the user chose **Push to GitHub** at the review gate (or **Push the spine to GitHub** in the `<next-actions>` follow-on). It reads the staged draft under `.tiki/onboarding/draft/`, creates real GitHub issues in two passes (create, then inject resolved dependency edges), groups them into a release so the dependency graph renders them, backfills the brief, and moves the draft to `.tiki/onboarding/pushed/` so a resume can never double-create. Scaffold still drives no pipeline here — no `transition`, no journal; issue numbers come into existence only as `gh` returns them.
+
+  **Idempotency contract (a push interrupted mid-flight must be safely re-runnable).** The danger is a PARTIAL push: creates succeed for issues 1..k, then issue k+1 (or the network) fails. A naive re-run would create issue 1..k a second time. Two safeguards prevent that, and BOTH are mandatory:
+  - **Persist the `localId → #N` map incrementally.** Maintain `.tiki/onboarding/draft/idmap.json` — a JSON object mapping each `localId` to its created issue number. **Write it with the Write tool after EACH successful create**, not once at the end. If the run dies after issue k, the map on disk already records issues 1..k.
+  - **Probe before every create.** BEFORE creating any issue in Pass A, check whether it already exists: (a) if its `localId` is already a key in `idmap.json`, it was created on a prior run — SKIP it and reuse the recorded `#N`; (b) otherwise probe GitHub for an exact title match via `gh issue list --search "<title> in:title" --json number,title` and, if a row's `title` matches exactly, record that number into `idmap.json` and SKIP the create. Only create when neither check finds the issue. This makes Pass A converge to the same `localId → #N` map whether it runs once cleanly or resumes after a mid-push failure.
+
+  <step>**Preflight auth (abort on failure).** Run, via Bash, `gh auth status`. If it exits non-zero, **abort the push** (the local draft is untouched and still resumable) and tell the user to run `gh auth login`, then re-run **`/tiki:scaffold resume`** and choose **Push to GitHub** again. Surface the `push-auth-failed` error. Do NOT attempt any `gh issue create` while unauthenticated.</step>
+
+  <step>**Load the draft and resolve the repo.** Read `.tiki/onboarding/draft/manifest.json` for the epics, issues, `version`, and `milestone`. Read each issue's `bodyFile` (`issue-<localId>.md`). Read `.tiki/onboarding/draft/idmap.json` if it exists (a prior partial push) into the in-memory `localId → #N` map; otherwise start with an empty map. Determine `{owner}/{repo}` from the current repo (`gh repo view --json owner,name --jq '.owner.login + "/" + .name'`) for the milestone API call below.</step>
+
+  <step>**Optional milestone.** If `manifest.milestone` is set (non-null) and a milestone with that title does not already exist, create it:
+    ```bash
+    gh api repos/{owner}/{repo}/milestones -f title="{milestone}" -f state=open
+    ```
+    Check existence first with `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="{milestone}") | .number'`; only create when absent (so a re-run does not duplicate the milestone). If `manifest.milestone` is null/absent, skip this step and omit `--milestone` from the creates below.</step>
+
+  <step>**Pass A — create the issues.** Process the manifest's `issues` in order. For EACH issue:
+    1. **Existence probe (idempotency).** If the issue's `localId` is already a key in the in-memory `idmap` (loaded from `idmap.json`), SKIP creation and keep the recorded `#N`. Otherwise run `gh issue list --search "<title> in:title" --json number,title` and, if any returned row's `title` exactly equals this issue's `title`, record that row's `number` into the map and SKIP creation. Only if neither finds it do you create.
+    2. **Create.** `gh issue create --title "<title>" --body-file .tiki/onboarding/draft/issue-<localId>.md --label "<label>" [--label "<label>" …] [--milestone "{milestone}"]` — one `--label` per label in the issue's `labels`, and `--milestone` only when `manifest.milestone` is set. `gh issue create` prints the new issue's URL to stdout on success.
+    3. **Parse the number.** Take the last path segment of that URL (split on `/`, take the final component — mirroring how the desktop's `create_github_issue` parses the number via `rsplit('/').next()` in `apps/desktop/src-tauri/src/github/issues.rs`) and parse it as the integer `#N`.
+    4. **Persist immediately.** Record `localId → #N` into the in-memory map AND **Write `.tiki/onboarding/draft/idmap.json` with the Write tool right now** (after THIS create), before moving to the next issue. This incremental persist is what makes a mid-push failure resumable without duplicates.
+
+    After Pass A, the `idmap` covers every manifest issue (`localId → #N`).</step>
+
+  <step>**Pass B — inject the resolved dependency edges.** For every manifest issue that has a non-empty `dependsOn`, re-render its body: replace each `{{localId}}` placeholder token with `Depends on #<resolved>`, where `<resolved>` is `idmap[localId]` (the dependency's real number). Per the edge-direction rule, the dependency line lives in the DEPENDENT issue's body, so injecting `Depends on #<dep>` into issue X's body yields the graph edge `dep → X`. Then push the rewritten body:
+    ```bash
+    gh issue edit <#N> --body-file <rerendered-body-file>
+    ```
+    where `<#N>` is the dependent issue's own number (`idmap[its localId]`). Issues whose `dependsOn` is empty keep their `## Dependencies` `None` body and need no edit. Re-running Pass B is safe — re-applying the same resolved bodies is idempotent.</step>
+
+  <step>**Write the release definition file with the Write tool.** Group every created issue into one release so the dependency graph renders them — the graph only shows issues grouped into a release; ungrouped issues are not even nodes. **Write `.tiki/releases/{version}.json` with the Write tool** (`{version}` = the manifest's `version`; create `.tiki/releases/` if absent), with this shape:
+    ```json
+    {
+      "version": "{version}",
+      "status": "active",
+      "issues": [
+        { "number": 101, "title": "Stand up the project skeleton" }
+      ],
+      "createdAt": "{ISO 8601 timestamp now}"
+    }
+    ```
+    Include EVERY issue from the manifest, each as a `{ number, title }` object using the resolved `#N` from `idmap` and the manifest title. This release grouping is REQUIRED — without it the dependency edges injected in Pass B have no graph to render in. (The framework cannot call `save_tiki_release` — that's a desktop-only Tauri IPC — so author this file with the Write tool, exactly as `release.md` does when no release file exists yet.)</step>
+
+  <step>**Backfill the brief front-matter.** Edit `.tiki/research/<slug>-brief.md` so its `issues: []` front-matter key lists the real created numbers, e.g. `issues: [101, 102, 103]` (ascending). This closes the loop the front-matter schema's `# backfilled with real #N after the spine is pushed` comment promised, so the brief surfaces the live issues during `/tiki:plan` and `/tiki:execute`.</step>
+
+  <step>**Move the draft to `pushed/` (LAST, after the release file and backfill are done).** Only after the release definition is written AND the brief is backfilled, move the staged draft out of the way so a later `resume` cannot re-enter the push and double-create:
+    ```bash
+    mkdir -p .tiki/onboarding
+    mv .tiki/onboarding/draft .tiki/onboarding/pushed
+    ```
+    Ordering matters: if the run is interrupted BEFORE this move, the draft (with its incrementally-persisted `idmap.json`) stays under `draft/` and a `resume` re-enters the push, skips the already-created issues via the existence probe, and completes the remaining steps. The move is the commit point that marks the push complete.</step>
+
+  <step>**Hand off via `<next-actions>`.** The spine is now live on GitHub, grouped into `{version}`, with dependency edges resolved. Present the `<next-actions>` follow-on so the user can start work: `/tiki:get <first-issue>` to begin the first issue, `/tiki:release {version}` to drive the whole wave, or open the desktop board to see the dependency graph.</step>
 </instructions>
 
 <front-matter-schema>
@@ -247,7 +301,7 @@ After rendering the spine tree in chat, present exactly ONE AskUserQuestion. Not
     description: "Remove .tiki/onboarding/draft/ (transient scratch) and stop"
 
 Branch behavior:
-- **Push to GitHub** → hand off to the downstream push capability (the boundary of this stage; it does not call `gh` here).
+- **Push to GitHub** → run the gated two-pass push stage above (preflight auth, create issues, inject resolved edges, write the release definition, backfill the brief, move the draft to `pushed/`), then present the `<next-actions>` follow-on.
 - **Edit a draft** → point at the draft files and instruct `/tiki:scaffold resume` after editing.
 - **Save draft & exit** → stop with the draft intact.
 - **Discard** → remove the draft directory with Bash (`rm -rf .tiki/onboarding/draft`) and stop.
@@ -287,20 +341,23 @@ Branch behavior:
   <error type="dangling-dependency">
     Issue "{localId}" lists a dependency on "{missingLocalId}", which is not an issue in the draft manifest. Every `dependsOn` entry must resolve to another issue's `localId`, or the downstream push stage will leave a stranded `{{token}}` in the body. Fix `.tiki/onboarding/draft/manifest.json` (add the missing issue or correct the id) and re-render before reviewing.
   </error>
+  <error type="push-auth-failed">
+    `gh auth status` failed, so the GitHub push cannot proceed. The staged draft under `.tiki/onboarding/draft/` is untouched and still resumable — nothing was created. Run `gh auth login`, then re-run `/tiki:scaffold resume` and choose **Push to GitHub** again. (If a prior push got partway, its `idmap.json` records what was already created — the re-run probes for and skips those, so no duplicates.)
+  </error>
 </errors>
 
 <next-actions>
-The review gate (above) is the primary branch point for the draft stage. After the user chooses **Push to GitHub**, hand off to the downstream push capability and present this follow-on so the user knows where the spine lands:
+This follow-on runs AFTER the gated push stage has completed: the issues are live on GitHub, the `{{localId}}` tokens are resolved to `Depends on #N`, the issues are grouped into `.tiki/releases/{version}.json`, the brief's `issues:` front-matter is backfilled, and the draft has moved to `.tiki/onboarding/pushed/`. Present this so the user can start work:
 
-- question: "Spine ready to push. Hand off to the GitHub push?"
-- header: "Push handoff"
+- question: "Spine pushed to GitHub and grouped into {version}. What next?"
+- header: "Spine pushed"
 - options:
-  - label: "Push the spine to GitHub"
-    description: "Create the issues, resolve {{deps}} → #N, group them into the target release, backfill the brief"
-  - label: "Edit a draft first"
-    description: "Adjust .tiki/onboarding/draft/ by hand, then /tiki:scaffold resume to re-review before pushing"
-  - label: "Save draft & exit"
-    description: "Keep the staged draft — resume and push later"
+  - label: "Start the first issue"
+    description: "Run /tiki:get <first-issue> to begin the foundation slice"
+  - label: "Drive the whole release"
+    description: "Run /tiki:release {version} to execute every issue in dependency order"
+  - label: "Open the board"
+    description: "Open the desktop app to see the new issues and the dependency graph for {version}"
 
-The actual GitHub push (issue creation, `{{localId}}` → `#N` token swap, release grouping) is a separate downstream capability and is NOT performed by this command. This stage ends at the handoff.
+The push has already happened by this point — the issues exist, the edges are resolved, and the release is grouped. These actions move from scaffolding into the normal Tiki pipeline.
 </next-actions>

@@ -8,3 +8,8 @@
 {"ts":"2026-06-14T13:27:45.469Z","workId":"issue:290","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T13:27:45.794Z","workId":"issue:290","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T13:32:21.391Z","workId":"issue:290","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T13:33:45.388Z","workId":"issue:291","step":"GET","event":"start","title":"/tiki:scaffold: two-pass GitHub push + release grouping + handoff"}
+{"ts":"2026-06-14T13:33:46.339Z","workId":"issue:291","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T13:34:26.951Z","workId":"issue:291","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T13:34:27.287Z","workId":"issue:291","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T13:39:25.192Z","workId":"issue:291","step":"SHIP","event":"start"}

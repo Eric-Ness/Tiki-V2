@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 290,
-      "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate",
-      "completedAt": "2026-06-14T13:32:52.007Z"
+      "number": 291,
+      "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff",
+      "completedAt": "2026-06-14T13:39:53.953Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 291,
+        "title": "/tiki:scaffold: two-pass GitHub push + release grouping + handoff",
+        "completedAt": "2026-06-14T13:39:53.953Z"
+      },
       {
         "number": 290,
         "title": "/tiki:scaffold: draft epic/issue spine + local staging + review/confirm gate",
