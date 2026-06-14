@@ -1,10 +1,5 @@
-{"ts":"2026-06-14T13:10:38.514Z","workId":"issue:285","step":"GET","event":"start","title":"Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder"}
-{"ts":"2026-06-14T13:10:39.337Z","workId":"issue:285","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T13:11:14.625Z","workId":"issue:285","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T13:11:14.981Z","workId":"issue:285","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T13:13:51.296Z","workId":"issue:285","step":"SHIP","event":"start"}
-{"ts":"2026-06-14T13:40:48.324Z","workId":"issue:294","step":"GET","event":"start","title":"Generate CLAUDE.md from the greenfield project brief"}
-{"ts":"2026-06-14T13:40:49.218Z","workId":"issue:294","step":"PLAN","event":"start"}
-{"ts":"2026-06-14T13:41:28.968Z","workId":"issue:294","step":"AUDIT","event":"start"}
-{"ts":"2026-06-14T13:41:29.270Z","workId":"issue:294","step":"EXECUTE","event":"start"}
-{"ts":"2026-06-14T13:45:20.413Z","workId":"issue:294","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T14:57:53.450Z","workId":"issue:295","step":"GET","event":"start","title":"Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)"}
+{"ts":"2026-06-14T14:57:54.376Z","workId":"issue:295","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T14:58:28.799Z","workId":"issue:295","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T14:58:29.204Z","workId":"issue:295","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T15:01:12.708Z","workId":"issue:295","step":"SHIP","event":"start"}

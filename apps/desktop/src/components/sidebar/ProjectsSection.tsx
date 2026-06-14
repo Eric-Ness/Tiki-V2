@@ -9,8 +9,36 @@ import {
   useDetailStore,
   useKanbanStore,
   useToastStore,
+  useLayoutStore,
 } from "../../stores";
+import { terminalFocusRegistry } from "../../stores/terminalStore";
 import "./ProjectsSection.css";
+
+/**
+ * Write a command to the active terminal and focus it. Mirrors the module-private
+ * `writeToActiveTerminal` in `useCommandActions.ts` / `GreenfieldChecklist.tsx`
+ * (getState() reads, not hooks). Returns the terminal id on success, or null when
+ * no terminal exists for the active project.
+ */
+async function writeToActiveTerminal(command: string): Promise<string | null> {
+  const projectId = useProjectsStore.getState().activeProjectId ?? "default";
+  const termState = useTerminalStore.getState();
+  const tabs = termState.tabsByProject[projectId] ?? [];
+  const activeTabId = termState.activeTabByProject[projectId] ?? null;
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  if (!activeTab) return null;
+
+  try {
+    await invoke("write_terminal", {
+      id: activeTab.activeTerminalId,
+      data: command,
+    });
+    terminalFocusRegistry.focus(activeTab.activeTerminalId);
+    return activeTab.activeTerminalId;
+  } catch {
+    return null;
+  }
+}
 
 export function ProjectsSection() {
   const projects = useProjectsStore((state) => state.projects);
@@ -154,6 +182,33 @@ export function ProjectsSection() {
                 "warning",
                 8000
               );
+          }
+
+          // 4. Init creates a LOCAL git repo + .gitignore but NO GitHub remote.
+          //    Proactively offer to create one so the user isn't left with
+          //    "Not in a GitHub repository" banners and no guidance (#295).
+          const createRepo = window.confirm(
+            "Tiki initialized. Create a GitHub repo for this project now?"
+          );
+          if (createRepo) {
+            // `gh repo create --source=. --remote=origin` creates the repo AND
+            // wires `origin` in one shot. The gh command prompts for auth in the
+            // terminal itself, so no auth preflight here. Hand off to the active
+            // terminal and surface it; if none exists, guide the user.
+            const terminalId = await writeToActiveTerminal(
+              "gh repo create --source=. --remote=origin\n"
+            );
+            if (terminalId === null) {
+              useToastStore
+                .getState()
+                .addToast(
+                  "Open a terminal (Start Claude), then create the repo from Settings → readiness checklist",
+                  "warning",
+                  8000
+                );
+            } else {
+              useLayoutStore.getState().setActiveView("terminal");
+            }
           }
         } catch (err) {
           // init is idempotent, so a retry is safe.

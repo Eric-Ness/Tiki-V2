@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 295,
+    "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/295"
+  },
+  "createdAt": "2026-06-14T15:30:00.000Z",
+  "research": [
+    "greenfield-onboarding",
+    "greenfield-implementation-plans"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "After initializing a blank folder, the user is prompted to create a GitHub repo; accepting writes 'gh repo create --source=. --remote=origin' to the terminal.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T15:01:12.461Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "Declining is a clean no-op; with no active terminal a helpful toast appears instead of a silent failure; the existing add-a-valid-project path is unchanged.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T15:01:12.461Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add a post-Initialize 'create a GitHub repo?' prompt to ProjectsSection",
+      "status": "completed",
+      "content": "In apps/desktop/src/components/sidebar/ProjectsSection.tsx, extend the Initialize flow added in #285 (the branch that runs invoke('init_tiki_project') after the user confirms 'Initialize Tiki here?'). AFTER init_tiki_project + switch_project + addProject succeed, proactively prompt: window.confirm('Tiki initialized. Create a GitHub repo for this project now?'). On DECLINE: clean no-op (project is already set up locally). On ACCEPT: hand off to the terminal exactly like GreenfieldChecklist.tsx's createRemote Fix (#287) — write 'gh repo create --source=. --remote=origin\\n' to the active terminal and switch to the terminal view. REUSE the established pattern: study how GreenfieldChecklist.tsx writes to the terminal (its local writeToActiveTerminal equivalent — reads the terminal store's active terminal and invoke('write_terminal', {id, data}), returns null when none) and how useCommandActions.ts:18 does it. If there is NO active terminal for the project (the write returns null), show a helpful toast via useToastStore (e.g. 'Open a terminal (Start Claude), then create the repo from Settings → readiness checklist') instead of failing silently. OPTIONAL (nice-to-have, only if clean): preflight by reading the just-init'd project — but do not over-engineer; the gh command itself will prompt for auth in the terminal if needed (the checklist's auth-first guard already covers the Settings path). Keep ALL existing conventions: per-action pending in component useState (no fresh-ref / store-selector), the existing isInitializing flow, and leave the valid-project path untouched. This is a small, self-contained addition to the existing init branch.",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (baseline 0 errors / 31 warnings; watch fresh-ref + exhaustive-deps)",
+        "VISUAL (tauri:dev): after initializing a blank folder, a 'Create a GitHub repo?' prompt appears; accepting writes 'gh repo create --source=. --remote=origin' to the terminal + switches to terminal view; declining is a clean no-op; no-terminal shows a toast"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx"
+      ],
+      "summary": "ProjectsSection init branch: after init_tiki_project+switch+addProject, window.confirm 'Create a GitHub repo now?' → writeToActiveTerminal 'gh repo create --source=. --remote=origin' + switch to terminal view (local helper replicating #287 pattern); no-terminal → toast; decline=no-op. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T15:38:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T14:58:28.903Z"
+}

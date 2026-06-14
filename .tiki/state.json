@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 285,
-      "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder",
-      "completedAt": "2026-06-14T13:47:10.726Z"
+      "number": 295,
+      "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)",
+      "completedAt": "2026-06-14T15:01:50.991Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 295,
+        "title": "Post-Initialize: prompt to create a GitHub repo (don't bury it in Settings)",
+        "completedAt": "2026-06-14T15:01:50.991Z"
+      },
       {
         "number": 285,
         "title": "Add Project: offer 'Initialize Tiki here' instead of dead-ending on a blank folder",
