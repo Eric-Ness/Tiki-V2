@@ -11,7 +11,7 @@ import {
   useToastStore,
   useLayoutStore,
 } from "../../stores";
-import { terminalFocusRegistry } from "../../stores/terminalStore";
+import { terminalFocusRegistry, EMPTY_TABS } from "../../stores/terminalStore";
 import "./ProjectsSection.css";
 
 const sleep = (ms: number): Promise<void> =>
@@ -75,6 +75,29 @@ export function ProjectsSection() {
   const [isInitializing, setIsInitializing] = useState(false);
   const previousActiveIdRef = useRef<string | null>(null);
 
+  // Pending "create a GitHub repo?" offer recorded when Initialize succeeds.
+  // We DON'T prompt synchronously at init time — the new project isn't focused
+  // and its terminal isn't loaded yet, so the popup races project/terminal
+  // readiness (#298). Instead we record the offer here and let the effect below
+  // consume it once the new project is active AND its terminal is loaded.
+  const [pendingCreateRepo, setPendingCreateRepo] = useState<{
+    projectId: string;
+    path: string;
+    name: string;
+  } | null>(null);
+  // Guards the async offer against re-entry: the effect re-runs as tabs appear,
+  // and `await git_remote_get` + `window.confirm` yield, so without this the
+  // confirm could double-fire before `setPendingCreateRepo(null)` lands.
+  const offerInFlightRef = useRef(false);
+
+  // Reactively observe the pending project's terminal tabs so the offer effect
+  // re-runs as TerminalPane auto-creates the initial terminal after the switch.
+  const pendingTabs = useTerminalStore((s) =>
+    pendingCreateRepo
+      ? (s.tabsByProject[pendingCreateRepo.projectId] ?? EMPTY_TABS)
+      : EMPTY_TABS
+  );
+
   // Switch file watcher and refresh framework version when active project changes
   useEffect(() => {
     const switchWatcher = async () => {
@@ -135,6 +158,67 @@ export function ProjectsSection() {
 
     switchWatcher();
   }, [activeProjectId, getActiveProject, setProjectFrameworkVersion]);
+
+  // Consume a pending create-repo offer ONLY once the newly-initialized project
+  // is both the active project AND has a loaded terminal (a tab with an
+  // `activeTerminalId`). This deferral keeps the popup in sync with the live UI
+  // instead of firing mid-load (#298). `pendingTabs` is a dependency so this
+  // re-runs as the auto-created terminal materializes.
+  useEffect(() => {
+    if (!pendingCreateRepo) return;
+    // Wait until the new project is actually focused.
+    if (activeProjectId !== pendingCreateRepo.projectId) return;
+    // Wait until its terminal is loaded (a tab with a live activeTerminalId).
+    const terminalReady = pendingTabs.some((t) => Boolean(t.activeTerminalId));
+    if (!terminalReady) return;
+    // Re-entry guard: the effect re-runs while the async offer is awaiting.
+    if (offerInFlightRef.current) return;
+    offerInFlightRef.current = true;
+
+    const offer = pendingCreateRepo;
+    const run = async () => {
+      try {
+        // Init creates a LOCAL git repo + .gitignore but NO GitHub remote.
+        // Only offer if there's no remote yet — skip silently otherwise (#295).
+        const remote = await invoke<string | null>("git_remote_get", {
+          projectPath: offer.path,
+        });
+        if (remote) return; // already has a remote — nothing to offer.
+
+        // `gh repo create --source=. --remote=origin` creates the repo AND
+        // wires `origin` in one shot. The gh command prompts for auth in the
+        // terminal itself, so no auth preflight here.
+        const createRepo = window.confirm(
+          `Create a GitHub repo for ${offer.name} now?`
+        );
+        if (!createRepo) return;
+
+        const terminalId = await writeToProjectTerminal(
+          offer.projectId,
+          "gh repo create --source=. --remote=origin\n"
+        );
+        if (terminalId === null) {
+          useToastStore
+            .getState()
+            .addToast(
+              `Open a terminal in ${offer.name}, then create the repo from Settings → readiness checklist`,
+              "warning",
+              8000
+            );
+        } else {
+          useLayoutStore.getState().setActiveView("terminal");
+        }
+      } catch (err) {
+        console.error("Failed to offer GitHub repo creation:", err);
+      } finally {
+        // Fire AT MOST ONCE — clear on accept, decline, skip, or error.
+        setPendingCreateRepo(null);
+        offerInFlightRef.current = false;
+      }
+    };
+
+    run();
+  }, [pendingCreateRepo, activeProjectId, pendingTabs]);
 
   const handleAddProject = async () => {
     setError(null);
@@ -215,36 +299,16 @@ export function ProjectsSection() {
           }
 
           // 4. Init creates a LOCAL git repo + .gitignore but NO GitHub remote.
-          //    Proactively offer to create one so the user isn't left with
-          //    "Not in a GitHub repository" banners and no guidance (#295).
-          const createRepo = window.confirm(
-            "Tiki initialized. Create a GitHub repo for this project now?"
-          );
-          if (createRepo) {
-            // `gh repo create --source=. --remote=origin` creates the repo AND
-            // wires `origin` in one shot. The gh command prompts for auth in the
-            // terminal itself, so no auth preflight here. Hand off to the NEW
-            // project's terminal *by id* — never a different (previously-active)
-            // project's terminal (#297). setActiveProject above makes
-            // TerminalPane auto-create that terminal asynchronously, so the
-            // helper polls briefly for it to appear.
-            const terminalId = newProjectId
-              ? await writeToProjectTerminal(
-                  newProjectId,
-                  "gh repo create --source=. --remote=origin\n"
-                )
-              : null;
-            if (terminalId === null) {
-              useToastStore
-                .getState()
-                .addToast(
-                  `Open a terminal in ${folderName}, then create the repo from Settings → readiness checklist`,
-                  "warning",
-                  8000
-                );
-            } else {
-              useLayoutStore.getState().setActiveView("terminal");
-            }
+          //    Record a pending create-repo offer instead of prompting now —
+          //    the new project isn't focused and its terminal isn't loaded yet,
+          //    so a synchronous popup races readiness (#298). The effect above
+          //    consumes this once the project is active AND its terminal loads.
+          if (newProjectId) {
+            setPendingCreateRepo({
+              projectId: newProjectId,
+              path: selectedPath,
+              name: folderName,
+            });
           }
         } catch (err) {
           // init is idempotent, so a retry is safe.

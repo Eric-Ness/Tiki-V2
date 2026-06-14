@@ -3,3 +3,8 @@
 {"ts":"2026-06-14T15:57:56.797Z","workId":"issue:297","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T15:57:57.321Z","workId":"issue:297","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T16:01:30.587Z","workId":"issue:297","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T16:11:24.968Z","workId":"issue:298","step":"GET","event":"start","title":"Defer post-Initialize create-repo prompt until the new project + terminal are loaded"}
+{"ts":"2026-06-14T16:11:26.078Z","workId":"issue:298","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T16:12:16.284Z","workId":"issue:298","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T16:12:16.714Z","workId":"issue:298","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T16:15:43.532Z","workId":"issue:298","step":"SHIP","event":"start"}

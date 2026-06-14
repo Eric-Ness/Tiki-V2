@@ -3,9 +3,9 @@
   "activeWork": {},
   "history": {
     "lastCompletedIssue": {
-      "number": 297,
-      "title": "Initialize flow: select new project + send create-repo to the correct terminal",
-      "completedAt": "2026-06-14T16:02:20.300Z"
+      "number": 298,
+      "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded",
+      "completedAt": "2026-06-14T16:16:11.201Z"
     },
     "lastCompletedRelease": {
       "version": "v0.9.4",
@@ -20,6 +20,11 @@
       "tag": "v0.9.4"
     },
     "recentIssues": [
+      {
+        "number": 298,
+        "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded",
+        "completedAt": "2026-06-14T16:16:11.201Z"
+      },
       {
         "number": 297,
         "title": "Initialize flow: select new project + send create-repo to the correct terminal",

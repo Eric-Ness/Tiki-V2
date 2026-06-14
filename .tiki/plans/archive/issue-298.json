@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 298,
+    "title": "Defer post-Initialize create-repo prompt until the new project + terminal are loaded",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/298"
+  },
+  "createdAt": "2026-06-14T16:45:00.000Z",
+  "research": [
+    "greenfield-onboarding"
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "After Initialize, the create-repo prompt appears only once the new project is focused AND its terminal is loaded (not mid-load); accepting lands 'gh repo create --source=. --remote=origin' in that project's ready terminal.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:15:43.264Z"
+    },
+    {
+      "id": "SC2",
+      "category": "other",
+      "description": "It fires at most once per initialized project, and not at all if the project already has a GitHub remote; declining is a clean no-op.",
+      "verified": true,
+      "verifiedAt": "2026-06-14T16:15:43.264Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Move the create-repo offer from the init handler to a readiness-gated effect",
+      "status": "completed",
+      "content": "In apps/desktop/src/components/sidebar/ProjectsSection.tsx, change WHEN the post-Initialize create-repo offer fires. Today (after #295/#297) the window.confirm + writeToProjectTerminal run SYNCHRONOUSLY inside handleAddProject right after init — before the new project is focused and its terminal is loaded — so it's out of sync and the gh command races project/terminal load. FIX: (1) REMOVE the synchronous window.confirm + create-repo write from the Initialize branch (keep init_tiki_project -> switch_project -> addProject -> setActiveProject(newId) from #297 — that stays; the new project still becomes selected). (2) When Initialize succeeds, RECORD a pending create-repo offer for the new project id — a local useState in ProjectsSection is fine (the component is always mounted): e.g. setPendingCreateRepo({ projectId: newProjectId, path: selectedPath, name: folderName }). (3) Add a useEffect that consumes the pending offer ONLY when ALL hold: (a) the pending project is the ACTIVE project (useProjectsStore activeProjectId === pending.projectId — i.e. focused), AND (b) it has a LOADED terminal — read useTerminalStore tabsByProject[pending.projectId] and confirm a tab with an activeTerminalId exists (the effect should depend on the terminal store so it re-runs as the auto-created terminal appears; subscribe via a useTerminalStore selector for tabsByProject[pending.projectId] so the effect re-fires when it populates). When (a)+(b) hold: check NO remote via `await invoke('git_remote_get', { projectPath: pending.path })` returning null (or check_greenfield_readiness.hasRemote === false). If no remote -> window.confirm('Create a GitHub repo for ' + pending.name + ' now?'); on accept -> writeToProjectTerminal(pending.projectId, 'gh repo create --source=. --remote=origin\\n') (the #297 helper) + switch to terminal view; on decline -> nothing. ALWAYS clear the pending offer afterward (setPendingCreateRepo(null)) so it fires AT MOST ONCE, whether accepted, declined, or skipped (remote already present). Guard the effect against re-entry (e.g. an in-flight ref) so the confirm can't double-fire. Do NOT prompt for projects that weren't just initialized (no general nag). No fresh-ref violations: select tabsByProject[pending.projectId] with the store's EMPTY_TABS fallback (not inline ?? []); keep the async work inside the effect guarded.",
+      "verification": [
+        "pnpm -C apps/desktop build (tsc -b strict) is clean",
+        "pnpm -C apps/desktop test passes (272 baseline, no regression)",
+        "pnpm -C apps/desktop lint adds zero new errors (fresh-ref + exhaustive-deps — the effect's deps must be exhaustive)",
+        "VISUAL (tauri:dev): Add+Initialize a blank folder while another project is active -> NO prompt mid-load; once the new project is focused and its terminal has loaded, the 'Create a GitHub repo?' prompt appears; accept -> gh repo create lands in the new project's ready terminal; it never re-prompts on subsequent focus; a project that already has a remote is never prompted"
+      ],
+      "addressesCriteria": [
+        "SC1",
+        "SC2"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ProjectsSection.tsx"
+      ],
+      "summary": "Moved create-repo offer out of the synchronous init handler into a readiness-gated useEffect: fires only when pending project is active + has a loaded terminal (reactive pendingTabs) + git_remote_get returns null; window.confirm → writeToProjectTerminal + switch view; fire-once via finally setPendingCreateRepo(null) + offerInFlightRef re-entry guard. build clean, vitest 272, lint 0 new. VISUAL pending tauri:dev",
+      "completedAt": "2026-06-14T16:52:00.000Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      1
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-06-14T16:12:16.437Z"
+}
