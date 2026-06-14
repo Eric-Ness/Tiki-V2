@@ -67,6 +67,7 @@ pub fn run() {
             commands::install_framework,
             commands::init_tiki_project,
             commands::read_framework_version,
+            commands::check_greenfield_readiness,
             commands::tiki_doctor,
             commands::normalize_archived_releases,
             config::read_tiki_config,

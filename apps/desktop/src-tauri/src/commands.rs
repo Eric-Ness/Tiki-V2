@@ -896,6 +896,66 @@ pub fn read_framework_version(project_path: String) -> Result<Option<String>, St
     Ok(Some(contents.trim().to_string()))
 }
 
+/// Greenfield onboarding readiness for a project folder (#284). Each field
+/// reports whether one setup step is done; the readiness-checklist UI (later
+/// phases) consumes it.
+///
+/// Mirrors `tiki_doctor`'s "degraded is a field, not an Err" discipline: a
+/// blank/missing/partial folder yields an all-false (or partial) report, NEVER
+/// an `Err`. Every check is guarded so a missing path or file is simply `false`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GreenfieldReport {
+    /// `.tiki/.framework-version` exists (framework files installed).
+    pub framework_installed: bool,
+    /// `.tiki/state.json` exists.
+    pub state_seeded: bool,
+    /// `<project>/.git` exists as a directory.
+    pub is_git_repo: bool,
+    /// An `origin` git remote is configured.
+    pub has_remote: bool,
+    /// The `gh` CLI reports an authenticated session.
+    pub gh_authenticated: bool,
+    /// `<project>/.gitignore` exists.
+    pub has_gitignore: bool,
+}
+
+/// Inspect `project_path` and report which greenfield setup steps are complete.
+/// Pure inspection: mutates nothing, and a non-existent/empty/partial folder
+/// yields an all-false (or partial) report rather than an `Err`.
+#[tauri::command]
+pub fn check_greenfield_readiness(project_path: String) -> Result<GreenfieldReport, String> {
+    let project = PathBuf::from(&project_path);
+
+    // framework_installed: reuse read_framework_version (Some => installed).
+    // Guard against an Err so a missing/unreadable path is just `false`.
+    let framework_installed = read_framework_version(project_path.clone())
+        .map(|v| v.is_some())
+        .unwrap_or(false);
+
+    let state_seeded = project.join(".tiki").join("state.json").exists();
+
+    let is_git_repo = project.join(".git").is_dir();
+
+    // has_remote: Ok(Some(_)) => a remote is configured. Err (git missing, not a
+    // repo) or Ok(None) (no origin) both collapse to `false`.
+    let has_remote = matches!(crate::github::git_remote_get(project_path.clone()), Ok(Some(_)));
+
+    // gh_authenticated: Ok(true) only; Err (gh missing) or Ok(false) => false.
+    let gh_authenticated = matches!(crate::github::check_gh_auth(), Ok(true));
+
+    let has_gitignore = project.join(".gitignore").exists();
+
+    Ok(GreenfieldReport {
+        framework_installed,
+        state_seeded,
+        is_git_repo,
+        has_remote,
+        gh_authenticated,
+        has_gitignore,
+    })
+}
+
 /// Read-only diagnostics over a `.tiki/` workspace — see `DiagnosticsReport`.
 /// Reports framework version, `state.json` validity, per-release location/status
 /// drift (`archivedButActive`), history↔JSON parity gaps, and reconciler-hook
@@ -2227,6 +2287,66 @@ mod tests {
         // The activeWork entry must SURVIVE — seed never clobbered it.
         let after = std::fs::read_to_string(project.join(".tiki").join("state.json")).unwrap();
         assert_eq!(after, with_work, "existing activeWork must be preserved byte-for-byte");
+
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    // ── #284 greenfield readiness detector ──────────────────────────────────
+    // A truly blank temp dir (no `.claude`, unlike `temp_project`) so we can
+    // assert the "degraded is a field, not an Err" contract on an empty folder.
+    fn blank_temp_dir(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("tiki-greenfield-{}-{}", tag, nanos));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn check_greenfield_readiness_blank_folder_all_false() {
+        let project = blank_temp_dir("blank");
+
+        // gh_authenticated is environment-dependent; the call must not Err/panic.
+        let report = check_greenfield_readiness(project.to_string_lossy().to_string())
+            .expect("blank folder must yield Ok, never Err");
+
+        assert!(!report.framework_installed);
+        assert!(!report.state_seeded);
+        assert!(!report.is_git_repo);
+        assert!(!report.has_remote);
+        assert!(!report.has_gitignore);
+
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    #[test]
+    fn check_greenfield_readiness_detects_tiki() {
+        let project = blank_temp_dir("tiki");
+        let tiki = project.join(".tiki");
+        std::fs::create_dir_all(&tiki).unwrap();
+        std::fs::write(tiki.join("state.json"), "{\"schemaVersion\":1,\"activeWork\":{}}").unwrap();
+        std::fs::write(tiki.join(".framework-version"), "9.9.9").unwrap();
+
+        let report = check_greenfield_readiness(project.to_string_lossy().to_string())
+            .expect("must yield Ok");
+
+        assert!(report.state_seeded, "stateSeeded must be true");
+        assert!(report.framework_installed, "frameworkInstalled must be true");
+
+        std::fs::remove_dir_all(&project).ok();
+    }
+
+    #[test]
+    fn check_greenfield_readiness_detects_git() {
+        let project = blank_temp_dir("git");
+        std::fs::create_dir_all(project.join(".git")).unwrap();
+
+        let report = check_greenfield_readiness(project.to_string_lossy().to_string())
+            .expect("must yield Ok");
+
+        assert!(report.is_git_repo, "isGitRepo must be true");
 
         std::fs::remove_dir_all(&project).ok();
     }

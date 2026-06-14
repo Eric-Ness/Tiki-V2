@@ -3,3 +3,8 @@
 {"ts":"2026-06-14T12:19:52.990Z","workId":"issue:283","step":"AUDIT","event":"start"}
 {"ts":"2026-06-14T12:27:23.580Z","workId":"issue:283","step":"EXECUTE","event":"start"}
 {"ts":"2026-06-14T12:47:32.565Z","workId":"issue:283","step":"SHIP","event":"start"}
+{"ts":"2026-06-14T12:54:49.501Z","workId":"issue:284","step":"GET","event":"start","title":"Greenfield readiness checklist: per-row detect + Fix (extend DiagnosticsPanel)"}
+{"ts":"2026-06-14T12:54:50.322Z","workId":"issue:284","step":"PLAN","event":"start"}
+{"ts":"2026-06-14T12:56:10.532Z","workId":"issue:284","step":"AUDIT","event":"start"}
+{"ts":"2026-06-14T12:56:10.821Z","workId":"issue:284","step":"EXECUTE","event":"start"}
+{"ts":"2026-06-14T13:07:58.879Z","workId":"issue:284","step":"SHIP","event":"start"}

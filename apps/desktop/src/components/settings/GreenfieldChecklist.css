@@ -1,0 +1,61 @@
+/* Settings → Greenfield setup checklist (#284). Reuses the global settings-*
+   classes for the section frame; these rules cover only the greenfield-specific
+   bits (rows + the inline per-row Fix button). */
+
+.greenfield-badge {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--success-color);
+  border: 1px solid var(--success-color);
+  vertical-align: middle;
+}
+
+.greenfield-rows {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.greenfield-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.greenfield-icon {
+  flex: 0 0 auto;
+}
+
+.greenfield-label {
+  flex: 1 1 auto;
+}
+
+.greenfield-pass {
+  color: var(--text-secondary);
+}
+
+.greenfield-fix {
+  color: var(--text-primary);
+}
+
+/* Inline per-row Fix button — net-new vs DiagnosticsPanel's single panel-level
+   button. Sits flush-right of the label. */
+.greenfield-fix-btn {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.greenfield-error {
+  color: var(--error-color);
+}

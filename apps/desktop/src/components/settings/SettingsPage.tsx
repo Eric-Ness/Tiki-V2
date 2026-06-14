@@ -10,6 +10,7 @@ import {
 } from "../../stores";
 import { WorkflowConfigSection } from "./WorkflowConfigSection";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { GreenfieldChecklist } from "./GreenfieldChecklist";
 import "./SettingsPage.css";
 
 export function SettingsPage() {
@@ -258,6 +259,9 @@ export function SettingsPage() {
 
         {/* Diagnostics (read-only .tiki/ health via tiki_doctor) */}
         <DiagnosticsPanel />
+
+        {/* Greenfield setup readiness + inline fixes (#284) */}
+        <GreenfieldChecklist />
 
         {/* GitHub */}
         <div className="settings-section">
