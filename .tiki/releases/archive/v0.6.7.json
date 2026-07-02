@@ -1,0 +1,15 @@
+{
+  "version": "v0.6.7",
+  "status": "shipped",
+  "issues": [
+    {
+      "number": 219,
+      "title": "A: Release-shipped issues never reach Kanban Completed (live data-loss)"
+    }
+  ],
+  "createdAt": "2026-05-21T08:34:35-04:00",
+  "completedAt": "2026-05-21T12:35:10.015Z",
+  "shipped": true,
+  "tag": "v0.6.7",
+  "reconstructed": true
+}

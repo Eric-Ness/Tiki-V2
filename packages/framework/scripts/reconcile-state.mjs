@@ -18,9 +18,10 @@
  * review — do not relax without re-reviewing):
  *
  *   1. activeWork-scoped. ONLY mutates issue entries that ALREADY exist in
- *      state.activeWork. It never scans plan files to CREATE entries — the repo
- *      has ~120 stale ACTIVE plan files for long-shipped issues (plan archiving is
- *      dropped as often as transitions), and resurrecting them would flood the
+ *      state.activeWork. It never scans plan files to CREATE entries — plan
+ *      archiving is dropped as often as transitions (the repo accumulated ~120
+ *      stale ACTIVE plan files for long-shipped issues before the #300
+ *      migration archived them), and resurrecting strays would flood the
  *      kanban. Early steps (GET→PLAN, before an entry exists) are covered by the
  *      unconditional foreground transitions from #247, not by this reconciler.
  *      1a. AMENDMENT (#270): a NARROW bootstrap exception exists for the case
@@ -30,9 +31,9 @@
  *          plan files, but ONLY when ALL FIVE guards pass, in order:
  *            (1) no issue:N entry already in activeWork — never clobber a
  *                tracked entry;
- *            (2) N not in history.recentIssues — but history only reaches back
- *                to #149 (~52 issues), so this guard ALONE cannot fence off
- *                the ~120 older stale plans;
+ *            (2) N not in history.recentIssues — but history is a bounded
+ *                window that does not reach all the way back, so this guard
+ *                ALONE cannot fence off plans older than the window;
  *            (3) no plans/archive/issue-N.json — archive presence means the
  *                issue shipped, even where history predates the record;
  *            (4) plan is RECENT: newest of the plan JSON's createdAt /
@@ -40,7 +41,7 @@
  *                of now. JSON timestamps ONLY, never file mtime (git clone /
  *                checkout resets mtime → a fresh clone would flood). A plan
  *                with no parseable timestamp is NOT recent. This is the guard
- *                that actually holds back the ~70 stale plans guards 2+3 miss:
+ *                that actually holds back any stale plans guards 2+3 miss:
  *                a legit bootstrap case has a recently written plan, a
  *                weeks-stale dropped entry is an accepted miss.
  *            (5) plan parses and plan.issue.number matches the filename —

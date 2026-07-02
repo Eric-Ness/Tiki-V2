@@ -1,0 +1,31 @@
+{
+  "version": "v0.7.5",
+  "status": "shipped",
+  "issues": [
+    {
+      "number": 245,
+      "title": "A: reconcile-state.mjs + enforced Stop hook (derive pipeline state from artifacts)"
+    },
+    {
+      "number": 246,
+      "title": "B: deriveDisplayStatus reads the plan file for EXECUTE progress + stale-tracking anomaly"
+    },
+    {
+      "number": 247,
+      "title": "C: Make per-step transitions unconditional; remove the Pattern A/B trap in yolo.md"
+    },
+    {
+      "number": 248,
+      "title": "D: End-to-end runtime reconciliation test (close the deferred #211 Phase 4)"
+    },
+    {
+      "number": 249,
+      "title": "E: Harden watcher↔frontend binding (startup anchor + stable activeProject ref)"
+    }
+  ],
+  "createdAt": "2026-05-22T15:13:41-04:00",
+  "completedAt": "2026-05-22T19:14:22.334Z",
+  "shipped": true,
+  "tag": "v0.7.5",
+  "reconstructed": true
+}

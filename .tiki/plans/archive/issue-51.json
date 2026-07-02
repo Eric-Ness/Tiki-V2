@@ -1,0 +1,59 @@
+{
+  "issueNumber": 51,
+  "title": "Test Issue 4",
+  "createdAt": "2026-02-04T07:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Verify repository structure",
+      "description": "Verify the repository structure is intact by checking that the key directories exist: packages/shared, packages/framework, and apps/desktop.",
+      "status": "completed",
+      "files": [],
+      "tasks": [
+        "Confirm packages/shared directory exists",
+        "Confirm packages/framework directory exists",
+        "Confirm apps/desktop directory exists"
+      ],
+      "verification": "All three directories exist and contain expected files"
+    },
+    {
+      "id": 2,
+      "title": "Verify package.json configurations",
+      "description": "Check that root and workspace package.json files have valid configurations and expected workspace references.",
+      "status": "completed",
+      "files": [],
+      "tasks": [
+        "Read root package.json and verify workspaces field",
+        "Read packages/shared/package.json and verify name is @tiki/shared",
+        "Read apps/desktop/package.json and verify it exists"
+      ],
+      "verification": "All package.json files are valid and contain expected fields"
+    },
+    {
+      "id": 3,
+      "title": "Verify Tiki state system",
+      "description": "Confirm the .tiki directory structure is intact with state.json and plans directory.",
+      "status": "completed",
+      "files": [],
+      "tasks": [
+        "Confirm .tiki/state.json exists and is valid JSON",
+        "Confirm .tiki/plans directory exists",
+        "Verify state.json has expected schema (schemaVersion, activeWork, history)"
+      ],
+      "verification": ".tiki state system is intact and functional"
+    },
+    {
+      "id": 4,
+      "title": "Verify git status",
+      "description": "Check that the git repository is in a clean state and on the expected branch.",
+      "status": "completed",
+      "files": [],
+      "tasks": [
+        "Run git status to check working tree state",
+        "Confirm we are on the main branch",
+        "Verify remote is configured"
+      ],
+      "verification": "Git repository is properly configured with remote"
+    }
+  ]
+}

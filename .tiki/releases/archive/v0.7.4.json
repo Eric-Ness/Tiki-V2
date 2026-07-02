@@ -1,0 +1,39 @@
+{
+  "version": "v0.7.4",
+  "status": "shipped",
+  "issues": [
+    {
+      "number": 230,
+      "title": "Refactor: de-duplicate workflow command files (delete orphaned copy, generate dogfood copy)"
+    },
+    {
+      "number": 231,
+      "title": "Bug: desktop re-declares @tiki/shared types — PhaseStatus drift (missing 'skipped')"
+    },
+    {
+      "number": 232,
+      "title": "Test: extend state-transition parity to mutation body + history-append"
+    },
+    {
+      "number": 233,
+      "title": "Refactor: split github.rs into a github/ module + add gh-output parse tests"
+    },
+    {
+      "number": 234,
+      "title": "Refactor: decompose App.tsx orchestration into custom hooks"
+    },
+    {
+      "number": 235,
+      "title": "Refactor: extract config.rs from commands.rs"
+    },
+    {
+      "number": 237,
+      "title": "Refactor: unify desktop view-model types with @tiki/shared (follow-up to #231)"
+    }
+  ],
+  "createdAt": "2026-05-22T12:58:04-04:00",
+  "completedAt": "2026-05-22T12:58:04-04:00",
+  "shipped": true,
+  "tag": "v0.7.4",
+  "reconstructed": true
+}
