@@ -1,0 +1,31 @@
+{
+  "issueNumber": 26,
+  "title": "test issue",
+  "createdAt": "2026-02-04T01:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Test Phase 1",
+      "objective": "First test phase - verify the pipeline can execute a phase",
+      "tasks": [
+        "Log that phase 1 is starting",
+        "Perform a simple verification (e.g., check a file exists)",
+        "Log that phase 1 completed successfully"
+      ],
+      "verification": "Phase 1 execution logs confirm completion",
+      "status": "completed"
+    },
+    {
+      "id": 2,
+      "name": "Test Phase 2",
+      "objective": "Second test phase - verify multi-phase execution works",
+      "tasks": [
+        "Log that phase 2 is starting",
+        "Confirm phase 1 completed before this phase",
+        "Log that phase 2 completed successfully"
+      ],
+      "verification": "Phase 2 execution logs confirm completion after Phase 1",
+      "status": "completed"
+    }
+  ]
+}

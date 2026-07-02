@@ -1,0 +1,117 @@
+{
+  "issueNumber": 25,
+  "title": "Fix GitHub CLI context for standalone app launch",
+  "createdAt": "2026-02-03T12:00:00.000Z",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "Functional",
+      "criterion": "gh CLI commands run in the active project's working directory"
+    },
+    {
+      "id": "SC2",
+      "category": "Functional",
+      "criterion": "Issues section shows 'Select a project' message when no project is active"
+    },
+    {
+      "id": "SC3",
+      "category": "Functional",
+      "criterion": "Issues/Releases load correctly after selecting a project"
+    },
+    {
+      "id": "SC4",
+      "category": "UX",
+      "criterion": "Error message no longer appears when app launched standalone"
+    },
+    {
+      "id": "SC5",
+      "category": "Consistency",
+      "criterion": "All GitHub operations use project context"
+    }
+  ],
+  "phases": [
+    {
+      "id": 1,
+      "name": "Update Rust GitHub commands to accept project path",
+      "status": "completed",
+      "description": "Modify all GitHub CLI commands in github.rs to accept an optional project_path parameter and use .current_dir() when executing gh commands.",
+      "tasks": [
+        "Add project_path: Option<String> parameter to fetch_github_issues",
+        "Add project_path: Option<String> parameter to fetch_github_releases",
+        "Add project_path: Option<String> parameter to fetch_github_labels",
+        "Add project_path: Option<String> parameter to create_github_issue",
+        "Add project_path: Option<String> parameter to edit_github_issue",
+        "Use .current_dir() on Command when project_path is provided",
+        "Maintain backward compatibility - fallback to process cwd if no path provided"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs"
+      ],
+      "verification": "Build Rust backend without errors: pnpm tauri:build"
+    },
+    {
+      "id": 2,
+      "name": "Update IssuesSection to pass project path",
+      "status": "completed",
+      "description": "Modify IssuesSection component to pass the active project path to GitHub commands and handle the no-project state gracefully.",
+      "tasks": [
+        "Import useProjectsStore to get activeProject",
+        "Pass activeProject.path to fetch_github_issues invoke call",
+        "Pass activeProject.path to create_github_issue invoke call",
+        "Pass activeProject.path to edit_github_issue invoke call",
+        "Show 'Select a project to view issues' when no activeProject",
+        "Disable create/refresh buttons when no project selected"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/IssuesSection.tsx"
+      ],
+      "verification": "Launch app without project selected - should show helpful message instead of error"
+    },
+    {
+      "id": 3,
+      "name": "Update ReleasesSection to pass project path",
+      "status": "completed",
+      "description": "Apply the same pattern to ReleasesSection for consistency.",
+      "tasks": [
+        "Import useProjectsStore to get activeProject",
+        "Pass activeProject.path to fetch_github_releases invoke call",
+        "Show 'Select a project to view releases' when no activeProject"
+      ],
+      "files": [
+        "apps/desktop/src/components/sidebar/ReleasesSection.tsx"
+      ],
+      "verification": "Launch app without project selected - releases section shows helpful message"
+    },
+    {
+      "id": 4,
+      "name": "Update IssueFormModal to pass project path",
+      "status": "completed",
+      "description": "Ensure the issue creation/edit modal also uses the project context for label fetching.",
+      "tasks": [
+        "Import useProjectsStore to get activeProject",
+        "Pass activeProject.path to fetch_github_labels invoke call",
+        "Handle no-project state if modal somehow opens without project"
+      ],
+      "files": [
+        "apps/desktop/src/components/ui/IssueFormModal.tsx"
+      ],
+      "verification": "Create/edit issue modal loads labels correctly"
+    },
+    {
+      "id": 5,
+      "name": "End-to-end verification",
+      "status": "completed",
+      "description": "Test the complete flow to ensure all success criteria are met.",
+      "tasks": [
+        "Launch app standalone (no project) - verify no error, shows prompts",
+        "Select a project with GitHub remote - verify issues load",
+        "Create a new issue - verify it works",
+        "Edit an existing issue - verify it works",
+        "Check releases section loads correctly",
+        "Switch between projects - verify data updates"
+      ],
+      "files": [],
+      "verification": "All success criteria SC1-SC5 validated through manual testing"
+    }
+  ]
+}

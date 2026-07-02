@@ -1,0 +1,97 @@
+{
+  "issueNumber": 24,
+  "title": "Show pipeline step status in Active Work sidebar",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Add PipelineStep Type and Update Schema",
+      "description": "Define the PipelineStep type and add pipelineStep field to state types and JSON schema",
+      "tasks": [
+        "Add PipelineStep type to packages/shared/src/types/state.ts with values: 'GET' | 'REVIEW' | 'PLAN' | 'AUDIT' | 'EXECUTE' | 'SHIP'",
+        "Add optional pipelineStep?: PipelineStep field to IssueWork interface",
+        "Add optional pipelineStep?: PipelineStep field to ReleaseWork interface",
+        "Update packages/shared/schemas/state.schema.json to include pipelineStep in both issueWork and releaseWork definitions"
+      ],
+      "files": [
+        "packages/shared/src/types/state.ts",
+        "packages/shared/schemas/state.schema.json"
+      ],
+      "verification": [
+        "Run pnpm typecheck in packages/shared",
+        "Validate that the schema matches the types"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": 2,
+      "name": "Update Desktop Frontend Types and WorkProgressCard UI",
+      "description": "Add pipelineStep to frontend types and create the pipeline step visualization in WorkProgressCard",
+      "tasks": [
+        "Add pipelineStep field to IssueContext and ReleaseContext types in WorkCard.tsx",
+        "Update WorkProgressCard.tsx to display 6 pipeline step indicators with completed/in-progress/pending states",
+        "During EXECUTE step, continue showing phase progress (N/M phases)",
+        "Add CSS styling for pipeline step indicators in WorkProgressCard.css"
+      ],
+      "files": [
+        "apps/desktop/src/components/work/WorkCard.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.tsx",
+        "apps/desktop/src/components/sidebar/WorkProgressCard.css"
+      ],
+      "verification": [
+        "Run pnpm typecheck in apps/desktop",
+        "Run pnpm build in apps/desktop",
+        "Visual verification with mock state containing pipelineStep values"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": 3,
+      "name": "Update Framework Commands to Set pipelineStep",
+      "description": "Update all 7 framework commands to set the pipelineStep field when updating state",
+      "tasks": [
+        "Update get.md to set pipelineStep: GET when creating/updating work entry",
+        "Update review.md to set pipelineStep: REVIEW when starting review",
+        "Update plan.md to set pipelineStep: PLAN when creating plan",
+        "Update audit.md to set pipelineStep: AUDIT when starting audit",
+        "Update execute.md to set pipelineStep: EXECUTE when starting execution",
+        "Update ship.md to set pipelineStep: SHIP when shipping",
+        "Update yolo.md to set appropriate pipelineStep at each stage"
+      ],
+      "files": [
+        "packages/framework/commands/get.md",
+        "packages/framework/commands/review.md",
+        "packages/framework/commands/plan.md",
+        "packages/framework/commands/audit.md",
+        "packages/framework/commands/execute.md",
+        "packages/framework/commands/ship.md",
+        "packages/framework/commands/yolo.md"
+      ],
+      "verification": [
+        "Review each command file to confirm pipelineStep is included in state update examples",
+        "Manual testing by running commands and checking .tiki/state.json"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": 4,
+      "name": "Integration Testing and Polish",
+      "description": "End-to-end verification and refinement of the pipeline step visualization",
+      "tasks": [
+        "Test full workflow with /tiki:get, /tiki:review, /tiki:plan, /tiki:audit, /tiki:execute, /tiki:ship",
+        "Test /tiki:yolo automated pipeline verifying steps progress correctly",
+        "Verify UI displays correctly for issues at different pipeline steps",
+        "Polish CSS for step indicators (spacing, colors, animations)",
+        "Run pnpm typecheck and pnpm build from root"
+      ],
+      "files": [],
+      "verification": [
+        "Full typecheck passes: pnpm typecheck",
+        "Full build passes: pnpm build",
+        "Desktop app runs correctly: pnpm tauri:dev",
+        "Visual inspection shows correct pipeline progression"
+      ],
+      "status": "completed"
+    }
+  ],
+  "createdAt": "2026-02-03T22:00:00.000Z"
+}

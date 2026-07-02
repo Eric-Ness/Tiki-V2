@@ -1,0 +1,40 @@
+{
+  "issueNumber": 59,
+  "title": "Test 7",
+  "description": "No-code test issue with 4 phases to exercise kanban board phase tracking",
+  "createdAt": "2026-02-05T21:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Verify monorepo package structure",
+      "description": "Confirm the three main packages exist: packages/shared, packages/framework, and apps/desktop.",
+      "status": "completed",
+      "verification": "All three package directories exist with package.json files",
+      "files": []
+    },
+    {
+      "id": 2,
+      "title": "Verify framework commands",
+      "description": "Confirm all 7 core framework command files exist in packages/framework/commands/: get.md, review.md, plan.md, audit.md, execute.md, ship.md, yolo.md.",
+      "status": "completed",
+      "verification": "All 7 command markdown files exist",
+      "files": []
+    },
+    {
+      "id": 3,
+      "title": "Verify shared types",
+      "description": "Confirm the shared types directory contains state type definitions in packages/shared/src/types/.",
+      "status": "completed",
+      "verification": "Type files exist in the shared types directory",
+      "files": []
+    },
+    {
+      "id": 4,
+      "title": "Verify .tiki directory structure",
+      "description": "Confirm the .tiki directory has the expected structure: state.json, plans/ directory, and that the state file is valid JSON.",
+      "status": "completed",
+      "verification": ".tiki/state.json exists and is valid JSON, plans/ directory exists",
+      "files": []
+    }
+  ]
+}

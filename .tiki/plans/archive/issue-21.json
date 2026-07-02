@@ -1,0 +1,36 @@
+{
+  "issueNumber": 21,
+  "title": "Create issue... bug",
+  "summary": "Fix bug where create_github_issue uses unsupported --json flag with gh issue create",
+  "createdAt": "2026-02-03T12:00:00.000Z",
+  "phases": [
+    {
+      "id": 1,
+      "name": "Fix create_github_issue function",
+      "description": "Remove --json flag from gh issue create command and use a two-step approach: create the issue, parse the issue number from the URL output, then fetch the issue data using gh issue view --json",
+      "status": "completed",
+      "tasks": [
+        "Remove --json args from create_github_issue (lines 228-230)",
+        "Parse issue number from the URL returned by gh issue create",
+        "Add fetch_github_issue_by_number helper function using gh issue view --json",
+        "Call the helper to get full issue data after creating"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/github.rs"
+      ],
+      "verification": "Build the Rust backend successfully with cargo build"
+    },
+    {
+      "id": 2,
+      "name": "Test the fix",
+      "description": "Verify the create issue functionality works correctly",
+      "status": "completed",
+      "tasks": [
+        "Run cargo check to verify no compilation errors",
+        "Run cargo clippy to check for warnings"
+      ],
+      "files": [],
+      "verification": "No compilation errors or clippy warnings in the modified code"
+    }
+  ]
+}
