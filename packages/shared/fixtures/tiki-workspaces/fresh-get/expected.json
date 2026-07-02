@@ -1,0 +1,36 @@
+{
+  "description": "Pipeline stage 1: a freshly fetched issue. GET created the activeWork entry (pending/GET), journaled the step, and nothing else exists yet - no plan, no releases.",
+  "state": {
+    "activeWork": {
+      "issue:42": { "status": "pending", "pipelineStep": "GET", "phase": null }
+    },
+    "historyIssuesInclude": [],
+    "journalFloor": { "issue:42": "GET" }
+  },
+  "issues": {
+    "42": {
+      "githubState": { "state": "open" },
+      "display": {
+        "column": "review",
+        "label": "Pending",
+        "pipelineState": "active",
+        "badge": "Open"
+      },
+      "kanban": { "toExecute": "dispatch-execute", "toShipping": "toast" },
+      "planLocation": null,
+      "planPhaseStatuses": null,
+      "phaseProgress": null,
+      "criteria": null
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 1,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": [] }
+  }
+}

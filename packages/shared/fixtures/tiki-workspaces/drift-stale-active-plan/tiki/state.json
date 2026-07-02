@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {},
+  "history": {
+    "lastCompletedIssue": {
+      "number": 77,
+      "title": "Fix the graph hover flicker",
+      "completedAt": "2026-01-20T16:00:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 77,
+        "title": "Fix the graph hover flicker",
+        "completedAt": "2026-01-20T16:00:00.000Z"
+      }
+    ]
+  }
+}

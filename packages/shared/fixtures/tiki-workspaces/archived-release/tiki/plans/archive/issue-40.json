@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 40, "title": "Fix the release badge" },
+  "createdAt": "2026-01-08T10:00:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Fix the badge source",
+      "status": "completed",
+      "content": "Derive the badge from location.",
+      "startedAt": "2026-01-08T10:30:00.000Z",
+      "completedAt": "2026-01-08T13:30:00.000Z",
+      "summary": "Badge fixed."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Badge derives from the archived location",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-08T13:30:00.000Z"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1] },
+  "audited": true,
+  "auditedAt": "2026-01-08T10:15:00.000Z"
+}

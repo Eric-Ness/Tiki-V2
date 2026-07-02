@@ -1,0 +1,34 @@
+{
+  "description": "Pipeline stage 3: a shipped standalone issue. activeWork is empty, the issue lives in history, and the plan is archived (all phases completed). SC3 is stored verified:false (visual) but the coverage-derived checklist still shows it verified - the stored flag is only doctor-relevant, and the January timestamps put it OUTSIDE the 30-day unverified-SC window, so the doctor deliberately reports nothing.",
+  "state": {
+    "activeWork": {},
+    "historyIssuesInclude": [42],
+    "journalFloor": {}
+  },
+  "issues": {
+    "42": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed", "completed", "completed", "completed"],
+      "phaseProgress": { "current": 4, "total": 4 },
+      "criteria": { "verifiedIds": ["SC1", "SC2", "SC3"], "unverifiedIds": [] }
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 0,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": [] }
+  }
+}

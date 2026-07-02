@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {},
+  "history": {
+    "lastCompletedIssue": {
+      "number": 41,
+      "title": "Polish the release timeline",
+      "completedAt": "2026-01-08T15:30:00.000Z"
+    },
+    "lastCompletedRelease": {
+      "version": "v1.1.0",
+      "completedAt": "2026-01-08T16:00:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 41,
+        "title": "Polish the release timeline",
+        "completedAt": "2026-01-08T15:30:00.000Z"
+      },
+      {
+        "number": 40,
+        "title": "Fix the release badge",
+        "completedAt": "2026-01-08T14:00:00.000Z"
+      }
+    ],
+    "recentReleases": [
+      {
+        "version": "v1.1.0",
+        "issues": [40, 41],
+        "completedAt": "2026-01-08T16:00:00.000Z",
+        "tag": "v1.1.0"
+      }
+    ]
+  }
+}

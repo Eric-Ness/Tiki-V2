@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 50, "title": "Harden the release gate" },
+  "createdAt": "2026-01-22T09:30:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add the pre-tag gate",
+      "status": "completed",
+      "content": "Wire the readiness gate before tagging.",
+      "startedAt": "2026-01-22T10:00:00.000Z",
+      "completedAt": "2026-01-22T11:30:00.000Z",
+      "summary": "Gate wired."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Tagging halts when the gate fails",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-22T11:30:00.000Z"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1] },
+  "audited": true,
+  "auditedAt": "2026-01-22T09:45:00.000Z"
+}

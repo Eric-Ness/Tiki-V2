@@ -1,0 +1,40 @@
+{
+  "description": "Drift class 2: STALE ACTIVE PLAN for a finished issue. Issue 77 shipped (history) and has no activeWork entry, but plans/issue-77.json is still in the ACTIVE location with a stuck executing phase - the class #300 found 118 of. The doctor flags it (warn + archiveStalePlans Fix); archive_stale_plans / migrate-stale-artifacts move it into plans/archive/ normalizing the stuck phase to completed.",
+  "state": {
+    "activeWork": {},
+    "historyIssuesInclude": [77],
+    "journalFloor": {}
+  },
+  "issues": {
+    "77": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "active",
+      "planPhaseStatuses": ["completed", "executing"],
+      "phaseProgress": { "current": 1, "total": 2 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": ["SC2"] }
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 0,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [{ "issue": 77, "planPath": "plans/issue-77.json" }],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "warnings", "actions": ["archiveStalePlans"] }
+  },
+  "migrate": {
+    "archivedPlans": [77],
+    "archivedPlanPhaseStatuses": { "77": ["completed", "completed"] },
+    "archivedDefs": [],
+    "reconstructedDefs": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "description": "Pipeline stage 2: mid-EXECUTE. Phase 1 of 4 completed, phase 2 executing. activeWork.phase says 2/4 (live pointer) while the durable plan-derived N/M is 1/4 (completed count). SC1 is coverage-verified; SC2/SC3 are not.",
+  "state": {
+    "activeWork": {
+      "issue:42": {
+        "status": "executing",
+        "pipelineStep": "EXECUTE",
+        "phase": { "current": 2, "total": 4, "status": "executing" }
+      }
+    },
+    "historyIssuesInclude": [],
+    "journalFloor": { "issue:42": "EXECUTE" }
+  },
+  "issues": {
+    "42": {
+      "githubState": { "state": "open" },
+      "display": {
+        "column": "execute",
+        "label": "Executing",
+        "pipelineState": "active",
+        "badge": "Open"
+      },
+      "kanban": { "toExecute": "reorder", "toShipping": "dispatch-ship" },
+      "planLocation": "active",
+      "planPhaseStatuses": ["completed", "executing", "pending", "pending"],
+      "phaseProgress": { "current": 1, "total": 4 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": ["SC2", "SC3"] }
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 1,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": [] }
+  }
+}

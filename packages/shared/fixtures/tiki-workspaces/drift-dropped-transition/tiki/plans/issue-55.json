@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 55, "title": "Refactor the settings panel" },
+  "createdAt": "2026-01-15T09:30:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Extract the panel sections",
+      "status": "executing",
+      "content": "Split the settings panel into sections.",
+      "startedAt": "2026-01-15T10:00:00.000Z"
+    },
+    {
+      "number": 2,
+      "title": "Route section state through the store",
+      "status": "pending",
+      "content": "Move section state into the store."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Panel sections render independently",
+      "category": "functional"
+    },
+    {
+      "id": "SC2",
+      "description": "Section state survives a panel remount",
+      "category": "functional"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1], "SC2": [2] },
+  "audited": true,
+  "auditedAt": "2026-01-15T09:45:00.000Z"
+}

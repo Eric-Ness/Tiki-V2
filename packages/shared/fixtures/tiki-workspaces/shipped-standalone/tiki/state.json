@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {},
+  "history": {
+    "lastCompletedIssue": {
+      "number": 42,
+      "title": "Add drift harness widget",
+      "completedAt": "2026-01-10T14:00:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 42,
+        "title": "Add drift harness widget",
+        "completedAt": "2026-01-10T14:00:00.000Z"
+      }
+    ]
+  }
+}

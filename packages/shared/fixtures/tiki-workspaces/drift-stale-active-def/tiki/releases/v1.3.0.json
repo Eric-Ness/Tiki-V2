@@ -1,0 +1,6 @@
+{
+  "version": "v1.3.0",
+  "status": "completed",
+  "issues": [{ "number": 50, "title": "Harden the release gate" }],
+  "createdAt": "2026-01-22T09:00:00.000Z"
+}

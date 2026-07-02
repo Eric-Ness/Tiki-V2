@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 60, "title": "Speed up the cold start" },
+  "createdAt": "2026-01-25T15:00:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Code-split the heavy views",
+      "status": "completed",
+      "content": "Lazy-load the heavy views.",
+      "startedAt": "2026-01-25T15:30:00.000Z",
+      "completedAt": "2026-01-25T17:30:00.000Z",
+      "summary": "Views split."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Cold-start JS payload shrinks by a third",
+      "category": "performance",
+      "verified": true,
+      "verifiedAt": "2026-01-25T17:30:00.000Z"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1] },
+  "audited": true,
+  "auditedAt": "2026-01-25T15:15:00.000Z"
+}

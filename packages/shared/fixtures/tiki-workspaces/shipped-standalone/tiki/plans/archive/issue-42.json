@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 42, "title": "Add drift harness widget" },
+  "createdAt": "2026-01-10T10:30:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Scaffold the widget module",
+      "status": "completed",
+      "content": "Create the widget module skeleton.",
+      "startedAt": "2026-01-10T11:00:00.000Z",
+      "completedAt": "2026-01-10T11:30:00.000Z",
+      "summary": "Scaffolded the widget module."
+    },
+    {
+      "number": 2,
+      "title": "Wire the widget into the sidebar",
+      "status": "completed",
+      "content": "Connect the widget to the sidebar store.",
+      "startedAt": "2026-01-10T11:45:00.000Z",
+      "completedAt": "2026-01-10T12:30:00.000Z",
+      "summary": "Wired into the sidebar."
+    },
+    {
+      "number": 3,
+      "title": "Add widget settings",
+      "status": "completed",
+      "content": "Persist widget settings.",
+      "startedAt": "2026-01-10T12:40:00.000Z",
+      "completedAt": "2026-01-10T13:10:00.000Z",
+      "summary": "Settings persisted."
+    },
+    {
+      "number": 4,
+      "title": "Document the widget",
+      "status": "completed",
+      "content": "Write the widget docs.",
+      "startedAt": "2026-01-10T13:20:00.000Z",
+      "completedAt": "2026-01-10T13:50:00.000Z",
+      "summary": "Docs written."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Widget module compiles and unit tests pass",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-10T11:30:00.000Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Sidebar shows the widget with live data",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-10T13:10:00.000Z"
+    },
+    {
+      "id": "SC3",
+      "description": "Widget renders correctly in the sidebar panel",
+      "category": "visual",
+      "verified": false
+    }
+  ],
+  "coverageMatrix": { "SC1": [1], "SC2": [2, 3], "SC3": [4] },
+  "audited": true,
+  "auditedAt": "2026-01-10T10:45:00.000Z"
+}

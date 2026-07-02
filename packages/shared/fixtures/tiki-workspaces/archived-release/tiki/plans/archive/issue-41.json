@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 41, "title": "Polish the release timeline" },
+  "createdAt": "2026-01-08T11:00:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Polish the timeline rows",
+      "status": "completed",
+      "content": "Tighten the timeline layout.",
+      "startedAt": "2026-01-08T11:30:00.000Z",
+      "completedAt": "2026-01-08T15:00:00.000Z",
+      "summary": "Timeline polished."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Timeline lists ship events in order",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-08T15:00:00.000Z"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1] },
+  "audited": true,
+  "auditedAt": "2026-01-08T11:15:00.000Z"
+}

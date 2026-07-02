@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:43": {
+      "type": "issue",
+      "issue": { "number": 43, "title": "Release child: fix badge" },
+      "status": "completed",
+      "pipelineStep": "SHIP",
+      "createdAt": "2026-01-12T09:00:00.000Z",
+      "lastActivity": "2026-01-12T11:00:00.000Z",
+      "parentRelease": "v1.2.0"
+    },
+    "release:v1.2.0": {
+      "type": "release",
+      "release": {
+        "version": "v1.2.0",
+        "issues": [43, 44],
+        "completedIssues": [43],
+        "currentIssue": 44
+      },
+      "status": "executing",
+      "pipelineStep": "EXECUTE",
+      "createdAt": "2026-01-12T08:00:00.000Z",
+      "lastActivity": "2026-01-12T11:00:00.000Z"
+    }
+  },
+  "history": {
+    "lastCompletedIssue": {
+      "number": 43,
+      "title": "Release child: fix badge",
+      "completedAt": "2026-01-12T11:00:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 43,
+        "title": "Release child: fix badge",
+        "completedAt": "2026-01-12T11:00:00.000Z"
+      }
+    ]
+  }
+}
