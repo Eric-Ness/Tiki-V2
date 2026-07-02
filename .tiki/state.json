@@ -1,71 +1,6 @@
 {
   "schemaVersion": 1,
-  "activeWork": {
-    "release:v1.0.1": {
-      "type": "release",
-      "release": {
-        "version": "v1.0.1",
-        "issues": [
-          300,
-          301,
-          302
-        ],
-        "completedIssues": [
-          300,
-          301,
-          302
-        ],
-        "currentIssues": [
-          302
-        ],
-        "completedBranches": [
-          "worktree-agent-a0ac643dfca69e937",
-          "worktree-agent-a8823ada9a99e4b55",
-          "worktree-agent-a631ba7805a8068b8"
-        ]
-      },
-      "status": "shipping",
-      "pipelineStep": "SHIP",
-      "createdAt": "2026-07-02T11:44:04.591Z",
-      "lastActivity": "2026-07-02T13:13:57.960Z"
-    },
-    "issue:300": {
-      "type": "issue",
-      "issue": {
-        "number": 300,
-        "title": "One-time artifact migration: archive ~130 stale-location plans + release defs, reconstruct 5 ghost release defs"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "createdAt": "2026-07-02T11:45:43.944Z",
-      "lastActivity": "2026-07-02T12:00:43.641Z",
-      "parentRelease": "v1.0.1"
-    },
-    "issue:301": {
-      "type": "issue",
-      "issue": {
-        "number": 301,
-        "title": "Doctor: flag stale active-location artifacts (plans for closed issues, active defs with completed status, ghost changelogs)"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "createdAt": "2026-07-02T12:05:03.589Z",
-      "lastActivity": "2026-07-02T12:36:21.032Z",
-      "parentRelease": "v1.0.1"
-    },
-    "issue:302": {
-      "type": "issue",
-      "issue": {
-        "number": 302,
-        "title": "State-vs-desktop drift harness: golden fixtures driven through the pipeline, asserted at every layer (shim, derivation, IPC)"
-      },
-      "status": "completed",
-      "pipelineStep": "SHIP",
-      "createdAt": "2026-07-02T12:39:42.508Z",
-      "lastActivity": "2026-07-02T13:10:03.319Z",
-      "parentRelease": "v1.0.1"
-    }
-  },
+  "activeWork": {},
   "history": {
     "lastCompletedIssue": {
       "number": 301,
@@ -73,24 +8,14 @@
       "completedAt": "2026-07-02T13:13:04.216Z"
     },
     "lastCompletedRelease": {
-      "version": "v1.0.0",
+      "version": "v1.0.1",
       "issues": [
-        283,
-        284,
-        285,
-        287,
-        289,
-        290,
-        291,
-        294,
-        295,
-        296,
-        297,
-        298,
-        299
+        300,
+        301,
+        302
       ],
-      "completedAt": "2026-06-14T17:45:00.000Z",
-      "tag": "v1.0.0"
+      "completedAt": "2026-07-02T13:28:57.067Z",
+      "tag": "v1.0.1"
     },
     "recentIssues": [
       {
@@ -504,6 +429,16 @@
       }
     ],
     "recentReleases": [
+      {
+        "version": "v1.0.1",
+        "issues": [
+          300,
+          301,
+          302
+        ],
+        "completedAt": "2026-07-02T13:28:57.067Z",
+        "tag": "v1.0.1"
+      },
       {
         "version": "v1.0.0",
         "issues": [

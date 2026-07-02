@@ -1,18 +1,2 @@
 {"ts":"2026-07-02T11:44:04.508Z","workId":"release:v1.0.1","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T11:45:43.862Z","workId":"issue:300","step":"GET","event":"start","title":"One-time artifact migration: archive ~130 stale-location plans + release defs, reconstruct 5 ghost release defs"}
-{"ts":"2026-07-02T11:45:57.865Z","workId":"issue:300","step":"REVIEW","event":"start"}
-{"ts":"2026-07-02T11:48:23.574Z","workId":"issue:300","step":"PLAN","event":"start"}
-{"ts":"2026-07-02T11:49:39.688Z","workId":"issue:300","step":"AUDIT","event":"start"}
-{"ts":"2026-07-02T11:50:16.045Z","workId":"issue:300","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T12:00:05.861Z","workId":"issue:300","step":"SHIP","event":"start"}
-{"ts":"2026-07-02T12:05:03.530Z","workId":"issue:301","step":"GET","event":"start","title":"Doctor: flag stale active-location artifacts"}
-{"ts":"2026-07-02T12:05:20.878Z","workId":"issue:301","step":"REVIEW","event":"start"}
-{"ts":"2026-07-02T12:09:19.301Z","workId":"issue:301","step":"PLAN","event":"start"}
-{"ts":"2026-07-02T12:10:34.142Z","workId":"issue:301","step":"AUDIT","event":"start"}
-{"ts":"2026-07-02T12:11:30.043Z","workId":"issue:301","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T12:21:30.352Z","workId":"issue:301","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T12:26:13.864Z","workId":"issue:301","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T12:30:08.521Z","workId":"issue:301","step":"EXECUTE","event":"start"}
-{"ts":"2026-07-02T12:35:27.070Z","workId":"issue:301","step":"SHIP","event":"start"}
-{"ts":"2026-07-02T12:36:20.962Z","workId":"issue:301","step":"SHIP","event":"complete"}
 {"ts":"2026-07-02T13:13:57.895Z","workId":"release:v1.0.1","step":"SHIP","event":"start"}

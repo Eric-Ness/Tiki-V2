@@ -1,6 +1,6 @@
 {
   "version": "v1.0.1",
-  "status": "active",
+  "status": "shipped",
   "issues": [
     {
       "number": 300,
@@ -16,5 +16,7 @@
     }
   ],
   "createdAt": "2026-07-02T00:00:00.000Z",
-  "note": "Reliability release from the 2026-07-01 artifact-drift deep dive. Dependency order: #300 first (migration defines clean shapes), then #301 (doctor checks reuse migration logic) and #302 (harness encodes the drift classes as fixtures). All three from the verified findings in the deep dive."
+  "note": "Reliability release from the 2026-07-01 artifact-drift deep dive. Dependency order: #300 first (migration defines clean shapes), then #301 (doctor checks reuse migration logic) and #302 (harness encodes the drift classes as fixtures). All three from the verified findings in the deep dive.",
+  "shipped": true,
+  "completedAt": "2026-07-02T13:25:00.000Z"
 }
