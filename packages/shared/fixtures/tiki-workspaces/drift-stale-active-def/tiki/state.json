@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {},
+  "history": {
+    "lastCompletedIssue": {
+      "number": 50,
+      "title": "Harden the release gate",
+      "completedAt": "2026-01-22T12:00:00.000Z"
+    },
+    "lastCompletedRelease": {
+      "version": "v1.3.0",
+      "completedAt": "2026-01-22T13:00:00.000Z"
+    },
+    "recentIssues": [
+      {
+        "number": 50,
+        "title": "Harden the release gate",
+        "completedAt": "2026-01-22T12:00:00.000Z"
+      }
+    ],
+    "recentReleases": [
+      {
+        "version": "v1.3.0",
+        "issues": [50],
+        "completedAt": "2026-01-22T13:00:00.000Z",
+        "tag": "v1.3.0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "description": "Drift class 4: GHOST RELEASE (changelog-only). v0.9.9 left a changelog in releases/ but has NO def in either location and is absent from history.recentReleases (the real v0.7.4 case). load_tiki_releases sees nothing; the doctor's changelog-stem widening (#301) reports it in recentReleasesMissingJson (warn, no Fix action); migrate-stale-artifacts reconstructs the archived def with the issue list parsed from the changelog's /issues/N links.",
+  "state": {
+    "activeWork": {},
+    "historyIssuesInclude": [60],
+    "journalFloor": {}
+  },
+  "issues": {
+    "60": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed"],
+      "phaseProgress": { "current": 1, "total": 1 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": [] }
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 0,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": ["v0.9.9"],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "warnings", "actions": [] }
+  },
+  "migrate": {
+    "archivedPlans": [],
+    "archivedDefs": [],
+    "reconstructedDefs": [{ "version": "v0.9.9", "issues": [60] }]
+  }
+}

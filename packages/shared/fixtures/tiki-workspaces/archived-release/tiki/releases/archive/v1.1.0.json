@@ -1,0 +1,9 @@
+{
+  "version": "v1.1.0",
+  "status": "active",
+  "issues": [
+    { "number": 40, "title": "Fix the release badge" },
+    { "number": 41, "title": "Polish the release timeline" }
+  ],
+  "createdAt": "2026-01-08T09:00:00.000Z"
+}

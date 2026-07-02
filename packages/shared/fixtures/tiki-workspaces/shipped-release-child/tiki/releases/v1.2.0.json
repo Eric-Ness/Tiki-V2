@@ -1,0 +1,9 @@
+{
+  "version": "v1.2.0",
+  "status": "active",
+  "issues": [
+    { "number": 43, "title": "Release child: fix badge" },
+    { "number": 44, "title": "Release child: fix tooltip" }
+  ],
+  "createdAt": "2026-01-12T08:00:00.000Z"
+}

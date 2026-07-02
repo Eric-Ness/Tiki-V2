@@ -1,0 +1,52 @@
+{
+  "description": "Pipeline stage 5: an archived (shipped) release. The def lives in releases/archive/ but still says status:active - the REAL post-ship resting state. Location is truth: archived=true makes the release completed. The changelog deliberately stays in the ACTIVE releases/ dir (the #300 keep-in-place decision). archivedButActive is benign residue: an info finding with the normalize action, never a warning.",
+  "state": {
+    "activeWork": {},
+    "historyIssuesInclude": [40, 41],
+    "journalFloor": {}
+  },
+  "issues": {
+    "40": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed"],
+      "phaseProgress": { "current": 1, "total": 1 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": [] }
+    },
+    "41": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed"],
+      "phaseProgress": { "current": 1, "total": 1 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": [] }
+    }
+  },
+  "releases": [
+    { "version": "v1.1.0", "location": "archive", "status": "active", "completed": true }
+  ],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 0,
+    "releaseChecks": [
+      { "version": "v1.1.0", "location": "archive", "status": "active", "archivedButActive": true }
+    ],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": ["normalizeArchivedReleases"] }
+  }
+}

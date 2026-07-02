@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 44, "title": "Release child: fix tooltip" },
+  "createdAt": "2026-01-12T10:50:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Fix the tooltip anchor",
+      "status": "pending",
+      "content": "Anchor the tooltip to the node."
+    },
+    {
+      "number": 2,
+      "title": "Pin tooltip behavior in a test",
+      "status": "pending",
+      "content": "Add the tooltip test."
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Tooltip anchors to its node",
+      "category": "functional"
+    }
+  ],
+  "coverageMatrix": { "SC1": [1, 2] },
+  "audited": true,
+  "auditedAt": "2026-01-12T10:55:00.000Z"
+}

@@ -1,6 +1,8 @@
 mod claude_usage;
 mod commands;
 mod config;
+#[cfg(test)]
+mod drift_harness_tests;
 mod fs_utils;
 mod github;
 pub mod state;

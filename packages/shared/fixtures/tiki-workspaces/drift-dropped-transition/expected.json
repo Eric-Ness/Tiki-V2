@@ -1,0 +1,43 @@
+{
+  "description": "Drift class 1: DROPPED TRANSITION. Phase 1 is executing on disk (plan artifact + journal floor EXECUTE) but state.json still says reviewing/REVIEW because the EXECUTE transition was never emitted. The board shows the review column while work runs - the display drift the reconciler exists to heal. The doctor does NOT flag this class (not artifact-location drift); reconcile-state.mjs advances the entry to MAX(artifact target, journal floor).",
+  "state": {
+    "activeWork": {
+      "issue:55": { "status": "reviewing", "pipelineStep": "REVIEW", "phase": null }
+    },
+    "historyIssuesInclude": [],
+    "journalFloor": { "issue:55": "EXECUTE" }
+  },
+  "issues": {
+    "55": {
+      "githubState": { "state": "open" },
+      "display": {
+        "column": "review",
+        "label": "Reviewing",
+        "pipelineState": "active",
+        "badge": "Open"
+      },
+      "kanban": { "toExecute": "dispatch-execute", "toShipping": "toast" },
+      "planLocation": "active",
+      "planPhaseStatuses": ["executing", "pending"],
+      "phaseProgress": { "current": 0, "total": 2 },
+      "criteria": { "verifiedIds": [], "unverifiedIds": ["SC1", "SC2"] }
+    }
+  },
+  "releases": [],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 1,
+    "releaseChecks": [],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": [] }
+  },
+  "reconcile": {
+    "workId": "issue:55",
+    "healedStatus": "executing",
+    "healedStep": "EXECUTE",
+    "healedPhase": { "current": 1, "total": 2, "status": "executing" },
+    "healedDisplayColumn": "execute"
+  }
+}

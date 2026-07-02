@@ -1,0 +1,60 @@
+{
+  "description": "Pipeline stage 4: a shipped RELEASE CHILD. issue:43 stays in activeWork as completed (parentRelease preserved) while release:v1.2.0 is still executing with an active-location def. Issue 44 is the next child: planned but untracked (no activeWork entry yet). The doctor must NOT flag 43's or 44's plans - 43 is history-finished but live via activeWork, 44 is not finished.",
+  "state": {
+    "activeWork": {
+      "issue:43": {
+        "status": "completed",
+        "pipelineStep": "SHIP",
+        "phase": null,
+        "parentRelease": "v1.2.0"
+      },
+      "release:v1.2.0": { "status": "executing", "pipelineStep": "EXECUTE" }
+    },
+    "historyIssuesInclude": [43],
+    "journalFloor": {}
+  },
+  "issues": {
+    "43": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed", "completed"],
+      "phaseProgress": { "current": 2, "total": 2 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": [] }
+    },
+    "44": {
+      "githubState": { "state": "open" },
+      "display": {
+        "column": "open",
+        "label": "Open",
+        "pipelineState": "none",
+        "badge": "Open"
+      },
+      "kanban": { "toExecute": "dispatch-execute", "toShipping": "toast" },
+      "planLocation": "active",
+      "planPhaseStatuses": ["pending", "pending"],
+      "phaseProgress": { "current": 0, "total": 2 },
+      "criteria": { "verifiedIds": [], "unverifiedIds": ["SC1"] }
+    }
+  },
+  "releases": [
+    { "version": "v1.2.0", "location": "active", "status": "active", "completed": false }
+  ],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 2,
+    "releaseChecks": [
+      { "version": "v1.2.0", "location": "active", "status": "active", "archivedButActive": false }
+    ],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "healthy", "actions": [] }
+  }
+}

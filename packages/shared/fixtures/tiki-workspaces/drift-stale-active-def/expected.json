@@ -1,0 +1,48 @@
+{
+  "description": "Drift class 3: ACTIVE-LOCATION DEF WITH FINISHED STATUS. v1.3.0 shipped (history + status:completed) but its def never moved to releases/archive/, so location-is-truth renders it as a LIVE release (completed=false) - the reverse of the benign archivedButActive residue. The doctor flags it (warn + archiveStaleReleaseDefs Fix); the Fix / migration move it to archive/ normalizing status to shipped, which flips completed to true.",
+  "state": {
+    "activeWork": {},
+    "historyIssuesInclude": [50],
+    "journalFloor": {}
+  },
+  "issues": {
+    "50": {
+      "githubState": { "state": "closed" },
+      "display": {
+        "column": "completed",
+        "label": "Completed",
+        "pipelineState": "complete",
+        "badge": "Closed"
+      },
+      "kanban": { "toExecute": "toast", "toShipping": "toast" },
+      "planLocation": "archive",
+      "planPhaseStatuses": ["completed"],
+      "phaseProgress": { "current": 1, "total": 1 },
+      "criteria": { "verifiedIds": ["SC1"], "unverifiedIds": [] }
+    }
+  },
+  "releases": [
+    { "version": "v1.3.0", "location": "active", "status": "completed", "completed": false }
+  ],
+  "doctor": {
+    "stateValid": true,
+    "activeWorkCount": 0,
+    "releaseChecks": [
+      {
+        "version": "v1.3.0",
+        "location": "active",
+        "status": "completed",
+        "archivedButActive": false
+      }
+    ],
+    "recentReleasesMissingJson": [],
+    "staleActivePlans": [],
+    "unverifiedShippedCriteria": [],
+    "summary": { "status": "warnings", "actions": ["archiveStaleReleaseDefs"] }
+  },
+  "migrate": {
+    "archivedPlans": [],
+    "archivedDefs": ["v1.3.0"],
+    "reconstructedDefs": []
+  }
+}

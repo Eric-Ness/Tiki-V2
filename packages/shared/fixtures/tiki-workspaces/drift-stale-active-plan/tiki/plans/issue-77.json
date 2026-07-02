@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "issue": { "number": 77, "title": "Fix the graph hover flicker" },
+  "createdAt": "2026-01-20T14:00:00.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Memoize the node component",
+      "status": "completed",
+      "content": "Kill the per-hover re-render storm.",
+      "startedAt": "2026-01-20T14:30:00.000Z",
+      "completedAt": "2026-01-20T15:00:00.000Z",
+      "summary": "Node memoized."
+    },
+    {
+      "number": 2,
+      "title": "Pin hover behavior in a test",
+      "status": "executing",
+      "content": "Add the hover regression test.",
+      "startedAt": "2026-01-20T15:10:00.000Z"
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Node component does not re-render on hover",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-01-20T15:00:00.000Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Hover regression test passes",
+      "category": "testing",
+      "verified": false
+    }
+  ],
+  "coverageMatrix": { "SC1": [1], "SC2": [2] },
+  "audited": true,
+  "auditedAt": "2026-01-20T14:15:00.000Z"
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "activeWork": {
+    "issue:55": {
+      "type": "issue",
+      "issue": { "number": 55, "title": "Refactor the settings panel" },
+      "status": "reviewing",
+      "pipelineStep": "REVIEW",
+      "createdAt": "2026-01-15T09:00:00.000Z",
+      "lastActivity": "2026-01-15T09:10:00.000Z"
+    }
+  },
+  "history": {}
+}
