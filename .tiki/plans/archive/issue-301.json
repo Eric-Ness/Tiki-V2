@@ -1,0 +1,165 @@
+{
+  "issue": {
+    "number": 301,
+    "title": "Doctor: flag stale active-location artifacts (plans for closed issues, active defs with completed status, ghost changelogs)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/301"
+  },
+  "createdAt": "2026-07-02T12:10:00.000Z",
+  "schemaVersion": 1,
+  "description": "Make the stale-active-location drift class (uncovered by the #300 deep dive) permanently visible in tiki_doctor / the Diagnostics panel, with one-shot Fix actions that reuse #300's move semantics.",
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "A def with status 'completed' placed in active releases/ produces a Diagnostics finding with a working Fix that archives it",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:34:56.526Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": "An active plan for an issue in history produces a staleActivePlans finding; Fix archives the plan; plans for issues currently in activeWork (including current-release children) are NOT flagged",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:34:56.526Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "A changelog-only ghost release (v0.7.4 fixture) is reported by the widened missing-json check",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:34:56.526Z"
+    },
+    {
+      "id": "SC4",
+      "category": "functional",
+      "description": "unverifiedShippedCriteria stays bounded after #300's migration: recency cutoff applied, tested, and documented in the check's doc comment",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:34:56.526Z"
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "Each new rule covered by summary/unit tests including the healthy negative case; all gates green (pnpm build, desktop vitest, cargo tests, framework suite, lint zero errors)",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:34:56.526Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Rust doctor read-side: staleActivePlans field, ghost-changelog widening, unverifiedShippedCriteria cutoff",
+      "status": "completed",
+      "content": "In state.rs add StaleActivePlan {issue: u32, plan_path: String, newest_timestamp: Option<String>} (camelCase serde) and a #[serde(default)] stale_active_plans: Vec<StaleActivePlan> field on DiagnosticsReport. In commands.rs: (a) add compute_stale_active_plans(tiki_path) scanning plans/*.json (top-level only) whose issue number is in history.recentIssues / history.lastCompletedIssue / any history.recentReleases[].issues, EXCLUDING any issue present in activeWork (any status, issue entries by number and release entries' release.issues lists) — Value-based traversal so a degraded state.json never fails the scan; newest_timestamp = max ISO string among auditedAt, createdAt, phases[].completedAt/startedAt. (b) widen compute_recent_releases_missing_json to also treat releases/*-changelog.md and releases/archive/*-changelog.md stems as candidate versions (v0.7.4 ghost class). (c) add a 30-day recency cutoff to compute_unverified_shipped_criteria using chrono (already a dependency): include a plan's criteria only when its newest parseable timestamp (auditedAt, phases[].completedAt, createdAt) is within 30 days of now; plans with no parseable timestamp are excluded; document the choice in the doc comment. Update the #281 fixtures to carry recent createdAt values and add cargo tests: stale plan flagged / activeWork-issue excluded / release-child excluded / not-in-history excluded; changelog-only ghost reported and non-ghost not; cutoff includes recent + excludes ancient/timestampless plans; serialization test that staleActivePlans key crosses IPC in camelCase.",
+      "verification": [
+        "cd apps/desktop/src-tauri && cargo test --lib (or cargo check --tests if exe locked)"
+      ],
+      "addresses_criteria": [
+        "SC2",
+        "SC3",
+        "SC4",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/state.rs",
+        "apps/desktop/src-tauri/src/commands.rs"
+      ],
+      "summary": "Rust doctor read-side: staleActivePlans field+struct, changelog-ghost widening, 30-day unverified-SC cutoff; cargo --lib 95 green"
+    },
+    {
+      "number": 2,
+      "title": "Rust fix commands: archive_stale_release_defs + archive_stale_plans",
+      "status": "completed",
+      "content": "Add two Tauri commands in commands.rs mirroring migrate-stale-artifacts.mjs move semantics, both returning Result<usize,String> (count moved) and skipping unreadable/unparseable files or existing archive destinations with log::warn, never failing the whole run. archive_stale_release_defs: scan releases/*.json (top-level), for each def with status != 'active': rewrite status to 'shipped' when it was completed/shipped (leave not_planned as-is; location is the fix), atomic-write, then rename into releases/archive/. archive_stale_plans: recompute compute_stale_active_plans, for each flagged plan normalize phases[].status (anything not completed/skipped -> completed, mirroring the migration), atomic-write, rename into plans/archive/. Register both in lib.rs invoke_handler. Cargo tests: only status!=active defs move (active-location active def untouched, archive dest collision skipped), moved def says shipped; only flagged plans move, phases normalized, excluded plans untouched.",
+      "verification": [
+        "cd apps/desktop/src-tauri && cargo test --lib (or cargo check --tests if exe locked)"
+      ],
+      "addresses_criteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/commands.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "summary": "archive_stale_release_defs + archive_stale_plans Tauri commands registered; cargo --lib 98, clippy --all-targets clean"
+    },
+    {
+      "number": 3,
+      "title": "Frontend summary rules: staleActiveReleaseDefs + staleActivePlans",
+      "status": "completed",
+      "content": "In diagnosticsSummary.ts: mirror the new staleActivePlans field ({issue, planPath, newestTimestamp}[]) on DiagnosticsReport; extend Finding.action union with 'archiveStaleReleaseDefs' | 'archiveStalePlans'. Add rule A: releaseChecks rows with location==='active' && status!=='active' -> WARN finding (genuine drift, unlike archivedButActive) listing versions, action archiveStaleReleaseDefs. Add rule B: staleActivePlans non-empty -> WARN finding listing issue numbers, action archiveStalePlans. Update the recentReleasesMissingJson message to reflect the widened source (history or changelog stems). Update the header doc comment. Vitest: stale active def flagged as warn+action / active-status active-location def NOT flagged / archived rows never flagged by rule A; staleActivePlans non-empty flagged with action / empty no finding; cleanReport fixture gains staleActivePlans: [].",
+      "verification": [
+        "pnpm --filter=@tiki/desktop test"
+      ],
+      "addresses_criteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/utils/diagnosticsSummary.ts",
+        "apps/desktop/src/utils/__tests__/diagnosticsSummary.test.ts"
+      ],
+      "dependencies": [
+        1
+      ],
+      "summary": "diagnosticsSummary warn rules + Fix actions, widened missing-json message; desktop vitest 276"
+    },
+    {
+      "number": 4,
+      "title": "DiagnosticsPanel wiring + full gates",
+      "status": "completed",
+      "content": "In DiagnosticsPanel.tsx: generalize the #276 normalize pattern into a runFix(command) helper; render Fix buttons for archiveStaleReleaseDefs (invokes archive_stale_release_defs) and archiveStalePlans (invokes archive_stale_plans) when the matching finding action is present, then re-run load(). Render the staleActivePlans list (issue, planPath, newestTimestamp) mirroring the unverifiedShippedCriteria section. Run all gates: pnpm build, pnpm --filter=@tiki/desktop test, cargo test --lib (or check --tests if locked), framework suite (cd packages/framework && node --test __tests__/*.test.mjs), pnpm -C apps/desktop lint (zero errors).",
+      "verification": [
+        "pnpm build",
+        "pnpm --filter=@tiki/desktop test",
+        "cd packages/framework && node --test __tests__/*.test.mjs",
+        "pnpm -C apps/desktop lint"
+      ],
+      "addresses_criteria": [
+        "SC1",
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/components/settings/DiagnosticsPanel.tsx"
+      ],
+      "dependencies": [
+        2,
+        3
+      ],
+      "summary": "DiagnosticsPanel runFix generalization + staleActivePlans list; all gates green"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      2,
+      3,
+      4
+    ],
+    "SC2": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "SC3": [
+      1
+    ],
+    "SC4": [
+      1
+    ],
+    "SC5": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-07-02T12:10:34.275Z"
+}

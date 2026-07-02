@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 300,
+    "title": "One-time artifact migration: archive ~130 stale-location plans + release defs, reconstruct 5 ghost release defs",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/300"
+  },
+  "createdAt": "2026-07-02T11:55:00.000Z",
+  "research": [],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "category": "functional",
+      "description": "After migration, .tiki/plans/ contains no plan for a closed/shipped issue; all migrated plans are in plans/archive/.",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:00:05.800Z"
+    },
+    {
+      "id": "SC2",
+      "category": "functional",
+      "description": ".tiki/releases/ contains no stranded defs; v0.2.5-v0.2.15 archived with status shipped; the 5 ghost versions (v0.6.7, v0.7.4, v0.7.5, v0.7.6, v0.7.8) have reconstructed archived defs; recentReleasesMissingJson would return empty.",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:00:05.800Z"
+    },
+    {
+      "id": "SC3",
+      "category": "functional",
+      "description": "Migration is idempotent (second run = no-op) and supports --dry-run listing every planned move.",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:00:05.800Z"
+    },
+    {
+      "id": "SC4",
+      "category": "visual",
+      "description": "Desktop sidebar no longer lists v0.2.x as active releases; dep graph / criteria checklist for an old issue (e.g. #96) shows completed, not mid-flight. (User eyes in tauri:dev after merge.)",
+      "verified": false
+    },
+    {
+      "id": "SC5",
+      "category": "testing",
+      "description": "Script covered by tests using a fixture .tiki/ tree (stale plan, stranded def, ghost history record, changelog-only ghost).",
+      "verified": true,
+      "verifiedAt": "2026-07-02T12:00:05.800Z"
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Write migrate-stale-artifacts.mjs + fix reconciler doc comment",
+      "status": "completed",
+      "content": "Create packages/framework/scripts/migrate-stale-artifacts.mjs (Node built-ins only, mirrors state.mjs conventions: parseArgs, resolveTikiPath import, atomic writes, die() exit codes). Behavior: (1) BACKUP state.json + write a manifest of every planned/executed move to .tiki/backups/migration-<ts>/ before touching anything (skip backup when nothing to do). (2) ARCHIVE stale plans: for each .tiki/plans/issue-N.json (non-archive), archive iff N is in a history.recentReleases issue list OR history.recentIssues OR the closed-issue set (one batched gh issue list --state closed call, or --closed-issues-file JSON override for tests/offline), AND issue:N is not active in activeWork; normalize phases[].status to completed (statuses not in {completed,skipped} -> completed, matching what ship would have written) then move to plans/archive/. (3) ARCHIVE stranded release defs: each .tiki/releases/vX.json with status completed|shipped (and not an executing activeWork release) moves to releases/archive/ with status normalized to shipped (mirrors normalize_archived_releases). (4) RECONSTRUCT ghost defs: for each history.recentReleases record with no def in either location, write releases/archive/vX.json from the history record (version/issues/completedAt/tag) + issue titles from the closed-issue set; ALSO scan releases/*-changelog.md for versions with no def in either location AND absent from history (v0.7.4): recover issue list by parsing /issues/(\\d+) links from the changelog, createdAt from git tag date (fallback: changelog mtime). Reconstructed defs match archived shape (version/status:shipped/issues[{number,title}]/createdAt/shipped:true/tag) + reconstructed:true provenance marker. (5) Orphan changelogs: KEEP IN PLACE, documented in the script header (read_release_changelog reads them from active releases/). (6) Flags: --dry-run (list every planned move, touch nothing), --tiki-path override, --closed-issues-file. Idempotent: second run finds nothing and exits 0 as a no-op. Also fix the stale reconcile-state.mjs guard-2 doc comment (~lines 33-35): remove the hardcoded '#149 (~52 issues)' / '~120 older stale plans' counts that go stale.",
+      "verification": "node packages/framework/scripts/migrate-stale-artifacts.mjs --help exits 0; script parses; reconcile doc comment updated.",
+      "summary": "migrate-stale-artifacts.mjs written (backup/plans/defs/ghosts/dry-run/idempotent, closed-issues-file override); reconcile-state.mjs stale doc counts fixed"
+    },
+    {
+      "number": 2,
+      "title": "Fixture-based tests for the migration script",
+      "status": "completed",
+      "content": "Create packages/framework/__tests__/migrate-stale-artifacts.test.mjs (node:test, mirrors existing test conventions in that dir). Build a temp fixture .tiki/ tree containing: a stale plan for a closed issue with pending/executing phases, a plan for an OPEN issue (must NOT move), a stranded release def with status completed, an active release def with status active (must NOT move), a ghost history.recentReleases record with no def, a changelog-only ghost version (changelog file with issue links, no def, absent from history), an orphan changelog for an archived def (must stay). Use --closed-issues-file so no gh calls. Assert: --dry-run changes nothing but lists every planned move; real run moves/normalizes/reconstructs correctly (plan phases completed, def status shipped, ghost def written to archive with parsed issues); backup + manifest written; second run is a no-op (no new backup, no changes); open-issue plan and active def untouched.",
+      "verification": "node --test packages/framework/__tests__/migrate-stale-artifacts.test.mjs green; full framework suite green.",
+      "summary": "migrate-stale-artifacts.test.mjs: 5 fixture tests (dry-run/real/idempotent/history-fallback/help+bad-args) all green"
+    },
+    {
+      "number": 3,
+      "title": "Run the migration against the worktree .tiki (dry-run, real, idempotency check)",
+      "status": "completed",
+      "content": "Run the script with --tiki-path pointing at THIS WORKTREE's checked-out .tiki tree (NOT the main repo working tree - the artifact moves are committed repo content that must land on this branch). First --dry-run: expect ~118 plan archives (#18-#224), 11 def moves (v0.2.5-v0.2.15), 5 ghost reconstructions (v0.6.7, v0.7.4, v0.7.5, v0.7.6, v0.7.8). Review the dry-run listing, then real run (uses one batched gh issue list --state closed call), then re-run to confirm no-op idempotency. Verify SC1/SC2 on the worktree tree: plans/ empty of closed-issue plans, releases/ has no stranded defs, archive has all 5 ghosts with status shipped. Confirm issue-16 was never planned (absent both locations) - documented, not fabricated. git add -A the .tiki changes so moves land as renames on the branch.",
+      "verification": "Dry-run counts match (118/11/5); real run completes; second run reports no-op; git status shows renames staged.",
+      "summary": "Migration run on worktree .tiki: 118 plans archived (statuses normalized), 11 v0.2.x defs archived as shipped, 5 ghosts reconstructed (v0.6.7/v0.7.4/v0.7.5/v0.7.6/v0.7.8); second run no-op; issue-16 confirmed never planned; 129 renames + 5 adds staged"
+    },
+    {
+      "number": 4,
+      "title": "Gates: build + full framework test suite",
+      "status": "completed",
+      "content": "Run pnpm build from the worktree root (tsc -b, stricter than typecheck) and node --test packages/framework/__tests__/ - all green. No desktop/Rust source touched, so cargo/vitest not required, but framework suite must pass including the new test file.",
+      "verification": "pnpm build clean; framework tests all pass.",
+      "summary": "Gates green: pnpm build clean (tsc -b + vite), framework suite 171/171 incl. 5 new migration tests; install.js parity regen for dogfood scripts"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1,
+      3
+    ],
+    "SC2": [
+      1,
+      3
+    ],
+    "SC3": [
+      1,
+      2,
+      3
+    ],
+    "SC5": [
+      2
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-07-02T11:49:39.813Z"
+}

@@ -1,0 +1,20 @@
+{
+  "version": "v1.0.1",
+  "status": "active",
+  "issues": [
+    {
+      "number": 300,
+      "title": "One-time artifact migration: archive ~130 stale-location plans + release defs, reconstruct 5 ghost release defs"
+    },
+    {
+      "number": 301,
+      "title": "Doctor: flag stale active-location artifacts (plans for closed issues, active defs with completed status, ghost changelogs)"
+    },
+    {
+      "number": 302,
+      "title": "State-vs-desktop drift harness: golden fixtures driven through the pipeline, asserted at every layer (shim, derivation, IPC)"
+    }
+  ],
+  "createdAt": "2026-07-02T00:00:00.000Z",
+  "note": "Reliability release from the 2026-07-01 artifact-drift deep dive. Dependency order: #300 first (migration defines clean shapes), then #301 (doctor checks reuse migration logic) and #302 (harness encodes the drift classes as fixtures). All three from the verified findings in the deep dive."
+}

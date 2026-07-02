@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "issue": {
+    "number": 302,
+    "title": "State-vs-desktop drift harness: golden fixtures driven through the pipeline, asserted at every layer (shim, derivation, IPC)",
+    "url": "https://github.com/Eric-Ness/Tiki-V2/issues/302"
+  },
+  "createdAt": "2026-07-02T12:48:30.000Z",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Author golden fixtures + expected.json under packages/shared/fixtures/tiki-workspaces/",
+      "status": "completed",
+      "content": "Create 9 hand-authored fixture workspaces, each `<name>/tiki/**` (the .tiki tree) + `<name>/expected.json`. Pipeline stages: fresh-get (issue:42 pending/GET, no plan), mid-execute (issue:42 executing/EXECUTE 2/4; plan phases [completed,executing,pending,pending], audited, SC1 verified via coverage), shipped-standalone (activeWork empty, history has 42, plans/archive/issue-42.json all-completed with one stored verified:false visual SC and OLD timestamps to pin the 30-day cutoff exclusion), shipped-release-child (issue:43 completed+parentRelease v1.2.0 retained in activeWork, release:v1.2.0 executing, active def releases/v1.2.0.json, archived plan 43, active plan 44), archived-release (releases/archive/v1.1.0.json with stale status:active, active-location changelog kept in place, history record present). Drift-injection: drift-dropped-transition (state says reviewing/REVIEW, journal floor EXECUTE, plan audited with phase 1 executing), drift-stale-active-plan (plans/issue-77.json active location, 77 in history, not in activeWork), drift-stale-active-def (releases/v1.3.0.json status completed, v1.3.0 in history), drift-ghost-release (releases/v0.9.9-changelog.md only, absent from history and both def locations, /issues/60 link in body). expected.json schema (shared by all 3 layers): { description, state: {activeWork subset, historyIssuesInclude, activeWorkEmpty?}, issues: { N: { githubState, display {column,label,pipelineState,badge,anomaly?}, kanban {toExecute,toShipping}, phaseProgress|null, criteria {verifiedIds,unverifiedIds}, planLocation active|archive|null, planPhaseStatuses } }, releases: [ {version,location,status,completed} ], doctor: { stateValid, activeWorkCount, releaseChecks, recentReleasesMissingJson, staleActivePlans [{issue,planPath}], unverifiedShippedCriteria, summary {status,actions} }, reconcile? {workId,healedStatus,healedStep,healedPhase}, migrate? {archivedPlans,archivedDefs,reconstructedDefs}. All timestamps static in Jan 2026 (permanently >30 days old). Shapes follow packages/shared/schemas/*.schema.json and the post-#300 archive conventions.",
+      "verification": [
+        "Every fixture tiki tree parses as JSON where applicable",
+        "expected.json present for all 9 fixtures with the documented schema"
+      ],
+      "addressesCriteria": [
+        "SC1"
+      ],
+      "files": [
+        "packages/shared/fixtures/tiki-workspaces/**"
+      ],
+      "dependencies": [],
+      "startedAt": "2026-07-02T12:50:00.000Z",
+      "summary": "9 fixture workspaces authored under packages/shared/fixtures/tiki-workspaces (5 pipeline stages + 4 drift classes), each tiki tree + expected.json; all JSON validated",
+      "completedAt": "2026-07-02T13:00:00.000Z"
+    },
+    {
+      "number": 2,
+      "title": "Framework layer: drift-harness.test.mjs drives fixtures through the real shim",
+      "status": "completed",
+      "content": "New packages/framework/__tests__/drift-harness.test.mjs (node:test, built-ins only, mirrors migrate-stale-artifacts.test.mjs conventions). (a) Pipeline drive: copy fresh-get's tiki tree to a temp dir; assert it matches fresh-get expected.state; then drive the REAL shim step-by-step with spawnSync + --tiki-path: journal+transition REVIEW -> PLAN (write plan file, phases all pending) -> plan.mjs audited + AUDIT transition -> EXECUTE transitions + plan.mjs phase/verify-criteria until state+plan+journal-floor match mid-execute expected -> complete remaining phases, SHIP transition, append-history, archive plan (fs move mirroring ship.md), remove entry -> assert matches shipped-standalone expected.state. (b) Reconciler heal: copy drift-dropped-transition, run reconcile-state.mjs --tiki-path, assert state healed to expected.reconcile (executing/EXECUTE phase 1/2) and legality/advance-only held. (c) Migration heal: copy drift-stale-active-plan / drift-stale-active-def / drift-ghost-release, run migrate-stale-artifacts.mjs --tiki-path --closed-issues-file, assert expected.migrate (plans archived+phases normalized, def archived+status shipped, ghost def reconstructed with issues from /issues/N links). (d) SC5 framework half: copy mid-execute, flip plan phase 1 status completed->pending in the copy, re-run the suite's own assertState/assertPlan helpers against expected.json and assert they now REPORT MISMATCH (the harness catches the mutation at this layer).",
+      "verification": [
+        "node --test __tests__/drift-harness.test.mjs green from packages/framework",
+        "full framework suite node --test __tests__/*.test.mjs green"
+      ],
+      "addressesCriteria": [
+        "SC2",
+        "SC5"
+      ],
+      "files": [
+        "packages/framework/__tests__/drift-harness.test.mjs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "startedAt": "2026-07-02T13:00:30.000Z",
+      "summary": "drift-harness.test.mjs: 15 tests green in worktree (conformance x9, pipeline drive, reconciler heal, migration heal x3, SC5 framework half); plan.test.mjs failure is pre-existing worktree node_modules gap, re-verified at gates",
+      "completedAt": "2026-07-02T13:10:00.000Z"
+    },
+    {
+      "number": 3,
+      "title": "Desktop vitest layer: driftHarnessFixtures.test.ts asserts every display derivation per fixture",
+      "status": "completed",
+      "content": "New apps/desktop/src/utils/__tests__/driftHarnessFixtures.test.ts (vitest, node env; resolve fixtures dir from import.meta.url -> ../../../../../packages/shared/fixtures/tiki-workspaces, fs.readFileSync). For every fixture: parse tiki/state.json + expected.json. Per expected issue: build DeriveDisplayStatusInput from activeWork entry (or null) + expected githubState + state history -> assert deriveDisplayStatus equals expected.display exactly. Kanban: assert work.status is in COLUMN_STATUSES[expected.display.column] when tracked, and classifyKanbanMove(column,'execute')/(column,'shipping') equal expected.kanban. Phase progress: load plan per planLocation (active else archive, mirroring get_plan fallback) -> derivePhaseProgressFromPlan(plan.phases) equals expected.phaseProgress (undefined for null). Criteria: deriveCriteriaChecklist(plan) verified ids == expected.criteria (coverage-derived, ignores stored flags - pinned by shipped-standalone's stored-false visual SC). Releases: derive archived from expected location, assert isReleaseCompleted({archived,status}) == expected.completed (drift-stale-active-def pins the FALSE case: shipped release renders live). Doctor summary: build a full DiagnosticsReport from expected.doctor (+ neutral defaults cargo also asserts: unresolvedScriptPaths [], copyInstallDetected false, reconcilerHookInstalled false, frameworkVersion null) -> diagnosticsSummary status + Fix-action set equal expected.doctor.summary. SC5 vitest half: same mutation as phase 2 (mid-execute plan phase 1 completed->pending, in memory) -> assert derivePhaseProgressFromPlan AND deriveCriteriaChecklist now DIFFER from expected.json, proving the same corrupted artifact fails a second layer.",
+      "verification": [
+        "pnpm -C apps/desktop test green",
+        "tsc -b clean (pnpm build)"
+      ],
+      "addressesCriteria": [
+        "SC3",
+        "SC5"
+      ],
+      "files": [
+        "apps/desktop/src/utils/__tests__/driftHarnessFixtures.test.ts"
+      ],
+      "dependencies": [
+        1
+      ],
+      "startedAt": "2026-07-02T13:10:30.000Z",
+      "summary": "driftHarnessFixtures.test.ts: 74 vitest tests green (display, kanban, phase progress, criteria, release completion, doctor summary, reconcile cross-check, SC5 vitest half) - validated in main checkout",
+      "completedAt": "2026-07-02T13:20:00.000Z"
+    },
+    {
+      "number": 4,
+      "title": "Rust cargo layer: drift_harness_tests.rs asserts IPC payloads + doctor flags + Fix commands against the same trees",
+      "status": "completed",
+      "content": "New apps/desktop/src-tauri/src/drift_harness_tests.rs (#[cfg(test)] module, declared in lib.rs). fixtures_root() = env!(\"CARGO_MANIFEST_DIR\")/../../../packages/shared/fixtures/tiki-workspaces. For every fixture: read expected.json as serde_json::Value. get_state(Some(tiki)) -> serde_json::to_value -> assert each expected.state.activeWork entry's status/pipelineStep/phase/parentRelease survive the serde round-trip (the #259 wire-format lesson, workspace-level). get_plan per expected issue: planLocation archive proves the fallback; assert serialized phases[].status == expected.planPhaseStatuses; planLocation null -> None. load_tiki_releases(include_archived=true) -> assert (version, archived, status) tuples == expected.releases (archived-release pins archived=true despite status:active; drift-stale-active-def pins archived=false despite status:completed). tiki_doctor -> assert stateValid/activeWorkCount/releaseChecks/recentReleasesMissingJson/staleActivePlans(issue+planPath)/unverifiedShippedCriteria(empty via 30-day cutoff) == expected.doctor, plus the neutral defaults phase 3 relies on. Heal round-trips on temp copies (recursive copy helper, std only): drift-stale-active-plan -> archive_stale_plans moves 1, phases normalized, doctor staleActivePlans empty after; drift-stale-active-def -> archive_stale_release_defs moves 1, archived def status shipped, isReleaseCompleted-equivalent (archived flag) flips true via load_tiki_releases. Run via cargo test --lib; clippy --all-targets --deny warnings clean (test code IS linted - v0.9.4 lesson: no doc_lazy_continuation etc.).",
+      "verification": [
+        "cargo test --lib green (or cargo check --tests if exe locked, noted)",
+        "cargo clippy --all-targets --deny warnings clean"
+      ],
+      "addressesCriteria": [
+        "SC4"
+      ],
+      "files": [
+        "apps/desktop/src-tauri/src/drift_harness_tests.rs",
+        "apps/desktop/src-tauri/src/lib.rs"
+      ],
+      "dependencies": [
+        1
+      ],
+      "startedAt": "2026-07-02T13:21:00.000Z",
+      "summary": "drift_harness_tests.rs: 7 cargo tests green (get_state/get_plan/load_tiki_releases/tiki_doctor payloads, ambient constants, 2 heal round-trips); full cargo --lib 105 passed; clippy --all-targets clean",
+      "completedAt": "2026-07-02T13:35:00.000Z"
+    },
+    {
+      "number": 5,
+      "title": "Full gates across all suites + CI slot-in verification",
+      "status": "completed",
+      "content": "Verify pr.yml already runs all three entry points (pnpm test covers framework node:test + desktop/shared vitest; cargo test job) so the harness gates PRs with zero new infra - adjust only if a suite is NOT wired. Then run every gate. Worktree has no node_modules: run framework node:test in the worktree (built-ins only); for pnpm build/vitest/lint, copy ONLY the new/changed files into the main checkout (fixtures dir, framework test, desktop test, drift_harness_tests.rs, lib.rs), run pnpm build + pnpm -C apps/desktop test + pnpm -C apps/desktop lint + pnpm -C packages/shared test + cargo test --lib + cargo clippy --all-targets --deny warnings there, then git-restore tracked files and delete copied untracked files, re-verifying main baseline is byte-clean (git status). Confirm test-count deltas per suite for the ship report.",
+      "verification": [
+        "pnpm build clean",
+        "desktop vitest green, framework green, shared green, cargo green, clippy --all-targets clean, lint 0 errors",
+        "main checkout restored to pre-gate state"
+      ],
+      "addressesCriteria": [
+        "SC5"
+      ],
+      "files": [],
+      "dependencies": [
+        2,
+        3,
+        4
+      ],
+      "startedAt": "2026-07-02T13:36:00.000Z",
+      "summary": "All gates green in main checkout: pnpm build clean; shared 135, desktop 350 (+74), framework 186 (+15), cargo 112 (+7); lint 0 errors; clippy --all-targets --deny warnings exit 0; pr.yml already wires all entry points; main restored byte-clean and baseline re-verified (276)",
+      "completedAt": "2026-07-02T13:50:00.000Z"
+    }
+  ],
+  "successCriteria": [
+    {
+      "id": "SC1",
+      "description": "Golden fixtures exist for fresh GET, mid-EXECUTE, shipped standalone, shipped release child, archived release, plus the 4 drift-injection classes (dropped transition, stale active plan for closed issue, active-location def with completed status, ghost changelog-only release), each with an expected.json.",
+      "category": "functional",
+      "verified": true,
+      "verifiedAt": "2026-07-02T13:09:19.292Z"
+    },
+    {
+      "id": "SC2",
+      "description": "Framework layer drives a temp copy of the fixtures through the real shim commands (state.mjs / plan.mjs / reconcile-state.mjs / migrate-stale-artifacts.mjs) and asserts state.json, plan, and journal per step.",
+      "category": "testing",
+      "verified": true,
+      "verifiedAt": "2026-07-02T13:09:19.292Z"
+    },
+    {
+      "id": "SC3",
+      "description": "Frontend derivation suite asserts deriveDisplayStatus, kanban classification/column placement, phaseProgress, isReleaseCompleted, deriveCriteriaChecklist, and diagnosticsSummary against expected.json per fixture.",
+      "category": "testing",
+      "verified": true,
+      "verifiedAt": "2026-07-02T13:09:19.292Z"
+    },
+    {
+      "id": "SC4",
+      "description": "Cargo suite asserts get_state/get_plan/load_tiki_releases/tiki_doctor IPC payloads for the same fixture trees; the doctor flags the drift-injection fixtures and the Fix commands heal them.",
+      "category": "testing",
+      "verified": true,
+      "verifiedAt": "2026-07-02T13:09:19.292Z"
+    },
+    {
+      "id": "SC5",
+      "description": "All suites are green in pr.yml entry points; a deliberately mutated fixture copy (phase status flip) fails at least two layers (framework + vitest meta-tests), proving cross-layer coupling.",
+      "category": "testing",
+      "verified": true,
+      "verifiedAt": "2026-07-02T13:09:19.292Z"
+    }
+  ],
+  "coverageMatrix": {
+    "SC1": [
+      1
+    ],
+    "SC2": [
+      2
+    ],
+    "SC3": [
+      3
+    ],
+    "SC4": [
+      4
+    ],
+    "SC5": [
+      2,
+      3,
+      5
+    ]
+  },
+  "audited": true,
+  "auditedAt": "2026-07-02T12:49:49.287Z"
+}
