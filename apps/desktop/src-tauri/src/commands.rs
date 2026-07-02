@@ -1,7 +1,7 @@
 use crate::fs_utils::{self, BackupInfo};
 use crate::state::{
-    DiagnosticsReport, ReleaseCheck, TikiPlan, TikiRelease, TikiReleaseStatus, TikiState,
-    UnverifiedCriterion, WorkContext, WorkStatus,
+    DiagnosticsReport, ReleaseCheck, StaleActivePlan, TikiPlan, TikiRelease, TikiReleaseStatus,
+    TikiState, UnverifiedCriterion, WorkContext, WorkStatus,
 };
 use crate::watcher;
 use include_dir::{include_dir, Dir};
@@ -1046,6 +1046,7 @@ pub fn tiki_doctor(tiki_path: Option<String>) -> Result<DiagnosticsReport, Strin
             .map(|p| p.join(".claude").join("commands").join("tiki").is_dir())
             .unwrap_or(false),
         unverified_shipped_criteria: compute_unverified_shipped_criteria(&path),
+        stale_active_plans: compute_stale_active_plans(&path),
     })
 }
 
@@ -1079,10 +1080,65 @@ fn is_visual_criterion(category: Option<&str>, description: &str) -> bool {
     VISUAL_SC_STEMS.iter().any(|stem| desc.contains(stem))
 }
 
+/// Recency window for `compute_unverified_shipped_criteria` (#301). After #300
+/// archived ~118 ancient plans, an unbounded archive scan would flood the
+/// pending-verification checklist with years-old SCs nobody will ever confirm.
+/// A plan's criteria are surfaced only when its newest parseable timestamp
+/// (`auditedAt`, `phases[].completedAt/startedAt`, `createdAt` — see
+/// `plan_newest_timestamp`) is within this many days of now; plans with NO
+/// parseable timestamp are treated as ancient and excluded (every plan the
+/// framework writes carries `createdAt`, so only pre-framework relics lack one).
+///
+/// Chosen over the alternative issue-number floor because a number floor is
+/// repo-specific (meaningless in any other project running the desktop app),
+/// while recency generalizes and matches the checklist's intent: it is a
+/// "verify soon after shipping" nudge, not a historical ledger.
+const UNVERIFIED_SC_MAX_AGE_DAYS: i64 = 30;
+
+/// Whether a plan's newest timestamp falls inside the #301 recency window.
+/// `None` (no parseable timestamp) is OUT of the window — see
+/// `UNVERIFIED_SC_MAX_AGE_DAYS`. A malformed timestamp string is likewise out.
+fn within_unverified_sc_window(newest: Option<&str>) -> bool {
+    let Some(ts) = newest else { return false };
+    let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts) else {
+        return false;
+    };
+    let age = chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
+    age.num_days() <= UNVERIFIED_SC_MAX_AGE_DAYS
+}
+
+/// Newest parseable ISO-8601 timestamp in a plan JSON: the lexicographic max of
+/// `auditedAt`, `createdAt`, and every phase's `completedAt`/`startedAt`
+/// (RFC 3339 strings order chronologically). `None` when the plan carries no
+/// non-empty timestamp strings.
+fn plan_newest_timestamp(plan: &serde_json::Value) -> Option<String> {
+    let mut newest: Option<String> = None;
+    let mut consider = |v: &serde_json::Value| {
+        if let Some(s) = v.as_str() {
+            if !s.is_empty() && newest.as_deref().map_or(true, |cur| s > cur) {
+                newest = Some(s.to_string());
+            }
+        }
+    };
+    consider(&plan["auditedAt"]);
+    consider(&plan["createdAt"]);
+    if let Some(phases) = plan["phases"].as_array() {
+        for phase in phases {
+            consider(&phase["completedAt"]);
+            consider(&phase["startedAt"]);
+        }
+    }
+    newest
+}
+
 /// Scan `<tiki>/plans/archive/issue-<N>.json` for success criteria left
 /// `verified:false` that look visual/manual (`is_visual_criterion`). These ship
 /// un-flipped because only a human can confirm them in `tauri:dev`/the installer
 /// (#281). Returns `{issue, id, description}` sorted by (issue, id).
+///
+/// Recency cutoff (#301): only plans whose newest parseable timestamp is within
+/// `UNVERIFIED_SC_MAX_AGE_DAYS` of now are scanned — see that constant's doc for
+/// the rationale and the deliberate exclusion of timestampless plans.
 ///
 /// Defensive: a single unreadable / unparseable / mis-named file is skipped — the
 /// whole scan never fails (diagnostics must work on a degraded workspace). The
@@ -1121,6 +1177,13 @@ fn compute_unverified_shipped_criteria(tiki_path: &Path) -> Vec<UnverifiedCriter
             Err(_) => continue,
         };
 
+        // #301 recency cutoff — ancient (or timestampless) archived plans are
+        // not actionable verification work; skip them entirely.
+        let newest = plan_newest_timestamp(&value);
+        if !within_unverified_sc_window(newest.as_deref()) {
+            continue;
+        }
+
         let criteria = match value.get("successCriteria").and_then(|v| v.as_array()) {
             Some(a) => a,
             None => continue,
@@ -1152,6 +1215,121 @@ fn compute_unverified_shipped_criteria(tiki_path: &Path) -> Vec<UnverifiedCriter
     }
 
     out.sort_by(|a, b| a.issue.cmp(&b.issue).then_with(|| a.id.cmp(&b.id)));
+    out
+}
+
+/// Scan `<tiki>/plans/*.json` (the ACTIVE location, not `plans/archive/`) for
+/// plans whose issue already finished — the #300/#301 stale-plan drift class.
+///
+/// "Finished" = the issue number appears in `history.recentIssues`,
+/// `history.lastCompletedIssue`, or any `history.recentReleases[].issues` list.
+/// LOCAL check only, deliberately: history membership is free and offline; a
+/// `gh`-backed closed-issue cross-check is a possible later enhancement.
+///
+/// Exclusion (MUST hold): any issue currently in `activeWork` — regardless of
+/// status, matched via issue entries (`issue.number` / `issue:N` key) AND every
+/// release entry's `release.issues` list — is live work and is never flagged.
+/// Live issues legitimately have an active plan, and a running release's
+/// completed children stay in `activeWork` (with their plans possibly still
+/// active) until the release itself ships.
+///
+/// Defensive: a missing/unparseable `state.json` or plans dir yields `[]`; a
+/// single unreadable plan is still reported (with `newest_timestamp: None`
+/// computed leniently). Sorted by issue number.
+fn compute_stale_active_plans(tiki_path: &Path) -> Vec<StaleActivePlan> {
+    use std::collections::HashSet;
+
+    // Value-based traversal: diagnostics must work on a degraded workspace, so
+    // we never require state.json to satisfy the full TikiState shape.
+    let state: serde_json::Value = match std::fs::read_to_string(tiki_path.join("state.json")) {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(_) => return Vec::new(),
+        },
+        Err(_) => return Vec::new(),
+    };
+
+    // Finished issues per history (recentIssues entries may be bare numbers or
+    // `{number}` records; recentReleases carry plain-number issue lists).
+    let mut finished: HashSet<u64> = HashSet::new();
+    let history = &state["history"];
+    if let Some(recs) = history["recentIssues"].as_array() {
+        for rec in recs {
+            if let Some(n) = rec.as_u64().or_else(|| rec["number"].as_u64()) {
+                finished.insert(n);
+            }
+        }
+    }
+    if let Some(n) = history["lastCompletedIssue"]["number"].as_u64() {
+        finished.insert(n);
+    }
+    if let Some(rels) = history["recentReleases"].as_array() {
+        for rel in rels {
+            if let Some(issues) = rel["issues"].as_array() {
+                for issue in issues {
+                    if let Some(n) = issue.as_u64().or_else(|| issue["number"].as_u64()) {
+                        finished.insert(n);
+                    }
+                }
+            }
+        }
+    }
+
+    // Live issues: everything referenced by activeWork, ANY status.
+    let mut live: HashSet<u64> = HashSet::new();
+    if let Some(work) = state["activeWork"].as_object() {
+        for (key, entry) in work {
+            if let Some(n) = entry["issue"]["number"].as_u64() {
+                live.insert(n);
+            } else if let Some(n) = key.strip_prefix("issue:").and_then(|r| r.parse().ok()) {
+                live.insert(n);
+            }
+            if let Some(issues) = entry["release"]["issues"].as_array() {
+                for issue in issues {
+                    if let Some(n) = issue.as_u64().or_else(|| issue["number"].as_u64()) {
+                        live.insert(n);
+                    }
+                }
+            }
+        }
+    }
+
+    let plans_dir = tiki_path.join("plans");
+    let entries = match std::fs::read_dir(&plans_dir) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut out: Vec<StaleActivePlan> = Vec::new();
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.is_file() {
+            continue; // skips the archive/ subdirectory
+        }
+        let issue = match file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|stem| stem.strip_prefix("issue-"))
+            .and_then(|n| n.parse::<u64>().ok())
+        {
+            Some(n) if file_path.extension().and_then(|e| e.to_str()) == Some("json") => n,
+            _ => continue,
+        };
+        if !finished.contains(&issue) || live.contains(&issue) {
+            continue;
+        }
+        let newest_timestamp = std::fs::read_to_string(&file_path)
+            .ok()
+            .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
+            .and_then(|plan| plan_newest_timestamp(&plan));
+        out.push(StaleActivePlan {
+            issue: issue as u32,
+            plan_path: format!("plans/issue-{}.json", issue),
+            newest_timestamp,
+        });
+    }
+
+    out.sort_by_key(|p| p.issue);
     out
 }
 
@@ -1255,44 +1433,259 @@ pub fn normalize_archived_releases(tiki_path: Option<String>) -> Result<usize, S
     Ok(fixed)
 }
 
-/// Versions listed in `<tiki>/state.json` `history.recentReleases` that have no
-/// matching `{version}.json` in either `releases/` or `releases/archive/`. A parity
-/// gap — the release shipped (it's in history) but its definition file is gone.
+/// One-shot fixer for stale ACTIVE-location release defs (#301) — the REVERSE of
+/// `normalize_archived_releases`' residue: a def still sitting in `releases/`
+/// whose own `status` says it finished (anything but `"active"`). Location is
+/// the sole completed-truth (#259/#276), so the fix is to MOVE the file into
+/// `releases/archive/`, mirroring `migrate-stale-artifacts.mjs`: a
+/// completed/shipped status is rewritten to `"shipped"` first (edited on a
+/// parsed `serde_json::Value` so unmodeled fields survive); other non-active
+/// statuses (e.g. `not_planned`) move as-is — the location move alone corrects
+/// the UI. Returns the count of defs moved.
 ///
-/// Distinct from `check_release_json_parity`, which compares changelogs↔JSON; this
-/// compares state-history↔JSON. Returns sorted versions; empty on any read failure.
+/// A live def (`status:"active"`) is NEVER touched. A single unreadable /
+/// unparseable file, or one whose archive destination already exists, is
+/// skipped with a warning — the whole operation never fails part-way.
+/// `tiki_path` defaults to `<cwd>/.tiki`.
+#[tauri::command]
+pub fn archive_stale_release_defs(tiki_path: Option<String>) -> Result<usize, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let releases_dir = path.join("releases");
+    let entries = match std::fs::read_dir(&releases_dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(0),
+    };
+    let archive_dir = releases_dir.join("archive");
+
+    let mut moved = 0usize;
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.is_file() || file_path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Failed to read release def {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+        let mut value: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Failed to parse release def {:?}: {}", file_path, e);
+                continue;
+            }
+        };
+        let status = value
+            .get("status")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string();
+        if status == "active" {
+            continue; // live release — never touched
+        }
+
+        let file_name = match file_path.file_name() {
+            Some(n) => n.to_os_string(),
+            None => continue,
+        };
+        let dest = archive_dir.join(&file_name);
+        if dest.exists() {
+            log::warn!(
+                "Archive already has {:?}; leaving the active copy untouched",
+                file_name
+            );
+            continue;
+        }
+
+        // completed/shipped normalize to "shipped" (the archived resting state);
+        // anything else (e.g. not_planned) keeps its status — location is the fix.
+        if status == "completed" || status == "shipped" {
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert(
+                    "status".to_string(),
+                    serde_json::Value::String("shipped".to_string()),
+                );
+            }
+            let serialized = match serde_json::to_string_pretty(&value) {
+                Ok(s) => s,
+                Err(e) => {
+                    log::warn!("Failed to serialize release def {:?}: {}", file_path, e);
+                    continue;
+                }
+            };
+            if let Err(e) = fs_utils::atomic_write(&file_path, &serialized) {
+                log::warn!("Failed to rewrite release def {:?}: {}", file_path, e);
+                continue;
+            }
+        }
+
+        if let Err(e) = std::fs::create_dir_all(&archive_dir) {
+            log::warn!("Failed to create {:?}: {}", archive_dir, e);
+            continue;
+        }
+        if let Err(e) = std::fs::rename(&file_path, &dest) {
+            log::warn!("Failed to move {:?} into archive: {}", file_path, e);
+            continue;
+        }
+        moved += 1;
+    }
+
+    Ok(moved)
+}
+
+/// One-shot fixer for the `staleActivePlans` finding (#301): recompute the
+/// stale set with `compute_stale_active_plans` (so the Fix moves EXACTLY what
+/// the doctor reported — same history-membership rule, same activeWork
+/// exclusions) and move each plan into `plans/archive/`. Mirrors
+/// `migrate-stale-artifacts.mjs`: non-completed/skipped phase statuses are
+/// normalized to `"completed"` before the move (the issue finished; a stuck
+/// `executing` phase status is recording drift, and archived-plan consumers
+/// like `deriveCriteriaChecklist` treat completed phases as done). Returns the
+/// count of plans moved.
+///
+/// A plan whose archive destination already exists is skipped with a warning
+/// (never overwrite an existing archived copy); a single read/parse/write
+/// failure skips that plan only. `tiki_path` defaults to `<cwd>/.tiki`.
+#[tauri::command]
+pub fn archive_stale_plans(tiki_path: Option<String>) -> Result<usize, String> {
+    let path = match tiki_path {
+        Some(p) => PathBuf::from(p),
+        None => {
+            let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+            cwd.join(".tiki")
+        }
+    };
+
+    let plans_dir = path.join("plans");
+    let archive_dir = plans_dir.join("archive");
+
+    let mut moved = 0usize;
+    for stale in compute_stale_active_plans(&path) {
+        let file_name = format!("issue-{}.json", stale.issue);
+        let from = plans_dir.join(&file_name);
+        let dest = archive_dir.join(&file_name);
+        if dest.exists() {
+            log::warn!(
+                "Archive already has {}; leaving the active copy untouched",
+                file_name
+            );
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&from) {
+            Ok(c) => c,
+            Err(e) => {
+                log::warn!("Failed to read plan {:?}: {}", from, e);
+                continue;
+            }
+        };
+        let mut value: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Failed to parse plan {:?}: {}", from, e);
+                continue;
+            }
+        };
+
+        // Normalize phase statuses (mirrors the #300 migration): the issue is
+        // finished, so anything not completed/skipped is recording drift.
+        if let Some(phases) = value.get_mut("phases").and_then(|p| p.as_array_mut()) {
+            for phase in phases {
+                let keep = matches!(
+                    phase.get("status").and_then(|s| s.as_str()),
+                    Some("completed") | Some("skipped")
+                );
+                if !keep {
+                    if let Some(obj) = phase.as_object_mut() {
+                        obj.insert(
+                            "status".to_string(),
+                            serde_json::Value::String("completed".to_string()),
+                        );
+                    }
+                }
+            }
+        }
+
+        let serialized = match serde_json::to_string_pretty(&value) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("Failed to serialize plan {:?}: {}", from, e);
+                continue;
+            }
+        };
+        if let Err(e) = fs_utils::atomic_write(&from, &serialized) {
+            log::warn!("Failed to rewrite plan {:?}: {}", from, e);
+            continue;
+        }
+
+        if let Err(e) = std::fs::create_dir_all(&archive_dir) {
+            log::warn!("Failed to create {:?}: {}", archive_dir, e);
+            continue;
+        }
+        if let Err(e) = std::fs::rename(&from, &dest) {
+            log::warn!("Failed to move {:?} into archive: {}", from, e);
+            continue;
+        }
+        moved += 1;
+    }
+
+    Ok(moved)
+}
+
+/// Versions that shipped by some evidence but have no matching `{version}.json`
+/// in either `releases/` or `releases/archive/`. Evidence sources:
+///
+/// 1. `<tiki>/state.json` `history.recentReleases` — the original #261 parity
+///    check (release in history, definition file gone).
+/// 2. `{version}-changelog.md` stems under `releases/` and `releases/archive/`
+///    (#301) — a changelog-only ghost (the v0.7.4 case: changelog written,
+///    absent from history AND both def locations) was invisible to source 1.
+///
+/// Distinct from `check_release_json_parity`, which compares changelogs↔JSON at
+/// release time; this is the doctor's standing drift check. Returns sorted,
+/// deduped versions; an unreadable state.json contributes no history candidates
+/// (changelog stems are still scanned — diagnostics work on degraded workspaces).
 fn compute_recent_releases_missing_json(tiki_path: &Path) -> Vec<String> {
     use std::collections::HashSet;
 
-    // History versions from state.json.
-    let history_versions: Vec<String> = match std::fs::read_to_string(tiki_path.join("state.json"))
-    {
-        Ok(content) => match serde_json::from_str::<TikiState>(&content) {
-            Ok(state) => state
-                .history
-                .and_then(|h| h.recent_releases)
-                .map(|rs| rs.into_iter().map(|r| r.version).collect())
-                .unwrap_or_default(),
-            Err(_) => return Vec::new(),
-        },
-        Err(_) => return Vec::new(),
-    };
+    // Candidate versions from state.json history (lenient: unreadable => none).
+    let mut candidates: Vec<String> = std::fs::read_to_string(tiki_path.join("state.json"))
+        .ok()
+        .and_then(|content| serde_json::from_str::<TikiState>(&content).ok())
+        .and_then(|state| state.history)
+        .and_then(|h| h.recent_releases)
+        .map(|rs| rs.into_iter().map(|r| r.version).collect())
+        .unwrap_or_default();
 
-    // Set of versions that have a JSON file in releases/ or releases/archive/.
+    // Versions with a JSON def in releases/ or releases/archive/ — and candidate
+    // versions from changelog stems in the same two directories (#301).
     let releases_dir = tiki_path.join("releases");
     let mut present: HashSet<String> = HashSet::new();
     for dir in [releases_dir.clone(), releases_dir.join("archive")] {
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
-                if let Some(v) = name.to_string_lossy().strip_suffix(".json") {
+                let name = name.to_string_lossy();
+                if let Some(v) = name.strip_suffix(".json") {
                     present.insert(v.to_string());
+                } else if let Some(v) = name.strip_suffix("-changelog.md") {
+                    candidates.push(v.to_string());
                 }
             }
         }
     }
 
-    let mut missing: Vec<String> = history_versions
+    let mut missing: Vec<String> = candidates
         .into_iter()
         .filter(|v| !present.contains(v))
         .collect();
@@ -1755,7 +2148,7 @@ mod tests {
         std::fs::remove_dir_all(&tiki).ok();
     }
 
-    /// #281: build a `<tiki>/plans/archive/` fixture with three archived plans and
+    /// #281: build a `<tiki>/plans/archive/` fixture with archived plans and
     /// return its path. The plans exercise the visual-SC heuristic:
     ///  - issue-10: an unverified SC whose description is visual ("renders") → included
     ///  - issue-20: an unverified SC that is non-visual ("reconciler advances") → excluded
@@ -1763,6 +2156,12 @@ mod tests {
     ///
     /// issue-10 also carries a SECOND visual unverified SC so we can pin (issue,id)
     /// ordering within a file.
+    ///
+    /// #301 recency cutoff coverage: issues 10/20/30 carry a fresh `createdAt`
+    /// (so 20/30 stay exclusions of the HEURISTIC, not the cutoff), while two
+    /// extra visual+unverified plans exist only to be aged out:
+    ///  - issue-40: `createdAt` far in the past → excluded by the cutoff
+    ///  - issue-50: NO timestamps at all → excluded by the cutoff
     fn temp_tiki_unverified_sc_fixture(tag: &str) -> PathBuf {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1771,40 +2170,68 @@ mod tests {
         let tiki = std::env::temp_dir().join(format!("tiki-unverified-sc-{}-{}", tag, nanos));
         let archive = tiki.join("plans").join("archive");
         std::fs::create_dir_all(&archive).unwrap();
+        let recent = chrono::Utc::now().to_rfc3339();
 
-        // (a) visual + unverified → INCLUDED. Two SCs so ordering is checkable;
-        // listed SC2-before-SC1 in the file to confirm we sort by id.
+        // (a) visual + unverified + recent → INCLUDED. Two SCs so ordering is
+        // checkable; listed SC2-before-SC1 in the file to confirm we sort by id.
         let issue_10 = serde_json::json!({
+            "createdAt": recent,
             "successCriteria": [
                 { "id": "SC2", "category": "visual", "description": "the panel renders correctly", "verified": false },
                 { "id": "SC1", "category": "functionality", "description": "the badge renders correctly", "verified": false }
             ],
             "phases": []
         });
-        // (b) unverified but NON-visual → EXCLUDED.
+        // (b) unverified but NON-visual → EXCLUDED (heuristic).
         let issue_20 = serde_json::json!({
+            "createdAt": recent,
             "successCriteria": [
                 { "id": "SC1", "category": "functionality", "description": "the reconciler advances state from artifacts", "verified": false }
             ],
             "phases": []
         });
-        // (c) visual but verified:true → EXCLUDED.
+        // (c) visual but verified:true → EXCLUDED (heuristic).
         let issue_30 = serde_json::json!({
+            "createdAt": recent,
             "successCriteria": [
                 { "id": "SC1", "category": "visual", "description": "the layout looks right", "verified": true }
+            ],
+            "phases": []
+        });
+        // (d) visual + unverified but ANCIENT → EXCLUDED (#301 cutoff). The
+        // newest timestamp is a phase completedAt, still far outside the window.
+        let issue_40 = serde_json::json!({
+            "createdAt": "2024-01-01T00:00:00.000Z",
+            "successCriteria": [
+                { "id": "SC1", "category": "visual", "description": "the ancient panel renders correctly", "verified": false }
+            ],
+            "phases": [
+                { "number": 1, "title": "p1", "status": "completed", "completedAt": "2024-02-01T00:00:00.000Z" }
+            ]
+        });
+        // (e) visual + unverified but NO timestamps → EXCLUDED (#301 cutoff
+        // treats timestampless plans as ancient).
+        let issue_50 = serde_json::json!({
+            "successCriteria": [
+                { "id": "SC1", "category": "visual", "description": "the timestampless badge renders", "verified": false }
             ],
             "phases": []
         });
         std::fs::write(archive.join("issue-10.json"), issue_10.to_string()).unwrap();
         std::fs::write(archive.join("issue-20.json"), issue_20.to_string()).unwrap();
         std::fs::write(archive.join("issue-30.json"), issue_30.to_string()).unwrap();
+        std::fs::write(archive.join("issue-40.json"), issue_40.to_string()).unwrap();
+        std::fs::write(archive.join("issue-50.json"), issue_50.to_string()).unwrap();
         tiki
     }
 
     /// #281 (SC1/SC4): `tiki_doctor` surfaces only the unverified visual/manual SCs
     /// from archived plans, sorted by (issue, id). Non-visual unverified SCs and
     /// verified visual SCs are excluded; the issue number is parsed from the
-    /// `issue-N.json` filename.
+    /// `issue-N.json` filename. #301: plans outside the recency window (issue-40
+    /// ancient, issue-50 timestampless) are excluded by the cutoff even though
+    /// their SCs are visual and unverified — the `all(issue == 10)` assertion
+    /// pins both exclusions.
     #[test]
     fn tiki_doctor_surfaces_unverified_visual_criteria() {
         let tiki = temp_tiki_unverified_sc_fixture("doctor");
@@ -1826,13 +2253,52 @@ mod tests {
         assert_eq!(pending[1].issue, 10);
         assert_eq!(pending[1].id, "SC2");
         assert_eq!(pending[1].description, "the panel renders correctly");
-        // Defensive: nothing from the excluded plans leaked in.
+        // Defensive: nothing from the excluded plans leaked in — neither the
+        // heuristic exclusions (20, 30) nor the #301 cutoff exclusions (40, 50).
         assert!(
             pending.iter().all(|c| c.issue == 10),
-            "no criteria from the non-visual or verified plans should appear"
+            "no criteria from the non-visual, verified, ancient, or timestampless plans should appear"
         );
 
         std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301 (SC4): the recency cutoff building blocks. `plan_newest_timestamp`
+    /// picks the lexicographic max across auditedAt/createdAt/phase timestamps
+    /// and returns None for a timestampless plan; `within_unverified_sc_window`
+    /// accepts a fresh timestamp and rejects ancient/None/garbage.
+    #[test]
+    fn unverified_sc_cutoff_window_and_newest_timestamp() {
+        let plan = serde_json::json!({
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "auditedAt": "2026-01-02T00:00:00.000Z",
+            "phases": [
+                { "number": 1, "title": "p", "status": "completed",
+                  "startedAt": "2026-01-03T00:00:00.000Z", "completedAt": "2026-01-04T00:00:00.000Z" }
+            ]
+        });
+        assert_eq!(
+            plan_newest_timestamp(&plan).as_deref(),
+            Some("2026-01-04T00:00:00.000Z"),
+            "newest timestamp must be the max across all timestamp fields"
+        );
+        assert_eq!(
+            plan_newest_timestamp(&serde_json::json!({ "phases": [] })),
+            None,
+            "a timestampless plan yields None"
+        );
+
+        let fresh = chrono::Utc::now().to_rfc3339();
+        assert!(within_unverified_sc_window(Some(&fresh)), "a fresh timestamp is in-window");
+        assert!(
+            !within_unverified_sc_window(Some("2024-01-01T00:00:00.000Z")),
+            "an ancient timestamp is out of the window"
+        );
+        assert!(!within_unverified_sc_window(None), "no timestamp = out of the window");
+        assert!(
+            !within_unverified_sc_window(Some("not-a-date")),
+            "garbage timestamps are out of the window"
+        );
     }
 
     /// #281 / #259 round-trip discipline: a `DiagnosticsReport` serializes with the
@@ -1984,6 +2450,323 @@ mod tests {
                 .recent_releases_missing_json
                 .contains(&"v1.0.0".to_string()),
             "v1.0.0 has a JSON file and must not be reported"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301 (SC3): a changelog-only ghost release — `{v}-changelog.md` exists but
+    /// there is no def in `releases/` or `releases/archive/` and the version is
+    /// absent from history (the v0.7.4 case) — is reported by the widened
+    /// missing-json check. A changelog whose def DOES exist is not reported.
+    #[test]
+    fn tiki_doctor_reports_changelog_only_ghost_release() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-doctor-ghost-{}", nanos));
+        let releases = tiki.join("releases");
+        let archive = releases.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        // Ghost: changelog only, absent from history, no def anywhere.
+        std::fs::write(releases.join("v0.7.4-changelog.md"), "# v0.7.4\nghost").unwrap();
+        // Healthy: changelog + archived def.
+        std::fs::write(releases.join("v0.7.5-changelog.md"), "# v0.7.5\nfine").unwrap();
+        std::fs::write(
+            archive.join("v0.7.5.json"),
+            serde_json::json!({
+                "version": "v0.7.5", "status": "shipped", "issues": [],
+                "createdAt": "2026-01-01T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        // History deliberately does NOT mention v0.7.4 — that's what made it
+        // invisible to the original history-only check.
+        std::fs::write(
+            tiki.join("state.json"),
+            serde_json::json!({ "schemaVersion": 1, "activeWork": {}, "history": {} }).to_string(),
+        )
+        .unwrap();
+
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert!(
+            report.recent_releases_missing_json.contains(&"v0.7.4".to_string()),
+            "a changelog-only ghost must be reported, got {:?}",
+            report.recent_releases_missing_json
+        );
+        assert!(
+            !report.recent_releases_missing_json.contains(&"v0.7.5".to_string()),
+            "a changelog whose def exists must not be reported"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301: fixture for the stale-active-plan checks. Four ACTIVE-location plans:
+    ///  - issue-50: finished (in history.recentIssues), not live → FLAGGED
+    ///  - issue-60: in activeWork as a live issue entry (executing) → excluded
+    ///  - issue-70: child of the executing release in activeWork (also finished
+    ///    per history.recentReleases issues — the release-mid-flight case) → excluded
+    ///  - issue-80: not in history at all → excluded (no local evidence it finished)
+    ///
+    /// Plus plans/archive/issue-90.json to prove archive/ is never scanned.
+    fn temp_tiki_stale_plans_fixture(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-stale-plans-{}-{}", tag, nanos));
+        let plans = tiki.join("plans");
+        let archive = plans.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        let plan = |phase_status: &str| {
+            serde_json::json!({
+                "createdAt": "2026-05-01T00:00:00.000Z",
+                "auditedAt": "2026-05-02T00:00:00.000Z",
+                "phases": [
+                    { "number": 1, "title": "p1", "status": phase_status,
+                      "completedAt": "2026-05-03T00:00:00.000Z" }
+                ]
+            })
+        };
+        std::fs::write(plans.join("issue-50.json"), plan("executing").to_string()).unwrap();
+        std::fs::write(plans.join("issue-60.json"), plan("executing").to_string()).unwrap();
+        std::fs::write(plans.join("issue-70.json"), plan("completed").to_string()).unwrap();
+        std::fs::write(plans.join("issue-80.json"), plan("pending").to_string()).unwrap();
+        std::fs::write(archive.join("issue-90.json"), plan("completed").to_string()).unwrap();
+
+        let state = serde_json::json!({
+            "schemaVersion": 1,
+            "activeWork": {
+                "issue:60": {
+                    "type": "issue",
+                    "issue": { "number": 60, "title": "live work" },
+                    "status": "executing",
+                    "createdAt": "2026-05-01T00:00:00.000Z"
+                },
+                "release:v9.9.9": {
+                    "type": "release",
+                    "release": { "version": "v9.9.9", "issues": [70, 71] },
+                    "status": "executing",
+                    "createdAt": "2026-05-01T00:00:00.000Z"
+                }
+            },
+            "history": {
+                "recentIssues": [
+                    { "number": 50, "completedAt": "2026-05-03T00:00:00.000Z" },
+                    { "number": 90, "completedAt": "2026-05-03T00:00:00.000Z" }
+                ],
+                "recentReleases": [
+                    { "version": "v9.9.8", "issues": [70], "completedAt": "2026-05-03T00:00:00.000Z" }
+                ]
+            }
+        });
+        std::fs::write(tiki.join("state.json"), state.to_string()).unwrap();
+        tiki
+    }
+
+    /// #301 (SC2): `tiki_doctor` flags exactly the active-location plan whose
+    /// issue finished per history — NEVER a plan whose issue is currently in
+    /// activeWork (live issue entry OR a running release's child), never a plan
+    /// with no history evidence, and never anything under plans/archive/.
+    #[test]
+    fn tiki_doctor_flags_stale_active_plans_with_activework_exclusions() {
+        let tiki = temp_tiki_stale_plans_fixture("doctor");
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+
+        assert_eq!(
+            report.stale_active_plans.len(),
+            1,
+            "only issue-50 is stale, got {:?}",
+            report.stale_active_plans
+        );
+        let stale = &report.stale_active_plans[0];
+        assert_eq!(stale.issue, 50);
+        assert_eq!(stale.plan_path, "plans/issue-50.json");
+        assert_eq!(
+            stale.newest_timestamp.as_deref(),
+            Some("2026-05-03T00:00:00.000Z"),
+            "newest timestamp is the phase completedAt"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301 / #259 round-trip discipline: `staleActivePlans` crosses the IPC
+    /// boundary in camelCase with the `{issue, planPath, newestTimestamp}` shape
+    /// the frontend mirrors. If the key is dropped/renamed the panel silently
+    /// reads `undefined`.
+    #[test]
+    fn diagnostics_report_serializes_stale_active_plans_key() {
+        let tiki = temp_tiki_stale_plans_fixture("serialize");
+        let report = tiki_doctor(Some(tiki.to_string_lossy().to_string())).unwrap();
+        let value = serde_json::to_value(&report).expect("DiagnosticsReport must serialize");
+
+        let arr = value
+            .get("staleActivePlans")
+            .expect("staleActivePlans key must be present in the IPC payload")
+            .as_array()
+            .expect("staleActivePlans must serialize as an array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0].get("issue").and_then(|v| v.as_u64()), Some(50));
+        assert_eq!(
+            arr[0].get("planPath").and_then(|v| v.as_str()),
+            Some("plans/issue-50.json")
+        );
+        assert!(
+            arr[0].get("newestTimestamp").and_then(|v| v.as_str()).is_some(),
+            "newestTimestamp must serialize in camelCase"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301 (SC2): `archive_stale_plans` moves exactly the doctor-flagged plan
+    /// into `plans/archive/` with phase statuses normalized (executing →
+    /// completed, mirroring the #300 migration), and leaves the excluded plans
+    /// (live issue, running-release child, not-in-history) untouched in place.
+    #[test]
+    fn archive_stale_plans_moves_only_flagged_and_normalizes_phases() {
+        let tiki = temp_tiki_stale_plans_fixture("fix");
+        let tiki_str = tiki.to_string_lossy().to_string();
+        let plans = tiki.join("plans");
+        let archive = plans.join("archive");
+
+        let moved = archive_stale_plans(Some(tiki_str.clone())).unwrap();
+        assert_eq!(moved, 1, "only issue-50 is stale and gets archived");
+
+        // issue-50: gone from active, present in archive, phases normalized.
+        assert!(!plans.join("issue-50.json").exists(), "stale plan must leave plans/");
+        let archived: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(archive.join("issue-50.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            archived["phases"][0]["status"], "completed",
+            "an executing phase status is normalized to completed on archive"
+        );
+        assert_eq!(
+            archived["createdAt"], "2026-05-01T00:00:00.000Z",
+            "other fields survive the rewrite"
+        );
+
+        // Excluded plans stay in the active location.
+        for n in [60, 70, 80] {
+            assert!(
+                plans.join(format!("issue-{}.json", n)).exists(),
+                "issue-{} must not be archived",
+                n
+            );
+        }
+
+        // Idempotent: a second run finds nothing to move.
+        assert_eq!(archive_stale_plans(Some(tiki_str)).unwrap(), 0);
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301: an archive-destination collision is skipped (never overwrite an
+    /// existing archived copy) and the active copy is left untouched.
+    #[test]
+    fn archive_stale_plans_skips_existing_archive_destination() {
+        let tiki = temp_tiki_stale_plans_fixture("collision");
+        let plans = tiki.join("plans");
+        let archive = plans.join("archive");
+        std::fs::write(archive.join("issue-50.json"), "{\"phases\":[]}").unwrap();
+
+        let moved = archive_stale_plans(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert_eq!(moved, 0, "destination collision must be skipped, not overwritten");
+        assert!(
+            plans.join("issue-50.json").exists(),
+            "the active copy stays when the archive already has the file"
+        );
+        assert_eq!(
+            std::fs::read_to_string(archive.join("issue-50.json")).unwrap(),
+            "{\"phases\":[]}",
+            "the pre-existing archived copy is untouched"
+        );
+
+        std::fs::remove_dir_all(&tiki).ok();
+    }
+
+    /// #301 (SC1): `archive_stale_release_defs` moves the completed-status def
+    /// from active `releases/` into `releases/archive/` rewritten to
+    /// `status:"shipped"` (other fields preserved), leaves the live
+    /// `status:"active"` def untouched, and skips a def whose archive
+    /// destination already exists.
+    #[test]
+    fn archive_stale_release_defs_moves_completed_defs_only() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tiki = std::env::temp_dir().join(format!("tiki-stale-defs-{}", nanos));
+        let releases = tiki.join("releases");
+        let archive = releases.join("archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        // Stale: completed status sitting in the ACTIVE location (the #301 class).
+        std::fs::write(
+            releases.join("v9.9.6.json"),
+            serde_json::json!({
+                "version": "v9.9.6", "status": "completed",
+                "issues": [{ "number": 1, "title": "one" }],
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        // Live: active status — must never be touched.
+        std::fs::write(
+            releases.join("v9.9.9.json"),
+            serde_json::json!({
+                "version": "v9.9.9", "status": "active", "issues": [],
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        // Collision: shipped status in active location BUT archive already has it.
+        std::fs::write(
+            releases.join("v9.9.5.json"),
+            serde_json::json!({
+                "version": "v9.9.5", "status": "shipped", "issues": [],
+                "createdAt": "2026-01-01T00:00:00.000Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(archive.join("v9.9.5.json"), "{\"version\":\"v9.9.5\"}").unwrap();
+
+        let live_before = std::fs::read_to_string(releases.join("v9.9.9.json")).unwrap();
+        let moved =
+            archive_stale_release_defs(Some(tiki.to_string_lossy().to_string())).unwrap();
+        assert_eq!(moved, 1, "only the collision-free stale def moves");
+
+        // The stale def moved and now says shipped, other fields intact.
+        assert!(!releases.join("v9.9.6.json").exists());
+        let archived: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(archive.join("v9.9.6.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(archived["status"], "shipped");
+        assert_eq!(archived["issues"][0]["number"], 1);
+
+        // The live def is byte-identical.
+        assert_eq!(
+            std::fs::read_to_string(releases.join("v9.9.9.json")).unwrap(),
+            live_before,
+            "an active-status def must never be touched"
+        );
+
+        // The collision def stayed active-location; the archived copy is untouched.
+        assert!(releases.join("v9.9.5.json").exists());
+        assert_eq!(
+            std::fs::read_to_string(archive.join("v9.9.5.json")).unwrap(),
+            "{\"version\":\"v9.9.5\"}"
         );
 
         std::fs::remove_dir_all(&tiki).ok();
@@ -2379,9 +3162,9 @@ mod ipc_serialization {
     };
     use crate::state::{
         DiagnosticsReport, IssueContext, IssueRef, Phase, PhaseProgress, PhaseProgressStatus,
-        PhaseStatus, PipelineStep, ReleaseCheck, ReleaseContext, ReleaseRef, TikiPlan, TikiRelease,
-        TikiReleaseIssue, TikiReleaseStatus, TikiState, UnverifiedCriterion, WorkContext,
-        WorkStatus,
+        PhaseStatus, PipelineStep, ReleaseCheck, ReleaseContext, ReleaseRef, StaleActivePlan,
+        TikiPlan, TikiRelease, TikiReleaseIssue, TikiReleaseStatus, TikiState,
+        UnverifiedCriterion, WorkContext, WorkStatus,
     };
     use serde_json::Value;
     use std::collections::HashMap;
@@ -2670,6 +3453,11 @@ mod ipc_serialization {
                 id: "SC1".to_string(),
                 description: "the badge renders correctly".to_string(),
             }],
+            stale_active_plans: vec![StaleActivePlan {
+                issue: 50,
+                plan_path: "plans/issue-50.json".to_string(),
+                newest_timestamp: Some("2026-05-03T00:00:00.000Z".to_string()),
+            }],
         };
         let v = serde_json::to_value(&report).unwrap();
         assert_keys_present(
@@ -2685,6 +3473,7 @@ mod ipc_serialization {
                 "unresolvedScriptPaths",
                 "copyInstallDetected",
                 "unverifiedShippedCriteria",
+                "staleActivePlans",
             ],
         );
         // #[serde(default)] / non-optional: present even at default value.

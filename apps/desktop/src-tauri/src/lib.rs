@@ -70,6 +70,8 @@ pub fn run() {
             commands::check_greenfield_readiness,
             commands::tiki_doctor,
             commands::normalize_archived_releases,
+            commands::archive_stale_release_defs,
+            commands::archive_stale_plans,
             config::read_tiki_config,
             config::save_tiki_config,
             state_transition::state_transition,

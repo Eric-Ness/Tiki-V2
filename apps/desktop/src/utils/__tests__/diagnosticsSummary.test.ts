@@ -19,6 +19,7 @@ function cleanReport(overrides: Partial<DiagnosticsReport> = {}): DiagnosticsRep
     unresolvedScriptPaths: [],
     copyInstallDetected: true,
     unverifiedShippedCriteria: [],
+    staleActivePlans: [],
     ...overrides,
   };
 }
@@ -144,6 +145,66 @@ describe("diagnosticsSummary", () => {
   it("has no pending visual-SC finding when the list is empty (#281)", () => {
     const s = diagnosticsSummary(cleanReport({ unverifiedShippedCriteria: [] }));
     expect(s.findings.some((f) => f.message.includes("await verification"))).toBe(false);
+  });
+
+  it("flags an active-location def with a finished status as warn + Fix action (#301)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        releaseChecks: [
+          { version: "v0.2.15", location: "active", status: "completed", archivedButActive: false },
+          { version: "v1.0.1", location: "active", status: "active", archivedButActive: false },
+        ],
+      })
+    );
+    // Genuine drift — unlike archivedButActive, this DOES flip the status.
+    expect(s.status).toBe("warnings");
+    const warn = s.findings.find((f) => f.action === "archiveStaleReleaseDefs");
+    expect(warn).toBeDefined();
+    expect(warn?.level).toBe("warn");
+    expect(warn?.message).toContain("1");
+    expect(warn?.message).toContain("v0.2.15");
+    // The live active-status def is NOT named in the finding.
+    expect(warn?.message).not.toContain("v1.0.1");
+  });
+
+  it("does not flag archived rows or active-status active-location defs (#301 healthy case)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        releaseChecks: [
+          // Healthy live release.
+          { version: "v1.0.1", location: "active", status: "active", archivedButActive: false },
+          // Archived rows — whatever their status, rule A never fires on them.
+          { version: "v0.9.0", location: "archive", status: "shipped", archivedButActive: false },
+          { version: "v0.8.0", location: "archive", status: "completed", archivedButActive: false },
+        ],
+      })
+    );
+    expect(s.status).toBe("healthy");
+    expect(s.findings.some((f) => f.action === "archiveStaleReleaseDefs")).toBe(false);
+  });
+
+  it("flags staleActivePlans as warn + Fix action listing the issues (#301)", () => {
+    const s = diagnosticsSummary(
+      cleanReport({
+        staleActivePlans: [
+          { issue: 104, planPath: "plans/issue-104.json", newestTimestamp: "2026-01-10T00:00:00Z" },
+          { issue: 107, planPath: "plans/issue-107.json", newestTimestamp: null },
+        ],
+      })
+    );
+    expect(s.status).toBe("warnings");
+    const warn = s.findings.find((f) => f.action === "archiveStalePlans");
+    expect(warn).toBeDefined();
+    expect(warn?.level).toBe("warn");
+    expect(warn?.message).toContain("2");
+    expect(warn?.message).toContain("#104");
+    expect(warn?.message).toContain("#107");
+  });
+
+  it("has no stale-plan finding when staleActivePlans is empty (#301 healthy case)", () => {
+    const s = diagnosticsSummary(cleanReport({ staleActivePlans: [] }));
+    expect(s.status).toBe("healthy");
+    expect(s.findings.some((f) => f.action === "archiveStalePlans")).toBe(false);
   });
 
   it("returns 'warnings' when state.json is invalid", () => {

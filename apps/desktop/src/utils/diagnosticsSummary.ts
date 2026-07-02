@@ -28,6 +28,13 @@
  * criteria left `verified:false` that match the visual/manual heuristic (computed
  * in Rust; the frontend only renders them and adds a neutral `info` checklist
  * finding, never re-deriving visual-ness or flipping the top-level status).
+ *
+ * #301 added two GENUINE-drift rules (both `warn`, both with a Fix action):
+ * a release def still in the active location whose own status says it finished
+ * (`location === "active" && status !== "active"` — the REVERSE of the benign
+ * `archivedButActive` residue), and the mirrored `staleActivePlans` field —
+ * active-location plan files whose issue already finished per history (computed
+ * in Rust with the activeWork exclusions; the frontend only renders them).
  */
 
 /** One release file's consistency check — mirrors Rust `ReleaseCheck`. */
@@ -69,6 +76,15 @@ export interface DiagnosticsReport {
    * pending.
    */
   unverifiedShippedCriteria: { issue: number; id: string; description: string }[];
+  /**
+   * Active-location plan files (`plans/issue-N.json`) whose issue already
+   * finished per `state.json` history, as computed by Rust `tiki_doctor`
+   * (#301). Plans for issues currently in `activeWork` — live issues AND a
+   * running release's children — are already excluded on the Rust side.
+   * ALWAYS present (serde default + non-Option Vec → `[]` when empty), sorted
+   * by issue. Empty = healthy.
+   */
+  staleActivePlans: { issue: number; planPath: string; newestTimestamp: string | null }[];
 }
 
 /** Severity of a single finding row in the panel. */
@@ -80,11 +96,14 @@ export interface Finding {
   /**
    * When set, the panel can render a Fix affordance (button) for this finding.
    * `'normalizeArchivedReleases'` (#276) rewrites stale-"active" archived release
-   * defs to `status:"shipped"` via the `normalize_archived_releases` command. An
-   * actionable finding is still purely cosmetic residue — it does NOT flip the
-   * top-level status to "warnings".
+   * defs to `status:"shipped"` via the `normalize_archived_releases` command —
+   * cosmetic residue, so its finding stays `info`. The two #301 actions fix
+   * GENUINE drift (their findings are `warn`): `'archiveStaleReleaseDefs'` moves
+   * finished-status defs out of the active `releases/` location via
+   * `archive_stale_release_defs`, and `'archiveStalePlans'` moves finished
+   * issues' active plans into `plans/archive/` via `archive_stale_plans`.
    */
-  action?: "normalizeArchivedReleases";
+  action?: "normalizeArchivedReleases" | "archiveStaleReleaseDefs" | "archiveStalePlans";
 }
 
 export interface DiagnosticsSummary {
@@ -109,14 +128,48 @@ export function diagnosticsSummary(report: DiagnosticsReport): DiagnosticsSummar
     passes.push({ level: "pass", message: "state.json is valid" });
   }
 
+  // Widened by #301: the Rust check now also treats `releases/*-changelog.md`
+  // stems as evidence a release shipped, so a changelog-only ghost (the v0.7.4
+  // case — absent from history AND both def locations) lands here too.
   const missing = report.recentReleasesMissingJson;
   if (missing.length > 0) {
     warnings.push({
       level: "warn",
-      message: `${missing.length} release(s) in history have no definition file: ${missing.join(", ")}`,
+      message: `${missing.length} release(s) in history or with a changelog have no definition file: ${missing.join(", ")}`,
     });
   } else {
     passes.push({ level: "pass", message: "All recent releases have a definition file" });
+  }
+
+  // #301: a def still in the ACTIVE releases/ location whose own status says it
+  // finished is genuine drift (the reverse of the benign archivedButActive
+  // residue): the sidebar shows a live release that actually shipped. Fixable —
+  // `archive_stale_release_defs` moves them into archive/.
+  const staleDefs = report.releaseChecks.filter(
+    (c) => c.location === "active" && c.status !== "active"
+  );
+  if (staleDefs.length > 0) {
+    warnings.push({
+      level: "warn",
+      message: `${staleDefs.length} finished release def(s) still in the active releases/ location: ${staleDefs
+        .map((c) => c.version)
+        .join(", ")} — Fix moves them to archive/`,
+      action: "archiveStaleReleaseDefs",
+    });
+  }
+
+  // #301: an active-location plan whose issue already finished per history is
+  // genuine drift (the class #300 found 118 of). Live work is already excluded
+  // on the Rust side — anything here is safe to archive.
+  const stalePlans = report.staleActivePlans;
+  if (stalePlans.length > 0) {
+    warnings.push({
+      level: "warn",
+      message: `${stalePlans.length} stale active plan(s) for finished issue(s): ${stalePlans
+        .map((p) => `#${p.issue}`)
+        .join(", ")} — Fix archives them`,
+      action: "archiveStalePlans",
+    });
   }
 
   const unresolved = report.unresolvedScriptPaths;

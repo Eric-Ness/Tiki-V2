@@ -673,6 +673,32 @@ pub struct DiagnosticsReport {
     /// nothing pending. Sorted by (issue, id). (#281)
     #[serde(default)]
     pub unverified_shipped_criteria: Vec<UnverifiedCriterion>,
+    /// Active-location plan files (`plans/issue-N.json`, NOT `plans/archive/`)
+    /// whose issue already finished — it appears in `history.recentIssues`,
+    /// `history.lastCompletedIssue`, or a `history.recentReleases[].issues`
+    /// list — while NOT being live work (any issue currently in `activeWork`,
+    /// including a running release's children, is excluded). These are the
+    /// stale plans the #300 deep dive found 118 of; the doctor surfaces them so
+    /// the class cannot silently re-accumulate (#301). Sorted by issue. Empty =
+    /// healthy.
+    #[serde(default)]
+    pub stale_active_plans: Vec<StaleActivePlan>,
+}
+
+/// One active-location plan file whose issue already finished (#301) — surfaced
+/// in the Diagnostics panel with a Fix that archives the plan via the
+/// `archive_stale_plans` command (mirroring #300's migration move semantics).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StaleActivePlan {
+    /// Issue number parsed from the plan's filename (`issue-N.json`).
+    pub issue: u32,
+    /// Tiki-relative forward-slash path, e.g. `plans/issue-42.json`.
+    pub plan_path: String,
+    /// Newest parseable ISO timestamp found in the plan (`auditedAt`,
+    /// `createdAt`, `phases[].completedAt/startedAt`), or `None` if the plan
+    /// carries no timestamps. Informational — helps judge how stale it is.
+    pub newest_timestamp: Option<String>,
 }
 
 /// One archived-plan success criterion left `verified:false` that matches the
